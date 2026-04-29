@@ -1,6 +1,7 @@
 # Node
 frontend/node_modules/
 frontend/.next/
+frontend/tsconfig.tsbuildinfo
 
 # Python
 backend/.venv/
@@ -24,3 +25,6 @@ infra/environments/prod/backend.hcl
 # OS
 .DS_Store
 Thumbs.db
+
+#Implementation idea
+README1.md

@@ -24,10 +24,11 @@ toggles. Treat each surface as having its own UX language.
 - **Frontend**: Next.js 15 (App Router), React 19, TypeScript, inline styles
 - **Local dev**: Docker Compose (`db`, `backend`, `frontend`)
 - **Auth**: Clerk (see `docs/decisions/adr-004-auth-provider-clerk.md`) —
-  backend verifies Clerk JWTs; frontend will integrate `@clerk/nextjs`
+  `@clerk/nextjs` integrated on the frontend, backend verifies Clerk JWTs
+  via JWKS, frontend forwards the JWT on every API call
 - **Infra**: Terraform scaffold for AWS (VPC, RDS, EC2 app-runtime, S3+CloudFront,
-  SES, Secrets Manager — Clerk keys stored as secrets) — **not deployed yet,
-  do not deploy**
+  SES, Secrets Manager — Clerk keys + issuer URL + JWKS URL stored as
+  secrets) — **not deployed yet, do not deploy**
 
 ## Repository layout
 
@@ -48,19 +49,26 @@ backend/              FastAPI service
   migrations/         Alembic — single initial migration
 frontend/
   src/
+    middleware.ts             clerkMiddleware (active when Clerk key set)
     app/
-      layout.tsx              root: RoleProvider + dev RoleSwitcher
+      layout.tsx              root: ClerkProvider (conditional) + RoleProvider
       page.tsx                root redirector by role
+      sign-in/[[...]]/        Clerk catch-all sign-in route
+      sign-up/[[...]]/        Clerk catch-all sign-up route
       admin/*                 org admin surface (dashboard / tables)
       worker/*                worker surface (mobile-first, card-based)
       apf/*                   APF oversight surface (dark, read-only)
     components/        admin-navigation, role-switcher, worker-availability-control,
                        request-create-form, request-workflow-card, panels, etc.
     lib/
-      api.ts           server-side fetch helpers (Docker-internal URL)
-      browser-api.ts   client-side fetch helpers (NEXT_PUBLIC_API_BASE_URL)
-      role-context.tsx RoleProvider, useRole, ROLE_HOME map
-      worker-session.tsx active-worker context for the worker surface
+      api.ts           server-side fetch helpers (Docker-internal URL,
+                       attaches Clerk JWT via auth() when configured)
+      browser-api.ts   client-side fetch helpers (NEXT_PUBLIC_API_BASE_URL,
+                       attaches Clerk JWT via window.Clerk.session.getToken)
+      role-context.tsx RoleProvider with Clerk + Dev variants, useRole,
+                       ROLE_HOME map
+      worker-session.tsx active-worker context with Clerk + Dev variants
+                         (Clerk variant matches by clerk_user_id)
       types.ts         shared TS types
 infra/                Terraform modules + dev/prod environments (idle)
 docs/
@@ -86,33 +94,53 @@ nav, and visual language**:
 
 ### Auth wiring (Clerk, conditional)
 
-The frontend integrates `@clerk/nextjs` and is **conditionally wired** based on
-whether `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is set:
+The frontend integrates `@clerk/nextjs` end-to-end and is **conditionally
+activated** based on whether `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is set:
 
-- **Key present** → `ClerkProvider` wraps the app, `clerkMiddleware` protects
-  every route except `/sign-in/*` and `/sign-up/*`. Sign-in / sign-up live at
-  `/sign-in/[[...sign-in]]/page.tsx` and `/sign-up/[[...sign-up]]/page.tsx`
-  using Clerk's catch-all components.
-- **Key absent** → middleware passes through, no `ClerkProvider`, dev role
-  switcher + worker picker remain the only auth shim. This keeps the local
-  stack working until a Clerk dev instance is set up.
+- **Key present** →
+  - `ClerkProvider` wraps the app
+  - `clerkMiddleware` (in `src/middleware.ts`) protects every route except
+    `/sign-in/*` and `/sign-up/*`
+  - `RoleProvider` reads role from `useUser().publicMetadata.role`
+    (with the dev role-switcher available as a preview override)
+  - `WorkerSessionProvider` auto-picks the worker whose `clerk_user_id`
+    equals the signed-in `useUser().user.id`; manual override still wins
+  - `lib/api.ts` and `lib/browser-api.ts` attach
+    `Authorization: Bearer <Clerk JWT>` to every request
+  - Backend (`auth/clerk.py`) verifies the JWT signature against the
+    Clerk JWKS (cached for 1h) and enforces the issuer claim
+- **Key absent** → middleware passes through, no `ClerkProvider`, the dev
+  role switcher + worker picker run as the only auth shim, no
+  `Authorization` header is sent. This keeps the local stack working
+  before any Clerk dev instance is set up.
+
+The conditional pattern is uniform: `RoleProvider` and
+`WorkerSessionProvider` each ship with a `Clerk*` variant and a `Dev*`
+variant. The export picks one based on the env var, so `useRole()` and
+`useWorkerSession()` look the same regardless.
 
 To turn on Clerk locally:
-1. Create a Clerk app, copy the publishable + secret keys.
+1. Create a Clerk app, copy the publishable + secret keys, and grab
+   `Frontend API` (issuer) and `JWKS Endpoint` from the Clerk dashboard.
 2. Add to `frontend/.env.local`:
    ```
    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
    CLERK_SECRET_KEY=sk_test_...
    ```
-3. Recreate the frontend container so the new package + env vars take effect:
+3. Add to `backend/.env`:
+   ```
+   CLERK_ISSUER_URL=https://your-instance.clerk.accounts.dev
+   CLERK_JWKS_URL=https://your-instance.clerk.accounts.dev/.well-known/jwks.json
+   ```
+4. Recreate the frontend container so the new package + env vars take effect:
    ```
    docker compose down
    docker volume rm staffig-platform_frontend_node_modules
    docker compose up --build
    ```
-4. Visit `/sign-in` to authenticate.
+5. Visit `/sign-in` to authenticate.
 
-### Dev role + worker selection
+### Dev role + worker selection (always available)
 
 A floating **role-switcher** pill (bottom-right) writes
 `localStorage["apf.devRole"]` and navigates to the matching surface. The root
@@ -122,10 +150,10 @@ The worker surface additionally uses a **WorkerSession** context. On first
 visit to `/worker/*`, users pick which worker they are previewing as
 (`localStorage["apf.workerId"]`). Sign-out from the profile page clears it.
 
-These dev shims still run even when Clerk is enabled — they let you preview
-each surface without juggling multiple Clerk users. They will be retired once
-roles are read from Clerk's `publicMetadata.role` and the active worker is
-matched by `clerk_user_id`.
+These dev shims still run even when Clerk is enabled — they act as
+preview overrides on top of the real Clerk session, useful for jumping
+between roles or impersonating a specific worker without juggling multiple
+Clerk users.
 
 ### Two API helpers
 
@@ -175,40 +203,41 @@ frontend ergonomics, but the underlying storage stays normalized.
 Since there is no production data yet, schema corrections happen by editing the
 initial migration directly — do not stack compatibility migrations.
 
-## What's working end-to-end (per `.codex`, last update 2026-04-25)
+## What's working end-to-end
 
 - Docker Compose stack boots; backend, frontend, DB all healthy
 - `make migrate && make seed` populates a working dataset
 - Full admin lifecycle: create → publish → notify → accept/decline → assign
 - Frontend reads live data from FastAPI for all three surfaces
-- `pytest` and `next build` both pass
+- Three role-scoped surfaces with distinct shells: `/admin/*`, `/worker/*`,
+  `/apf/*`, with a role-aware redirect at `/`
+- Clerk integration (when keys are configured): sign-in, sign-up,
+  middleware-protected routes, JWT forwarded server-side and client-side,
+  signature-verified backend JWKS check, role read from
+  `publicMetadata.role`, worker matched by `clerk_user_id`
+- `pytest` (3/3) and `next build` / `tsc --noEmit` pass
 
 ## Known gaps (be aware of these before suggesting fixes)
 
-1. **Auth is not production-safe.** `auth/clerk.py` reads claims via
-   `jwt.get_unverified_claims()` — no JWKS signature verification yet.
-   Treat anything except endpoint shape as untrusted until that's wired.
-2. **No frontend → backend authorization.** Neither `lib/api.ts` nor
-   `lib/browser-api.ts` sends an `Authorization` header. The dev role/worker
-   selection is purely client-side make-believe.
-3. **`require_role()` exists but is unused.** No route enforces RBAC yet.
-4. **All 6 GitHub workflows are placeholder echos.** No CI runs anything real.
-5. **Clerk integration is wired but workers are not auto-linked.**
-   `ClerkProvider` + middleware + sign-in/sign-up routes are live (conditional
-   on `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`). `lib/api.ts` and
-   `lib/browser-api.ts` forward the Clerk JWT as `Authorization: Bearer …`.
-   Backend verifies the JWT against the Clerk JWKS (cached 1h) and enforces
-   the issuer when configured. `RoleProvider` reads role from
-   `publicMetadata.role`. `WorkerSession` matches the active worker by
-   `clerk_user_id`. **What's still pending**: a flow to populate
-   `users.clerk_user_id` for existing seeded workers — until then a Clerk
-   user signing in for the first time will fall through to the worker
-   picker. JIT user provisioning + a "link my account" endpoint are TBD.
-6. **Email/SMS are stubs.** `notifications/email_service.py` etc. exist but
+1. **No `clerk_user_id` linking flow yet.** Clerk auth works end-to-end
+   (signature-verified JWT, role from `publicMetadata`, worker matched by
+   `clerk_user_id`), but seeded workers in the DB have a NULL
+   `clerk_user_id`. Until that column is populated for a given Clerk user,
+   they sign in successfully but the worker session falls through to the
+   manual picker. A "link my account" endpoint or JIT provisioning needs
+   to be built.
+2. **`require_role()` exists but is unused.** No route enforces RBAC yet.
+   Roles flow into `CurrentUserModel` but no endpoint checks them.
+3. **Email/SMS are stubs.** `notifications/email_service.py` etc. exist but
    are not wired to SES or any provider.
-7. **Tests are smoke-only.** No coverage for publish/respond/assign flows.
-8. **`request-create-form.tsx` accepts any `org_id`** without checking the
+4. **All 6 GitHub workflows are placeholder echos.** No CI runs anything real.
+5. **Tests are smoke-only.** No coverage for publish/respond/assign flows.
+6. **`request-create-form.tsx` accepts any `org_id`** without checking the
    current user's membership.
+7. **Backend JWT verification falls back to unverified claims** when
+   `CLERK_JWKS_URL` is empty (i.e. local dev without a Clerk dev instance).
+   That fallback exists by design, but make sure prod always has the JWKS
+   URL set so `_decode_verified()` is taken.
 
 ## Working agreements
 
@@ -256,3 +285,12 @@ docker compose exec frontend npx tsc --noEmit
   via `lib/api.ts`, add to `AdminNavigation` if top-level.
 - **Touching matching logic** → update `services/matching_service.py` and add a
   test (this is the part most worth covering).
+- **Auth changes** → if you add a new role claim, surface it on both
+  `auth/clerk.py` (claim extraction) and `lib/role-context.tsx`
+  (`isRole()` guard). If you add a Clerk-derived field, add it to
+  `users.clerk_user_id`-style columns rather than relying on JWT claims at
+  query time.
+- **Touching env config** → keep `backend/.env.example`, the root
+  `.env.example`, `frontend/.env.local.example`, and the Terraform
+  `terraform.tfvars` + `secrets-manager` module in sync. Drift across
+  these is the most common source of subtle breakage.
