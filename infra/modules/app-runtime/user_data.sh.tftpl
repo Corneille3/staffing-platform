@@ -1,0 +1,32 @@
+#!/bin/bash
+set -euxo pipefail
+
+dnf update -y
+dnf install -y docker
+systemctl enable docker
+systemctl start docker
+usermod -aG docker ec2-user
+
+cat >/etc/systemd/system/apf-app.service <<EOF
+[Unit]
+Description=APF Staffing Platform App
+After=docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+ExecStartPre=-/usr/bin/docker rm -f apf-app
+ExecStart=/usr/bin/docker run --name apf-app \
+  -p ${app_port}:${app_port} \
+  -e APP_ENV_SECRET_NAME=${app_env_secret} \
+  -e AWS_REGION=${aws_region} \
+  ${app_image}
+ExecStop=/usr/bin/docker stop apf-app
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable apf-app
+systemctl start apf-app

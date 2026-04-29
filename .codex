@@ -1,0 +1,72 @@
+# Project Evolution
+
+## Current State
+
+The project is a local-first APF bilingual staffing MVP with:
+
+- FastAPI backend
+- Next.js frontend
+- PostgreSQL database
+- Docker Compose local stack
+- Terraform scaffold present, but not active for deployment
+
+## Product Goal
+
+Build a substitute dispatch workflow:
+
+1. Organization admin creates a staffing request.
+2. System identifies eligible workers.
+3. Request is published.
+4. Workers accept or decline.
+5. Organization admin confirms assignment.
+6. Audit and reporting data are recorded.
+
+## Timeline
+
+### 2026-04-25
+
+- Local stack confirmed working end to end.
+- Backend running through Docker Compose.
+- Database migrated and seeded.
+- Frontend reads live backend data.
+- Request workflow tested through publish, accept, and assign.
+- Added dedicated frontend pages:
+  - `/requests`
+  - `/workers`
+  - `/organizations`
+- Added request creation UI.
+- Added frontend actions for:
+  - create request
+  - publish request
+  - cancel request
+  - worker accept/decline
+  - confirm assignment
+  - worker availability updates
+- Confirmed:
+  - `docker compose exec frontend npm run build`
+  - `docker compose exec backend pytest`
+
+## Current Local UI
+
+- `/` dashboard summary
+- `/requests` request creation and lifecycle workflow
+- `/workers` worker roster and availability controls
+- `/organizations` active organization directory
+
+## Known Gaps
+
+- Auth is not production-safe yet.
+- APIs are not consistently protected by RBAC.
+- Cognito direction exists in backend naming, but token verification needs hardening.
+- UI is functional but still feels like an admin test console.
+- Request detail experience should become a modal or detail page.
+- No AWS deployment should happen yet.
+- Terraform exists but is not the current priority.
+
+## Next Priorities
+
+1. Improve request workflow UX with detail views or modals.
+2. Add stronger frontend states: loading, empty, success, and error.
+3. Harden auth/RBAC after local workflow stabilizes.
+4. Expand backend tests around publish/respond/assign.
+5. Clean generated artifacts and project docs.
