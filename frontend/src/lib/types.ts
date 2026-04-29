@@ -26,6 +26,7 @@ export type WorkerProfile = {
 
 export type Worker = {
   id: string;
+  clerk_user_id: string | null;
   first_name: string;
   last_name: string;
   email: string;

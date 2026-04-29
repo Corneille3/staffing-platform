@@ -9,9 +9,22 @@ import {
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+type ClerkLike = { session?: { getToken: () => Promise<string | null> } };
+
+async function authHeaders(): Promise<Record<string, string>> {
+  if (!CLERK_ENABLED || typeof window === "undefined") return {};
+  const clerk = (window as unknown as { Clerk?: ClerkLike }).Clerk;
+  const token = await clerk?.session?.getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${BASE}${path}`, { cache: "no-store" });
+  const response = await fetch(`${BASE}${path}`, {
+    cache: "no-store",
+    headers: await authHeaders(),
+  });
   if (!response.ok) throw new Error(`GET ${path} failed (${response.status})`);
   return response.json();
 }
@@ -19,7 +32,7 @@ async function getJson<T>(path: string): Promise<T> {
 async function postJson<T>(path: string, body?: object): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!response.ok) {
@@ -32,7 +45,7 @@ async function postJson<T>(path: string, body?: object): Promise<T> {
 async function patchJson<T>(path: string, body: object): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify(body),
   });
   if (!response.ok) {

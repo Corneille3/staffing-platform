@@ -193,12 +193,17 @@ initial migration directly — do not stack compatibility migrations.
    selection is purely client-side make-believe.
 3. **`require_role()` exists but is unused.** No route enforces RBAC yet.
 4. **All 6 GitHub workflows are placeholder echos.** No CI runs anything real.
-5. **Clerk integration is partial.** `@clerk/nextjs` is installed and
-   `ClerkProvider` + middleware + sign-in/sign-up routes exist (conditionally
-   on `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`). Still pending: forwarding Clerk
-   JWTs in `lib/api.ts` / `lib/browser-api.ts`, JWKS-based signature
-   verification on the backend, reading roles from `publicMetadata.role`,
-   and matching the active worker by `clerk_user_id`.
+5. **Clerk integration is wired but workers are not auto-linked.**
+   `ClerkProvider` + middleware + sign-in/sign-up routes are live (conditional
+   on `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`). `lib/api.ts` and
+   `lib/browser-api.ts` forward the Clerk JWT as `Authorization: Bearer …`.
+   Backend verifies the JWT against the Clerk JWKS (cached 1h) and enforces
+   the issuer when configured. `RoleProvider` reads role from
+   `publicMetadata.role`. `WorkerSession` matches the active worker by
+   `clerk_user_id`. **What's still pending**: a flow to populate
+   `users.clerk_user_id` for existing seeded workers — until then a Clerk
+   user signing in for the first time will fall through to the worker
+   picker. JIT user provisioning + a "link my account" endpoint are TBD.
 6. **Email/SMS are stubs.** `notifications/email_service.py` etc. exist but
    are not wired to SES or any provider.
 7. **Tests are smoke-only.** No coverage for publish/respond/assign flows.

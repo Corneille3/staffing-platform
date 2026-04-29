@@ -1,10 +1,12 @@
 "use client";
 
+import { useUser } from "@clerk/nextjs";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { fetchWorkers } from "./browser-api";
 import { Worker } from "./types";
 
 const STORAGE_KEY = "apf.workerId";
+const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 type WorkerSessionValue = {
   worker: Worker | null;
@@ -17,9 +19,18 @@ type WorkerSessionValue = {
 
 const WorkerSessionContext = createContext<WorkerSessionValue | null>(null);
 
-export function WorkerSessionProvider({ children }: { children: ReactNode }) {
+type SharedState = {
+  workers: Worker[];
+  override: string | null;
+  loading: boolean;
+  error: string | null;
+  selectWorker: (id: string) => void;
+  refresh: () => Promise<void>;
+};
+
+function useSharedState(): SharedState {
   const [workers, setWorkers] = useState<Worker[]>([]);
-  const [workerId, setWorkerId] = useState<string | null>(null);
+  const [override, setOverride] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,23 +49,56 @@ export function WorkerSessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored) setWorkerId(stored);
+    if (stored) setOverride(stored);
     load();
   }, []);
 
   function selectWorker(id: string) {
-    setWorkerId(id);
+    setOverride(id);
     window.localStorage.setItem(STORAGE_KEY, id);
   }
 
-  const worker = workers.find((w) => w.id === workerId) || null;
+  return { workers, override, loading, error, selectWorker, refresh: load };
+}
+
+function DevWorkerSessionProvider({ children }: { children: ReactNode }) {
+  const { workers, override, loading, error, selectWorker, refresh } = useSharedState();
+  const worker = override ? workers.find((w) => w.id === override) || null : null;
 
   return (
     <WorkerSessionContext.Provider
-      value={{ worker, workers, loading, error, selectWorker, refresh: load }}
+      value={{ worker, workers, loading, error, selectWorker, refresh }}
     >
       {children}
     </WorkerSessionContext.Provider>
+  );
+}
+
+function ClerkWorkerSessionProvider({ children }: { children: ReactNode }) {
+  const { user } = useUser();
+  const { workers, override, loading, error, selectWorker, refresh } = useSharedState();
+
+  const matchedByClerk = user ? workers.find((w) => w.clerk_user_id === user.id) || null : null;
+  const overrideWorker = override ? workers.find((w) => w.id === override) || null : null;
+
+  // Prefer explicit override (so the dev picker can still preview another
+  // worker), then the Clerk-linked worker, then nothing.
+  const worker = overrideWorker ?? matchedByClerk;
+
+  return (
+    <WorkerSessionContext.Provider
+      value={{ worker, workers, loading, error, selectWorker, refresh }}
+    >
+      {children}
+    </WorkerSessionContext.Provider>
+  );
+}
+
+export function WorkerSessionProvider({ children }: { children: ReactNode }) {
+  return CLERK_ENABLED ? (
+    <ClerkWorkerSessionProvider>{children}</ClerkWorkerSessionProvider>
+  ) : (
+    <DevWorkerSessionProvider>{children}</DevWorkerSessionProvider>
   );
 }
 

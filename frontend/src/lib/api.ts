@@ -1,3 +1,4 @@
+import { auth } from "@clerk/nextjs/server";
 import {
   Assignment,
   NetworkSummary,
@@ -13,9 +14,23 @@ const apiBaseUrl =
   process.env.INTERNAL_API_BASE_URL ||
   "http://backend:8000";
 
+const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+async function authHeaders(): Promise<Record<string, string>> {
+  if (!CLERK_ENABLED) return {};
+  try {
+    const session = await auth();
+    const token = await session.getToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}
+
 async function fetchJson<T>(path: string): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, {
     cache: "no-store",
+    headers: await authHeaders(),
   });
 
   if (!response.ok) {
