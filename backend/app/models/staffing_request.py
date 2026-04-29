@@ -2,11 +2,10 @@ from datetime import date, datetime, time
 from uuid import UUID
 
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, Time, func
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.enums import RequestStatus, RequestType, db_enum
+from app.models.enums import RequestRequirementType, RequestStatus, RequestType, db_enum
 
 
 class StaffingRequest(Base):
@@ -30,8 +29,6 @@ class StaffingRequest(Base):
     end_time: Mapped[time] = mapped_column(Time)
     urgency_level: Mapped[int] = mapped_column(Integer, default=1, server_default='1')
     language_requirement: Mapped[str | None] = mapped_column(String(20), default='fr', server_default='fr')
-    required_qualifications: Mapped[list] = mapped_column(JSONB, default=list, server_default='[]')
-    required_certifications: Mapped[list] = mapped_column(JSONB, default=list, server_default='[]')
     assigned_worker_user_id: Mapped[UUID | None] = mapped_column(ForeignKey('users.id', ondelete='SET NULL'))
     assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -43,3 +40,20 @@ class StaffingRequest(Base):
     notifications = relationship('RequestNotification', back_populates='staffing_request')
     responses = relationship('RequestResponse', back_populates='staffing_request')
     assignment = relationship('Assignment', back_populates='staffing_request', uselist=False)
+    requirements = relationship('RequestRequirement', back_populates='staffing_request', cascade='all, delete-orphan')
+
+    @property
+    def required_qualifications(self) -> list[str]:
+        return [
+            requirement.requirement_code
+            for requirement in self.requirements
+            if requirement.requirement_type == RequestRequirementType.QUALIFICATION
+        ]
+
+    @property
+    def required_certifications(self) -> list[str]:
+        return [
+            requirement.requirement_code
+            for requirement in self.requirements
+            if requirement.requirement_type == RequestRequirementType.CERTIFICATION
+        ]

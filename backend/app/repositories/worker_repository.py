@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.user import User
 from app.models.enums import UserRole
@@ -16,7 +16,11 @@ class WorkerRepository:
         stmt = (
             select(User)
             .where(User.role == UserRole.WORKER)
-            .options(joinedload(User.worker_profile))
+            .options(
+                selectinload(User.worker_profile).selectinload(WorkerProfile.region_records),
+                selectinload(User.worker_profile).selectinload(WorkerProfile.qualification_records),
+                selectinload(User.worker_profile).selectinload(WorkerProfile.certification_records),
+            )
             .order_by(User.first_name, User.last_name)
         )
         return list(self.db.scalars(stmt).unique().all())
@@ -25,7 +29,11 @@ class WorkerRepository:
         stmt = (
             select(User)
             .where(User.id == user_id, User.role == UserRole.WORKER)
-            .options(joinedload(User.worker_profile))
+            .options(
+                selectinload(User.worker_profile).selectinload(WorkerProfile.region_records),
+                selectinload(User.worker_profile).selectinload(WorkerProfile.qualification_records),
+                selectinload(User.worker_profile).selectinload(WorkerProfile.certification_records),
+            )
         )
         return self.db.scalar(stmt)
 

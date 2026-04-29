@@ -5,7 +5,9 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.enums import NotificationChannel, RequestStatus, ResponseStatus
+from app.models.enums import RequestRequirementType
 from app.models.request_notification import RequestNotification
+from app.models.request_requirement import RequestRequirement
 from app.models.request_response import RequestResponse
 from app.models.staffing_request import StaffingRequest
 from app.repositories.response_repository import ResponseRepository
@@ -46,9 +48,27 @@ class StaffingRequestService:
             end_time=payload.end_time,
             urgency_level=payload.urgency_level,
             language_requirement=payload.language_requirement,
-            required_qualifications=list(payload.required_qualifications),
-            required_certifications=list(payload.required_certifications),
         )
+        staffing_request.requirements = [
+            *[
+                RequestRequirement(
+                    id=uuid4(),
+                    requirement_type=RequestRequirementType.QUALIFICATION,
+                    requirement_code=self._requirement_code(item),
+                    requirement_label=self._requirement_label(item),
+                )
+                for item in payload.required_qualifications
+            ],
+            *[
+                RequestRequirement(
+                    id=uuid4(),
+                    requirement_type=RequestRequirementType.CERTIFICATION,
+                    requirement_code=self._requirement_code(item),
+                    requirement_label=self._requirement_label(item),
+                )
+                for item in payload.required_certifications
+            ],
+        ]
         created = self.repository.create(staffing_request)
         self.audit_service.log(
             action='staffing_request.created',
@@ -104,6 +124,19 @@ class StaffingRequestService:
         self.db.commit()
         self.db.refresh(staffing_request)
         return staffing_request
+
+    @staticmethod
+    def _requirement_code(item: dict | str) -> str:
+        if isinstance(item, dict):
+            return str(item.get('code') or item.get('value') or item.get('label') or '').strip()
+        return str(item).strip()
+
+    @staticmethod
+    def _requirement_label(item: dict | str) -> str | None:
+        if isinstance(item, dict):
+            value = item.get('label')
+            return str(value).strip() if value else None
+        return None
 
     def cancel(self, request_id: UUID) -> StaffingRequest:
         staffing_request = self._get_required(request_id)

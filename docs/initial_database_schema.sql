@@ -11,6 +11,7 @@ CREATE TYPE response_status AS ENUM ('notified', 'viewed', 'accepted', 'declined
 CREATE TYPE assignment_status AS ENUM ('pending_confirmation', 'confirmed', 'cancelled', 'completed');
 CREATE TYPE availability_status AS ENUM ('available', 'unavailable');
 CREATE TYPE notification_channel AS ENUM ('email', 'in_app', 'sms');
+CREATE TYPE request_requirement_type AS ENUM ('qualification', 'certification');
 
 -- Tables
 
@@ -61,12 +62,38 @@ CREATE TABLE worker_profiles (
     availability_status availability_status NOT NULL DEFAULT 'available',
     urgent_alert_opt_in BOOLEAN NOT NULL DEFAULT TRUE,
     travel_radius_km INTEGER,
-    qualifications JSONB NOT NULL DEFAULT '[]'::jsonb,
-    certifications JSONB NOT NULL DEFAULT '[]'::jsonb,
-    supported_cities JSONB NOT NULL DEFAULT '[]'::jsonb,
     notes TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE worker_regions (
+    id UUID PRIMARY KEY,
+    worker_profile_id UUID NOT NULL REFERENCES worker_profiles(id) ON DELETE CASCADE,
+    city VARCHAR(100) NOT NULL,
+    region VARCHAR(100),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (worker_profile_id, city, region)
+);
+
+CREATE TABLE worker_qualifications (
+    id UUID PRIMARY KEY,
+    worker_profile_id UUID NOT NULL REFERENCES worker_profiles(id) ON DELETE CASCADE,
+    qualification_code VARCHAR(100) NOT NULL,
+    qualification_label VARCHAR(255),
+    expires_at DATE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (worker_profile_id, qualification_code)
+);
+
+CREATE TABLE worker_certifications (
+    id UUID PRIMARY KEY,
+    worker_profile_id UUID NOT NULL REFERENCES worker_profiles(id) ON DELETE CASCADE,
+    certification_code VARCHAR(100) NOT NULL,
+    certification_label VARCHAR(255),
+    expires_at DATE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (worker_profile_id, certification_code)
 );
 
 CREATE TABLE staffing_requests (
@@ -84,14 +111,23 @@ CREATE TABLE staffing_requests (
     end_time TIME NOT NULL,
     urgency_level INTEGER NOT NULL DEFAULT 1,
     language_requirement VARCHAR(20) DEFAULT 'fr',
-    required_qualifications JSONB NOT NULL DEFAULT '[]'::jsonb,
-    required_certifications JSONB NOT NULL DEFAULT '[]'::jsonb,
     assigned_worker_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     assigned_at TIMESTAMPTZ,
     cancelled_at TIMESTAMPTZ,
     completed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE request_requirements (
+    id UUID PRIMARY KEY,
+    staffing_request_id UUID NOT NULL REFERENCES staffing_requests(id) ON DELETE CASCADE,
+    requirement_type request_requirement_type NOT NULL,
+    requirement_code VARCHAR(100) NOT NULL,
+    requirement_label VARCHAR(255),
+    is_required BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (staffing_request_id, requirement_type, requirement_code)
 );
 
 CREATE TABLE request_notifications (
@@ -146,21 +182,28 @@ CREATE TABLE audit_logs (
 -- 3. users
 -- 4. organization_memberships
 -- 5. worker_profiles
--- 6. staffing_requests
--- 7. request_notifications
--- 8. request_responses
--- 9. assignments
--- 10. audit_logs
--- 11. indexes
+-- 6. worker_regions / worker_qualifications / worker_certifications
+-- 7. staffing_requests
+-- 8. request_requirements
+-- 9. request_notifications
+-- 10. request_responses
+-- 11. assignments
+-- 12. audit_logs
+-- 13. indexes
 
 -- Early indexes
 
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_org_memberships_org_id ON organization_memberships(organization_id);
 CREATE INDEX idx_worker_profiles_availability ON worker_profiles(availability_status);
+CREATE INDEX idx_worker_regions_city_region ON worker_regions(city, region);
+CREATE INDEX idx_worker_qualifications_code ON worker_qualifications(qualification_code);
+CREATE INDEX idx_worker_certifications_code ON worker_certifications(certification_code);
 CREATE INDEX idx_staffing_requests_org_id ON staffing_requests(organization_id);
 CREATE INDEX idx_staffing_requests_status ON staffing_requests(status);
 CREATE INDEX idx_staffing_requests_work_date ON staffing_requests(work_date);
+CREATE INDEX idx_request_requirements_request_id ON request_requirements(staffing_request_id);
+CREATE INDEX idx_request_requirements_type_code ON request_requirements(requirement_type, requirement_code);
 CREATE INDEX idx_request_responses_request_id ON request_responses(staffing_request_id);
 CREATE INDEX idx_request_notifications_request_id ON request_notifications(staffing_request_id);
 CREATE INDEX idx_audit_logs_org_created_at ON audit_logs(organization_id, created_at DESC);

@@ -59,5 +59,10 @@ class NotificationChannel(str, Enum):
     SMS = 'sms'
 
 
+class RequestRequirementType(str, Enum):
+    QUALIFICATION = 'qualification'
+    CERTIFICATION = 'certification'
+
+
 def db_enum(enum_cls: type[Enum], name: str) -> SAEnum:
     return SAEnum(enum_cls, name=name, values_callable=lambda members: [member.value for member in members])

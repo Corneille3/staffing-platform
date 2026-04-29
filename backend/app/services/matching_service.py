@@ -16,13 +16,14 @@ class MatchingService:
 
             required_qualifications = staffing_request.required_qualifications or []
             worker_qualifications = profile.qualifications or []
-            worker_qualification_values = {
-                item.get('code', item) if isinstance(item, dict) else item for item in worker_qualifications
-            }
-            if any(
-                (item.get('code', item) if isinstance(item, dict) else item) not in worker_qualification_values
-                for item in required_qualifications
-            ):
+            worker_qualification_values = {self._code(item) for item in worker_qualifications}
+            if any(self._code(item) not in worker_qualification_values for item in required_qualifications):
+                continue
+
+            required_certifications = staffing_request.required_certifications or []
+            worker_certifications = profile.certifications or []
+            worker_certification_values = {self._code(item) for item in worker_certifications}
+            if any(self._code(item) not in worker_certification_values for item in required_certifications):
                 continue
 
             if staffing_request.language_requirement and staffing_request.language_requirement not in (
@@ -34,3 +35,9 @@ class MatchingService:
             eligible.append(worker)
 
         return eligible
+
+    @staticmethod
+    def _code(item: dict | str) -> str:
+        if isinstance(item, dict):
+            return str(item.get('code') or item.get('value') or item.get('label') or '').strip()
+        return str(item).strip()
