@@ -1,7 +1,7 @@
-import { PageFrame } from "../../components/page-frame";
-import { Panel } from "../../components/panel";
-import { getWorkers } from "../../lib/api";
-import { WorkerAvailabilityControl } from "../../components/worker-availability-control";
+import { PageFrame } from "../../../components/page-frame";
+import { Panel } from "../../../components/panel";
+import { getWorkers } from "../../../lib/api";
+import { WorkerAvailabilityControl } from "../../../components/worker-availability-control";
 
 export default async function WorkersPage() {
   const workers = await getWorkers();

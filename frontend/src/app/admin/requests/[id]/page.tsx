@@ -1,16 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PageFrame } from "../../../components/page-frame";
-import { Panel } from "../../../components/panel";
-import { RequestWorkflowCard } from "../../../components/request-workflow-card";
+import { PageFrame } from "../../../../components/page-frame";
+import { Panel } from "../../../../components/panel";
+import { RequestWorkflowCard } from "../../../../components/request-workflow-card";
 import {
   getAssignments,
   getOrganizations,
   getRequest,
   getRequestResponses,
   getUsers,
-} from "../../../lib/api";
-import { RequestResponse, User } from "../../../lib/types";
+} from "../../../../lib/api";
+import { RequestResponse, User } from "../../../../lib/types";
 
 function formatStatus(value: string) {
   return value.replace(/_/g, " ");
@@ -65,7 +65,7 @@ export default async function RequestDetailPage({
     >
       <div style={{ marginBottom: 18 }}>
         <Link
-          href="/requests"
+          href="/admin/requests"
           style={{
             color: "#183229",
             fontWeight: 800,

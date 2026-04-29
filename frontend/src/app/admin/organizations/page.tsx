@@ -1,6 +1,6 @@
-import { PageFrame } from "../../components/page-frame";
-import { Panel } from "../../components/panel";
-import { getOrganizations } from "../../lib/api";
+import { PageFrame } from "../../../components/page-frame";
+import { Panel } from "../../../components/panel";
+import { getOrganizations } from "../../../lib/api";
 
 export default async function OrganizationsPage() {
   const organizations = await getOrganizations();

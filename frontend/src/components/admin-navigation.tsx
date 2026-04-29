@@ -4,25 +4,21 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links = [
-  { href: "/", label: "Dashboard" },
-  { href: "/organizations", label: "Organizations" },
-  { href: "/workers", label: "Workers" },
-  { href: "/requests", label: "Requests" },
+  { href: "/admin", label: "Dashboard" },
+  { href: "/admin/organizations", label: "Organizations" },
+  { href: "/admin/workers", label: "Workers" },
+  { href: "/admin/requests", label: "Requests" },
 ];
 
-export function Navigation() {
+export function AdminNavigation() {
   const pathname = usePathname();
 
   return (
-    <nav
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        gap: 10,
-      }}
-    >
+    <nav style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
       {links.map((link) => {
-        const active = pathname === link.href;
+        const active =
+          pathname === link.href ||
+          (link.href !== "/admin" && pathname.startsWith(link.href));
 
         return (
           <Link

@@ -100,7 +100,7 @@ export function RequestWorkflowCard({
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
         <Link
-          href={`/requests/${request.id}`}
+          href={`/admin/requests/${request.id}`}
           style={{
             borderRadius: 999,
             padding: "12px 16px",

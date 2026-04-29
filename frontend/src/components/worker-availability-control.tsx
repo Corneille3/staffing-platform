@@ -2,9 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-
-const browserApiBaseUrl =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+import { updateAvailability } from "../lib/browser-api";
 
 export function WorkerAvailabilityControl({
   workerId,
@@ -18,27 +16,20 @@ export function WorkerAvailabilityControl({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  async function updateAvailability(nextStatus: "available" | "unavailable") {
-    const previousStatus = status;
+  async function setNext(nextStatus: "available" | "unavailable") {
+    const previous = status;
     setStatus(nextStatus);
     setError(null);
 
-    const response = await fetch(`${browserApiBaseUrl}/api/v1/workers/${workerId}/availability`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ availability_status: nextStatus }),
-    });
-
-    if (!response.ok) {
-      setStatus(previousStatus);
-      const text = await response.text();
-      setError(text || `Update failed with status ${response.status}`);
-      return;
+    try {
+      await updateAvailability(workerId, nextStatus);
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (err) {
+      setStatus(previous);
+      setError(err instanceof Error ? err.message : "Update failed");
     }
-
-    startTransition(() => {
-      router.refresh();
-    });
   }
 
   return (
@@ -47,7 +38,7 @@ export function WorkerAvailabilityControl({
         <button
           type="button"
           disabled={isPending}
-          onClick={() => updateAvailability("available")}
+          onClick={() => setNext("available")}
           style={{
             border: 0,
             borderRadius: 999,
@@ -63,7 +54,7 @@ export function WorkerAvailabilityControl({
         <button
           type="button"
           disabled={isPending}
-          onClick={() => updateAvailability("unavailable")}
+          onClick={() => setNext("unavailable")}
           style={{
             border: 0,
             borderRadius: 999,
