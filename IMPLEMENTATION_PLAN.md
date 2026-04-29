@@ -52,19 +52,18 @@ These decisions must be resolved before building feature code.
 
 ### 1. Authentication Provider
 
-The PDF recommends `Amazon Cognito`, and the backend has moved toward Cognito.
+**Resolved**: Clerk. See `docs/decisions/adr-004-auth-provider-clerk.md`.
 
-Pick one provider and standardize:
+The PDF originally recommended Amazon Cognito; that direction was reversed.
+Clerk now handles authentication across all surfaces.
 
-- backend auth integration
-- frontend auth flow
-- environment variables
-- Terraform secrets
-- documentation
+Standardized on:
 
-Create:
-
-- `docs/decisions/adr-004-auth-provider.md`
+- backend Clerk JWT decode in `app/auth/clerk.py`
+- frontend `@clerk/nextjs` (not yet installed — pending)
+- environment variables: `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`,
+  `CLERK_ISSUER_URL`, `CLERK_JWKS_URL`
+- Terraform `secrets-manager` module stores Clerk keys + JWKS URL
 
 ### 2. Schema Direction
 
@@ -392,10 +391,10 @@ Build the minimum real auth and RBAC foundation.
 Update:
 
 - `backend/app/api/v1/auth.py`
-- `backend/app/auth/cognito.py`
+- `backend/app/auth/clerk.py`
 - `backend/app/auth/permissions.py`
 
-Keep Cognito naming consistent across backend settings, frontend environment variables, Terraform secrets, and documentation.
+Keep Clerk naming consistent across backend settings, frontend environment variables, Terraform secrets, and documentation.
 
 Minimum Sprint 1 behavior:
 
@@ -734,7 +733,8 @@ The foundation phase is complete when:
 ## Important Risk Areas
 
 1. Auth drift:
-   building against Clerk while planning for Cognito will create rework
+   any residual Cognito references in code/docs/infra after the Clerk
+   decision will create rework — sweep them on sight
 
 2. Schema drift:
    if the migration and the product spec keep diverging, services and frontend contracts will become unstable

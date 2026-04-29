@@ -18,4 +18,4 @@ class UserBase(BaseModel):
 
 class UserRead(UserBase, TimestampedSchema):
     id: UUID
-    cognito_sub: str | None = None
+    clerk_user_id: str | None = None

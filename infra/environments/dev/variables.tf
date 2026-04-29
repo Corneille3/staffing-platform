@@ -17,6 +17,9 @@ variable "deletion_protection" { type = bool }
 variable "app_instance_type" { type = string }
 variable "app_port" { type = number }
 variable "app_image" { type = string }
-variable "cognito_region" { type = string }
-variable "cognito_user_pool_id" { type = string }
-variable "cognito_app_client_id" { type = string }
+variable "clerk_publishable_key" { type = string }
+variable "clerk_secret_key" {
+  type      = string
+  sensitive = true
+}
+variable "clerk_jwks_url" { type = string }

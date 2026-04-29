@@ -34,7 +34,7 @@ CREATE TABLE organizations (
 
 CREATE TABLE users (
     id UUID PRIMARY KEY,
-    cognito_sub VARCHAR(255) UNIQUE,
+    clerk_user_id VARCHAR(255) UNIQUE,
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,

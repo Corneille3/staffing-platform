@@ -16,7 +16,7 @@ def list_workers(db: Session = Depends(get_db_session)) -> dict[str, list[Worker
     items = [
         WorkerRead(
             id=worker.id,
-            cognito_sub=worker.cognito_sub,
+            clerk_user_id=worker.clerk_user_id,
             first_name=worker.first_name,
             last_name=worker.last_name,
             email=worker.email,
@@ -37,7 +37,7 @@ def get_worker(user_id: UUID, db: Session = Depends(get_db_session)) -> WorkerRe
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Worker not found')
     return WorkerRead(
         id=worker.id,
-        cognito_sub=worker.cognito_sub,
+        clerk_user_id=worker.clerk_user_id,
         first_name=worker.first_name,
         last_name=worker.last_name,
         email=worker.email,

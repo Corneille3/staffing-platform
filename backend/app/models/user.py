@@ -12,7 +12,7 @@ class User(Base):
     __tablename__ = 'users'
 
     id: Mapped[UUID] = mapped_column(primary_key=True)
-    cognito_sub: Mapped[str | None] = mapped_column(String(255), unique=True)
+    clerk_user_id: Mapped[str | None] = mapped_column(String(255), unique=True)
     first_name: Mapped[str] = mapped_column(String(100))
     last_name: Mapped[str] = mapped_column(String(100))
     email: Mapped[str] = mapped_column(String(255), unique=True)

@@ -1,7 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from pydantic import BaseModel
 
-from app.auth.cognito import CognitoAuthError, decode_token
+from app.auth.clerk import ClerkAuthError, decode_token
 from app.core.constants import ROLE_WORKER
 from app.core.security import bearer_scheme, extract_bearer_token
 
@@ -23,7 +23,7 @@ def get_current_user(credentials=Depends(bearer_scheme)) -> CurrentUserModel:
 
     try:
         payload = decode_token(token)
-    except CognitoAuthError as exc:
+    except ClerkAuthError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
     return CurrentUserModel(

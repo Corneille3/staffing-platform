@@ -23,7 +23,7 @@ class WorkerProfileRead(WorkerProfileBase, TimestampedSchema):
 
 class WorkerRead(BaseModel):
     id: UUID
-    cognito_sub: str | None = None
+    clerk_user_id: str | None = None
     first_name: str
     last_name: str
     email: EmailStr

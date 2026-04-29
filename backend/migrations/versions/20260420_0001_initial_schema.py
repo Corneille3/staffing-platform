@@ -58,7 +58,7 @@ def upgrade() -> None:
     op.create_table(
         'users',
         sa.Column('id', postgresql.UUID(as_uuid=False), primary_key=True),
-        sa.Column('cognito_sub', sa.String(length=255), nullable=True, unique=True),
+        sa.Column('clerk_user_id', sa.String(length=255), nullable=True, unique=True),
         sa.Column('first_name', sa.String(length=100), nullable=False),
         sa.Column('last_name', sa.String(length=100), nullable=False),
         sa.Column('email', sa.String(length=255), nullable=False, unique=True),

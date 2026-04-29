@@ -1,6 +1,5 @@
 locals {
-  name_prefix        = "${var.project_name}-${var.environment}"
-  cognito_issuer_url = "https://cognito-idp.${var.cognito_region}.amazonaws.com/${var.cognito_user_pool_id}"
+  name_prefix = "${var.project_name}-${var.environment}"
 
   tags = {
     Project     = var.project_name
@@ -60,11 +59,9 @@ module "secrets" {
   source                = "../../modules/secrets-manager"
   name_prefix           = local.name_prefix
   db_url                = module.db.database_url
-  cognito_region        = var.cognito_region
-  cognito_user_pool_id  = var.cognito_user_pool_id
-  cognito_app_client_id = var.cognito_app_client_id
-  cognito_issuer_url    = local.cognito_issuer_url
-  cognito_jwks_url      = "${local.cognito_issuer_url}/.well-known/jwks.json"
+  clerk_publishable_key = var.clerk_publishable_key
+  clerk_secret_key      = var.clerk_secret_key
+  clerk_jwks_url        = var.clerk_jwks_url
   app_env               = var.environment
   app_port              = var.app_port
   tags                  = local.tags

@@ -23,8 +23,11 @@ toggles. Treat each surface as having its own UX language.
 - **Backend**: FastAPI + SQLAlchemy + Alembic, PostgreSQL 16
 - **Frontend**: Next.js 15 (App Router), React 19, TypeScript, inline styles
 - **Local dev**: Docker Compose (`db`, `backend`, `frontend`)
+- **Auth**: Clerk (see `docs/decisions/adr-004-auth-provider-clerk.md`) —
+  backend verifies Clerk JWTs; frontend will integrate `@clerk/nextjs`
 - **Infra**: Terraform scaffold for AWS (VPC, RDS, EC2 app-runtime, S3+CloudFront,
-  Cognito-by-env-var, SES, Secrets Manager) — **not deployed yet, do not deploy**
+  SES, Secrets Manager — Clerk keys stored as secrets) — **not deployed yet,
+  do not deploy**
 
 ## Repository layout
 
@@ -32,7 +35,7 @@ toggles. Treat each surface as having its own UX language.
 backend/              FastAPI service
   app/
     api/v1/           Route handlers grouped by resource
-    auth/             Cognito JWT decode (NOT production-safe yet — see Gaps)
+    auth/             Clerk JWT decode (NOT production-safe yet — see Gaps)
     core/             config, logging, security
     db/               SQLAlchemy base + session
     models/           ORM models (normalized per docs/schema-alignment.md)
@@ -92,9 +95,9 @@ The worker surface additionally uses a **WorkerSession** context. On first visit
 to `/worker/*`, users pick which worker they are previewing as
 (`localStorage["apf.workerId"]`). Sign-out from the profile page clears it.
 
-When real auth lands (Cognito JWT verification + frontend session), swap
-`RoleProvider` and `WorkerSessionProvider` to read from the real session. The
-rest of the surface code does not need to change.
+When Clerk integration lands (JWKS-verified backend tokens + `@clerk/nextjs`
+on the frontend), swap `RoleProvider` and `WorkerSessionProvider` to read
+from the Clerk session. The rest of the surface code does not need to change.
 
 ### Two API helpers
 
@@ -154,16 +157,17 @@ initial migration directly — do not stack compatibility migrations.
 
 ## Known gaps (be aware of these before suggesting fixes)
 
-1. **Auth is not production-safe.** `auth/cognito.py` falls back to
-   `jwt.get_unverified_claims()` if JWKS env vars are unset. Treat anything
-   except endpoint shape as untrusted. `auth/clerk.py` is an empty stub.
+1. **Auth is not production-safe.** `auth/clerk.py` reads claims via
+   `jwt.get_unverified_claims()` — no JWKS signature verification yet.
+   Treat anything except endpoint shape as untrusted until that's wired.
 2. **No frontend → backend authorization.** Neither `lib/api.ts` nor
    `lib/browser-api.ts` sends an `Authorization` header. The dev role/worker
    selection is purely client-side make-believe.
 3. **`require_role()` exists but is unused.** No route enforces RBAC yet.
 4. **All 6 GitHub workflows are placeholder echos.** No CI runs anything real.
-5. **Cognito User Pool is not provisioned in Terraform.** Env vars assume an
-   externally created pool.
+5. **Clerk is not yet wired into the frontend.** `@clerk/nextjs` is not
+   installed; sign-in/sign-up UI does not exist. The dev role + worker
+   selectors stand in for it.
 6. **Email/SMS are stubs.** `notifications/email_service.py` etc. exist but
    are not wired to SES or any provider.
 7. **Tests are smoke-only.** No coverage for publish/respond/assign flows.
