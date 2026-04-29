@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import React from "react";
 import { ClerkProvider } from "@clerk/nextjs";
+import { ClerkSyncBoundary } from "../components/clerk-sync-boundary";
 import { RoleProvider } from "../lib/role-context";
 import { RoleSwitcher } from "../components/role-switcher";
 
@@ -29,7 +30,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           fontFamily: 'Georgia, "Times New Roman", serif',
         }}
       >
-        {CLERK_ENABLED ? <ClerkProvider>{inner}</ClerkProvider> : inner}
+        {CLERK_ENABLED ? (
+          <ClerkProvider>
+            <ClerkSyncBoundary />
+            {inner}
+          </ClerkProvider>
+        ) : (
+          inner
+        )}
       </body>
     </html>
   );

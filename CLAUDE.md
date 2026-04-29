@@ -101,6 +101,12 @@ activated** based on whether `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is set:
   - `ClerkProvider` wraps the app
   - `clerkMiddleware` (in `src/middleware.ts`) protects every route except
     `/sign-in/*` and `/sign-up/*`
+  - `ClerkSyncBoundary` (mounted in the root layout) fires
+    `POST /api/v1/auth/sync` once when a user becomes signed in. The
+    backend resolves the Clerk identity to a `users` row: lookup by
+    `clerk_user_id` → lookup by email (link if found) → JIT-create. Names
+    and email are pulled from JWT claims when present, otherwise from the
+    Clerk Backend API (`GET /v1/users/{id}`) using `CLERK_SECRET_KEY`.
   - `RoleProvider` reads role from `useUser().publicMetadata.role`
     (with the dev role-switcher available as a preview override)
   - `WorkerSessionProvider` auto-picks the worker whose `clerk_user_id`
@@ -214,27 +220,25 @@ initial migration directly — do not stack compatibility migrations.
 - Clerk integration (when keys are configured): sign-in, sign-up,
   middleware-protected routes, JWT forwarded server-side and client-side,
   signature-verified backend JWKS check, role read from
-  `publicMetadata.role`, worker matched by `clerk_user_id`
-- `pytest` (3/3) and `next build` / `tsc --noEmit` pass
+  `publicMetadata.role`, `/auth/sync` links/provisions a `users` row on
+  first sign-in, worker matched by `clerk_user_id`
+- `pytest` (4/4) and `next build` / `tsc --noEmit` pass
 
 ## Known gaps (be aware of these before suggesting fixes)
 
-1. **No `clerk_user_id` linking flow yet.** Clerk auth works end-to-end
-   (signature-verified JWT, role from `publicMetadata`, worker matched by
-   `clerk_user_id`), but seeded workers in the DB have a NULL
-   `clerk_user_id`. Until that column is populated for a given Clerk user,
-   they sign in successfully but the worker session falls through to the
-   manual picker. A "link my account" endpoint or JIT provisioning needs
-   to be built.
-2. **`require_role()` exists but is unused.** No route enforces RBAC yet.
-   Roles flow into `CurrentUserModel` but no endpoint checks them.
-3. **Email/SMS are stubs.** `notifications/email_service.py` etc. exist but
+1. **`require_role()` exists but is unused.** No route enforces RBAC yet.
+   Roles flow into `CurrentUserModel` and are now persisted in `users.role`
+   (set by `/auth/sync`), so the substrate is there — endpoints just need
+   the dependency added.
+2. **Email/SMS are stubs.** `notifications/email_service.py` etc. exist but
    are not wired to SES or any provider.
-4. **All 6 GitHub workflows are placeholder echos.** No CI runs anything real.
-5. **Tests are smoke-only.** No coverage for publish/respond/assign flows.
-6. **`request-create-form.tsx` accepts any `org_id`** without checking the
+3. **All 6 GitHub workflows are placeholder echos.** No CI runs anything real.
+4. **Tests are smoke-only.** No coverage for publish/respond/assign flows.
+   `test_auth.py` covers the auth gate on `/me` and `/sync` but no
+   integration coverage of the linking flow itself.
+5. **`request-create-form.tsx` accepts any `org_id`** without checking the
    current user's membership.
-7. **Backend JWT verification falls back to unverified claims** when
+6. **Backend JWT verification falls back to unverified claims** when
    `CLERK_JWKS_URL` is empty (i.e. local dev without a Clerk dev instance).
    That fallback exists by design, but make sure prod always has the JWKS
    URL set so `_decode_verified()` is taken.

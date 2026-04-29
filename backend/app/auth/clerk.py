@@ -109,3 +109,46 @@ def decode_token(token: str) -> ClerkTokenPayload:
     role = role or claims.get('org_role') or claims.get('role')
 
     return ClerkTokenPayload(sub=sub, email=claims.get('email'), role=role)
+
+
+def fetch_user_details(user_id: str) -> dict:
+    """Fetch a Clerk user's full record via the Backend API.
+
+    Returns an empty dict if the secret key is unset (dev mode) or the
+    request fails. The default Clerk session JWT carries no email/name
+    claims unless a custom session token template is configured, so we
+    fall back to the REST API to populate users on first sync.
+    """
+    if not settings.clerk_secret_key:
+        return {}
+    try:
+        response = httpx.get(
+            f'https://api.clerk.com/v1/users/{user_id}',
+            headers={'Authorization': f'Bearer {settings.clerk_secret_key}'},
+            timeout=5.0,
+        )
+        response.raise_for_status()
+        return response.json()
+    except (httpx.HTTPError, ValueError):
+        return {}
+
+
+def primary_email(details: dict) -> str | None:
+    primary_id = details.get('primary_email_address_id')
+    addresses = details.get('email_addresses') or []
+    if primary_id:
+        for entry in addresses:
+            if entry.get('id') == primary_id:
+                return entry.get('email_address')
+    if len(addresses) == 1:
+        return addresses[0].get('email_address')
+    return None
+
+
+def public_metadata_role(details: dict) -> str | None:
+    metadata = details.get('public_metadata') or {}
+    if isinstance(metadata, dict):
+        candidate = metadata.get('role')
+        if candidate in {'worker', 'org_admin', 'apf_admin'}:
+            return candidate
+    return None
