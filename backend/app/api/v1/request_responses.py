@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
+from app.auth.permissions import require_admin
 from app.repositories.response_repository import ResponseRepository
 from app.schemas.request_response import RequestResponseAction, RequestResponseRead
 from app.models.enums import ResponseStatus
@@ -12,7 +13,7 @@ from app.services.response_service import ResponseService
 router = APIRouter()
 
 
-@router.get('/{request_id}/responses')
+@router.get('/{request_id}/responses', dependencies=[Depends(require_admin)])
 def list_request_responses(
     request_id: UUID,
     db: Session = Depends(get_db_session),

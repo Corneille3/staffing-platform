@@ -115,6 +115,12 @@ activated** based on whether `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is set:
     `Authorization: Bearer <Clerk JWT>` to every request
   - Backend (`auth/clerk.py`) verifies the JWT signature against the
     Clerk JWKS (cached for 1h) and enforces the issuer claim
+  - Every `/api/v1/*` route requires authentication. `auth/permissions.py`
+    exposes `require_admin` (apf_admin or org_admin) and `require_apf`
+    (apf_admin only); these are applied as dependencies on writes,
+    assignments, reports, and audit logs. Routes accept/decline workers
+    can hit (worker actions, GET request listings) stay open to all
+    authenticated roles
 - **Key absent** → middleware passes through, no `ClerkProvider`, the dev
   role switcher + worker picker run as the only auth shim, no
   `Authorization` header is sent. This keeps the local stack working
@@ -222,20 +228,29 @@ initial migration directly — do not stack compatibility migrations.
   signature-verified backend JWKS check, role read from
   `publicMetadata.role`, `/auth/sync` links/provisions a `users` row on
   first sign-in, worker matched by `clerk_user_id`
-- `pytest` (4/4) and `next build` / `tsc --noEmit` pass
+- Backend RBAC: every `/api/v1/*` route requires authentication via the
+  global `require_authenticated` dependency. Per-route role gates use
+  `require_admin` (apf+org) or `require_apf` (apf only) — applied to
+  request writes, assignments, audit logs, and reports
+- `pytest` (14/14) and `next build` / `tsc --noEmit` pass
 
 ## Known gaps (be aware of these before suggesting fixes)
 
-1. **`require_role()` exists but is unused.** No route enforces RBAC yet.
-   Roles flow into `CurrentUserModel` and are now persisted in `users.role`
-   (set by `/auth/sync`), so the substrate is there — endpoints just need
-   the dependency added.
+1. **No row-level / org scoping yet.** Role gates are enforced (any
+   authenticated user is required, admin/APF roles are required where
+   appropriate), but endpoints don't filter results by the caller's
+   organization. An `org_admin` from Org A can call
+   `/reports/network-summary` and see counts that span all orgs;
+   `/assignments` returns every assignment regardless of who owns the
+   request. Closing this needs a `current_db_user` dependency that
+   resolves the Clerk JWT → `users` row → `organization_memberships`,
+   then service-layer filters that take the membership set.
 2. **Email/SMS are stubs.** `notifications/email_service.py` etc. exist but
    are not wired to SES or any provider.
 3. **All 6 GitHub workflows are placeholder echos.** No CI runs anything real.
-4. **Tests are smoke-only.** No coverage for publish/respond/assign flows.
-   `test_auth.py` covers the auth gate on `/me` and `/sync` but no
-   integration coverage of the linking flow itself.
+4. **Tests cover auth gates and route registration, no integration flows.**
+   No coverage for publish/respond/assign or the `/auth/sync` linking
+   path.
 5. **`request-create-form.tsx` accepts any `org_id`** without checking the
    current user's membership.
 6. **Backend JWT verification falls back to unverified claims** when

@@ -4,13 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
+from app.auth.permissions import require_admin
 from app.schemas.worker import WorkerAvailabilityUpdate, WorkerProfileRead, WorkerRead
 from app.services.worker_service import WorkerService
 
 router = APIRouter()
 
 
-@router.get('')
+@router.get('', dependencies=[Depends(require_admin)])
 def list_workers(db: Session = Depends(get_db_session)) -> dict[str, list[WorkerRead]]:
     workers = WorkerService(db).list()
     items = [

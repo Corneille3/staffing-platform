@@ -4,10 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
+from app.auth.permissions import require_admin
 from app.repositories.organization_repository import OrganizationRepository
 from app.schemas.organization import OrganizationRead
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 
 @router.get('')

@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
+from app.auth.permissions import require_admin
 from app.repositories.assignment_repository import AssignmentRepository
 from app.schemas.assignment import AssignmentCreate, AssignmentRead
 from app.services.assignment_service import AssignmentService
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 
 @router.get('')

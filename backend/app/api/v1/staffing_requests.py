@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
+from app.auth.permissions import require_admin
 from app.schemas.staffing_request import StaffingRequestCreate, StaffingRequestRead
 from app.services.staffing_request_service import StaffingRequestService
 
@@ -24,7 +25,7 @@ def get_staffing_request(request_id: UUID, db: Session = Depends(get_db_session)
     return StaffingRequestRead.model_validate(staffing_request)
 
 
-@router.post('', status_code=status.HTTP_201_CREATED)
+@router.post('', status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)])
 def create_staffing_request(
     payload: StaffingRequestCreate,
     db: Session = Depends(get_db_session),
@@ -33,13 +34,13 @@ def create_staffing_request(
     return StaffingRequestRead.model_validate(staffing_request)
 
 
-@router.post('/{request_id}/publish')
+@router.post('/{request_id}/publish', dependencies=[Depends(require_admin)])
 def publish_staffing_request(request_id: UUID, db: Session = Depends(get_db_session)) -> StaffingRequestRead:
     staffing_request = StaffingRequestService(db).publish(request_id)
     return StaffingRequestRead.model_validate(staffing_request)
 
 
-@router.post('/{request_id}/cancel')
+@router.post('/{request_id}/cancel', dependencies=[Depends(require_admin)])
 def cancel_staffing_request(request_id: UUID, db: Session = Depends(get_db_session)) -> StaffingRequestRead:
     staffing_request = StaffingRequestService(db).cancel(request_id)
     return StaffingRequestRead.model_validate(staffing_request)
