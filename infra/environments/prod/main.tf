@@ -61,6 +61,7 @@ module "secrets" {
   db_url                = module.db.database_url
   clerk_publishable_key = var.clerk_publishable_key
   clerk_secret_key      = var.clerk_secret_key
+  clerk_issuer_url      = var.clerk_issuer_url
   clerk_jwks_url        = var.clerk_jwks_url
   app_env               = var.environment
   app_port              = var.app_port

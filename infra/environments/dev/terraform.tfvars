@@ -17,4 +17,5 @@ app_port                = 8000
 app_image               = "public.ecr.aws/docker/library/nginx:latest"
 clerk_publishable_key   = "CHANGE_ME"
 clerk_secret_key        = "CHANGE_ME"
+clerk_issuer_url        = "CHANGE_ME"
 clerk_jwks_url          = "CHANGE_ME"
