@@ -84,20 +84,48 @@ nav, and visual language**:
 | `/worker/*` | Workers     | Mobile-first, bottom nav, large cards, big buttons  |
 | `/apf/*`    | APF admins  | Dark, sticky header, metrics + read-only tables     |
 
-### Dev role + worker selection (no auth yet)
+### Auth wiring (Clerk, conditional)
 
-A floating **role-switcher** pill lives at the bottom-right of every page (defined
-in `RoleSwitcher` and mounted in the root layout). It writes to
+The frontend integrates `@clerk/nextjs` and is **conditionally wired** based on
+whether `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is set:
+
+- **Key present** → `ClerkProvider` wraps the app, `clerkMiddleware` protects
+  every route except `/sign-in/*` and `/sign-up/*`. Sign-in / sign-up live at
+  `/sign-in/[[...sign-in]]/page.tsx` and `/sign-up/[[...sign-up]]/page.tsx`
+  using Clerk's catch-all components.
+- **Key absent** → middleware passes through, no `ClerkProvider`, dev role
+  switcher + worker picker remain the only auth shim. This keeps the local
+  stack working until a Clerk dev instance is set up.
+
+To turn on Clerk locally:
+1. Create a Clerk app, copy the publishable + secret keys.
+2. Add to `frontend/.env.local`:
+   ```
+   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+   CLERK_SECRET_KEY=sk_test_...
+   ```
+3. Recreate the frontend container so the new package + env vars take effect:
+   ```
+   docker compose down
+   docker volume rm staffig-platform_frontend_node_modules
+   docker compose up --build
+   ```
+4. Visit `/sign-in` to authenticate.
+
+### Dev role + worker selection
+
+A floating **role-switcher** pill (bottom-right) writes
 `localStorage["apf.devRole"]` and navigates to the matching surface. The root
 `/` redirects based on that role.
 
-The worker surface additionally uses a **WorkerSession** context. On first visit
-to `/worker/*`, users pick which worker they are previewing as
+The worker surface additionally uses a **WorkerSession** context. On first
+visit to `/worker/*`, users pick which worker they are previewing as
 (`localStorage["apf.workerId"]`). Sign-out from the profile page clears it.
 
-When Clerk integration lands (JWKS-verified backend tokens + `@clerk/nextjs`
-on the frontend), swap `RoleProvider` and `WorkerSessionProvider` to read
-from the Clerk session. The rest of the surface code does not need to change.
+These dev shims still run even when Clerk is enabled — they let you preview
+each surface without juggling multiple Clerk users. They will be retired once
+roles are read from Clerk's `publicMetadata.role` and the active worker is
+matched by `clerk_user_id`.
 
 ### Two API helpers
 
@@ -165,9 +193,12 @@ initial migration directly — do not stack compatibility migrations.
    selection is purely client-side make-believe.
 3. **`require_role()` exists but is unused.** No route enforces RBAC yet.
 4. **All 6 GitHub workflows are placeholder echos.** No CI runs anything real.
-5. **Clerk is not yet wired into the frontend.** `@clerk/nextjs` is not
-   installed; sign-in/sign-up UI does not exist. The dev role + worker
-   selectors stand in for it.
+5. **Clerk integration is partial.** `@clerk/nextjs` is installed and
+   `ClerkProvider` + middleware + sign-in/sign-up routes exist (conditionally
+   on `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`). Still pending: forwarding Clerk
+   JWTs in `lib/api.ts` / `lib/browser-api.ts`, JWKS-based signature
+   verification on the backend, reading roles from `publicMetadata.role`,
+   and matching the active worker by `clerk_user_id`.
 6. **Email/SMS are stubs.** `notifications/email_service.py` etc. exist but
    are not wired to SES or any provider.
 7. **Tests are smoke-only.** No coverage for publish/respond/assign flows.
