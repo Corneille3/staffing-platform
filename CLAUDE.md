@@ -6,6 +6,42 @@ APF Staffing Platform. It supersedes older planning docs where they conflict —
 superseded; `Implementation-idea.md` and the project README describe the *current*
 product direction. Read `.codex` for a timeline of what has shipped.
 
+## ⚡ Session pickup
+
+When the user opens a new session and asks where we left off, **first check
+that all the recent implementation is visible** — do not rely on what their
+editor is showing, since stale VS Code buffers have caused phantom "missing
+code" reports more than once.
+
+Run, in this order:
+
+```
+git -C /home/corneille3/STAFFIG-PLATFORM status
+git -C /home/corneille3/STAFFIG-PLATFORM log --oneline -10
+```
+
+The working tree should be clean and the most recent commits should include
+the row-level scoping (`AccessScope`), the RBAC enforcement, the `/auth/sync`
+linking endpoint, and the Clerk wiring. If anything looks missing in the
+editor, walk the user through the same "Revert File / restart Terraform LSP /
+close-and-reopen the IDE" troubleshooting from prior sessions — the disk
+state is authoritative.
+
+**Last shipped (most recent first):**
+1. Row-level / org scoping via `AccessScope` (`backend/app/auth/scope.py`)
+2. RBAC enforcement on every `/api/v1/*` endpoint
+3. `POST /auth/sync` — Clerk → DB user link/provision flow
+4. `@clerk/nextjs` end-to-end (sign-in/up, JWT forwarding, JWKS verification,
+   role from publicMetadata, worker matched by clerk_user_id)
+5. Cognito → Clerk migration
+
+**Top remaining gaps** (see "Known gaps" section for the full list):
+1. Email/SMS notifications are stubs
+2. CI workflows are placeholder echos
+3. No integration test coverage (auth gates only)
+
+If the user asks "what's next?" — the natural pick is one of those three.
+
 ## What this project is
 
 A bilingual (FR/EN) substitute-staffing dispatch MVP for Quebec daycares, schools, and
