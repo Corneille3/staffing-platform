@@ -121,6 +121,14 @@ activated** based on whether `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is set:
     assignments, reports, and audit logs. Routes accept/decline workers
     can hit (worker actions, GET request listings) stay open to all
     authenticated roles
+  - Row-level scoping via `auth/scope.py`: `get_access_scope` resolves
+    the caller's `users` row + active `organization_memberships` into an
+    `AccessScope` (`is_apf`, `is_org_admin`, `is_worker`, `org_ids`).
+    Repositories expose `list_for_scope(scope)` methods that filter by
+    role: APF sees all rows; org_admin filtered by `org_ids`; worker
+    filtered by `user.id` (responses, assignments) or membership
+    (notifications). Routes that fetch a single resource call
+    `repo.can_access(resource, scope)` and return 403 on mismatch.
 - **Key absent** → middleware passes through, no `ClerkProvider`, the dev
   role switcher + worker picker run as the only auth shim, no
   `Authorization` header is sent. This keeps the local stack working
@@ -232,31 +240,36 @@ initial migration directly — do not stack compatibility migrations.
   global `require_authenticated` dependency. Per-route role gates use
   `require_admin` (apf+org) or `require_apf` (apf only) — applied to
   request writes, assignments, audit logs, and reports
+- Backend row-level scoping via `AccessScope`: requests, assignments,
+  organizations, notifications, request_responses, and reports are
+  filtered by the caller's identity. APF sees the network; org_admin
+  sees only their orgs; workers see only their own data. Cross-scope
+  access returns 403.
 - `pytest` (14/14) and `next build` / `tsc --noEmit` pass
 
 ## Known gaps (be aware of these before suggesting fixes)
 
-1. **No row-level / org scoping yet.** Role gates are enforced (any
-   authenticated user is required, admin/APF roles are required where
-   appropriate), but endpoints don't filter results by the caller's
-   organization. An `org_admin` from Org A can call
-   `/reports/network-summary` and see counts that span all orgs;
-   `/assignments` returns every assignment regardless of who owns the
-   request. Closing this needs a `current_db_user` dependency that
-   resolves the Clerk JWT → `users` row → `organization_memberships`,
-   then service-layer filters that take the membership set.
-2. **Email/SMS are stubs.** `notifications/email_service.py` etc. exist but
+1. **Email/SMS are stubs.** `notifications/email_service.py` etc. exist but
    are not wired to SES or any provider.
-3. **All 6 GitHub workflows are placeholder echos.** No CI runs anything real.
-4. **Tests cover auth gates and route registration, no integration flows.**
+2. **All 6 GitHub workflows are placeholder echos.** No CI runs anything real.
+3. **Tests cover auth gates and route registration, no integration flows.**
    No coverage for publish/respond/assign or the `/auth/sync` linking
-   path.
-5. **`request-create-form.tsx` accepts any `org_id`** without checking the
-   current user's membership.
-6. **Backend JWT verification falls back to unverified claims** when
+   path. With `AccessScope` in place, scoped behavior (worker sees only
+   own, org_admin sees only their orgs) is also untested end-to-end.
+4. **`request-create-form.tsx` accepts any `org_id`** without checking the
+   current user's membership against the org list. The backend now
+   restricts `/organizations` GET to the caller's orgs, so the dropdown
+   already self-filters — but the form should also gate that the
+   selected `created_by_user_id` is the current user.
+5. **Backend JWT verification falls back to unverified claims** when
    `CLERK_JWKS_URL` is empty (i.e. local dev without a Clerk dev instance).
    That fallback exists by design, but make sure prod always has the JWKS
    URL set so `_decode_verified()` is taken.
+6. **Org admins without memberships see nothing.** A user signing in
+   with `role=org_admin` but no `organization_memberships` rows will see
+   empty lists across requests, assignments, organizations, reports.
+   Provisioning memberships is a manual DB step today; an
+   admin-management UI / "promote to org" flow is a future addition.
 
 ## Working agreements
 
