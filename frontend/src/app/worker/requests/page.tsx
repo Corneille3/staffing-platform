@@ -7,6 +7,7 @@ import {
   fetchRequestResponses,
   fetchRequests,
 } from "../../../lib/browser-api";
+import { pickLocale, workerRequestPerspective } from "../../../lib/status-labels";
 import { RequestResponse, StaffingRequest } from "../../../lib/types";
 import { useWorkerSession } from "../../../lib/worker-session";
 
@@ -49,6 +50,7 @@ export default function WorkerRequestsPage() {
   }, [worker]);
 
   if (!worker) return null;
+  const locale = pickLocale(worker.preferred_language);
 
   async function respond(requestId: string, action: "accept" | "decline") {
     if (!worker) return;
@@ -109,6 +111,8 @@ export default function WorkerRequestsPage() {
                   key={request.id}
                   request={request}
                   myResponse={myResponse}
+                  myUserId={worker.id}
+                  locale={locale}
                   busy={busy === request.id}
                   onAccept={() => respond(request.id, "accept")}
                   onDecline={() => respond(request.id, "decline")}
@@ -124,6 +128,8 @@ export default function WorkerRequestsPage() {
                   key={request.id}
                   request={request}
                   myResponse={myResponse}
+                  myUserId={worker.id}
+                  locale={locale}
                   busy={busy === request.id}
                   onDecline={() => respond(request.id, "decline")}
                 />
@@ -138,6 +144,8 @@ export default function WorkerRequestsPage() {
                   key={request.id}
                   request={request}
                   myResponse={myResponse}
+                  myUserId={worker.id}
+                  locale={locale}
                   busy={busy === request.id}
                   onAccept={() => respond(request.id, "accept")}
                 />
@@ -190,16 +198,21 @@ function Empty({ children }: { children: React.ReactNode }) {
 function RequestCard({
   request,
   myResponse,
+  myUserId,
+  locale,
   busy,
   onAccept,
   onDecline,
 }: {
   request: StaffingRequest;
   myResponse: RequestResponse | null;
+  myUserId: string;
+  locale: "en" | "fr";
   busy: boolean;
   onAccept?: () => void;
   onDecline?: () => void;
 }) {
+  const perspectiveLabel = workerRequestPerspective(request, myResponse, myUserId, locale);
   return (
     <article
       style={{
@@ -235,7 +248,7 @@ function RequestCard({
         </p>
       ) : null}
 
-      {myResponse ? (
+      {perspectiveLabel ? (
         <div
           style={{
             fontSize: 12,
@@ -243,14 +256,14 @@ function RequestCard({
             letterSpacing: "0.06em",
             textTransform: "uppercase",
             color:
-              myResponse.status === "accepted"
+              myResponse?.status === "accepted"
                 ? "#296246"
-                : myResponse.status === "declined"
+                : myResponse?.status === "declined"
                 ? "#8c4d3f"
                 : "#5d6d66",
           }}
         >
-          You: {myResponse.status.replace(/_/g, " ")}
+          {perspectiveLabel}
         </div>
       ) : null}
 

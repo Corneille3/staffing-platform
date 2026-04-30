@@ -7,6 +7,7 @@ import {
   fetchRequestResponses,
   fetchRequests,
 } from "../../lib/browser-api";
+import { assignmentStatusLabel, pickLocale } from "../../lib/status-labels";
 import { Assignment, RequestResponse, StaffingRequest } from "../../lib/types";
 import { useWorkerSession } from "../../lib/worker-session";
 
@@ -84,7 +85,14 @@ export default function WorkerHome() {
           myAssignments.slice(0, 3).map((a) => {
             const req = requests.find((r) => r.id === a.staffing_request_id);
             if (!req) return null;
-            return <AssignmentPreviewCard key={a.id} request={req} assignment={a} />;
+            return (
+              <AssignmentPreviewCard
+                key={a.id}
+                request={req}
+                assignment={a}
+                locale={pickLocale(worker.preferred_language)}
+              />
+            );
           })
         )}
       </Section>
@@ -189,9 +197,11 @@ function RequestPreviewCard({ request }: { request: StaffingRequest }) {
 function AssignmentPreviewCard({
   request,
   assignment,
+  locale,
 }: {
   request: StaffingRequest;
   assignment: Assignment;
+  locale: "en" | "fr";
 }) {
   return (
     <div
@@ -216,7 +226,7 @@ function AssignmentPreviewCard({
             textTransform: "uppercase",
           }}
         >
-          {assignment.status.replace(/_/g, " ")}
+          {assignmentStatusLabel(assignment.status, locale)}
         </span>
       </div>
       <div style={{ marginTop: 8, opacity: 0.85, fontSize: 14 }}>

@@ -307,6 +307,95 @@ initial migration directly — do not stack compatibility migrations.
    Provisioning memberships is a manual DB step today; an
    admin-management UI / "promote to org" flow is a future addition.
 
+## Implementation roadmap (Implementation-idea.md alignment)
+
+This roadmap closes the gap between the current code and the product vision in
+`Implementation-idea.md`. Items are ordered by dependency + leverage. Tick
+each as it ships and keep "Current focus" in sync.
+
+**Current focus:** A2 — Eligibility-reason badges.
+
+### Phase A — Worker UX core (the doc's heaviest emphasis)
+
+- [x] **A1. Human-friendly status labels.** Replace raw enums in worker views
+  with: *Response sent · Waiting for confirmation · Confirmed · Not selected
+  · Cancelled · Completed*. Centralize in a label helper used by request
+  cards, assignment cards, and notifications.
+  *Shipped: `frontend/src/lib/status-labels.ts` (bilingual EN/FR), wired
+  into `worker/page.tsx`, `worker/requests/page.tsx`,
+  `worker/assignments/page.tsx`, `worker/availability/page.tsx`. Locale
+  derived from `worker.preferred_language`.*
+- [ ] **A2. Eligibility-reason badges on Available Coverage cards.** Surface
+  the matching rules (`services/matching_service.py`) per request: ✓ city,
+  ✓ language, ✓ qualification, or "Missing: <requirement>". Backend
+  returns reasons; frontend renders chips.
+- [ ] **A3. Available Coverage tabs + filters.** Tabs: All / Urgent / Today /
+  This Week. Filters: city, date, urgent-only. No advanced filters.
+- [ ] **A4. Worker home top card.** Greeting, current availability,
+  urgent-alerts on/off, quick buttons (Set unavailable / Update availability
+  / View available coverage).
+- [ ] **A5. Worker home sections.** "Urgent Requests", "Available Coverage
+  Near You" (cards), "Upcoming Assignment" — replacing any dashboard density.
+- [ ] **A6. Accept-flow confirmation modal.** "Confirm availability" step,
+  then post-accept state shows *Response sent. The coordinator will confirm.*
+  Distinct from "Assigned".
+- [ ] **A7. Decline-flow with optional reason.** Reasons: Not available / Too
+  far / Not interested / Conflict / Other. Reason is optional in MVP.
+- [ ] **A8. Assignment detail enrichments.** Contact person + phone/email,
+  arrival/parking instructions, add-to-calendar, request-cancellation
+  (admin-confirmed, not direct cancel).
+- [ ] **A9. Availability screen polish.** Available/Unavailable toggle (have),
+  urgent-alerts on/off (new), preferred cities (new), optional preferred
+  days (new — checkboxes only, not a calendar).
+- [ ] **A10. Notifications grouped by type.** Types: new request · urgent ·
+  response received · assigned · not selected · cancelled · reminder.
+  Human copy on each.
+- [ ] **A11. "Request filled" notice.** When a worker opens a request that's
+  been assigned to someone else, show *This request has been filled.*
+
+### Phase B — Schema/domain extensions to support the new flows
+
+- [ ] **B1. Coverage urgency types.** Extend the urgency model beyond a single
+  flag: same-day-urgent / planned-absence / recurring / emergency. Update
+  enum, migration, schema, seed data.
+- [ ] **B2. Response state — viewed + no-response.** Add `viewed_at` to
+  `request_responses`; surface "no response" in admin response boards and
+  "Response sent → received" copy on worker side.
+- [ ] **B3. Organization type enum.** childcare / long-term-care /
+  community-care / home-care / assisted-living / other. Drives copy + which
+  qualification fields appear.
+- [ ] **B4. Care-sector-neutral copy pass.** Audit all UI strings + emails
+  for childcare-specific language; replace with care-sector-neutral terms
+  that adapt by org type. Lock in the *Coverage Request / Substitute /
+  Coverage Desk* vocabulary; remove any "task / lead / ticket" residue.
+
+### Phase C — Coordinator (org admin) surface
+
+- [ ] **C1. Rename "Admin Dashboard" → "Coverage Desk / Coverage Board".**
+  Visual + nav rename, no functional change.
+- [ ] **C2. Per-request Responses board.** Show notified / viewed / accepted
+  / declined / no-response per worker for a given request. Depends on B2.
+- [ ] **C3. Substitute Directory page.** Browse the worker pool with city,
+  qualification, language, availability filters.
+- [ ] **C4. Coverage History page.** Past + cancelled requests with outcome
+  and time-to-fill.
+
+### Phase D — Network admin (APF) surface
+
+- [ ] **D1. Network Overview metrics.** Fill rate, time-to-fill, shortage by
+  region, active substitute pool, unfilled requests, demand trends.
+  Backend aggregations + dark-themed dashboard cards.
+- [ ] **D2. Substitute Pool view.** Network-wide worker list with status +
+  utilization.
+- [ ] **D3. Activity History.** Network-wide audit-log-style feed.
+
+### Working order
+
+We work top-to-bottom but Phase B items can be pulled forward when an A item
+needs them (e.g., A6's "Response sent" copy benefits from B2's `viewed_at`).
+Don't start C or D until Phase A is materially done — the worker surface is
+the unique product surface and CLAUDE.md already names it the priority.
+
 ## Working agreements
 
 - **No AWS deployment yet.** The Terraform is scaffold for later. Don't

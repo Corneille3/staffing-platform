@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { updateAvailability } from "../../../lib/browser-api";
+import { availabilityStatusLabel, pickLocale } from "../../../lib/status-labels";
 import { useWorkerSession } from "../../../lib/worker-session";
 
 export default function WorkerAvailabilityPage() {
@@ -10,8 +11,10 @@ export default function WorkerAvailabilityPage() {
   const [error, setError] = useState<string | null>(null);
 
   if (!worker) return null;
+  const locale = pickLocale(worker.preferred_language);
 
   const status = worker.profile?.availability_status || "unknown";
+  const statusLabel = availabilityStatusLabel(status, locale);
 
   async function setStatus(next: "available" | "unavailable") {
     if (!worker) return;
@@ -65,10 +68,9 @@ export default function WorkerAvailabilityPage() {
               fontSize: 30,
               fontWeight: 800,
               color: status === "available" ? "#214639" : "#7a473f",
-              textTransform: "capitalize",
             }}
           >
-            {status}
+            {statusLabel}
           </p>
         </div>
 
@@ -79,7 +81,7 @@ export default function WorkerAvailabilityPage() {
             onClick={() => setStatus("available")}
             tone="primary"
           >
-            Available
+            {availabilityStatusLabel("available", locale)}
           </Toggle>
           <Toggle
             active={status === "unavailable"}
@@ -87,7 +89,7 @@ export default function WorkerAvailabilityPage() {
             onClick={() => setStatus("unavailable")}
             tone="muted"
           >
-            Unavailable
+            {availabilityStatusLabel("unavailable", locale)}
           </Toggle>
         </div>
 

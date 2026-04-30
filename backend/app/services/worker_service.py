@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.auth.scope import AccessScope
 from app.models.enums import AvailabilityStatus
 from app.models.worker_profile import WorkerProfile
 from app.models.user import User
@@ -17,6 +18,9 @@ class WorkerService:
 
     def list(self) -> list[User]:
         return self.repository.list()
+
+    def list_for_scope(self, scope: AccessScope) -> list[User]:
+        return self.repository.list_for_scope(scope)
 
     def get(self, user_id: UUID) -> User | None:
         return self.repository.get(user_id)

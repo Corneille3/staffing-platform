@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchAssignments, fetchRequests } from "../../../lib/browser-api";
+import { assignmentStatusLabel, pickLocale } from "../../../lib/status-labels";
 import { Assignment, StaffingRequest } from "../../../lib/types";
 import { useWorkerSession } from "../../../lib/worker-session";
 
@@ -44,6 +45,7 @@ export default function WorkerAssignmentsPage() {
   }, [worker]);
 
   if (!worker) return null;
+  const locale = pickLocale(worker.preferred_language);
 
   const upcoming = items.filter(
     (i) => i.assignment.status === "pending_confirmation" || i.assignment.status === "confirmed",
@@ -71,7 +73,12 @@ export default function WorkerAssignmentsPage() {
             ) : (
               upcoming.map(({ assignment, request }) =>
                 request ? (
-                  <AssignmentCard key={assignment.id} assignment={assignment} request={request} />
+                  <AssignmentCard
+                    key={assignment.id}
+                    assignment={assignment}
+                    request={request}
+                    locale={locale}
+                  />
                 ) : null,
               )
             )}
@@ -85,6 +92,7 @@ export default function WorkerAssignmentsPage() {
                     key={assignment.id}
                     assignment={assignment}
                     request={request}
+                    locale={locale}
                     muted
                   />
                 ) : null,
@@ -137,10 +145,12 @@ function Empty({ children }: { children: React.ReactNode }) {
 function AssignmentCard({
   assignment,
   request,
+  locale,
   muted,
 }: {
   assignment: Assignment;
   request: StaffingRequest;
+  locale: "en" | "fr";
   muted?: boolean;
 }) {
   const bg = muted ? "rgba(255, 253, 247, 0.7)" : "#214639";
@@ -172,7 +182,7 @@ function AssignmentCard({
             textTransform: "uppercase",
           }}
         >
-          {assignment.status.replace(/_/g, " ")}
+          {assignmentStatusLabel(assignment.status, locale)}
         </span>
       </div>
       <div style={{ display: "grid", gap: 4, color: sub, fontSize: 14 }}>

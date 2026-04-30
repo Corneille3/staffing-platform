@@ -30,10 +30,7 @@ def list_workers(
     scope: AccessScope = Depends(get_access_scope),
     db: Session = Depends(get_db_session),
 ) -> dict[str, list[WorkerRead]]:
-    workers = WorkerService(db).list()
-    if not scope.is_admin:
-        # Workers only see themselves.
-        workers = [w for w in workers if w.id == scope.user.id]
+    workers = WorkerService(db).list_for_scope(scope)
     return {'items': [_to_worker_read(worker) for worker in workers]}
 
 
