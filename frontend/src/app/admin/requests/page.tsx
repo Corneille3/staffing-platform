@@ -42,7 +42,9 @@ export default async function RequestsPage() {
 
       <Panel title="Request workflow" subtitle={`${requests.length} requests`}>
         <div style={{ display: "grid", gap: 18 }}>
-          {requests.map((request) => (
+          {[...requests]
+            .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))
+            .map((request) => (
             <RequestWorkflowCard
               key={request.id}
               request={request}

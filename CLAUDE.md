@@ -28,25 +28,32 @@ close-and-reopen the IDE" troubleshooting from prior sessions — the disk
 state is authoritative.
 
 **Last shipped (most recent first):**
-1. Assignment cancellation (`POST /assignments/{id}/cancel`) — rolls back
+1. Bug fixes + admin UX polish — psycopg3 UUID adapter registration via
+   `register_default_adapters` (fixed 500 on `GET /workers`); admin request
+   workflow sorted newest-first by `created_at`; worker response status labels
+   humanised ("Notified — awaiting reply" / "Accepted" / "Declined") in
+   `RequestWorkflowCard`. Assigned requests already hidden from worker view
+   (status filter `["open","notified","responses_received"]` was in place from A3)
+   and reappear automatically when an assignment is cancelled.
+2. Assignment cancellation (`POST /assignments/{id}/cancel`) — rolls back
    request to `responses_received`, resets worker response, audit logged.
    Unique constraint on `assignments.staffing_request_id` dropped so
    requests can be re-assigned after cancellation.
-2. Admin `RequestWorkflowCard` — `WorkerReviewCard` with eligibility chips
+3. Admin `RequestWorkflowCard` — `WorkerReviewCard` with eligibility chips
    (city, language, qualifications, certifications) per accepted worker;
    `AssignedWorkerCard` + `CancelAssignmentModal` for cancellation flow.
-3. `GET /requests/{id}/eligibility` — per-rule pass/fail for a worker
+4. `GET /requests/{id}/eligibility` — per-rule pass/fail for a worker
    against a request. `MatchingService.eligibility_result()` is the
    canonical eligibility check (also used internally by `eligible_workers`).
    `EligibilityReason` / `EligibilityResult` in `schemas/eligibility.py`.
-4. Worker-side human status labels (`frontend/src/lib/status-labels.ts`) —
+5. Worker-side human status labels (`frontend/src/lib/status-labels.ts`) —
    bilingual EN/FR, driven by `worker.preferred_language`. Covers response,
    assignment, request, and availability statuses. `workerRequestPerspective()`
    derives the correct combined label from request + response state.
-5. `GET /workers` filter pushed to query layer (`list_for_scope`).
-6. Row-level / org scoping via `AccessScope` (`backend/app/auth/scope.py`)
-7. RBAC enforcement on every `/api/v1/*` endpoint
-8. `POST /auth/sync` — Clerk → DB user link/provision flow
+6. `GET /workers` filter pushed to query layer (`list_for_scope`).
+7. Row-level / org scoping via `AccessScope` (`backend/app/auth/scope.py`)
+8. RBAC enforcement on every `/api/v1/*` endpoint
+9. `POST /auth/sync` — Clerk → DB user link/provision flow
 
 **Top remaining gaps** (see "Known gaps" section for the full list):
 1. Email/SMS notifications are stubs

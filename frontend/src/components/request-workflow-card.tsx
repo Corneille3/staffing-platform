@@ -12,6 +12,15 @@ function formatStatus(value: string) {
   return value.replace(/_/g, " ");
 }
 
+function workerResponseLabel(status: string): string {
+  switch (status) {
+    case "notified": return "Notified — awaiting reply";
+    case "accepted": return "Accepted";
+    case "declined": return "Declined";
+    default: return formatStatus(status);
+  }
+}
+
 const ASSIGNMENT_CANCELLATION_REASONS = [
   "Worker unavailable",
   "Coordinator changed plan",
@@ -200,7 +209,7 @@ export function RequestWorkflowCard({
                   {worker.first_name} {worker.last_name}
                 </strong>
                 <div style={{ marginTop: 4, color: "#5d6d66", fontSize: 14 }}>
-                  {response ? formatStatus(response.status) : "not notified"}
+                  {response ? workerResponseLabel(response.status) : "Not notified"}
                 </div>
               </div>
               {!isClosed ? (
