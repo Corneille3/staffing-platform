@@ -3,6 +3,7 @@
 import {
   Assignment,
   EligibilityResult,
+  NotificationFeedItem,
   RequestResponse,
   StaffingRequest,
   Worker,
@@ -87,6 +88,12 @@ export async function fetchRequestEligibility(
 
 export async function fetchAssignments(): Promise<Assignment[]> {
   const data = await getJson<{ items: Assignment[] }>("/api/v1/assignments");
+  return data.items;
+}
+
+export async function fetchNotificationFeed(workerUserId: string): Promise<NotificationFeedItem[]> {
+  const params = new URLSearchParams({ worker_user_id: workerUserId });
+  const data = await getJson<{ items: NotificationFeedItem[] }>(`/api/v1/notifications/feed?${params}`);
   return data.items;
 }
 

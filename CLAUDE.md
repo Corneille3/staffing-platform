@@ -28,7 +28,11 @@ close-and-reopen the IDE" troubleshooting from prior sessions — the disk
 state is authoritative.
 
 **Last shipped (most recent first):**
-1. A8 + A9 — Assignment detail enrichments + preferred cities.
+1. A10 — Notification feed. `GET /notifications/feed?worker_user_id=`
+   synthesises typed events (new_request · urgent · assigned · cancelled ·
+   not_selected) from existing tables. `/worker/notifications` page renders
+   grouped bilingual cards with relative timestamps. 🔔 Alerts nav tab added.
+2. A8 + A9 — Assignment detail enrichments + preferred cities.
    A8: `contact_name`, `contact_phone`, `contact_email`, `arrival_instructions`
    added to `staffing_requests` (model, migration, schema, SQL doc, TS types,
    seed). Worker assignment card surfaces contact block (tappable tel/mailto
@@ -342,7 +346,7 @@ This roadmap closes the gap between the current code and the product vision in
 `Implementation-idea.md`. Items are ordered by dependency + leverage. Tick
 each as it ships and keep "Current focus" in sync.
 
-**Current focus:** A10 — Notifications grouped by type.
+**Current focus:** A11 — "Request filled" notice.
 
 ### Phase A — Worker UX core (the doc's heaviest emphasis)
 
@@ -400,9 +404,13 @@ each as it ships and keep "Current focus" in sync.
   `worker_regions`; PATCH `/workers/{id}/availability` accepts
   `supported_cities`. Preferred days deferred (no matching logic yet).
   *Shipped: city picker live on `/worker/availability`.*
-- [ ] **A10. Notifications grouped by type.** Types: new request · urgent ·
-  response received · assigned · not selected · cancelled · reminder.
-  Human copy on each.
+- [x] **A10. Notifications grouped by type.** Types: new request · urgent ·
+  assigned · not selected · cancelled. Human copy, bilingual EN/FR.
+  *Shipped: `GET /notifications/feed?worker_user_id=` synthesises typed
+  events from `request_notifications`, `assignments`, and accepted-but-not-
+  selected responses. `/worker/notifications` page groups by type with
+  colour-coded cards and relative timestamps. 🔔 Alerts tab added to
+  worker bottom nav.*
 - [ ] **A11. "Request filled" notice.** When a worker opens a request that's
   been assigned to someone else, show *This request has been filled.*
 

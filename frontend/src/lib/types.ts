@@ -94,6 +94,16 @@ export type RequestResponse = {
   responded_at: string | null;
 };
 
+export type NotificationFeedItem = {
+  id: string;
+  type: "new_request" | "urgent" | "assigned" | "not_selected" | "cancelled";
+  staffing_request_id: string;
+  request_title: string;
+  request_city: string;
+  request_date: string;
+  created_at: string;
+};
+
 export type Assignment = {
   id: string;
   staffing_request_id: string;

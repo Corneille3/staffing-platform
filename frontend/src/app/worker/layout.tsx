@@ -159,9 +159,10 @@ function WorkerHeader({ workerName }: { workerName: string }) {
 }
 
 const NAV_LINKS = [
-  { href: "/worker", label: "Home", icon: "•" },
-  { href: "/worker/requests", label: "Requests", icon: "›" },
+  { href: "/worker", label: "Home", icon: "⌂" },
+  { href: "/worker/requests", label: "Requests", icon: "◈" },
   { href: "/worker/assignments", label: "Shifts", icon: "✓" },
+  { href: "/worker/notifications", label: "Alerts", icon: "🔔" },
   { href: "/worker/availability", label: "Availability", icon: "○" },
   { href: "/worker/profile", label: "Profile", icon: "☉" },
 ];
