@@ -8,12 +8,14 @@ import {
   getRequestResponses,
   getRequests,
   getUsers,
+  getWorkers,
 } from "../../../lib/api";
 
 export default async function RequestsPage() {
-  const [requests, users, organizations, assignments] = await Promise.all([
+  const [requests, users, workers, organizations, assignments] = await Promise.all([
     getRequests(),
     getUsers(),
+    getWorkers(),
     getOrganizations(),
     getAssignments(),
   ]);
@@ -46,7 +48,8 @@ export default async function RequestsPage() {
               request={request}
               responses={responseMap.get(request.id) || []}
               users={users}
-              assignment={assignments.find((assignment) => assignment.staffing_request_id === request.id) || null}
+              workers={workers}
+              assignment={assignments.find((assignment) => assignment.staffing_request_id === request.id && assignment.status !== "cancelled") || null}
             />
           ))}
         </div>

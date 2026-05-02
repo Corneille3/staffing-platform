@@ -12,7 +12,7 @@ class Assignment(Base):
     __tablename__ = 'assignments'
 
     id: Mapped[UUID] = mapped_column(primary_key=True)
-    staffing_request_id: Mapped[UUID] = mapped_column(ForeignKey('staffing_requests.id', ondelete='CASCADE'), unique=True)
+    staffing_request_id: Mapped[UUID] = mapped_column(ForeignKey('staffing_requests.id', ondelete='CASCADE'))
     worker_user_id: Mapped[UUID] = mapped_column(ForeignKey('users.id', ondelete='RESTRICT'))
     assigned_by_user_id: Mapped[UUID] = mapped_column(ForeignKey('users.id', ondelete='RESTRICT'))
     status: Mapped[AssignmentStatus] = mapped_column(

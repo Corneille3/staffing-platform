@@ -46,15 +46,20 @@ export default function WorkerHome() {
 
   if (!worker) return null;
 
-  const openForMe = requests.filter(
+  const workerId = worker.id;
+  const locale = pickLocale(worker.preferred_language);
+  const availabilityStatus = worker.profile?.availability_status || "unavailable";
+  const canReceiveRequests = availabilityStatus === "available";
+  const urgentAlertsEnabled = worker.profile?.urgent_alert_opt_in ?? false;
+  const openForMe = canReceiveRequests ? requests.filter(
     (request) => ["open", "notified", "responses_received"].includes(request.status),
-  );
+  ) : [];
   const urgentRequests = openForMe
     .filter((request) => request.urgency_level >= 3)
-    .sort(compareRequestsByStart);
+    .sort(compareRequestsByNewest);
   const nearbyCoverage = openForMe
     .filter((request) => request.urgency_level < 3)
-    .sort(compareRequestsByStart);
+    .sort(compareRequestsByNewest);
   const myAssignments = assignments.filter(
     (a) => a.worker_user_id === worker.id && a.status !== "completed" && a.status !== "cancelled",
   );
@@ -65,11 +70,6 @@ export default function WorkerHome() {
     }))
     .filter((item): item is { assignment: Assignment; request: StaffingRequest } => Boolean(item.request))
     .sort((left, right) => compareRequestsByStart(left.request, right.request))[0] || null;
-  const workerId = worker.id;
-  const locale = pickLocale(worker.preferred_language);
-  const availabilityStatus = worker.profile?.availability_status || "unavailable";
-  const urgentAlertsEnabled = worker.profile?.urgent_alert_opt_in ?? false;
-
   async function updatePreferences(payload: {
     availability_status?: "available" | "unavailable";
     urgent_alert_opt_in?: boolean;
@@ -96,6 +96,7 @@ export default function WorkerHome() {
         busy={preferenceBusy}
         error={preferenceError}
         openRequestCount={openForMe.length}
+        canReceiveRequests={canReceiveRequests}
         onSetUnavailable={() => updatePreferences({ availability_status: "unavailable" })}
         onToggleUrgentAlerts={() =>
           updatePreferences({ urgent_alert_opt_in: !urgentAlertsEnabled })
@@ -105,10 +106,12 @@ export default function WorkerHome() {
       <Section title="Urgent Requests" actionLabel="See all" actionHref="/worker/requests">
         {loading ? (
           <Placeholder>Loading…</Placeholder>
+        ) : !canReceiveRequests ? (
+          <Placeholder>You are unavailable, so urgent requests are hidden.</Placeholder>
         ) : urgentRequests.length === 0 ? (
           <Placeholder>No urgent requests right now.</Placeholder>
         ) : (
-          urgentRequests.slice(0, 2).map((request) => (
+          urgentRequests.slice(0, 3).map((request) => (
             <RequestPreviewCard key={request.id} request={request} emphasis="urgent" />
           ))
         )}
@@ -117,10 +120,12 @@ export default function WorkerHome() {
       <Section title="Available Coverage Near You" actionLabel="Browse all" actionHref="/worker/requests">
         {loading ? (
           <Placeholder>Loading…</Placeholder>
+        ) : !canReceiveRequests ? (
+          <Placeholder>You are unavailable, so coverage requests are hidden.</Placeholder>
         ) : nearbyCoverage.length === 0 ? (
           <Placeholder>No nearby coverage requests right now.</Placeholder>
         ) : (
-          nearbyCoverage.slice(0, 3).map((request) => (
+          nearbyCoverage.slice(0, 4).map((request) => (
             <RequestPreviewCard key={request.id} request={request} />
           ))
         )}
@@ -151,6 +156,7 @@ function HomeTopCard({
   busy,
   error,
   openRequestCount,
+  canReceiveRequests,
   onSetUnavailable,
   onToggleUrgentAlerts,
 }: {
@@ -161,6 +167,7 @@ function HomeTopCard({
   busy: boolean;
   error: string | null;
   openRequestCount: number;
+  canReceiveRequests: boolean;
   onSetUnavailable: () => void;
   onToggleUrgentAlerts: () => void;
 }) {
@@ -183,7 +190,9 @@ function HomeTopCard({
           Hello, {firstName}.
         </h1>
         <p style={{ margin: "6px 0 0", color: "#496158" }}>
-          {openRequestCount > 0
+          {!canReceiveRequests
+            ? "You are unavailable. New request alerts are paused."
+            : openRequestCount > 0
             ? `${openRequestCount} new request${openRequestCount === 1 ? "" : "s"} available.`
             : "No new requests right now."}
         </p>
@@ -479,6 +488,14 @@ function compareRequestsByStart(left: StaffingRequest, right: StaffingRequest): 
   return requestStartTime(left) - requestStartTime(right);
 }
 
+function compareRequestsByNewest(left: StaffingRequest, right: StaffingRequest): number {
+  return requestCreatedTime(right) - requestCreatedTime(left) || compareRequestsByStart(left, right);
+}
+
 function requestStartTime(request: StaffingRequest): number {
   return new Date(`${request.work_date}T${request.start_time}`).getTime();
+}
+
+function requestCreatedTime(request: StaffingRequest): number {
+  return request.created_at ? new Date(request.created_at).getTime() : 0;
 }

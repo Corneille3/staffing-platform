@@ -25,3 +25,8 @@ class AssignmentCreate(BaseModel):
     worker_user_id: UUID
     assigned_by_user_id: UUID
     notes: str | None = None
+
+
+class AssignmentCancel(BaseModel):
+    reason: str
+    notes: str | None = None

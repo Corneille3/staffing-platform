@@ -44,6 +44,10 @@ export default function WorkerRequestsPage() {
     setLoading(true);
     setError(null);
     try {
+      if (worker.profile?.availability_status !== "available") {
+        setItems([]);
+        return;
+      }
       const all = await fetchRequests();
       const open = all.filter((r) =>
         ["open", "notified", "responses_received"].includes(r.status),
@@ -94,6 +98,7 @@ export default function WorkerRequestsPage() {
 
   if (!worker) return null;
   const locale = pickLocale(worker.preferred_language);
+  const canReceiveRequests = worker.profile?.availability_status === "available";
 
   async function respond(requestId: string, action: "accept" | "decline") {
     if (!worker) return;
@@ -119,7 +124,9 @@ export default function WorkerRequestsPage() {
       <header>
         <h1 style={{ margin: 0, fontSize: 26 }}>Available requests</h1>
         <p style={{ margin: "6px 0 0", color: "#496158" }}>
-          Tap a request to accept or decline.
+          {canReceiveRequests
+            ? "Tap a request to accept or decline."
+            : "You are unavailable. New request alerts are paused."}
         </p>
       </header>
 
@@ -140,6 +147,8 @@ export default function WorkerRequestsPage() {
 
       {loading ? (
         <p style={{ color: "#496158" }}>Loading…</p>
+      ) : !canReceiveRequests ? (
+        <Empty>Set your availability to available to receive new requests.</Empty>
       ) : (
         <>
           <CoverageFilters

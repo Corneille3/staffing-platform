@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.scope import AccessScope
 from app.models.assignment import Assignment
+from app.models.enums import AssignmentStatus
 from app.models.staffing_request import StaffingRequest
 
 
@@ -31,7 +32,14 @@ class AssignmentRepository:
         return list(self.db.scalars(stmt).all())
 
     def get_by_request(self, request_id):
-        stmt = select(Assignment).where(Assignment.staffing_request_id == request_id)
+        stmt = select(Assignment).where(
+            Assignment.staffing_request_id == request_id,
+            Assignment.status != AssignmentStatus.CANCELLED,
+        )
+        return self.db.scalar(stmt)
+
+    def get(self, assignment_id):
+        stmt = select(Assignment).where(Assignment.id == assignment_id)
         return self.db.scalar(stmt)
 
     def create(self, assignment: Assignment) -> Assignment:

@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Assignment, RequestResponse, StaffingRequest, User } from "../lib/types";
+import { availabilityStatusLabel } from "../lib/status-labels";
+import { Assignment, RequestResponse, StaffingRequest, User, Worker } from "../lib/types";
 
 const browserApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -11,26 +12,38 @@ function formatStatus(value: string) {
   return value.replace(/_/g, " ");
 }
 
+const ASSIGNMENT_CANCELLATION_REASONS = [
+  "Worker unavailable",
+  "Coordinator changed plan",
+  "Request no longer needed",
+  "Other",
+];
+
 export function RequestWorkflowCard({
   request,
   responses,
   users,
+  workers,
   assignment,
 }: {
   request: StaffingRequest;
   responses: RequestResponse[];
   users: User[];
+  workers: Worker[];
   assignment: Assignment | null;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [assignWorkerId, setAssignWorkerId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [cancelAssignmentOpen, setCancelAssignmentOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState(ASSIGNMENT_CANCELLATION_REASONS[0]);
+  const [cancelNotes, setCancelNotes] = useState("");
 
-  const workers = users.filter((user) => user.role === "worker");
+  const workerUsers = users.filter((user) => user.role === "worker");
   const orgAdmin = users.find((user) => user.role === "org_admin");
   const acceptedResponses = responses.filter((response) => response.status === "accepted");
   const assignedWorker = users.find((user) => user.id === request.assigned_worker_user_id || user.id === assignment?.worker_user_id);
+  const assignedWorkerProfile = workers.find((worker) => worker.id === assignment?.worker_user_id) || null;
   const isClosed = request.status === "assigned" || request.status === "cancelled" || request.status === "completed";
 
   async function post(path: string, payload?: object) {
@@ -156,9 +169,18 @@ export function RequestWorkflowCard({
         </p>
       ) : null}
 
+      {assignment && assignedWorkerProfile ? (
+        <AssignedWorkerCard
+          worker={assignedWorkerProfile}
+          assignment={assignment}
+          disabled={isPending}
+          onCancel={() => setCancelAssignmentOpen(true)}
+        />
+      ) : null}
+
       <div style={{ display: "grid", gap: 10 }}>
         <strong style={{ fontSize: 18 }}>Worker responses</strong>
-        {workers.map((worker) => {
+        {workerUsers.map((worker) => {
           const response = responses.find((item) => item.worker_user_id === worker.id);
           return (
             <div
@@ -231,64 +253,28 @@ export function RequestWorkflowCard({
       </div>
 
       {request.status !== "assigned" && acceptedResponses.length > 0 && orgAdmin ? (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 12,
-            alignItems: "center",
-            padding: 16,
-            borderRadius: 18,
-            background: "#e2ebdd",
-          }}
-        >
-          <strong>Assign accepted worker</strong>
-          <select
-            value={assignWorkerId}
-            onChange={(event) => setAssignWorkerId(event.target.value)}
-            style={{
-              borderRadius: 12,
-              border: "1px solid rgba(24, 50, 41, 0.2)",
-              padding: "10px 12px",
-              minWidth: 220,
-            }}
-          >
-            <option value="">Choose worker</option>
-            {acceptedResponses.map((response) => {
-              const worker = users.find((user) => user.id === response.worker_user_id);
-              if (!worker) {
-                return null;
-              }
-              return (
-                <option key={worker.id} value={worker.id}>
-                  {worker.first_name} {worker.last_name}
-                </option>
-              );
-            })}
-          </select>
-          <button
-            type="button"
-            disabled={isPending || !assignWorkerId}
-            onClick={() =>
-              post("/api/v1/assignments", {
-                staffing_request_id: request.id,
-                worker_user_id: assignWorkerId,
-                assigned_by_user_id: orgAdmin.id,
-                notes: "Assigned from dashboard",
-              })
-            }
-            style={{
-              border: 0,
-              borderRadius: 999,
-              padding: "12px 16px",
-              background: "#183229",
-              color: "#f7f0df",
-              cursor: "pointer",
-              fontWeight: 700,
-            }}
-          >
-            Confirm assignment
-          </button>
+        <div style={{ display: "grid", gap: 12 }}>
+          <strong style={{ fontSize: 18 }}>Review accepted workers</strong>
+          {acceptedResponses.map((response) => {
+            const worker = workers.find((item) => item.id === response.worker_user_id);
+            if (!worker) return null;
+            return (
+              <WorkerReviewCard
+                key={worker.id}
+                worker={worker}
+                request={request}
+                disabled={isPending}
+                onConfirm={() =>
+                  post("/api/v1/assignments", {
+                    staffing_request_id: request.id,
+                    worker_user_id: worker.id,
+                    assigned_by_user_id: orgAdmin.id,
+                    notes: "Assigned after worker profile review",
+                  })
+                }
+              />
+            );
+          })}
         </div>
       ) : request.status !== "assigned" && responses.length > 0 ? (
         <div
@@ -303,6 +289,331 @@ export function RequestWorkflowCard({
           Assignment opens after at least one notified worker accepts.
         </div>
       ) : null}
+
+      {assignment && cancelAssignmentOpen ? (
+        <CancelAssignmentModal
+          workerName={
+            assignedWorker
+              ? `${assignedWorker.first_name} ${assignedWorker.last_name}`
+              : "this worker"
+          }
+          reason={cancelReason}
+          notes={cancelNotes}
+          disabled={isPending}
+          onReasonChange={setCancelReason}
+          onNotesChange={setCancelNotes}
+          onClose={() => setCancelAssignmentOpen(false)}
+          onConfirm={() => {
+            setCancelAssignmentOpen(false);
+            post(`/api/v1/assignments/${assignment.id}/cancel`, {
+              reason: cancelReason,
+              notes: cancelNotes.trim() || undefined,
+            });
+          }}
+        />
+      ) : null}
     </article>
   );
+}
+
+function AssignedWorkerCard({
+  worker,
+  assignment,
+  disabled,
+  onCancel,
+}: {
+  worker: Worker;
+  assignment: Assignment;
+  disabled: boolean;
+  onCancel: () => void;
+}) {
+  const profile = worker.profile;
+
+  return (
+    <article
+      style={{
+        borderRadius: 18,
+        padding: 16,
+        background: "#e2ebdd",
+        display: "grid",
+        gap: 14,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
+        <div>
+          <strong style={{ display: "block", fontSize: 18 }}>
+            Assigned worker: {worker.first_name} {worker.last_name}
+          </strong>
+          <span style={{ display: "block", marginTop: 4, color: "#496158", fontSize: 14 }}>
+            {worker.email}
+          </span>
+        </div>
+        <StatusChip label={formatStatus(assignment.status)} tone="good" />
+      </div>
+
+      <div style={{ display: "grid", gap: 8, color: "#314c42", fontSize: 14 }}>
+        <span><strong>Availability:</strong> {profile ? availabilityStatusLabel(profile.availability_status) : "no profile"}</span>
+        <span><strong>Language:</strong> {worker.preferred_language}</span>
+        <span><strong>Cities:</strong> {profile?.supported_cities.join(", ") || "none"}</span>
+        <span><strong>Qualifications:</strong> {profile?.qualifications.join(", ") || "none"}</span>
+        <span><strong>Certifications:</strong> {profile?.certifications.join(", ") || "none"}</span>
+        <span><strong>Assigned at:</strong> {new Date(assignment.assigned_at).toLocaleString()}</span>
+      </div>
+
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onCancel}
+        style={{
+          border: 0,
+          borderRadius: 999,
+          padding: "12px 16px",
+          background: "#eadfd7",
+          color: "#7a473f",
+          cursor: disabled ? "wait" : "pointer",
+          fontWeight: 800,
+        }}
+      >
+        Cancel assignment
+      </button>
+    </article>
+  );
+}
+
+function CancelAssignmentModal({
+  workerName,
+  reason,
+  notes,
+  disabled,
+  onReasonChange,
+  onNotesChange,
+  onClose,
+  onConfirm,
+}: {
+  workerName: string;
+  reason: string;
+  notes: string;
+  disabled: boolean;
+  onReasonChange: (reason: string) => void;
+  onNotesChange: (notes: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 50,
+        background: "rgba(24, 50, 41, 0.35)",
+        display: "grid",
+        placeItems: "center",
+        padding: 18,
+      }}
+    >
+      <section
+        style={{
+          width: "min(100%, 460px)",
+          borderRadius: 22,
+          padding: 20,
+          background: "#fffdf7",
+          boxShadow: "0 18px 40px rgba(24, 50, 41, 0.22)",
+          display: "grid",
+          gap: 16,
+        }}
+      >
+        <div>
+          <h3 style={{ margin: 0, fontSize: 22 }}>Cancel assignment</h3>
+          <p style={{ margin: "8px 0 0", color: "#496158", lineHeight: 1.45 }}>
+            Cancel the confirmed shift for {workerName}. The request will reopen for coordinator review.
+          </p>
+        </div>
+
+        <label style={{ display: "grid", gap: 8, color: "#314c42", fontWeight: 800 }}>
+          Reason
+          <select
+            value={reason}
+            onChange={(event) => onReasonChange(event.target.value)}
+            style={{
+              borderRadius: 12,
+              border: "1px solid rgba(24, 50, 41, 0.18)",
+              padding: "12px 14px",
+              background: "#fff",
+              color: "#183229",
+              font: "inherit",
+            }}
+          >
+            {ASSIGNMENT_CANCELLATION_REASONS.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label style={{ display: "grid", gap: 8, color: "#314c42", fontWeight: 800 }}>
+          Notes
+          <textarea
+            value={notes}
+            onChange={(event) => onNotesChange(event.target.value)}
+            rows={4}
+            placeholder="Optional details"
+            style={{
+              borderRadius: 12,
+              border: "1px solid rgba(24, 50, 41, 0.18)",
+              padding: "12px 14px",
+              background: "#fff",
+              color: "#183229",
+              font: "inherit",
+              resize: "vertical",
+            }}
+          />
+        </label>
+
+        <div style={{ display: "flex", justifyContent: "end", gap: 10 }}>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onClose}
+            style={{
+              border: 0,
+              borderRadius: 999,
+              padding: "12px 16px",
+              background: "#e4eadf",
+              color: "#183229",
+              cursor: disabled ? "wait" : "pointer",
+              fontWeight: 800,
+            }}
+          >
+            Keep assignment
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onConfirm}
+            style={{
+              border: 0,
+              borderRadius: 999,
+              padding: "12px 16px",
+              background: "#7a3526",
+              color: "#fffdf7",
+              cursor: disabled ? "wait" : "pointer",
+              fontWeight: 800,
+            }}
+          >
+            Cancel assignment
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function WorkerReviewCard({
+  worker,
+  request,
+  disabled,
+  onConfirm,
+}: {
+  worker: Worker;
+  request: StaffingRequest;
+  disabled: boolean;
+  onConfirm: () => void;
+}) {
+  const profile = worker.profile;
+  const missingQualification = missingItems(request.required_qualifications, profile?.qualifications || []);
+  const missingCertification = missingItems(request.required_certifications || [], profile?.certifications || []);
+  const languageMatches = !request.language_requirement || worker.preferred_language === request.language_requirement || worker.preferred_language === "bilingual";
+  const cityMatches = Boolean(profile?.supported_cities.includes(request.city));
+
+  return (
+    <article
+      style={{
+        borderRadius: 18,
+        padding: 16,
+        background: "#e2ebdd",
+        display: "grid",
+        gap: 14,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
+        <div>
+          <strong style={{ display: "block", fontSize: 18 }}>
+            {worker.first_name} {worker.last_name}
+          </strong>
+          <span style={{ display: "block", marginTop: 4, color: "#496158", fontSize: 14 }}>
+            {worker.email}
+          </span>
+        </div>
+        <StatusChip
+          label={profile ? availabilityStatusLabel(profile.availability_status) : "no profile"}
+          tone={profile?.availability_status === "available" ? "good" : "warn"}
+        />
+      </div>
+
+      <div style={{ display: "grid", gap: 8, color: "#314c42", fontSize: 14 }}>
+        <span><strong>Language:</strong> {worker.preferred_language}</span>
+        <span><strong>Cities:</strong> {profile?.supported_cities.join(", ") || "none"}</span>
+        <span><strong>Qualifications:</strong> {profile?.qualifications.join(", ") || "none"}</span>
+        <span><strong>Certifications:</strong> {profile?.certifications.join(", ") || "none"}</span>
+      </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <StatusChip label={cityMatches ? "City match" : `Missing: ${request.city}`} tone={cityMatches ? "good" : "warn"} />
+        <StatusChip label={languageMatches ? "Language match" : `Missing: ${request.language_requirement}`} tone={languageMatches ? "good" : "warn"} />
+        {missingQualification.length === 0 ? (
+          <StatusChip label="Qualification match" tone="good" />
+        ) : (
+          missingQualification.map((item) => <StatusChip key={item} label={`Missing: ${item}`} tone="warn" />)
+        )}
+        {missingCertification.length === 0 ? (
+          <StatusChip label="Certification match" tone="good" />
+        ) : (
+          missingCertification.map((item) => <StatusChip key={item} label={`Missing: ${item}`} tone="warn" />)
+        )}
+      </div>
+
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onConfirm}
+        style={{
+          border: 0,
+          borderRadius: 999,
+          padding: "12px 16px",
+          background: "#183229",
+          color: "#f7f0df",
+          cursor: disabled ? "wait" : "pointer",
+          fontWeight: 800,
+        }}
+      >
+        Confirm this worker
+      </button>
+    </article>
+  );
+}
+
+function StatusChip({ label, tone }: { label: string; tone: "good" | "warn" }) {
+  return (
+    <span
+      style={{
+        borderRadius: 999,
+        padding: "6px 10px",
+        background: tone === "good" ? "#d2ead8" : "#f4d4cc",
+        color: tone === "good" ? "#214639" : "#7a3526",
+        fontSize: 12,
+        fontWeight: 800,
+        textTransform: "capitalize",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function missingItems(required: string[], workerItems: string[]): string[] {
+  const workerSet = new Set(workerItems);
+  return required.filter((item) => !workerSet.has(item));
 }

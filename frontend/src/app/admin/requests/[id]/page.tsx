@@ -9,6 +9,7 @@ import {
   getRequest,
   getRequestResponses,
   getUsers,
+  getWorkers,
 } from "../../../../lib/api";
 import { RequestResponse, User } from "../../../../lib/types";
 
@@ -45,15 +46,16 @@ export default async function RequestDetailPage({
     notFound();
   }
 
-  const [users, organizations, assignments, responses] = await Promise.all([
+  const [users, workers, organizations, assignments, responses] = await Promise.all([
     getUsers(),
+    getWorkers(),
     getOrganizations(),
     getAssignments(),
     getRequestResponses(id),
   ]);
 
   const organization = organizations.find((item) => item.id === request.organization_id);
-  const assignment = assignments.find((item) => item.staffing_request_id === request.id) || null;
+  const assignment = assignments.find((item) => item.staffing_request_id === request.id && item.status !== "cancelled") || null;
   const assignedWorker = assignment ? formatWorkerName(users, assignment.worker_user_id) : null;
   const counts = responseCounts(responses);
 
@@ -185,6 +187,7 @@ export default async function RequestDetailPage({
             request={request}
             responses={responses}
             users={users}
+            workers={workers}
             assignment={assignment}
           />
         </Panel>

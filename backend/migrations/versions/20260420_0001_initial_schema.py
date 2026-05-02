@@ -193,7 +193,7 @@ def upgrade() -> None:
     op.create_table(
         'assignments',
         sa.Column('id', postgresql.UUID(as_uuid=False), primary_key=True),
-        sa.Column('staffing_request_id', postgresql.UUID(as_uuid=False), sa.ForeignKey('staffing_requests.id', ondelete='CASCADE'), nullable=False, unique=True),
+        sa.Column('staffing_request_id', postgresql.UUID(as_uuid=False), sa.ForeignKey('staffing_requests.id', ondelete='CASCADE'), nullable=False),
         sa.Column('worker_user_id', postgresql.UUID(as_uuid=False), sa.ForeignKey('users.id', ondelete='RESTRICT'), nullable=False),
         sa.Column('assigned_by_user_id', postgresql.UUID(as_uuid=False), sa.ForeignKey('users.id', ondelete='RESTRICT'), nullable=False),
         sa.Column('status', assignment_status, nullable=False, server_default='pending_confirmation'),
