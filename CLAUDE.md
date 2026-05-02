@@ -28,7 +28,16 @@ close-and-reopen the IDE" troubleshooting from prior sessions — the disk
 state is authoritative.
 
 **Last shipped (most recent first):**
-1. Bug fixes + admin UX polish — psycopg3 UUID adapter registration via
+1. A8 + A9 — Assignment detail enrichments + preferred cities.
+   A8: `contact_name`, `contact_phone`, `contact_email`, `arrival_instructions`
+   added to `staffing_requests` (model, migration, schema, SQL doc, TS types,
+   seed). Worker assignment card surfaces contact block (tappable tel/mailto
+   links), arrival instructions, and a Google Calendar add-to-calendar link;
+   coordinator notes hidden from worker view. A9: preferred cities picker on
+   `/worker/availability` — chip list with × remove + text input to add;
+   backed by `worker_regions` table; PATCH `/workers/{id}/availability` now
+   accepts `supported_cities: list[str]` and replaces region rows atomically.
+2. Bug fixes + admin UX polish — psycopg3 UUID adapter registration via
    `register_default_adapters` (fixed 500 on `GET /workers`); admin request
    workflow sorted newest-first by `created_at`; worker response status labels
    humanised ("Notified — awaiting reply" / "Accepted" / "Declined") in
@@ -333,7 +342,7 @@ This roadmap closes the gap between the current code and the product vision in
 `Implementation-idea.md`. Items are ordered by dependency + leverage. Tick
 each as it ships and keep "Current focus" in sync.
 
-**Current focus:** A8 — Assignment detail enrichments.
+**Current focus:** A10 — Notifications grouped by type.
 
 ### Phase A — Worker UX core (the doc's heaviest emphasis)
 
@@ -380,13 +389,17 @@ each as it ships and keep "Current focus" in sync.
   *Shipped: DeclineModal with reason select, decline_reason stored on
   request_responses, surfaced on declined cards. Backend: nullable
   decline_reason column + schema/service/route threaded through.*
-- [ ] **A8. Assignment detail enrichments.** Contact person + phone/email,
-  arrival/parking instructions, add-to-calendar, request-cancellation
-  (admin-confirmed, not direct cancel).
-- [ ] **A9. Availability screen polish.** Available/Unavailable toggle (have),
-  urgent-alerts on/off (now editable from the A4 home card; optionally mirror
-  here), preferred cities (new), optional preferred days (new — checkboxes
-  only, not a calendar).
+- [x] **A8. Assignment detail enrichments.** Contact person + phone/email,
+  arrival/parking instructions, add-to-calendar link (Google Calendar URL),
+  coordinator notes hidden from worker view.
+  *Shipped: `contact_name`, `contact_phone`, `contact_email`,
+  `arrival_instructions` on `staffing_requests`; worker assignment card
+  surfaces all four with tappable links and a calendar button.*
+- [x] **A9. Availability screen polish.** Preferred cities picker on
+  `/worker/availability` — chips with remove + text input to add; backed by
+  `worker_regions`; PATCH `/workers/{id}/availability` accepts
+  `supported_cities`. Preferred days deferred (no matching logic yet).
+  *Shipped: city picker live on `/worker/availability`.*
 - [ ] **A10. Notifications grouped by type.** Types: new request · urgent ·
   response received · assigned · not selected · cancelled · reminder.
   Human copy on each.

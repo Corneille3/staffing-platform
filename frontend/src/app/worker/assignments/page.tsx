@@ -188,13 +188,93 @@ function AssignmentCard({
       <div style={{ display: "grid", gap: 4, color: sub, fontSize: 14 }}>
         <span>📍 {request.location_name ? `${request.location_name}, ${request.city}` : request.city}</span>
         <span>📅 {request.work_date}</span>
-        <span>
-          🕒 {request.start_time.slice(0, 5)} – {request.end_time.slice(0, 5)}
-        </span>
+        <span>🕒 {request.start_time.slice(0, 5)} – {request.end_time.slice(0, 5)}</span>
       </div>
-      {assignment.notes ? (
-        <p style={{ margin: 0, color: sub, fontSize: 14, lineHeight: 1.5 }}>{assignment.notes}</p>
+
+      {(request.contact_name || request.contact_phone || request.contact_email) && !muted ? (
+        <div
+          style={{
+            borderRadius: 14,
+            padding: "12px 14px",
+            background: "rgba(247, 240, 223, 0.12)",
+            display: "grid",
+            gap: 6,
+            color: sub,
+            fontSize: 14,
+          }}
+        >
+          <strong style={{ color: fg, fontSize: 13, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+            Contact
+          </strong>
+          {request.contact_name ? <span>👤 {request.contact_name}</span> : null}
+          {request.contact_phone ? (
+            <a href={`tel:${request.contact_phone}`} style={{ color: fg, fontWeight: 700 }}>
+              📞 {request.contact_phone}
+            </a>
+          ) : null}
+          {request.contact_email ? (
+            <a href={`mailto:${request.contact_email}`} style={{ color: fg, fontWeight: 700 }}>
+              ✉️ {request.contact_email}
+            </a>
+          ) : null}
+        </div>
+      ) : null}
+
+      {request.arrival_instructions && !muted ? (
+        <div
+          style={{
+            borderRadius: 14,
+            padding: "12px 14px",
+            background: "rgba(247, 240, 223, 0.12)",
+            display: "grid",
+            gap: 6,
+            color: sub,
+            fontSize: 14,
+          }}
+        >
+          <strong style={{ color: fg, fontSize: 13, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+            Arrival
+          </strong>
+          <span style={{ lineHeight: 1.5 }}>{request.arrival_instructions}</span>
+        </div>
+      ) : null}
+
+
+      {!muted ? (
+        <a
+          href={buildCalendarUrl(request)}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "block",
+            textAlign: "center",
+            borderRadius: 14,
+            padding: "14px 18px",
+            background: "rgba(247, 240, 223, 0.15)",
+            color: fg,
+            fontWeight: 800,
+            fontSize: 14,
+            textDecoration: "none",
+            border: "1px solid rgba(247, 240, 223, 0.25)",
+          }}
+        >
+          📅 Add to calendar
+        </a>
       ) : null}
     </article>
   );
+}
+
+function buildCalendarUrl(request: StaffingRequest): string {
+  const start = `${request.work_date.replace(/-/g, "")}T${request.start_time.slice(0, 5).replace(":", "")}00`;
+  const end = `${request.work_date.replace(/-/g, "")}T${request.end_time.slice(0, 5).replace(":", "")}00`;
+  const location = request.location_name ? `${request.location_name}, ${request.city}` : request.city;
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: request.title,
+    dates: `${start}/${end}`,
+    location,
+    details: request.arrival_instructions || "",
+  });
+  return `https://calendar.google.com/calendar/render?${params}`;
 }

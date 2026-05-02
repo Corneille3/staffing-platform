@@ -36,9 +36,10 @@ class WorkerRead(BaseModel):
 class WorkerAvailabilityUpdate(BaseModel):
     availability_status: AvailabilityStatus | None = None
     urgent_alert_opt_in: bool | None = None
+    supported_cities: list[str] | None = None
 
     @model_validator(mode='after')
     def require_at_least_one_change(self):
-        if self.availability_status is None and self.urgent_alert_opt_in is None:
+        if self.availability_status is None and self.urgent_alert_opt_in is None and self.supported_cities is None:
             raise ValueError('At least one worker preference must be provided.')
         return self

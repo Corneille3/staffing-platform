@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
 
 from app.auth.scope import AccessScope
 from app.models.enums import AvailabilityStatus
 from app.models.worker_profile import WorkerProfile
+from app.models.worker_region import WorkerRegion
 from app.models.user import User
 from app.repositories.worker_repository import WorkerRepository
 from app.services.audit_service import AuditService
@@ -32,6 +33,7 @@ class WorkerService:
         user_id: UUID,
         availability_status: AvailabilityStatus | None = None,
         urgent_alert_opt_in: bool | None = None,
+        supported_cities: list[str] | None = None,
     ) -> WorkerProfile | None:
         profile = self.repository.get_profile(user_id)
         if profile is None:
@@ -44,6 +46,14 @@ class WorkerService:
         if urgent_alert_opt_in is not None:
             profile.urgent_alert_opt_in = urgent_alert_opt_in
             payload['urgent_alert_opt_in'] = urgent_alert_opt_in
+        if supported_cities is not None:
+            profile.region_records.clear()
+            profile.region_records.extend(
+                WorkerRegion(id=uuid4(), worker_profile_id=profile.id, city=city.strip(), region=None)
+                for city in supported_cities
+                if city.strip()
+            )
+            payload['supported_cities'] = supported_cities
 
         saved = self.repository.save(profile)
         self.audit_service.log(

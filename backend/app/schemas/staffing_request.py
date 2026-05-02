@@ -20,6 +20,10 @@ class StaffingRequestBase(BaseModel):
     end_time: time
     urgency_level: int = 1
     language_requirement: str | None = 'fr'
+    contact_name: str | None = None
+    contact_phone: str | None = None
+    contact_email: str | None = None
+    arrival_instructions: str | None = None
     required_qualifications: list[dict] | list[str] = Field(default_factory=list)
     required_certifications: list[dict] | list[str] = Field(default_factory=list)
 

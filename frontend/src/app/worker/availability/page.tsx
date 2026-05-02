@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { updateAvailability } from "../../../lib/browser-api";
+import { updateAvailability, updateWorkerPreferences } from "../../../lib/browser-api";
 import { availabilityStatusLabel, pickLocale } from "../../../lib/status-labels";
 import { useWorkerSession } from "../../../lib/worker-session";
 
@@ -9,12 +9,16 @@ export default function WorkerAvailabilityPage() {
   const { worker, refresh } = useWorkerSession();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cityInput, setCityInput] = useState("");
+  const [cityBusy, setCityBusy] = useState(false);
+  const [cityError, setCityError] = useState<string | null>(null);
 
   if (!worker) return null;
   const locale = pickLocale(worker.preferred_language);
 
   const status = worker.profile?.availability_status || "unknown";
   const statusLabel = availabilityStatusLabel(status, locale);
+  const cities: string[] = worker.profile?.supported_cities ?? [];
 
   async function setStatus(next: "available" | "unavailable") {
     if (!worker) return;
@@ -28,6 +32,31 @@ export default function WorkerAvailabilityPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function saveCities(next: string[]) {
+    if (!worker) return;
+    setCityBusy(true);
+    setCityError(null);
+    try {
+      await updateWorkerPreferences(worker.id, { supported_cities: next });
+      await refresh();
+    } catch (err) {
+      setCityError(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setCityBusy(false);
+    }
+  }
+
+  function addCity() {
+    const trimmed = cityInput.trim();
+    if (!trimmed || cities.includes(trimmed)) { setCityInput(""); return; }
+    saveCities([...cities, trimmed]);
+    setCityInput("");
+  }
+
+  function removeCity(city: string) {
+    saveCities(cities.filter((c) => c !== city));
   }
 
   return (
@@ -108,6 +137,110 @@ export default function WorkerAvailabilityPage() {
       >
         When you are <strong>unavailable</strong>, you will not be matched to new requests. You can
         still see and respond to ones already sent to you.
+      </section>
+
+      <section
+        style={{
+          background: "#fffdf7",
+          borderRadius: 22,
+          padding: 22,
+          boxShadow: "0 8px 18px rgba(24, 50, 41, 0.08)",
+          display: "grid",
+          gap: 18,
+        }}
+      >
+        <div>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Preferred cities</h2>
+          <p style={{ margin: "6px 0 0", color: "#496158", fontSize: 14 }}>
+            Only requests in these cities will be matched to you.
+          </p>
+        </div>
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+          {cities.length === 0 ? (
+            <span style={{ color: "#5d6d66", fontSize: 14 }}>No cities added yet.</span>
+          ) : (
+            cities.map((city) => (
+              <span
+                key={city}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  borderRadius: 999,
+                  padding: "8px 14px",
+                  background: "#e2ebdd",
+                  color: "#214639",
+                  fontWeight: 800,
+                  fontSize: 14,
+                }}
+              >
+                {city}
+                <button
+                  type="button"
+                  aria-label={`Remove ${city}`}
+                  disabled={cityBusy}
+                  onClick={() => removeCity(city)}
+                  style={{
+                    border: 0,
+                    background: "none",
+                    color: "#496158",
+                    cursor: cityBusy ? "wait" : "pointer",
+                    padding: 0,
+                    fontSize: 16,
+                    lineHeight: 1,
+                    fontWeight: 800,
+                  }}
+                >
+                  ×
+                </button>
+              </span>
+            ))
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <input
+            type="text"
+            value={cityInput}
+            placeholder="Add a city…"
+            onChange={(e) => setCityInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCity(); } }}
+            disabled={cityBusy}
+            style={{
+              flex: 1,
+              border: "1px solid rgba(24, 50, 41, 0.18)",
+              borderRadius: 12,
+              padding: "12px 14px",
+              fontSize: 15,
+              background: "#fff",
+              color: "#183229",
+              font: "inherit",
+            }}
+          />
+          <button
+            type="button"
+            disabled={cityBusy || !cityInput.trim()}
+            onClick={addCity}
+            style={{
+              border: 0,
+              borderRadius: 12,
+              padding: "12px 18px",
+              background: "#214639",
+              color: "#f7f0df",
+              fontWeight: 800,
+              fontSize: 15,
+              cursor: cityBusy || !cityInput.trim() ? "default" : "pointer",
+              opacity: cityBusy || !cityInput.trim() ? 0.5 : 1,
+            }}
+          >
+            Add
+          </button>
+        </div>
+
+        {cityError ? (
+          <p style={{ margin: 0, color: "#7a3526", fontWeight: 700, fontSize: 14 }}>{cityError}</p>
+        ) : null}
       </section>
     </div>
   );

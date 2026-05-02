@@ -50,6 +50,10 @@ export type StaffingRequest = {
   status: string;
   urgency_level: number;
   language_requirement: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  arrival_instructions: string | null;
   required_qualifications: string[];
   required_certifications?: string[];
   assigned_worker_user_id: string | null;

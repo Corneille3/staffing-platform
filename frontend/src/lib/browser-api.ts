@@ -127,6 +127,7 @@ export async function updateWorkerPreferences(
   payload: {
     availability_status?: "available" | "unavailable";
     urgent_alert_opt_in?: boolean;
+    supported_cities?: string[];
   },
 ): Promise<WorkerProfile> {
   return patchJson<WorkerProfile>(`/api/v1/workers/${workerId}/availability`, payload);

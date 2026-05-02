@@ -64,6 +64,7 @@ def update_worker_availability(
         user_id,
         availability_status=payload.availability_status,
         urgent_alert_opt_in=payload.urgent_alert_opt_in,
+        supported_cities=payload.supported_cities,
     )
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Worker profile not found')

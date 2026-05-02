@@ -127,6 +127,10 @@ def seed() -> None:
             end_time=time(hour=12),
             urgency_level=3,
             language_requirement='fr',
+            contact_name='Marie-Claude Bergeron',
+            contact_phone='306-555-0147',
+            contact_email='mc.bergeron@example.org',
+            arrival_instructions='Enter through the side door on Rue des Érables. Sign in at the front desk and ask for Marie-Claude.',
         )
         staffing_request.requirements = [
             RequestRequirement(
