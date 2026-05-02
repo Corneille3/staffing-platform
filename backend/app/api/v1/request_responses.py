@@ -68,5 +68,7 @@ def decline_request_response(
             status_code=status.HTTP_403_FORBIDDEN,
             detail='Workers may only respond on their own behalf.',
         )
-    saved = ResponseService(db).set_status(request_id, payload.worker_user_id, ResponseStatus.DECLINED)
+    saved = ResponseService(db).set_status(
+        request_id, payload.worker_user_id, ResponseStatus.DECLINED, payload.decline_reason
+    )
     return RequestResponseRead.model_validate(saved)

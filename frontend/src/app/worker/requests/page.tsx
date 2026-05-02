@@ -38,6 +38,8 @@ export default function WorkerRequestsPage() {
   const [dateFilter, setDateFilter] = useState("");
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [confirmingRequest, setConfirmingRequest] = useState<StaffingRequest | null>(null);
+  const [decliningRequest, setDecliningRequest] = useState<StaffingRequest | null>(null);
+  const [declineReason, setDeclineReason] = useState<string>("");
 
   async function load() {
     if (!worker) return;
@@ -100,16 +102,18 @@ export default function WorkerRequestsPage() {
   const locale = pickLocale(worker.preferred_language);
   const canReceiveRequests = worker.profile?.availability_status === "available";
 
-  async function respond(requestId: string, action: "accept" | "decline") {
+  async function respond(requestId: string, action: "accept" | "decline", reason?: string) {
     if (!worker) return;
     setConfirmingRequest(null);
+    setDecliningRequest(null);
+    setDeclineReason("");
     setBusy(requestId);
     setError(null);
     try {
       if (action === "accept") {
         await acceptRequest(requestId, worker.id);
       } else {
-        await declineRequest(requestId, worker.id);
+        await declineRequest(requestId, worker.id, reason || undefined);
       }
       await load();
     } catch (err) {
@@ -183,7 +187,7 @@ export default function WorkerRequestsPage() {
                   locale={locale}
                   busy={busy === request.id}
                   onAccept={() => setConfirmingRequest(request)}
-                  onDecline={() => respond(request.id, "decline")}
+                  onDecline={() => setDecliningRequest(request)}
                 />
               ))
             )}
@@ -200,7 +204,7 @@ export default function WorkerRequestsPage() {
                   myUserId={worker.id}
                   locale={locale}
                   busy={busy === request.id}
-                  onDecline={() => respond(request.id, "decline")}
+                  onDecline={() => setDecliningRequest(request)}
                 />
               ))}
             </Group>
@@ -228,6 +232,16 @@ export default function WorkerRequestsPage() {
               busy={busy === confirmingRequest.id}
               onCancel={() => setConfirmingRequest(null)}
               onConfirm={() => respond(confirmingRequest.id, "accept")}
+            />
+          ) : null}
+          {decliningRequest ? (
+            <DeclineModal
+              request={decliningRequest}
+              reason={declineReason}
+              busy={busy === decliningRequest.id}
+              onReasonChange={setDeclineReason}
+              onCancel={() => { setDecliningRequest(null); setDeclineReason(""); }}
+              onConfirm={() => respond(decliningRequest.id, "decline", declineReason || undefined)}
             />
           ) : null}
         </>
@@ -493,6 +507,10 @@ function RequestCard({
         <p style={{ margin: 0, color: "#296246", fontSize: 14, fontWeight: 800 }}>
           Response sent. The coordinator will confirm.
         </p>
+      ) : myResponse?.status === "declined" && myResponse.decline_reason ? (
+        <p style={{ margin: 0, color: "#8c4d3f", fontSize: 13 }}>
+          Reason: {myResponse.decline_reason}
+        </p>
       ) : null}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -616,13 +634,109 @@ function ConfirmAvailabilityModal({
   );
 }
 
+const DECLINE_REASONS = [
+  "Not available",
+  "Too far",
+  "Not interested",
+  "Conflict with another assignment",
+  "Other",
+];
+
+function DeclineModal({
+  request,
+  reason,
+  busy,
+  onReasonChange,
+  onCancel,
+  onConfirm,
+}: {
+  request: StaffingRequest;
+  reason: string;
+  busy: boolean;
+  onReasonChange: (reason: string) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="decline-title"
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(24, 50, 41, 0.34)",
+        display: "flex",
+        alignItems: "end",
+        justifyContent: "center",
+        padding: 16,
+        zIndex: 30,
+      }}
+    >
+      <section
+        style={{
+          width: "min(100%, 440px)",
+          background: "#fffdf7",
+          color: "#183229",
+          borderRadius: 20,
+          padding: 20,
+          boxShadow: "0 18px 42px rgba(24, 50, 41, 0.24)",
+          display: "grid",
+          gap: 16,
+        }}
+      >
+        <div>
+          <h2 id="decline-title" style={{ margin: 0, fontSize: 22 }}>
+            Decline request
+          </h2>
+          <p style={{ margin: "8px 0 0", color: "#496158", lineHeight: 1.45 }}>
+            {request.title} · {request.city} · {request.work_date}
+          </p>
+        </div>
+
+        <label style={{ display: "grid", gap: 8, fontWeight: 700, color: "#314c42" }}>
+          Reason <span style={{ fontWeight: 400, fontSize: 13, color: "#5d6d66" }}>(optional)</span>
+          <select
+            value={reason}
+            onChange={(e) => onReasonChange(e.target.value)}
+            style={{
+              border: "1px solid rgba(24, 50, 41, 0.16)",
+              borderRadius: 12,
+              background: "#fff",
+              color: "#183229",
+              fontSize: 15,
+              minHeight: 44,
+              padding: "0 12px",
+              font: "inherit",
+            }}
+          >
+            <option value="">No reason provided</option>
+            {DECLINE_REASONS.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+        </label>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <BigButton tone="muted" disabled={busy} onClick={onCancel}>
+            Go back
+          </BigButton>
+          <BigButton tone="decline" disabled={busy} onClick={onConfirm}>
+            Decline
+          </BigButton>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function BigButton({
   tone,
   disabled,
   onClick,
   children,
 }: {
-  tone: "primary" | "muted";
+  tone: "primary" | "muted" | "decline";
   disabled: boolean;
   onClick: () => void;
   children: React.ReactNode;
@@ -630,6 +744,8 @@ function BigButton({
   const palette =
     tone === "primary"
       ? { bg: "#214639", color: "#f7f0df" }
+      : tone === "decline"
+      ? { bg: "#7a3526", color: "#fffdf7" }
       : { bg: "#eadfd7", color: "#7a473f" };
   return (
     <button

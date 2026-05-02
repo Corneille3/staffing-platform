@@ -86,6 +86,7 @@ export type RequestResponse = {
   staffing_request_id: string;
   worker_user_id: string;
   status: string;
+  decline_reason: string | null;
   responded_at: string | null;
 };
 

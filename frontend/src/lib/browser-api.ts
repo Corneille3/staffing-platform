@@ -102,9 +102,11 @@ export async function acceptRequest(
 export async function declineRequest(
   requestId: string,
   workerUserId: string,
+  declineReason?: string,
 ): Promise<RequestResponse> {
   return postJson<RequestResponse>(`/api/v1/requests/${requestId}/responses/decline`, {
     worker_user_id: workerUserId,
+    decline_reason: declineReason ?? null,
   });
 }
 

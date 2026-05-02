@@ -12,6 +12,7 @@ class RequestResponseRead(TimestampedSchema):
     staffing_request_id: UUID
     worker_user_id: UUID
     status: ResponseStatus
+    decline_reason: str | None = None
     responded_at: datetime | None = None
 
 
@@ -21,3 +22,4 @@ class RequestResponseUpdate(BaseModel):
 
 class RequestResponseAction(BaseModel):
     worker_user_id: UUID
+    decline_reason: str | None = None

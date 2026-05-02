@@ -184,6 +184,7 @@ def upgrade() -> None:
         sa.Column('staffing_request_id', postgresql.UUID(as_uuid=False), sa.ForeignKey('staffing_requests.id', ondelete='CASCADE'), nullable=False),
         sa.Column('worker_user_id', postgresql.UUID(as_uuid=False), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
         sa.Column('status', response_status, nullable=False),
+        sa.Column('decline_reason', sa.String(length=255), nullable=True),
         sa.Column('responded_at', sa.TIMESTAMP(timezone=True), nullable=True),
         sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False, server_default=sa.text('NOW()')),
         sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False, server_default=sa.text('NOW()')),

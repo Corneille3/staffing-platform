@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
@@ -23,6 +23,7 @@ class ResponseService:
         request_id: UUID,
         worker_user_id: UUID,
         response_status: ResponseStatus,
+        decline_reason: str | None = None,
     ) -> RequestResponse:
         staffing_request = self.request_repository.get(request_id)
         if staffing_request is None:
@@ -41,7 +42,9 @@ class ResponseService:
         else:
             response.status = response_status
 
-        response.responded_at = datetime.utcnow()
+        if response_status == ResponseStatus.DECLINED:
+            response.decline_reason = decline_reason
+        response.responded_at = datetime.now(timezone.utc)
         saved = self.response_repository.save(response)
         staffing_request.status = RequestStatus.RESPONSES_RECEIVED
         self.request_repository.save(staffing_request)
