@@ -313,7 +313,7 @@ This roadmap closes the gap between the current code and the product vision in
 `Implementation-idea.md`. Items are ordered by dependency + leverage. Tick
 each as it ships and keep "Current focus" in sync.
 
-**Current focus:** A4 — Worker home top card.
+**Current focus:** A5 — Worker home sections.
 
 ### Phase A — Worker UX core (the doc's heaviest emphasis)
 
@@ -339,9 +339,12 @@ each as it ships and keep "Current focus" in sync.
   *Shipped: worker request page tabs plus simple city/date/urgent filters in
   `frontend/src/app/worker/requests/page.tsx`. Filters apply before Pending /
   Accepted / Declined grouping and include a clear-filters action.*
-- [ ] **A4. Worker home top card.** Greeting, current availability,
+- [x] **A4. Worker home top card.** Greeting, current availability,
   urgent-alerts on/off, quick buttons (Set unavailable / Update availability
   / View available coverage).
+  *Shipped: `/worker` top card shows greeting, availability, urgent-alert
+  status, quick actions, and an editable urgent-alert toggle. Backend worker
+  profile PATCH now accepts `urgent_alert_opt_in` as well as availability.*
 - [ ] **A5. Worker home sections.** "Urgent Requests", "Available Coverage
   Near You" (cards), "Upcoming Assignment" — replacing any dashboard density.
 - [ ] **A6. Accept-flow confirmation modal.** "Confirm availability" step,
@@ -353,8 +356,9 @@ each as it ships and keep "Current focus" in sync.
   arrival/parking instructions, add-to-calendar, request-cancellation
   (admin-confirmed, not direct cancel).
 - [ ] **A9. Availability screen polish.** Available/Unavailable toggle (have),
-  urgent-alerts on/off (new), preferred cities (new), optional preferred
-  days (new — checkboxes only, not a calendar).
+  urgent-alerts on/off (now editable from the A4 home card; optionally mirror
+  here), preferred cities (new), optional preferred days (new — checkboxes
+  only, not a calendar).
 - [ ] **A10. Notifications grouped by type.** Types: new request · urgent ·
   response received · assigned · not selected · cancelled · reminder.
   Human copy on each.

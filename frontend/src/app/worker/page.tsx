@@ -6,17 +6,20 @@ import {
   fetchAssignments,
   fetchRequestResponses,
   fetchRequests,
+  updateWorkerPreferences,
 } from "../../lib/browser-api";
-import { assignmentStatusLabel, pickLocale } from "../../lib/status-labels";
+import { assignmentStatusLabel, availabilityStatusLabel, pickLocale } from "../../lib/status-labels";
 import { Assignment, RequestResponse, StaffingRequest } from "../../lib/types";
 import { useWorkerSession } from "../../lib/worker-session";
 
 export default function WorkerHome() {
-  const { worker } = useWorkerSession();
+  const { worker, refresh } = useWorkerSession();
   const [requests, setRequests] = useState<StaffingRequest[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [responses, setResponses] = useState<RequestResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [preferenceBusy, setPreferenceBusy] = useState(false);
+  const [preferenceError, setPreferenceError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!worker) return;
@@ -52,19 +55,42 @@ export default function WorkerHome() {
   const myAssignments = assignments.filter(
     (a) => a.worker_user_id === worker.id && a.status !== "completed" && a.status !== "cancelled",
   );
+  const workerId = worker.id;
+  const locale = pickLocale(worker.preferred_language);
+  const availabilityStatus = worker.profile?.availability_status || "unavailable";
+  const urgentAlertsEnabled = worker.profile?.urgent_alert_opt_in ?? false;
+
+  async function updatePreferences(payload: {
+    availability_status?: "available" | "unavailable";
+    urgent_alert_opt_in?: boolean;
+  }) {
+    setPreferenceBusy(true);
+    setPreferenceError(null);
+    try {
+      await updateWorkerPreferences(workerId, payload);
+      await refresh();
+    } catch (err) {
+      setPreferenceError(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setPreferenceBusy(false);
+    }
+  }
 
   return (
     <div style={{ display: "grid", gap: 24 }}>
-      <section style={{ marginTop: 12 }}>
-        <h1 style={{ margin: 0, fontSize: 28, lineHeight: 1.15 }}>
-          Hello, {worker.first_name}.
-        </h1>
-        <p style={{ margin: "6px 0 0", color: "#496158" }}>
-          {openForMe.length > 0
-            ? `${openForMe.length} new request${openForMe.length === 1 ? "" : "s"} available.`
-            : "No new requests right now."}
-        </p>
-      </section>
+      <HomeTopCard
+        firstName={worker.first_name}
+        availabilityStatus={availabilityStatus}
+        urgentAlertsEnabled={urgentAlertsEnabled}
+        locale={locale}
+        busy={preferenceBusy}
+        error={preferenceError}
+        openRequestCount={openForMe.length}
+        onSetUnavailable={() => updatePreferences({ availability_status: "unavailable" })}
+        onToggleUrgentAlerts={() =>
+          updatePreferences({ urgent_alert_opt_in: !urgentAlertsEnabled })
+        }
+      />
 
       <Section title="New requests" actionLabel="See all" actionHref="/worker/requests">
         {loading ? (
@@ -90,13 +116,198 @@ export default function WorkerHome() {
                 key={a.id}
                 request={req}
                 assignment={a}
-                locale={pickLocale(worker.preferred_language)}
+                locale={locale}
               />
             );
           })
         )}
       </Section>
     </div>
+  );
+}
+
+function HomeTopCard({
+  firstName,
+  availabilityStatus,
+  urgentAlertsEnabled,
+  locale,
+  busy,
+  error,
+  openRequestCount,
+  onSetUnavailable,
+  onToggleUrgentAlerts,
+}: {
+  firstName: string;
+  availabilityStatus: string;
+  urgentAlertsEnabled: boolean;
+  locale: "en" | "fr";
+  busy: boolean;
+  error: string | null;
+  openRequestCount: number;
+  onSetUnavailable: () => void;
+  onToggleUrgentAlerts: () => void;
+}) {
+  const available = availabilityStatus === "available";
+
+  return (
+    <section
+      style={{
+        marginTop: 12,
+        background: "#fffdf7",
+        borderRadius: 22,
+        padding: 20,
+        boxShadow: "0 8px 18px rgba(24, 50, 41, 0.08)",
+        display: "grid",
+        gap: 18,
+      }}
+    >
+      <div>
+        <h1 style={{ margin: 0, fontSize: 28, lineHeight: 1.15 }}>
+          Hello, {firstName}.
+        </h1>
+        <p style={{ margin: "6px 0 0", color: "#496158" }}>
+          {openRequestCount > 0
+            ? `${openRequestCount} new request${openRequestCount === 1 ? "" : "s"} available.`
+            : "No new requests right now."}
+        </p>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+          gap: 10,
+        }}
+      >
+        <StatusPill
+          label="Availability"
+          value={availabilityStatusLabel(availabilityStatus, locale)}
+          tone={available ? "good" : "muted"}
+        />
+        <StatusPill
+          label="Urgent alerts"
+          value={urgentAlertsEnabled ? "On" : "Off"}
+          tone={urgentAlertsEnabled ? "good" : "muted"}
+        />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <QuickButton
+          disabled={busy || !available}
+          onClick={onSetUnavailable}
+          tone="muted"
+        >
+          Set unavailable
+        </QuickButton>
+        <QuickButton
+          disabled={busy}
+          onClick={onToggleUrgentAlerts}
+          tone={urgentAlertsEnabled ? "muted" : "primary"}
+        >
+          {urgentAlertsEnabled ? "Turn alerts off" : "Turn alerts on"}
+        </QuickButton>
+        <QuickLink href="/worker/availability">Update availability</QuickLink>
+        <QuickLink href="/worker/requests">View available coverage</QuickLink>
+      </div>
+
+      {error ? <p style={{ margin: 0, color: "#7a3526", fontWeight: 800 }}>{error}</p> : null}
+    </section>
+  );
+}
+
+function StatusPill({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "good" | "muted";
+}) {
+  const palette =
+    tone === "good"
+      ? { bg: "#e2f1e8", color: "#214639" }
+      : { bg: "#eadfd7", color: "#7a473f" };
+
+  return (
+    <div
+      style={{
+        borderRadius: 16,
+        background: palette.bg,
+        color: palette.color,
+        padding: 14,
+        display: "grid",
+        gap: 4,
+      }}
+    >
+      <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+        {label}
+      </span>
+      <strong style={{ fontSize: 16 }}>{value}</strong>
+    </div>
+  );
+}
+
+function QuickButton({
+  disabled,
+  onClick,
+  tone,
+  children,
+}: {
+  disabled: boolean;
+  onClick: () => void;
+  tone: "primary" | "muted";
+  children: React.ReactNode;
+}) {
+  const palette =
+    tone === "primary"
+      ? { bg: "#214639", color: "#f7f0df" }
+      : { bg: "#eadfd7", color: "#7a473f" };
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        border: 0,
+        borderRadius: 14,
+        minHeight: 48,
+        padding: "12px 14px",
+        background: palette.bg,
+        color: palette.color,
+        fontSize: 14,
+        fontWeight: 800,
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.58 : 1,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function QuickLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      style={{
+        borderRadius: 14,
+        minHeight: 48,
+        padding: "12px 14px",
+        background: "#dbe4dd",
+        color: "#214639",
+        fontSize: 14,
+        fontWeight: 800,
+        textDecoration: "none",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+      }}
+    >
+      {children}
+    </Link>
   );
 }
 

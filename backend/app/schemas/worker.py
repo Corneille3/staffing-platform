@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from app.models.enums import AvailabilityStatus
 from app.schemas.common import TimestampedSchema
@@ -34,4 +34,11 @@ class WorkerRead(BaseModel):
 
 
 class WorkerAvailabilityUpdate(BaseModel):
-    availability_status: AvailabilityStatus
+    availability_status: AvailabilityStatus | None = None
+    urgent_alert_opt_in: bool | None = None
+
+    @model_validator(mode='after')
+    def require_at_least_one_change(self):
+        if self.availability_status is None and self.urgent_alert_opt_in is None:
+            raise ValueError('At least one worker preference must be provided.')
+        return self

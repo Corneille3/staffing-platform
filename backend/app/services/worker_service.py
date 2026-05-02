@@ -27,19 +27,31 @@ class WorkerService:
     def get(self, user_id: UUID) -> User | None:
         return self.repository.get(user_id)
 
-    def update_availability(self, user_id: UUID, availability_status: AvailabilityStatus) -> WorkerProfile | None:
+    def update_availability(
+        self,
+        user_id: UUID,
+        availability_status: AvailabilityStatus | None = None,
+        urgent_alert_opt_in: bool | None = None,
+    ) -> WorkerProfile | None:
         profile = self.repository.get_profile(user_id)
         if profile is None:
             return None
 
-        profile.availability_status = availability_status
+        payload: dict[str, object] = {}
+        if availability_status is not None:
+            profile.availability_status = availability_status
+            payload['availability_status'] = availability_status.value
+        if urgent_alert_opt_in is not None:
+            profile.urgent_alert_opt_in = urgent_alert_opt_in
+            payload['urgent_alert_opt_in'] = urgent_alert_opt_in
+
         saved = self.repository.save(profile)
         self.audit_service.log(
             action='worker.availability_updated',
             entity_type='worker_profile',
             entity_id=saved.id,
             actor_user_id=user_id,
-            payload={'availability_status': availability_status.value},
+            payload=payload,
         )
         self.db.commit()
         return saved

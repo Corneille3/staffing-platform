@@ -111,8 +111,21 @@ export async function declineRequest(
 export async function updateAvailability(
   workerId: string,
   status: "available" | "unavailable",
+  urgentAlertOptIn?: boolean,
 ): Promise<WorkerProfile> {
-  return patchJson<WorkerProfile>(`/api/v1/workers/${workerId}/availability`, {
+  const body: { availability_status: "available" | "unavailable"; urgent_alert_opt_in?: boolean } = {
     availability_status: status,
-  });
+  };
+  if (urgentAlertOptIn !== undefined) body.urgent_alert_opt_in = urgentAlertOptIn;
+  return patchJson<WorkerProfile>(`/api/v1/workers/${workerId}/availability`, body);
+}
+
+export async function updateWorkerPreferences(
+  workerId: string,
+  payload: {
+    availability_status?: "available" | "unavailable";
+    urgent_alert_opt_in?: boolean;
+  },
+): Promise<WorkerProfile> {
+  return patchJson<WorkerProfile>(`/api/v1/workers/${workerId}/availability`, payload);
 }

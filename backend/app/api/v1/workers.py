@@ -60,7 +60,11 @@ def update_worker_availability(
             status_code=status.HTTP_403_FORBIDDEN,
             detail='Workers may only update their own availability.',
         )
-    profile = WorkerService(db).update_availability(user_id, payload.availability_status)
+    profile = WorkerService(db).update_availability(
+        user_id,
+        availability_status=payload.availability_status,
+        urgent_alert_opt_in=payload.urgent_alert_opt_in,
+    )
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Worker profile not found')
     return WorkerProfileRead.model_validate(profile)
