@@ -152,6 +152,24 @@ export function RequestWorkflowCard({
             Publish request
           </button>
         ) : null}
+        {request.status === "responses_received" && acceptedResponses.length === 0 ? (
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => post(`/api/v1/requests/${request.id}/renotify`)}
+            style={{
+              border: 0,
+              borderRadius: 999,
+              padding: "12px 16px",
+              background: "#3d6b5a",
+              color: "#f7f0df",
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            Re-notify workers
+          </button>
+        ) : null}
         {!isClosed ? (
           <button
             type="button"

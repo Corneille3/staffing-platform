@@ -28,7 +28,13 @@ close-and-reopen the IDE" troubleshooting from prior sessions — the disk
 state is authoritative.
 
 **Last shipped (most recent first):**
-1. A10 — Notification feed. `GET /notifications/feed?worker_user_id=`
+1. A11 — "Request filled" notice + Re-notify workers action. Worker
+   requests page shows filled requests with bilingual notice. Admin
+   `RequestWorkflowCard` gains "Re-notify workers" button (shown when
+   status=responses_received and no accepted responses remain).
+   `POST /requests/{id}/renotify` resets declined responses and
+   re-dispatches notifications to eligible workers.
+2. A10 — Notification feed. `GET /notifications/feed?worker_user_id=`
    synthesises typed events (new_request · urgent · assigned · cancelled ·
    not_selected) from existing tables. `/worker/notifications` page renders
    grouped bilingual cards with relative timestamps. 🔔 Alerts nav tab added.
@@ -346,7 +352,7 @@ This roadmap closes the gap between the current code and the product vision in
 `Implementation-idea.md`. Items are ordered by dependency + leverage. Tick
 each as it ships and keep "Current focus" in sync.
 
-**Current focus:** A11 — "Request filled" notice.
+**Current focus:** B1 — Coverage urgency types.
 
 ### Phase A — Worker UX core (the doc's heaviest emphasis)
 
@@ -411,8 +417,15 @@ each as it ships and keep "Current focus" in sync.
   selected responses. `/worker/notifications` page groups by type with
   colour-coded cards and relative timestamps. 🔔 Alerts tab added to
   worker bottom nav.*
-- [ ] **A11. "Request filled" notice.** When a worker opens a request that's
-  been assigned to someone else, show *This request has been filled.*
+- [x] **A11. "Request filled" notice + Re-notify workers.**
+  Worker requests page shows a muted "Filled (n)" section for assigned
+  requests where the worker had a response; bilingual "This request has
+  been filled / Ce remplacement a été pourvu" copy.
+  Re-notify: `POST /requests/{id}/renotify` re-runs matching, resets
+  declined workers to notified, creates new notification rows, sets
+  status → notified. Admin "Re-notify workers" button appears on
+  `RequestWorkflowCard` when status is `responses_received` and no
+  accepted responses remain (post-assignment-cancellation path).
 
 ### Phase B — Schema/domain extensions to support the new flows
 

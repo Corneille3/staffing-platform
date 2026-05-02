@@ -125,6 +125,60 @@ class StaffingRequestService:
         self.db.refresh(staffing_request)
         return staffing_request
 
+    def renotify(self, request_id: UUID, actor_user_id: UUID) -> StaffingRequest:
+        staffing_request = self._get_required(request_id)
+        if staffing_request.status not in {RequestStatus.RESPONSES_RECEIVED, RequestStatus.NOTIFIED, RequestStatus.OPEN}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='Request cannot be re-notified in its current state.',
+            )
+
+        workers = self.worker_repository.list()
+        eligible_workers = self.matching_service.eligible_workers(staffing_request, workers)
+
+        staffing_request.status = RequestStatus.NOTIFIED
+        self.repository.save(staffing_request)
+
+        new_notifications = 0
+        for worker in eligible_workers:
+            self.db.add(
+                RequestNotification(
+                    id=uuid4(),
+                    staffing_request_id=staffing_request.id,
+                    worker_user_id=worker.id,
+                    channel=NotificationChannel.IN_APP,
+                    delivery_status='queued',
+                )
+            )
+            existing = self.response_repository.get_for_request_and_worker(staffing_request.id, worker.id)
+            if existing is None or existing.status == ResponseStatus.DECLINED:
+                if existing is not None:
+                    existing.status = ResponseStatus.NOTIFIED
+                    existing.responded_at = None
+                    existing.decline_reason = None
+                else:
+                    self.db.add(
+                        RequestResponse(
+                            id=uuid4(),
+                            staffing_request_id=staffing_request.id,
+                            worker_user_id=worker.id,
+                            status=ResponseStatus.NOTIFIED,
+                        )
+                    )
+                new_notifications += 1
+
+        self.audit_service.log(
+            action='staffing_request.renotified',
+            entity_type='staffing_request',
+            entity_id=staffing_request.id,
+            actor_user_id=actor_user_id,
+            organization_id=staffing_request.organization_id,
+            payload={'eligible_worker_count': len(eligible_workers), 'new_notifications': new_notifications},
+        )
+        self.db.commit()
+        self.db.refresh(staffing_request)
+        return staffing_request
+
     @staticmethod
     def _requirement_code(item: dict | str) -> str:
         if isinstance(item, dict):

@@ -89,3 +89,13 @@ def publish_staffing_request(request_id: UUID, db: Session = Depends(get_db_sess
 def cancel_staffing_request(request_id: UUID, db: Session = Depends(get_db_session)) -> StaffingRequestRead:
     staffing_request = StaffingRequestService(db).cancel(request_id)
     return StaffingRequestRead.model_validate(staffing_request)
+
+
+@router.post('/{request_id}/renotify', dependencies=[Depends(require_admin)])
+def renotify_staffing_request(
+    request_id: UUID,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> StaffingRequestRead:
+    staffing_request = StaffingRequestService(db).renotify(request_id, actor_user_id=scope.user.id)
+    return StaffingRequestRead.model_validate(staffing_request)

@@ -30,6 +30,7 @@ const COVERAGE_TABS: { id: CoverageTab; label: string }[] = [
 export default function WorkerRequestsPage() {
   const { worker } = useWorkerSession();
   const [items, setItems] = useState<RequestWithMyResponse[]>([]);
+  const [filledItems, setFilledItems] = useState<StaffingRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,26 +49,36 @@ export default function WorkerRequestsPage() {
     try {
       if (worker.profile?.availability_status !== "available") {
         setItems([]);
+        setFilledItems([]);
         return;
       }
       const all = await fetchRequests();
       const open = all.filter((r) =>
         ["open", "notified", "responses_received"].includes(r.status),
       );
-      const [responses, eligibilityResults] = await Promise.all([
+      // Assigned requests where this worker was notified (has a response row)
+      const assignedToOther = all.filter(
+        (r) => r.status === "assigned" && r.assigned_worker_user_id !== worker.id,
+      );
+
+      const [responses, eligibilityResults, assignedResponses] = await Promise.all([
         Promise.all(open.map((r) => fetchRequestResponses(r.id))),
-        Promise.all(
-          open.map((r) =>
-            fetchRequestEligibility(r.id, worker.id).catch(() => null),
-          ),
-        ),
+        Promise.all(open.map((r) => fetchRequestEligibility(r.id, worker.id).catch(() => null))),
+        Promise.all(assignedToOther.map((r) => fetchRequestResponses(r.id))),
       ]);
+
       const enriched: RequestWithMyResponse[] = open.map((request, i) => ({
         request,
         myResponse: responses[i].find((res) => res.worker_user_id === worker.id) || null,
         eligibility: eligibilityResults[i],
       }));
       setItems(enriched);
+
+      // Only show "filled" notice for requests where the worker had a response
+      const filled = assignedToOther.filter((request, i) =>
+        assignedResponses[i].some((res) => res.worker_user_id === worker.id),
+      );
+      setFilledItems(filled);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load requests");
     } finally {
@@ -226,6 +237,15 @@ export default function WorkerRequestsPage() {
               ))}
             </Group>
           ) : null}
+
+          {filledItems.length > 0 ? (
+            <Group title={`Filled (${filledItems.length})`}>
+              {filledItems.map((request) => (
+                <FilledRequestCard key={request.id} request={request} locale={locale} />
+              ))}
+            </Group>
+          ) : null}
+
           {confirmingRequest ? (
             <ConfirmAvailabilityModal
               request={confirmingRequest}
@@ -525,6 +545,66 @@ function RequestCard({
           </BigButton>
         ) : null}
       </div>
+    </article>
+  );
+}
+
+function FilledRequestCard({
+  request,
+  locale,
+}: {
+  request: StaffingRequest;
+  locale: "en" | "fr";
+}) {
+  const notice =
+    locale === "fr"
+      ? "Ce remplacement a été pourvu. Un·e autre remplaçant·e a été confirmé·e."
+      : "This request has been filled. Another substitute was confirmed.";
+  return (
+    <article
+      style={{
+        background: "#f5f5f3",
+        borderRadius: 20,
+        padding: 18,
+        display: "grid",
+        gap: 10,
+        opacity: 0.85,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "start" }}>
+        <strong style={{ fontSize: 16, color: "#5d6d66", lineHeight: 1.2 }}>{request.title}</strong>
+        <span
+          style={{
+            borderRadius: 999,
+            padding: "4px 10px",
+            background: "#e8e8e5",
+            color: "#5d6d66",
+            fontSize: 11,
+            fontWeight: 800,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {locale === "fr" ? "Pourvu" : "Filled"}
+        </span>
+      </div>
+      <div style={{ display: "grid", gap: 4, color: "#7d8f87", fontSize: 14 }}>
+        <span>📍 {request.location_name ? `${request.location_name}, ${request.city}` : request.city}</span>
+        <span>📅 {request.work_date}</span>
+        <span>🕒 {request.start_time.slice(0, 5)} – {request.end_time.slice(0, 5)}</span>
+      </div>
+      <p
+        style={{
+          margin: 0,
+          fontSize: 13,
+          color: "#5d6d66",
+          fontStyle: "italic",
+          lineHeight: 1.45,
+        }}
+      >
+        {notice}
+      </p>
     </article>
   );
 }
