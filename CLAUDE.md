@@ -326,7 +326,7 @@ This roadmap closes the gap between the current code and the product vision in
 `Implementation-idea.md`. Items are ordered by dependency + leverage. Tick
 each as it ships and keep "Current focus" in sync.
 
-**Current focus:** A7 — Decline-flow with optional reason.
+**Current focus:** A8 — Assignment detail enrichments.
 
 ### Phase A — Worker UX core (the doc's heaviest emphasis)
 
@@ -368,8 +368,11 @@ each as it ships and keep "Current focus" in sync.
   *Shipped: worker request Accept actions now open a confirm-availability
   modal before submitting. Accepted cards show explicit coordinator-confirm
   copy while assignment labels remain separate.*
-- [ ] **A7. Decline-flow with optional reason.** Reasons: Not available / Too
+- [x] **A7. Decline-flow with optional reason.** Reasons: Not available / Too
   far / Not interested / Conflict / Other. Reason is optional in MVP.
+  *Shipped: DeclineModal with reason select, decline_reason stored on
+  request_responses, surfaced on declined cards. Backend: nullable
+  decline_reason column + schema/service/route threaded through.*
 - [ ] **A8. Assignment detail enrichments.** Contact person + phone/email,
   arrival/parking instructions, add-to-calendar, request-cancellation
   (admin-confirmed, not direct cancel).
