@@ -313,7 +313,7 @@ This roadmap closes the gap between the current code and the product vision in
 `Implementation-idea.md`. Items are ordered by dependency + leverage. Tick
 each as it ships and keep "Current focus" in sync.
 
-**Current focus:** A2 — Eligibility-reason badges.
+**Current focus:** A4 — Worker home top card.
 
 ### Phase A — Worker UX core (the doc's heaviest emphasis)
 
@@ -325,12 +325,20 @@ each as it ships and keep "Current focus" in sync.
   into `worker/page.tsx`, `worker/requests/page.tsx`,
   `worker/assignments/page.tsx`, `worker/availability/page.tsx`. Locale
   derived from `worker.preferred_language`.*
-- [ ] **A2. Eligibility-reason badges on Available Coverage cards.** Surface
+- [x] **A2. Eligibility-reason badges on Available Coverage cards.** Surface
   the matching rules (`services/matching_service.py`) per request: ✓ city,
   ✓ language, ✓ qualification, or "Missing: <requirement>". Backend
   returns reasons; frontend renders chips.
-- [ ] **A3. Available Coverage tabs + filters.** Tabs: All / Urgent / Today /
+  *Shipped: `backend/app/schemas/eligibility.py`,
+  `MatchingService.eligibility_result()`,
+  `GET /api/v1/requests/{id}/eligibility`, and worker request card chips.
+  Added focused matching tests for city, language, bilingual, qualification,
+  and certification reasons.*
+- [x] **A3. Available Coverage tabs + filters.** Tabs: All / Urgent / Today /
   This Week. Filters: city, date, urgent-only. No advanced filters.
+  *Shipped: worker request page tabs plus simple city/date/urgent filters in
+  `frontend/src/app/worker/requests/page.tsx`. Filters apply before Pending /
+  Accepted / Declined grouping and include a clear-filters action.*
 - [ ] **A4. Worker home top card.** Greeting, current availability,
   urgent-alerts on/off, quick buttons (Set unavailable / Update availability
   / View available coverage).

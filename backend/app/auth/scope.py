@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
 from app.auth.current_user import CurrentUserModel, get_current_user
+from app.core.config import settings
 from app.core.constants import ROLE_APF_ADMIN, ROLE_ORG_ADMIN, ROLE_WORKER
 from app.models.organization_membership import OrganizationMembership
 from app.models.user import User
@@ -51,6 +52,13 @@ def get_access_scope(
     db: Session = Depends(get_db_session),
 ) -> AccessScope:
     user = db.scalar(select(User).where(User.clerk_user_id == current_user.sub))
+    if user is None and settings.app_env == 'dev' and settings.dev_auth_bypass and current_user.email:
+        user = db.scalar(select(User).where(User.email == current_user.email))
+        if user is not None and user.clerk_user_id is None:
+            user.clerk_user_id = current_user.sub
+            db.add(user)
+            db.commit()
+            db.refresh(user)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

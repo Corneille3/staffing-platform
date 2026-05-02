@@ -60,6 +60,18 @@ export type StaffingRequest = {
   updated_at?: string;
 };
 
+export type EligibilityReason = {
+  type: "profile" | "availability" | "city" | "language" | "qualification" | "certification";
+  status: "matched" | "missing";
+  label: string;
+  code: string | null;
+};
+
+export type EligibilityResult = {
+  eligible: boolean;
+  reasons: EligibilityReason[];
+};
+
 export type User = {
   id: string;
   first_name: string;

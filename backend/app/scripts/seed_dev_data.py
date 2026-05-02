@@ -34,6 +34,7 @@ def seed() -> None:
         )
         apf_admin = User(
             id=uuid4(),
+            clerk_user_id='dev-apf-admin',
             first_name='Alice',
             last_name='Admin',
             email='alice.admin@example.org',
@@ -41,6 +42,7 @@ def seed() -> None:
         )
         org_admin = User(
             id=uuid4(),
+            clerk_user_id='dev-org-admin',
             first_name='Olivia',
             last_name='Operator',
             email='olivia.operator@example.org',
@@ -48,6 +50,7 @@ def seed() -> None:
         )
         worker_one = User(
             id=uuid4(),
+            clerk_user_id='dev-worker-wendy',
             first_name='Wendy',
             last_name='Worker',
             email='wendy.worker@example.org',
@@ -55,6 +58,7 @@ def seed() -> None:
         )
         worker_two = User(
             id=uuid4(),
+            clerk_user_id='dev-worker-bruno',
             first_name='Bruno',
             last_name='Bilingual',
             email='bruno.worker@example.org',

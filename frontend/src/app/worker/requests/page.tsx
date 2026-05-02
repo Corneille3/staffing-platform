@@ -1,20 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import {
   acceptRequest,
   declineRequest,
+  fetchRequestEligibility,
   fetchRequestResponses,
   fetchRequests,
 } from "../../../lib/browser-api";
 import { pickLocale, workerRequestPerspective } from "../../../lib/status-labels";
-import { RequestResponse, StaffingRequest } from "../../../lib/types";
+import { EligibilityResult, RequestResponse, StaffingRequest } from "../../../lib/types";
 import { useWorkerSession } from "../../../lib/worker-session";
 
 type RequestWithMyResponse = {
   request: StaffingRequest;
   myResponse: RequestResponse | null;
+  eligibility: EligibilityResult | null;
 };
+
+type CoverageTab = "all" | "urgent" | "today" | "week";
+
+const COVERAGE_TABS: { id: CoverageTab; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "urgent", label: "Urgent" },
+  { id: "today", label: "Today" },
+  { id: "week", label: "This Week" },
+];
 
 export default function WorkerRequestsPage() {
   const { worker } = useWorkerSession();
@@ -22,6 +33,10 @@ export default function WorkerRequestsPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<CoverageTab>("all");
+  const [cityFilter, setCityFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+  const [urgentOnly, setUrgentOnly] = useState(false);
 
   async function load() {
     if (!worker) return;
@@ -32,10 +47,18 @@ export default function WorkerRequestsPage() {
       const open = all.filter((r) =>
         ["open", "notified", "responses_received"].includes(r.status),
       );
-      const responses = await Promise.all(open.map((r) => fetchRequestResponses(r.id)));
+      const [responses, eligibilityResults] = await Promise.all([
+        Promise.all(open.map((r) => fetchRequestResponses(r.id))),
+        Promise.all(
+          open.map((r) =>
+            fetchRequestEligibility(r.id, worker.id).catch(() => null),
+          ),
+        ),
+      ]);
       const enriched: RequestWithMyResponse[] = open.map((request, i) => ({
         request,
         myResponse: responses[i].find((res) => res.worker_user_id === worker.id) || null,
+        eligibility: eligibilityResults[i],
       }));
       setItems(enriched);
     } catch (err) {
@@ -48,6 +71,25 @@ export default function WorkerRequestsPage() {
   useEffect(() => {
     load();
   }, [worker]);
+
+  const cityOptions = useMemo(
+    () => Array.from(new Set(items.map((item) => item.request.city))).sort(),
+    [items],
+  );
+  const filteredItems = useMemo(
+    () =>
+      items.filter((item) =>
+        matchesTab(item.request, activeTab) &&
+        matchesCity(item.request, cityFilter) &&
+        matchesDate(item.request, dateFilter) &&
+        (!urgentOnly || isUrgent(item.request)),
+      ),
+    [items, activeTab, cityFilter, dateFilter, urgentOnly],
+  );
+
+  const undecided = filteredItems.filter((i) => !i.myResponse || i.myResponse.status === "notified" || i.myResponse.status === "viewed");
+  const accepted = filteredItems.filter((i) => i.myResponse?.status === "accepted");
+  const declined = filteredItems.filter((i) => i.myResponse?.status === "declined");
 
   if (!worker) return null;
   const locale = pickLocale(worker.preferred_language);
@@ -69,10 +111,6 @@ export default function WorkerRequestsPage() {
       setBusy(null);
     }
   }
-
-  const undecided = items.filter((i) => !i.myResponse || i.myResponse.status === "notified" || i.myResponse.status === "viewed");
-  const accepted = items.filter((i) => i.myResponse?.status === "accepted");
-  const declined = items.filter((i) => i.myResponse?.status === "declined");
 
   return (
     <div style={{ display: "grid", gap: 24, paddingTop: 16 }}>
@@ -102,15 +140,34 @@ export default function WorkerRequestsPage() {
         <p style={{ color: "#496158" }}>Loading…</p>
       ) : (
         <>
+          <CoverageFilters
+            activeTab={activeTab}
+            cityFilter={cityFilter}
+            cityOptions={cityOptions}
+            dateFilter={dateFilter}
+            urgentOnly={urgentOnly}
+            onTabChange={setActiveTab}
+            onCityChange={setCityFilter}
+            onDateChange={setDateFilter}
+            onUrgentOnlyChange={setUrgentOnly}
+            onClear={() => {
+              setActiveTab("all");
+              setCityFilter("");
+              setDateFilter("");
+              setUrgentOnly(false);
+            }}
+          />
+
           <Group title={`Pending (${undecided.length})`}>
             {undecided.length === 0 ? (
-              <Empty>No pending requests.</Empty>
+              <Empty>{filteredItems.length === 0 ? "No requests match these filters." : "No pending requests."}</Empty>
             ) : (
-              undecided.map(({ request, myResponse }) => (
+              undecided.map(({ request, myResponse, eligibility }) => (
                 <RequestCard
                   key={request.id}
                   request={request}
                   myResponse={myResponse}
+                  eligibility={eligibility}
                   myUserId={worker.id}
                   locale={locale}
                   busy={busy === request.id}
@@ -123,11 +180,12 @@ export default function WorkerRequestsPage() {
 
           {accepted.length > 0 ? (
             <Group title={`Accepted (${accepted.length})`}>
-              {accepted.map(({ request, myResponse }) => (
+              {accepted.map(({ request, myResponse, eligibility }) => (
                 <RequestCard
                   key={request.id}
                   request={request}
                   myResponse={myResponse}
+                  eligibility={eligibility}
                   myUserId={worker.id}
                   locale={locale}
                   busy={busy === request.id}
@@ -139,11 +197,12 @@ export default function WorkerRequestsPage() {
 
           {declined.length > 0 ? (
             <Group title={`Declined (${declined.length})`}>
-              {declined.map(({ request, myResponse }) => (
+              {declined.map(({ request, myResponse, eligibility }) => (
                 <RequestCard
                   key={request.id}
                   request={request}
                   myResponse={myResponse}
+                  eligibility={eligibility}
                   myUserId={worker.id}
                   locale={locale}
                   busy={busy === request.id}
@@ -155,6 +214,146 @@ export default function WorkerRequestsPage() {
         </>
       )}
     </div>
+  );
+}
+
+function CoverageFilters({
+  activeTab,
+  cityFilter,
+  cityOptions,
+  dateFilter,
+  urgentOnly,
+  onTabChange,
+  onCityChange,
+  onDateChange,
+  onUrgentOnlyChange,
+  onClear,
+}: {
+  activeTab: CoverageTab;
+  cityFilter: string;
+  cityOptions: string[];
+  dateFilter: string;
+  urgentOnly: boolean;
+  onTabChange: (tab: CoverageTab) => void;
+  onCityChange: (city: string) => void;
+  onDateChange: (date: string) => void;
+  onUrgentOnlyChange: (urgentOnly: boolean) => void;
+  onClear: () => void;
+}) {
+  const hasFilters = activeTab !== "all" || cityFilter || dateFilter || urgentOnly;
+
+  return (
+    <section style={{ display: "grid", gap: 12 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 8,
+        }}
+      >
+        {COVERAGE_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onTabChange(tab.id)}
+            aria-pressed={activeTab === tab.id}
+            style={{
+              minHeight: 44,
+              border: activeTab === tab.id ? "1px solid #214639" : "1px solid rgba(24, 50, 41, 0.16)",
+              borderRadius: 12,
+              background: activeTab === tab.id ? "#214639" : "#fffdf7",
+              color: activeTab === tab.id ? "#f7f0df" : "#214639",
+              fontSize: 13,
+              fontWeight: 800,
+              cursor: "pointer",
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+          gap: 10,
+        }}
+      >
+        <label style={{ display: "grid", gap: 6, color: "#496158", fontSize: 13, fontWeight: 800 }}>
+          City
+          <select
+            value={cityFilter}
+            onChange={(event) => onCityChange(event.target.value)}
+            style={filterInputStyle}
+          >
+            <option value="">Any city</option>
+            {cityOptions.map((city) => (
+              <option key={city} value={city}>
+                {city}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label style={{ display: "grid", gap: 6, color: "#496158", fontSize: 13, fontWeight: 800 }}>
+          Date
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={(event) => onDateChange(event.target.value)}
+            style={filterInputStyle}
+          />
+        </label>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            color: "#314c42",
+            fontSize: 14,
+            fontWeight: 800,
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={urgentOnly}
+            onChange={(event) => onUrgentOnlyChange(event.target.checked)}
+            style={{ width: 18, height: 18, accentColor: "#214639" }}
+          />
+          Urgent only
+        </label>
+
+        {hasFilters ? (
+          <button
+            type="button"
+            onClick={onClear}
+            style={{
+              border: 0,
+              background: "transparent",
+              color: "#214639",
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: 800,
+              padding: "8px 0",
+            }}
+          >
+            Clear filters
+          </button>
+        ) : null}
+      </div>
+    </section>
   );
 }
 
@@ -198,6 +397,7 @@ function Empty({ children }: { children: React.ReactNode }) {
 function RequestCard({
   request,
   myResponse,
+  eligibility,
   myUserId,
   locale,
   busy,
@@ -206,6 +406,7 @@ function RequestCard({
 }: {
   request: StaffingRequest;
   myResponse: RequestResponse | null;
+  eligibility: EligibilityResult | null;
   myUserId: string;
   locale: "en" | "fr";
   busy: boolean;
@@ -248,6 +449,8 @@ function RequestCard({
         </p>
       ) : null}
 
+      {eligibility ? <EligibilityChips eligibility={eligibility} /> : null}
+
       {perspectiveLabel ? (
         <div
           style={{
@@ -280,6 +483,29 @@ function RequestCard({
         ) : null}
       </div>
     </article>
+  );
+}
+
+function EligibilityChips({ eligibility }: { eligibility: EligibilityResult }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      {eligibility.reasons.map((reason, index) => (
+        <span
+          key={`${reason.type}-${reason.code || index}`}
+          style={{
+            borderRadius: 999,
+            padding: "6px 10px",
+            background: reason.status === "matched" ? "#e2f1e8" : "#f4d4cc",
+            color: reason.status === "matched" ? "#296246" : "#7a3526",
+            fontSize: 12,
+            fontWeight: 800,
+            lineHeight: 1.1,
+          }}
+        >
+          {reason.label}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -339,4 +565,60 @@ function Badge({ tone, children }: { tone: "urgent"; children: React.ReactNode }
       {children}
     </span>
   );
+}
+
+const filterInputStyle: CSSProperties = {
+  border: "1px solid rgba(24, 50, 41, 0.16)",
+  borderRadius: 12,
+  background: "#fffdf7",
+  color: "#183229",
+  fontSize: 15,
+  minHeight: 44,
+  padding: "0 12px",
+};
+
+function matchesTab(request: StaffingRequest, tab: CoverageTab): boolean {
+  if (tab === "urgent") return isUrgent(request);
+  if (tab === "today") return request.work_date === todayString();
+  if (tab === "week") return isWithinThisWeek(request.work_date);
+  return true;
+}
+
+function matchesCity(request: StaffingRequest, city: string): boolean {
+  if (!city) return true;
+  return request.city === city;
+}
+
+function matchesDate(request: StaffingRequest, date: string): boolean {
+  if (!date) return true;
+  return request.work_date === date;
+}
+
+function isUrgent(request: StaffingRequest): boolean {
+  return request.urgency_level >= 3;
+}
+
+function isWithinThisWeek(dateValue: string): boolean {
+  const target = parseDateOnly(dateValue).getTime();
+  const today = parseDateOnly(todayString());
+  const end = new Date(today);
+  end.setDate(today.getDate() + 6);
+  return target >= today.getTime() && target <= end.getTime();
+}
+
+function todayString(): string {
+  const today = new Date();
+  return toDateInputValue(today);
+}
+
+function parseDateOnly(dateValue: string): Date {
+  const [year, month, day] = dateValue.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function toDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }

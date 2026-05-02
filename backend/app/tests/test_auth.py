@@ -1,10 +1,21 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.config import settings
 from app.main import app
 
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def disable_dev_auth_bypass():
+    original = settings.dev_auth_bypass
+    settings.dev_auth_bypass = False
+    try:
+        yield
+    finally:
+        settings.dev_auth_bypass = original
 
 
 def test_me_requires_authentication() -> None:

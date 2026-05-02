@@ -2,6 +2,7 @@
 
 import {
   Assignment,
+  EligibilityResult,
   RequestResponse,
   StaffingRequest,
   Worker,
@@ -74,6 +75,14 @@ export async function fetchRequestResponses(requestId: string): Promise<RequestR
     `/api/v1/requests/${requestId}/responses`,
   );
   return data.items;
+}
+
+export async function fetchRequestEligibility(
+  requestId: string,
+  workerUserId: string,
+): Promise<EligibilityResult> {
+  const params = new URLSearchParams({ worker_user_id: workerUserId });
+  return getJson<EligibilityResult>(`/api/v1/requests/${requestId}/eligibility?${params}`);
 }
 
 export async function fetchAssignments(): Promise<Assignment[]> {

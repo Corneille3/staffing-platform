@@ -2,8 +2,12 @@ from fastapi import Depends, HTTPException, status
 from pydantic import BaseModel
 
 from app.auth.clerk import ClerkAuthError, decode_token
-from app.core.constants import ROLE_WORKER
+from app.core.config import settings
+from app.core.constants import ROLE_APF_ADMIN, ROLE_WORKER
 from app.core.security import bearer_scheme, extract_bearer_token
+
+DEV_AUTH_SUB = 'dev-apf-admin'
+DEV_AUTH_EMAIL = 'alice.admin@example.org'
 
 
 class CurrentUserModel(BaseModel):
@@ -16,6 +20,12 @@ class CurrentUserModel(BaseModel):
 def get_current_user(credentials=Depends(bearer_scheme)) -> CurrentUserModel:
     token = extract_bearer_token(credentials)
     if not token:
+        if settings.app_env == 'dev' and settings.dev_auth_bypass and not settings.clerk_publishable_key:
+            return CurrentUserModel(
+                sub=DEV_AUTH_SUB,
+                email=DEV_AUTH_EMAIL,
+                role=ROLE_APF_ADMIN,
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail='Authentication credentials were not provided.',

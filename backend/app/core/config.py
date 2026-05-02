@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     clerk_secret_key: str | None = None
     clerk_issuer_url: str | None = None
     clerk_jwks_url: str | None = None
+    dev_auth_bypass: bool = True
     allowed_origins: list[str] | str = 'http://localhost:3000'
     log_level: str = 'INFO'
 
