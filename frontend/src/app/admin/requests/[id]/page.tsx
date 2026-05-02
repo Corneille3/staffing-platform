@@ -168,7 +168,7 @@ export default async function RequestDetailPage({
                   <strong>Status:</strong> {formatStatus(assignment.status)}
                 </span>
                 <span>
-                  <strong>Assigned at:</strong> {new Date(assignment.assigned_at).toLocaleString()}
+                  <strong>Assigned at:</strong> {assignment.assigned_at.slice(0, 16).replace("T", " ")}
                 </span>
                 <span>
                   <strong>Notes:</strong> {assignment.notes || "None"}

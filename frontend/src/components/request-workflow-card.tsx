@@ -357,7 +357,7 @@ function AssignedWorkerCard({
         <span><strong>Cities:</strong> {profile?.supported_cities.join(", ") || "none"}</span>
         <span><strong>Qualifications:</strong> {profile?.qualifications.join(", ") || "none"}</span>
         <span><strong>Certifications:</strong> {profile?.certifications.join(", ") || "none"}</span>
-        <span><strong>Assigned at:</strong> {new Date(assignment.assigned_at).toLocaleString()}</span>
+        <span><strong>Assigned at:</strong> {assignment.assigned_at.slice(0, 16).replace("T", " ")}</span>
       </div>
 
       <button
