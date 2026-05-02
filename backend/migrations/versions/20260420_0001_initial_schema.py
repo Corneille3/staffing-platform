@@ -23,6 +23,7 @@ assignment_status = postgresql.ENUM('pending_confirmation', 'confirmed', 'cancel
 availability_status = postgresql.ENUM('available', 'unavailable', name='availability_status', create_type=False)
 notification_channel = postgresql.ENUM('email', 'in_app', 'sms', name='notification_channel', create_type=False)
 request_requirement_type = postgresql.ENUM('qualification', 'certification', name='request_requirement_type', create_type=False)
+coverage_type = postgresql.ENUM('same_day_urgent', 'planned_absence', 'recurring', 'emergency', name='coverage_type', create_type=False)
 
 
 def upgrade() -> None:
@@ -36,6 +37,7 @@ def upgrade() -> None:
     availability_status.create(bind, checkfirst=True)
     notification_channel.create(bind, checkfirst=True)
     request_requirement_type.create(bind, checkfirst=True)
+    coverage_type.create(bind, checkfirst=True)
 
     op.create_table(
         'organizations',
@@ -141,6 +143,7 @@ def upgrade() -> None:
         sa.Column('end_time', sa.Time(), nullable=False),
         sa.Column('urgency_level', sa.Integer(), nullable=False, server_default='1'),
         sa.Column('language_requirement', sa.String(length=20), nullable=True, server_default='fr'),
+        sa.Column('coverage_type', coverage_type, nullable=True),
         sa.Column('contact_name', sa.String(length=255), nullable=True),
         sa.Column('contact_phone', sa.String(length=50), nullable=True),
         sa.Column('contact_email', sa.String(length=255), nullable=True),
@@ -269,6 +272,7 @@ def downgrade() -> None:
 
     bind = op.get_bind()
     request_requirement_type.drop(bind, checkfirst=True)
+    coverage_type.drop(bind, checkfirst=True)
     notification_channel.drop(bind, checkfirst=True)
     availability_status.drop(bind, checkfirst=True)
     assignment_status.drop(bind, checkfirst=True)

@@ -28,7 +28,11 @@ close-and-reopen the IDE" troubleshooting from prior sessions — the disk
 state is authoritative.
 
 **Last shipped (most recent first):**
-1. A11 — "Request filled" notice + Re-notify workers action. Worker
+1. B1 — CoverageType enum (same_day_urgent · planned_absence · recurring ·
+   emergency), create form contact fields, bilingual badge on worker cards.
+   Bug fix: assignment cancellation resets worker response to notified
+   instead of declined so they can re-respond.
+2. A11 — "Request filled" notice + Re-notify workers action. Worker
    requests page shows filled requests with bilingual notice. Admin
    `RequestWorkflowCard` gains "Re-notify workers" button (shown when
    status=responses_received and no accepted responses remain).
@@ -352,7 +356,7 @@ This roadmap closes the gap between the current code and the product vision in
 `Implementation-idea.md`. Items are ordered by dependency + leverage. Tick
 each as it ships and keep "Current focus" in sync.
 
-**Current focus:** B1 — Coverage urgency types.
+**Current focus:** B2 — Response state (viewed + no-response).
 
 ### Phase A — Worker UX core (the doc's heaviest emphasis)
 
@@ -429,9 +433,16 @@ each as it ships and keep "Current focus" in sync.
 
 ### Phase B — Schema/domain extensions to support the new flows
 
-- [ ] **B1. Coverage urgency types.** Extend the urgency model beyond a single
-  flag: same-day-urgent / planned-absence / recurring / emergency. Update
-  enum, migration, schema, seed data.
+- [x] **B1. Coverage urgency types.** `CoverageType` enum added:
+  `same_day_urgent`, `planned_absence`, `recurring`, `emergency`.
+  Column on `staffing_requests` (model, migration, schema, SQL doc, TS
+  types, seed). Create form has coverage type dropdown + on-site contact
+  fields (contact name, phone, email, arrival instructions — were missing
+  from form despite existing on the model). Coverage type badge on worker
+  request cards (bilingual). Admin workflow card shows type inline.
+  Bug fixed: assignment cancellation now resets the worker's response to
+  `notified` (not `declined`) so they appear back in Pending and can
+  re-respond.
 - [ ] **B2. Response state — viewed + no-response.** Add `viewed_at` to
   `request_responses`; surface "no response" in admin response boards and
   "Response sent → received" copy on worker side.

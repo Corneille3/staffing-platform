@@ -38,10 +38,15 @@ export function RequestCreateForm({
   const [workDate, setWorkDate] = useState(todayIsoDate());
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("12:00");
+  const [coverageType, setCoverageType] = useState("same_day_urgent");
   const [urgencyLevel, setUrgencyLevel] = useState("2");
   const [languageRequirement, setLanguageRequirement] = useState("fr");
   const [qualifications, setQualifications] = useState("ECE_LEVEL_1");
   const [certifications, setCertifications] = useState("FIRST_AID");
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [arrivalInstructions, setArrivalInstructions] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,6 +59,7 @@ export function RequestCreateForm({
         organization_id: organizationId,
         created_by_user_id: createdByUserId,
         request_type: "urgent_replacement",
+        coverage_type: coverageType,
         title,
         description: description || null,
         city,
@@ -65,6 +71,10 @@ export function RequestCreateForm({
         language_requirement: languageRequirement || null,
         required_qualifications: splitList(qualifications),
         required_certifications: splitList(certifications),
+        contact_name: contactName || null,
+        contact_phone: contactPhone || null,
+        contact_email: contactEmail || null,
+        arrival_instructions: arrivalInstructions || null,
       }),
     });
 
@@ -185,6 +195,15 @@ export function RequestCreateForm({
           <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} style={inputStyle} required />
         </label>
         <label style={labelStyle}>
+          Coverage type
+          <select value={coverageType} onChange={(event) => setCoverageType(event.target.value)} style={inputStyle}>
+            <option value="same_day_urgent">Same-day urgent</option>
+            <option value="planned_absence">Planned absence</option>
+            <option value="recurring">Recurring</option>
+            <option value="emergency">Emergency</option>
+          </select>
+        </label>
+        <label style={labelStyle}>
           Urgency
           <select value={urgencyLevel} onChange={(event) => setUrgencyLevel(event.target.value)} style={inputStyle}>
             <option value="1">Low</option>
@@ -214,6 +233,43 @@ export function RequestCreateForm({
         <label style={labelStyle}>
           Certifications
           <input value={certifications} onChange={(event) => setCertifications(event.target.value)} style={inputStyle} />
+        </label>
+      </div>
+
+      <div
+        style={{
+          borderTop: "1px solid rgba(24, 50, 41, 0.1)",
+          paddingTop: 14,
+          display: "grid",
+          gap: 6,
+        }}
+      >
+        <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: "#496158", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          On-site contact
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+          <label style={labelStyle}>
+            Contact name
+            <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Marie-Claude Bergeron" style={inputStyle} />
+          </label>
+          <label style={labelStyle}>
+            Phone
+            <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="514-555-0100" style={inputStyle} />
+          </label>
+          <label style={labelStyle}>
+            Email
+            <input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="contact@org.ca" style={inputStyle} />
+          </label>
+        </div>
+        <label style={labelStyle}>
+          Arrival instructions
+          <textarea
+            value={arrivalInstructions}
+            onChange={(e) => setArrivalInstructions(e.target.value)}
+            placeholder="Enter through the side door, sign in at the front desk…"
+            rows={2}
+            style={{ ...inputStyle, resize: "vertical" }}
+          />
         </label>
       </div>
 

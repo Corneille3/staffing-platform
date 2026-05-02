@@ -50,6 +50,7 @@ export type StaffingRequest = {
   status: string;
   urgency_level: number;
   language_requirement: string | null;
+  coverage_type: "same_day_urgent" | "planned_absence" | "recurring" | "emergency" | null;
   contact_name: string | null;
   contact_phone: string | null;
   contact_email: string | null;

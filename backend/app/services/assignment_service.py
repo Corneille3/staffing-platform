@@ -87,8 +87,9 @@ class AssignmentService:
             assignment.worker_user_id,
         )
         if response is not None:
-            response.status = ResponseStatus.DECLINED
-            response.responded_at = datetime.now(timezone.utc)
+            response.status = ResponseStatus.NOTIFIED
+            response.responded_at = None
+            response.decline_reason = None
             self.response_repository.save(response)
 
         staffing_request.status = RequestStatus.RESPONSES_RECEIVED

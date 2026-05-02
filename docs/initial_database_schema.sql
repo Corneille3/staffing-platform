@@ -12,6 +12,7 @@ CREATE TYPE assignment_status AS ENUM ('pending_confirmation', 'confirmed', 'can
 CREATE TYPE availability_status AS ENUM ('available', 'unavailable');
 CREATE TYPE notification_channel AS ENUM ('email', 'in_app', 'sms');
 CREATE TYPE request_requirement_type AS ENUM ('qualification', 'certification');
+CREATE TYPE coverage_type AS ENUM ('same_day_urgent', 'planned_absence', 'recurring', 'emergency');
 
 -- Tables
 
@@ -111,6 +112,7 @@ CREATE TABLE staffing_requests (
     end_time TIME NOT NULL,
     urgency_level INTEGER NOT NULL DEFAULT 1,
     language_requirement VARCHAR(20) DEFAULT 'fr',
+    coverage_type coverage_type,
     contact_name VARCHAR(255),
     contact_phone VARCHAR(50),
     contact_email VARCHAR(255),

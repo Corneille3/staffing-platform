@@ -21,6 +21,13 @@ function workerResponseLabel(status: string): string {
   }
 }
 
+const COVERAGE_TYPE_LABELS: Record<string, string> = {
+  same_day_urgent: "Same-day urgent",
+  planned_absence: "Planned absence",
+  recurring: "Recurring",
+  emergency: "Emergency",
+};
+
 const ASSIGNMENT_CANCELLATION_REASONS = [
   "Worker unavailable",
   "Coordinator changed plan",
@@ -109,7 +116,10 @@ export function RequestWorkflowCard({
 
       <div style={{ color: "#3d564c", display: "grid", gap: 6 }}>
         <span>{request.description || "No additional notes."}</span>
-        <span>Language: {request.language_requirement || "none"} · Urgency {request.urgency_level}</span>
+        <span>
+          {request.coverage_type ? `${COVERAGE_TYPE_LABELS[request.coverage_type] ?? request.coverage_type} · ` : ""}
+          Language: {request.language_requirement || "none"} · Urgency {request.urgency_level}
+        </span>
         <span>Required qualifications: {request.required_qualifications.join(", ") || "none"}</span>
         <span>Required certifications: {request.required_certifications?.join(", ") || "none"}</span>
         {assignedWorker ? (

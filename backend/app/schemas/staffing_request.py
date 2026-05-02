@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import RequestStatus, RequestType
+from app.models.enums import CoverageType, RequestStatus, RequestType
 from app.schemas.common import TimestampedSchema
 
 
@@ -20,6 +20,7 @@ class StaffingRequestBase(BaseModel):
     end_time: time
     urgency_level: int = 1
     language_requirement: str | None = 'fr'
+    coverage_type: CoverageType | None = None
     contact_name: str | None = None
     contact_phone: str | None = None
     contact_email: str | None = None

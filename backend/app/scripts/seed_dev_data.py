@@ -4,7 +4,7 @@ from uuid import uuid4
 import app.models  # noqa: F401
 
 from app.db.session import SessionLocal
-from app.models.enums import AvailabilityStatus, OrganizationType, RequestRequirementType, RequestStatus, RequestType, UserRole
+from app.models.enums import AvailabilityStatus, CoverageType, OrganizationType, RequestRequirementType, RequestStatus, RequestType, UserRole
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
 from app.models.request_requirement import RequestRequirement
@@ -127,6 +127,7 @@ def seed() -> None:
             end_time=time(hour=12),
             urgency_level=3,
             language_requirement='fr',
+            coverage_type=CoverageType.SAME_DAY_URGENT,
             contact_name='Marie-Claude Bergeron',
             contact_phone='306-555-0147',
             contact_email='mc.bergeron@example.org',

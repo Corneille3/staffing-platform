@@ -21,6 +21,13 @@ class RequestType(str, Enum):
     OPEN_STAFFING_NEED = 'open_staffing_need'
 
 
+class CoverageType(str, Enum):
+    SAME_DAY_URGENT = 'same_day_urgent'
+    PLANNED_ABSENCE = 'planned_absence'
+    RECURRING = 'recurring'
+    EMERGENCY = 'emergency'
+
+
 class RequestStatus(str, Enum):
     DRAFT = 'draft'
     OPEN = 'open'

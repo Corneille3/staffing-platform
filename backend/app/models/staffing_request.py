@@ -5,7 +5,7 @@ from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, Time, 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.enums import RequestRequirementType, RequestStatus, RequestType, db_enum
+from app.models.enums import CoverageType, RequestRequirementType, RequestStatus, RequestType, db_enum
 
 
 class StaffingRequest(Base):
@@ -29,6 +29,7 @@ class StaffingRequest(Base):
     end_time: Mapped[time] = mapped_column(Time)
     urgency_level: Mapped[int] = mapped_column(Integer, default=1, server_default='1')
     language_requirement: Mapped[str | None] = mapped_column(String(20), default='fr', server_default='fr')
+    coverage_type: Mapped[CoverageType | None] = mapped_column(db_enum(CoverageType, 'coverage_type'))
     contact_name: Mapped[str | None] = mapped_column(String(255))
     contact_phone: Mapped[str | None] = mapped_column(String(50))
     contact_email: Mapped[str | None] = mapped_column(String(255))

@@ -480,10 +480,15 @@ function RequestCard({
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "start" }}>
         <strong style={{ fontSize: 18, lineHeight: 1.2 }}>{request.title}</strong>
-        {request.urgency_level >= 3 ? (
+        {request.coverage_type ? (
+          <Badge tone={request.coverage_type === "emergency" || request.coverage_type === "same_day_urgent" ? "urgent" : "neutral"}>
+            {coverageTypeLabel(request.coverage_type, locale)}
+          </Badge>
+        ) : request.urgency_level >= 3 ? (
           <Badge tone="urgent">Urgent</Badge>
         ) : null}
       </div>
+
 
       <div style={{ display: "grid", gap: 4, color: "#3d564c", fontSize: 14 }}>
         <span>📍 {request.location_name ? `${request.location_name}, ${request.city}` : request.city}</span>
@@ -850,8 +855,21 @@ function BigButton({
   );
 }
 
-function Badge({ tone, children }: { tone: "urgent"; children: React.ReactNode }) {
-  const palette = tone === "urgent" ? { bg: "#f4d4cc", color: "#7a3526" } : null;
+function coverageTypeLabel(type: string, locale: "en" | "fr"): string {
+  const map: Record<string, { en: string; fr: string }> = {
+    same_day_urgent: { en: "Same-day urgent", fr: "Urgent même jour" },
+    planned_absence: { en: "Planned absence", fr: "Absence planifiée" },
+    recurring:       { en: "Recurring",       fr: "Récurrent" },
+    emergency:       { en: "Emergency",       fr: "Urgence" },
+  };
+  return map[type]?.[locale] ?? type;
+}
+
+function Badge({ tone, children }: { tone: "urgent" | "neutral"; children: React.ReactNode }) {
+  const palette =
+    tone === "urgent"
+      ? { bg: "#f4d4cc", color: "#7a3526" }
+      : { bg: "#e2ebdd", color: "#214639" };
   return (
     <span
       style={{

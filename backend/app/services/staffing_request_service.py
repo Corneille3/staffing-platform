@@ -48,6 +48,11 @@ class StaffingRequestService:
             end_time=payload.end_time,
             urgency_level=payload.urgency_level,
             language_requirement=payload.language_requirement,
+            coverage_type=payload.coverage_type,
+            contact_name=payload.contact_name,
+            contact_phone=payload.contact_phone,
+            contact_email=payload.contact_email,
+            arrival_instructions=payload.arrival_instructions,
         )
         staffing_request.requirements = [
             *[
