@@ -1,5 +1,5 @@
 from datetime import datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -32,9 +32,15 @@ class ResponseService:
 
         response = self.response_repository.get_for_request_and_worker(request_id, worker_user_id)
         if response is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Response record not found')
+            response = RequestResponse(
+                id=uuid4(),
+                staffing_request_id=request_id,
+                worker_user_id=worker_user_id,
+                status=response_status,
+            )
+        else:
+            response.status = response_status
 
-        response.status = response_status
         response.responded_at = datetime.utcnow()
         saved = self.response_repository.save(response)
         staffing_request.status = RequestStatus.RESPONSES_RECEIVED

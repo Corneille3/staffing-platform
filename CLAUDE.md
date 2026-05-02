@@ -313,7 +313,7 @@ This roadmap closes the gap between the current code and the product vision in
 `Implementation-idea.md`. Items are ordered by dependency + leverage. Tick
 each as it ships and keep "Current focus" in sync.
 
-**Current focus:** A5 — Worker home sections.
+**Current focus:** A7 — Decline-flow with optional reason.
 
 ### Phase A — Worker UX core (the doc's heaviest emphasis)
 
@@ -345,11 +345,16 @@ each as it ships and keep "Current focus" in sync.
   *Shipped: `/worker` top card shows greeting, availability, urgent-alert
   status, quick actions, and an editable urgent-alert toggle. Backend worker
   profile PATCH now accepts `urgent_alert_opt_in` as well as availability.*
-- [ ] **A5. Worker home sections.** "Urgent Requests", "Available Coverage
+- [x] **A5. Worker home sections.** "Urgent Requests", "Available Coverage
   Near You" (cards), "Upcoming Assignment" — replacing any dashboard density.
-- [ ] **A6. Accept-flow confirmation modal.** "Confirm availability" step,
+  *Shipped: `/worker` now separates urgent requests, nearby available
+  coverage, and the next upcoming assignment with mobile-first cards.*
+- [x] **A6. Accept-flow confirmation modal.** "Confirm availability" step,
   then post-accept state shows *Response sent. The coordinator will confirm.*
   Distinct from "Assigned".
+  *Shipped: worker request Accept actions now open a confirm-availability
+  modal before submitting. Accepted cards show explicit coordinator-confirm
+  copy while assignment labels remain separate.*
 - [ ] **A7. Decline-flow with optional reason.** Reasons: Not available / Too
   far / Not interested / Conflict / Other. Reason is optional in MVP.
 - [ ] **A8. Assignment detail enrichments.** Contact person + phone/email,

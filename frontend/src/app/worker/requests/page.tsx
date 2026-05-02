@@ -37,6 +37,7 @@ export default function WorkerRequestsPage() {
   const [cityFilter, setCityFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [urgentOnly, setUrgentOnly] = useState(false);
+  const [confirmingRequest, setConfirmingRequest] = useState<StaffingRequest | null>(null);
 
   async function load() {
     if (!worker) return;
@@ -96,6 +97,7 @@ export default function WorkerRequestsPage() {
 
   async function respond(requestId: string, action: "accept" | "decline") {
     if (!worker) return;
+    setConfirmingRequest(null);
     setBusy(requestId);
     setError(null);
     try {
@@ -171,7 +173,7 @@ export default function WorkerRequestsPage() {
                   myUserId={worker.id}
                   locale={locale}
                   busy={busy === request.id}
-                  onAccept={() => respond(request.id, "accept")}
+                  onAccept={() => setConfirmingRequest(request)}
                   onDecline={() => respond(request.id, "decline")}
                 />
               ))
@@ -206,10 +208,18 @@ export default function WorkerRequestsPage() {
                   myUserId={worker.id}
                   locale={locale}
                   busy={busy === request.id}
-                  onAccept={() => respond(request.id, "accept")}
+                  onAccept={() => setConfirmingRequest(request)}
                 />
               ))}
             </Group>
+          ) : null}
+          {confirmingRequest ? (
+            <ConfirmAvailabilityModal
+              request={confirmingRequest}
+              busy={busy === confirmingRequest.id}
+              onCancel={() => setConfirmingRequest(null)}
+              onConfirm={() => respond(confirmingRequest.id, "accept")}
+            />
           ) : null}
         </>
       )}
@@ -470,6 +480,12 @@ function RequestCard({
         </div>
       ) : null}
 
+      {myResponse?.status === "accepted" ? (
+        <p style={{ margin: 0, color: "#296246", fontSize: 14, fontWeight: 800 }}>
+          Response sent. The coordinator will confirm.
+        </p>
+      ) : null}
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         {onAccept ? (
           <BigButton tone="primary" disabled={busy} onClick={onAccept}>
@@ -505,6 +521,88 @@ function EligibilityChips({ eligibility }: { eligibility: EligibilityResult }) {
           {reason.label}
         </span>
       ))}
+    </div>
+  );
+}
+
+function ConfirmAvailabilityModal({
+  request,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  request: StaffingRequest;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-availability-title"
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(24, 50, 41, 0.34)",
+        display: "flex",
+        alignItems: "end",
+        justifyContent: "center",
+        padding: 16,
+        zIndex: 30,
+      }}
+    >
+      <section
+        style={{
+          width: "min(100%, 440px)",
+          background: "#fffdf7",
+          color: "#183229",
+          borderRadius: 20,
+          padding: 20,
+          boxShadow: "0 18px 42px rgba(24, 50, 41, 0.24)",
+          display: "grid",
+          gap: 16,
+        }}
+      >
+        <div>
+          <h2 id="confirm-availability-title" style={{ margin: 0, fontSize: 22 }}>
+            Confirm availability
+          </h2>
+          <p style={{ margin: "8px 0 0", color: "#496158", lineHeight: 1.45 }}>
+            Confirm you are available for this coverage request. Your response will be sent to the
+            coordinator for final confirmation.
+          </p>
+        </div>
+
+        <div
+          style={{
+            borderRadius: 16,
+            background: "#f3eadb",
+            padding: 14,
+            display: "grid",
+            gap: 6,
+            color: "#314c42",
+            fontSize: 14,
+          }}
+        >
+          <strong style={{ color: "#183229", fontSize: 16 }}>{request.title}</strong>
+          <span>{request.city} · {request.work_date}</span>
+          <span>{request.start_time.slice(0, 5)} - {request.end_time.slice(0, 5)}</span>
+        </div>
+
+        <p style={{ margin: 0, color: "#496158", fontSize: 14, fontWeight: 800 }}>
+          This sends your response only. The assignment is confirmed by the coordinator.
+        </p>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <BigButton tone="muted" disabled={busy} onClick={onCancel}>
+            Go back
+          </BigButton>
+          <BigButton tone="primary" disabled={busy} onClick={onConfirm}>
+            Confirm
+          </BigButton>
+        </div>
+      </section>
     </div>
   );
 }

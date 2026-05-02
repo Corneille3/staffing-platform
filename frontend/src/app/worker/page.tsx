@@ -46,15 +46,25 @@ export default function WorkerHome() {
 
   if (!worker) return null;
 
-  const myResponseIds = new Set(responses.map((r) => r.staffing_request_id));
   const openForMe = requests.filter(
-    (r) =>
-      ["open", "notified", "responses_received"].includes(r.status) &&
-      !myResponseIds.has(r.id),
+    (request) => ["open", "notified", "responses_received"].includes(request.status),
   );
+  const urgentRequests = openForMe
+    .filter((request) => request.urgency_level >= 3)
+    .sort(compareRequestsByStart);
+  const nearbyCoverage = openForMe
+    .filter((request) => request.urgency_level < 3)
+    .sort(compareRequestsByStart);
   const myAssignments = assignments.filter(
     (a) => a.worker_user_id === worker.id && a.status !== "completed" && a.status !== "cancelled",
   );
+  const upcomingAssignment = myAssignments
+    .map((assignment) => ({
+      assignment,
+      request: requests.find((request) => request.id === assignment.staffing_request_id) || null,
+    }))
+    .filter((item): item is { assignment: Assignment; request: StaffingRequest } => Boolean(item.request))
+    .sort((left, right) => compareRequestsByStart(left.request, right.request))[0] || null;
   const workerId = worker.id;
   const locale = pickLocale(worker.preferred_language);
   const availabilityStatus = worker.profile?.availability_status || "unavailable";
@@ -92,34 +102,41 @@ export default function WorkerHome() {
         }
       />
 
-      <Section title="New requests" actionLabel="See all" actionHref="/worker/requests">
+      <Section title="Urgent Requests" actionLabel="See all" actionHref="/worker/requests">
         {loading ? (
           <Placeholder>Loading…</Placeholder>
-        ) : openForMe.length === 0 ? (
-          <Placeholder>You are all caught up.</Placeholder>
+        ) : urgentRequests.length === 0 ? (
+          <Placeholder>No urgent requests right now.</Placeholder>
         ) : (
-          openForMe.slice(0, 3).map((r) => <RequestPreviewCard key={r.id} request={r} />)
+          urgentRequests.slice(0, 2).map((request) => (
+            <RequestPreviewCard key={request.id} request={request} emphasis="urgent" />
+          ))
         )}
       </Section>
 
-      <Section title="My upcoming shifts" actionLabel="See all" actionHref="/worker/assignments">
+      <Section title="Available Coverage Near You" actionLabel="Browse all" actionHref="/worker/requests">
         {loading ? (
           <Placeholder>Loading…</Placeholder>
-        ) : myAssignments.length === 0 ? (
-          <Placeholder>No assigned shifts yet.</Placeholder>
+        ) : nearbyCoverage.length === 0 ? (
+          <Placeholder>No nearby coverage requests right now.</Placeholder>
         ) : (
-          myAssignments.slice(0, 3).map((a) => {
-            const req = requests.find((r) => r.id === a.staffing_request_id);
-            if (!req) return null;
-            return (
-              <AssignmentPreviewCard
-                key={a.id}
-                request={req}
-                assignment={a}
-                locale={locale}
-              />
-            );
-          })
+          nearbyCoverage.slice(0, 3).map((request) => (
+            <RequestPreviewCard key={request.id} request={request} />
+          ))
+        )}
+      </Section>
+
+      <Section title="Upcoming Assignment" actionLabel="See all" actionHref="/worker/assignments">
+        {loading ? (
+          <Placeholder>Loading…</Placeholder>
+        ) : !upcomingAssignment ? (
+          <Placeholder>No assigned shift yet.</Placeholder>
+        ) : (
+          <AssignmentPreviewCard
+            request={upcomingAssignment.request}
+            assignment={upcomingAssignment.assignment}
+            locale={locale}
+          />
         )}
       </Section>
     </div>
@@ -362,7 +379,14 @@ function Placeholder({ children }: { children: React.ReactNode }) {
   );
 }
 
-function RequestPreviewCard({ request }: { request: StaffingRequest }) {
+function RequestPreviewCard({
+  request,
+  emphasis = "normal",
+}: {
+  request: StaffingRequest;
+  emphasis?: "normal" | "urgent";
+}) {
+  const urgent = request.urgency_level >= 3;
   return (
     <Link
       href={`/worker/requests`}
@@ -370,15 +394,16 @@ function RequestPreviewCard({ request }: { request: StaffingRequest }) {
         display: "block",
         textDecoration: "none",
         color: "inherit",
-        background: "#fffdf7",
+        background: emphasis === "urgent" ? "#f8e6df" : "#fffdf7",
         borderRadius: 18,
         padding: 18,
-        boxShadow: "0 8px 18px rgba(24, 50, 41, 0.08)",
+        border: emphasis === "urgent" ? "1px solid rgba(122, 53, 38, 0.18)" : "1px solid transparent",
+        boxShadow: emphasis === "urgent" ? "0 8px 18px rgba(122, 53, 38, 0.1)" : "0 8px 18px rgba(24, 50, 41, 0.08)",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
         <strong style={{ fontSize: 17 }}>{request.title}</strong>
-        {request.urgency_level >= 3 ? (
+        {urgent ? (
           <span
             style={{
               borderRadius: 999,
@@ -448,4 +473,12 @@ function AssignmentPreviewCard({
       </div>
     </div>
   );
+}
+
+function compareRequestsByStart(left: StaffingRequest, right: StaffingRequest): number {
+  return requestStartTime(left) - requestStartTime(right);
+}
+
+function requestStartTime(request: StaffingRequest): number {
+  return new Date(`${request.work_date}T${request.start_time}`).getTime();
 }
