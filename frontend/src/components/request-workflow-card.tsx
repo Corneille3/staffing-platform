@@ -31,7 +31,7 @@ const COVERAGE_TYPE_LABELS: Record<string, string> = {
 };
 
 const ASSIGNMENT_CANCELLATION_REASONS = [
-  "Worker unavailable",
+  "Substitute unavailable",
   "Coordinator changed plan",
   "Request no longer needed",
   "Other",
@@ -218,7 +218,7 @@ export function RequestWorkflowCard({
       ) : null}
 
       <div style={{ display: "grid", gap: 10 }}>
-        <strong style={{ fontSize: 18 }}>Worker responses</strong>
+        <strong style={{ fontSize: 18 }}>Substitute responses</strong>
         {workerUsers.map((worker) => {
           const response = responses.find((item) => item.worker_user_id === worker.id);
           return (
@@ -339,7 +339,7 @@ export function RequestWorkflowCard({
           workerName={
             assignedWorker
               ? `${assignedWorker.first_name} ${assignedWorker.last_name}`
-              : "this worker"
+              : "this substitute"
           }
           reason={cancelReason}
           notes={cancelNotes}
@@ -386,7 +386,7 @@ function AssignedWorkerCard({
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
         <div>
           <strong style={{ display: "block", fontSize: 18 }}>
-            Assigned worker: {worker.first_name} {worker.last_name}
+            Assigned substitute: {worker.first_name} {worker.last_name}
           </strong>
           <span style={{ display: "block", marginTop: 4, color: "#496158", fontSize: 14 }}>
             {worker.email}
@@ -633,7 +633,7 @@ function WorkerReviewCard({
           fontWeight: 800,
         }}
       >
-        Confirm this worker
+        Confirm this substitute
       </button>
     </article>
   );

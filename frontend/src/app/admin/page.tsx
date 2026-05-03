@@ -14,8 +14,8 @@ export default async function AdminDashboardPage() {
   return (
     <PageFrame
       eyebrow="APF Network Pilot"
-      title="Staffing operations in one view."
-      description="Local substitute dispatch is running end to end: requests, worker responses, assignments, and reporting are all coming from the live FastAPI backend."
+      title="Coverage operations in one view."
+      description="Local substitute dispatch is running end to end: coverage requests, substitute responses, assignments, and reporting are all coming from the live FastAPI backend."
     >
       <section
         style={{
@@ -38,7 +38,7 @@ export default async function AdminDashboardPage() {
           marginTop: 26,
         }}
       >
-        <Panel title="Active staffing requests" subtitle={`${requests.length} total`}>
+        <Panel title="Active coverage requests" subtitle={`${requests.length} total`}>
           <div style={{ display: "grid", gap: 16, marginTop: 20 }}>
             {requests.map((request) => (
               <Link
@@ -118,7 +118,7 @@ export default async function AdminDashboardPage() {
             </div>
           </Panel>
 
-          <Panel title="Workers">
+          <Panel title="Substitutes">
             <div style={{ display: "grid", gap: 14, marginTop: 18 }}>
               {workers.map((worker) => (
                 <div

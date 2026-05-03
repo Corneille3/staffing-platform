@@ -356,7 +356,7 @@ This roadmap closes the gap between the current code and the product vision in
 `Implementation-idea.md`. Items are ordered by dependency + leverage. Tick
 each as it ships and keep "Current focus" in sync.
 
-**Current focus:** B4 — Care-sector-neutral copy pass.
+**Current focus:** C1 — Rename "Admin Dashboard" → "Coverage Desk / Coverage Board".
 
 ### Phase A — Worker UX core (the doc's heaviest emphasis)
 
@@ -458,10 +458,17 @@ each as it ships and keep "Current focus" in sync.
   `assisted_living`, `other`. Updated migration, model, SQL doc, seed.
   Human labels in admin Organizations page and as a sub-hint under the
   org dropdown in the create-request form.
-- [ ] **B4. Care-sector-neutral copy pass.** Audit all UI strings + emails
-  for childcare-specific language; replace with care-sector-neutral terms
-  that adapt by org type. Lock in the *Coverage Request / Substitute /
-  Coverage Desk* vocabulary; remove any "task / lead / ticket" residue.
+- [x] **B4. Care-sector-neutral copy pass.** Audited all frontend UI
+  strings. Locked vocabulary: *Coverage Request* (replaces "staffing
+  request"), *Substitute* (replaces "worker" in user-facing labels),
+  *Coverage Desk* (replaces "Dashboard" in admin nav). Changes: admin nav
+  Dashboard→Coverage Desk, Workers→Substitutes; admin page title/panels
+  updated; workers page eyebrow/title/panel updated; request detail
+  description updated; workflow card "Worker responses"→"Substitute
+  responses", "Assigned worker"→"Assigned substitute", "Confirm this
+  worker"→"Confirm this substitute", cancellation reason updated; worker
+  requests heading "Available requests"→"Available coverage"; create form
+  placeholder copy de-childcarified.
 
 ### Phase C — Coordinator (org admin) surface
 

@@ -174,7 +174,7 @@ export function RequestCreateForm({
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          placeholder="Educator replacement - afternoon shift"
+          placeholder="Coverage request - afternoon shift"
           style={inputStyle}
           required
         />
@@ -185,7 +185,7 @@ export function RequestCreateForm({
         <textarea
           value={description}
           onChange={(event) => setDescription(event.target.value)}
-          placeholder="Coverage details, group, or room notes"
+          placeholder="Coverage details or shift notes"
           rows={3}
           style={{ ...inputStyle, resize: "vertical" }}
         />

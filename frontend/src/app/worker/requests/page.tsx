@@ -138,7 +138,7 @@ export default function WorkerRequestsPage() {
   return (
     <div style={{ display: "grid", gap: 24, paddingTop: 16 }}>
       <header>
-        <h1 style={{ margin: 0, fontSize: 26 }}>Available requests</h1>
+        <h1 style={{ margin: 0, fontSize: 26 }}>Available coverage</h1>
         <p style={{ margin: "6px 0 0", color: "#496158" }}>
           {canReceiveRequests
             ? "Tap a request to accept or decline."

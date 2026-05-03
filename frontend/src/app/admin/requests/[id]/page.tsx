@@ -63,7 +63,7 @@ export default async function RequestDetailPage({
     <PageFrame
       eyebrow="Request Detail"
       title={request.title}
-      description="Inspect one staffing request, its matching context, response board, and assignment state."
+      description="Inspect one coverage request, its matching context, response board, and assignment state."
     >
       <div style={{ marginBottom: 18 }}>
         <Link

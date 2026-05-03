@@ -8,11 +8,11 @@ export default async function WorkersPage() {
 
   return (
     <PageFrame
-      eyebrow="Worker Roster"
-      title="Workers"
-      description="This view shows who is active, where they can travel, and whether they are currently available for substitute dispatch."
+      eyebrow="Substitute Roster"
+      title="Substitutes"
+      description="This view shows who is active, where they can cover, and whether they are currently available."
     >
-      <Panel title="Worker availability" subtitle={`${workers.length} workers`}>
+      <Panel title="Substitute availability" subtitle={`${workers.length} substitutes`}>
         <div style={{ display: "grid", gap: 16 }}>
           {workers.map((worker) => (
             <article
