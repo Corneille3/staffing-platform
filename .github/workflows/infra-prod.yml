@@ -1,11 +1,46 @@
-name: Placeholder
+name: Infra CI (main)
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra-prod.yml"
 
 jobs:
-  placeholder:
+  validate:
+    name: terraform fmt + validate
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [dev, prod]
+
     steps:
       - uses: actions/checkout@v4
-      - run: echo "Implement CI/CD next"
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.7"
+
+      - name: Terraform format check
+        working-directory: infra/environments/${{ matrix.environment }}
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init (local backend, no credentials needed)
+        working-directory: infra/environments/${{ matrix.environment }}
+        run: terraform init -backend=false
+
+      - name: Terraform validate
+        working-directory: infra/environments/${{ matrix.environment }}
+        run: terraform validate
+
+  # Apply step — add when AWS credentials are set as repo secrets.
+  # apply:
+  #   needs: validate
+  #   if: github.ref == 'refs/heads/main'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Terraform apply
+  #       run: echo "Wire terraform apply here (requires AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY secrets)"

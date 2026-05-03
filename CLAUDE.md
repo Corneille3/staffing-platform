@@ -28,7 +28,15 @@ close-and-reopen the IDE" troubleshooting from prior sessions — the disk
 state is authoritative.
 
 **Last shipped (most recent first):**
-1. Email notifications — real SMTP via `smtplib`, no extra deps. Mailpit
+1. CI pipelines — all 6 placeholder workflows replaced with real jobs.
+   `backend-dev/prod`: pytest on push/PR with postgres:16 service container,
+   alembic migrate, python-m-pytest -v. `frontend-dev/prod`: npm ci +
+   tsc --noEmit + next build (API_BASE_URL=localhost:8000 so server-component
+   fetches don't fail at build time). `infra-dev/prod`: terraform fmt -check
+   -recursive + init -backend=false + validate for both dev and prod
+   environments (matrix strategy). Prod variants gate on branch=main; deploy
+   steps are present as commented-out scaffolding for when AWS infra is live.
+2. Email notifications — real SMTP via `smtplib`, no extra deps. Mailpit
    added to Docker Compose (SMTP :1025, web UI :8025) for local capture.
    `NotificationDispatcher` composes bilingual (FR/EN) emails for:
    worker notified (publish + renotify), assignment confirmed, assignment
@@ -104,8 +112,7 @@ state is authoritative.
 
 **Top remaining gaps** (see "Known gaps" section for the full list):
 1. SMS notifications are a logged stub (no Twilio/SNS keys configured)
-2. CI workflows are placeholder echos
-3. No integration test coverage (auth gates only)
+2. No integration test coverage (auth gates only; publish/respond/assign flows untested)
 
 If the user asks "what's next?" — check the Implementation roadmap section.
 

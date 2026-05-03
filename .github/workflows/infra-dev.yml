@@ -1,11 +1,39 @@
-name: Placeholder
+name: Infra CI
 
 on:
-  workflow_dispatch:
+  push:
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra-dev.yml"
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra-dev.yml"
 
 jobs:
-  placeholder:
+  validate:
+    name: terraform fmt + validate
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [dev, prod]
+
     steps:
       - uses: actions/checkout@v4
-      - run: echo "Implement CI/CD next"
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.7"
+
+      - name: Terraform format check
+        working-directory: infra/environments/${{ matrix.environment }}
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init (local backend, no credentials needed)
+        working-directory: infra/environments/${{ matrix.environment }}
+        run: terraform init -backend=false
+
+      - name: Terraform validate
+        working-directory: infra/environments/${{ matrix.environment }}
+        run: terraform validate

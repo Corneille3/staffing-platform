@@ -1,11 +1,65 @@
-name: Placeholder
+name: Backend CI (main)
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-prod.yml"
 
 jobs:
-  placeholder:
+  test:
+    name: pytest
     runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/apf_staffing_test
+      APP_ENV: test
+      DEV_AUTH_BYPASS: "true"
+      SMTP_HOST: ""
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: apf_staffing_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v4
-      - run: echo "Implement CI/CD next"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Run migrations
+        working-directory: backend
+        run: alembic upgrade head
+
+      - name: Run tests
+        working-directory: backend
+        run: python -m pytest -v
+
+  # Deploy step — add when AWS infra is provisioned.
+  # deploy:
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Deploy to production
+  #       run: echo "Wire AWS deploy here (ECR push + EC2 restart)"

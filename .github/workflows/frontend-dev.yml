@@ -1,11 +1,44 @@
-name: Placeholder
+name: Frontend CI
 
 on:
-  workflow_dispatch:
+  push:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-dev.yml"
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-dev.yml"
 
 jobs:
-  placeholder:
+  build:
+    name: type-check + build
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
     steps:
       - uses: actions/checkout@v4
-      - run: echo "Implement CI/CD next"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+        env:
+          # Point at a dummy URL so server-component fetches don't fail at build time.
+          # Real API calls happen at request time, not during static build.
+          API_BASE_URL: http://localhost:8000
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
