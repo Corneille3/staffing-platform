@@ -28,7 +28,20 @@ close-and-reopen the IDE" troubleshooting from prior sessions — the disk
 state is authoritative.
 
 **Last shipped (most recent first):**
-1. CI pipelines — all 6 placeholder workflows replaced with real jobs.
+1. Integration tests — 18 new tests across two files covering the full
+   request lifecycle and row-level access control. `app/tests/conftest.py`
+   seeds org/APF admin/org admin/worker A/worker B with real DB rows;
+   each test is wrapped in a transaction that rolls back via SQLAlchemy
+   `join_transaction_mode='create_savepoint'`, so tests are fully isolated
+   without truncating tables. `test_request_lifecycle.py`: create request,
+   publish notifies eligible workers, publish excludes unavailable worker,
+   accept, decline with reason, mark-viewed + idempotency, assign, assign
+   requires prior acceptance, cancel resets request + worker response,
+   renotify resets declined workers. `test_scoping.py`: worker sees only
+   own assignments, worker cannot accept on behalf of another, org admin
+   scoped to their org, APF sees all, network overview live metrics,
+   auth/sync idempotent. Total test count: 38 (up from 20).
+2. CI pipelines — all 6 placeholder workflows replaced with real jobs.
    `backend-dev/prod`: pytest on push/PR with postgres:16 service container,
    alembic migrate, python-m-pytest -v. `frontend-dev/prod`: npm ci +
    tsc --noEmit + next build (API_BASE_URL=localhost:8000 so server-component
@@ -112,7 +125,6 @@ state is authoritative.
 
 **Top remaining gaps** (see "Known gaps" section for the full list):
 1. SMS notifications are a logged stub (no Twilio/SNS keys configured)
-2. No integration test coverage (auth gates only; publish/respond/assign flows untested)
 
 If the user asks "what's next?" — check the Implementation roadmap section.
 
