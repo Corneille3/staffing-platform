@@ -356,7 +356,7 @@ This roadmap closes the gap between the current code and the product vision in
 `Implementation-idea.md`. Items are ordered by dependency + leverage. Tick
 each as it ships and keep "Current focus" in sync.
 
-**Current focus:** C4 — Coverage History page.
+**Current focus:** D1 — Network Overview metrics (APF surface).
 
 ### Phase A — Worker UX core (the doc's heaviest emphasis)
 
@@ -485,8 +485,13 @@ each as it ships and keep "Current focus" in sync.
   qualification/certification text search. Shows match count and
   clear-filters action. Each card shows language + city chips plus
   qualifications/certifications.
-- [ ] **C4. Coverage History page.** Past + cancelled requests with outcome
-  and time-to-fill.
+- [x] **C4. Coverage History page.** `/admin/requests/history` shows closed
+  requests (assigned/completed/cancelled/expired) sorted newest-first.
+  Each card shows outcome text (assigned substitute name + time-to-fill,
+  or cancelled duration), color-coded status badge, org/city/date, links
+  to request detail. Active requests page now filters to in-progress only
+  and shows "View coverage history (N closed) →" link when closed records
+  exist.
 
 ### Phase D — Network admin (APF) surface
 
