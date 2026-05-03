@@ -43,3 +43,19 @@ class WorkerAvailabilityUpdate(BaseModel):
         if self.availability_status is None and self.urgent_alert_opt_in is None and self.supported_cities is None:
             raise ValueError('At least one worker preference must be provided.')
         return self
+
+
+class WorkerInviteCreate(BaseModel):
+    first_name: str
+    last_name: str
+    email: EmailStr
+    phone: str | None = None
+    preferred_language: str = 'fr'
+
+
+class WorkerOnboardCreate(BaseModel):
+    availability_status: AvailabilityStatus = AvailabilityStatus.AVAILABLE
+    urgent_alert_opt_in: bool = True
+    supported_cities: list[str] = Field(default_factory=list)
+    qualifications: list[str] = Field(default_factory=list)
+    certifications: list[str] = Field(default_factory=list)

@@ -28,7 +28,31 @@ close-and-reopen the IDE" troubleshooting from prior sessions — the disk
 state is authoritative.
 
 **Last shipped (most recent first):**
-1. Integration tests — 18 new tests across two files covering the full
+1. Worker onboarding flow — network admin pre-registers a worker via
+   `POST /api/v1/workers/invite` (creates User + TenantMembership);
+   worker signs in and is redirected to `/worker/onboarding` (redirect
+   gate in `worker/layout.tsx` fires when `worker.profile === null`).
+   Onboarding page: CityPicker + ChipPicker for qualifications/certs
+   (preset suggestions + free text), urgent-alerts checkbox; on submit
+   calls `POST /api/v1/workers/{id}/onboard` which creates WorkerProfile +
+   normalized region/qual/cert rows. "Add substitute" button added to
+   `/apf/substitutes` linking to `/apf/workers/new` (APF invite form).
+2. Multi-tenant layer + SMS notifications — `tenants` and
+   `tenant_memberships` tables added. `UserRole` enum replaced
+   `apf_admin` with `platform_admin` + `network_admin`. `AccessScope`
+   rewritten: `is_platform_admin`, `is_network_admin`, `is_org_admin`,
+   `is_worker`; `tenant_id` derived from TenantMembership.
+   `permissions.py`: `require_platform_admin`, `require_network_admin`,
+   `require_admin` (all three), `require_apf` (alias for network_admin).
+   All repositories updated to scope by tenant for network_admin role.
+   `WorkerRepository.list_for_tenant()` added so publish/renotify only
+   match workers in the same tenant pool. Seed creates APF Tenant +
+   network_admin user with TenantMembership; workers also get memberships.
+   SMS: `SmsNotificationService` calls Twilio REST API via `httpx` with
+   Basic auth; skips gracefully when `TWILIO_ACCOUNT_SID` is empty.
+   `NotificationDispatcher._send_to_worker()` fires email + SMS side-by-
+   side (SMS only when `worker.phone` is set).
+3. Integration tests — 18 new tests across two files covering the full
    request lifecycle and row-level access control. `app/tests/conftest.py`
    seeds org/APF admin/org admin/worker A/worker B with real DB rows;
    each test is wrapped in a transaction that rolls back via SQLAlchemy
@@ -124,7 +148,9 @@ state is authoritative.
 9. `POST /auth/sync` — Clerk → DB user link/provision flow
 
 **Top remaining gaps** (see "Known gaps" section for the full list):
-1. SMS notifications are a logged stub (no Twilio/SNS keys configured)
+1. Optional org layer not yet implemented — org_admin without memberships
+   sees nothing; flat-tenant coordinators need `organization_id` nullable
+   on requests and tenant-scoped fallback in AccessScope.
 
 If the user asks "what's next?" — check the Implementation roadmap section.
 
@@ -197,7 +223,7 @@ docs/
   decisions/          ADR-001..003 (single account / public app+private DB / no NAT)
   initial_database_schema.sql
   schema-alignment.md  decision: normalized tables for matching/compliance data
-.github/workflows/    placeholder CI (all are echo stubs today)
+.github/workflows/    real CI: pytest + migrate, tsc + next build, terraform validate
 docker-compose.yml
 Makefile              up / down / migrate / seed / test
 cleanup.sh            local disk reclaim helper for Docker iteration
@@ -367,31 +393,36 @@ initial migration directly — do not stack compatibility migrations.
   filtered by the caller's identity. APF sees the network; org_admin
   sees only their orgs; workers see only their own data. Cross-scope
   access returns 403.
-- `pytest` (14/14) and `next build` / `tsc --noEmit` pass
+- Multi-tenant layer: `tenants` + `tenant_memberships` tables, `platform_admin`
+  + `network_admin` roles, all repositories tenant-scoped
+- Worker onboarding: invite (network admin) → `/worker/onboarding` (worker),
+  redirect gate in worker layout when `profile === null`
+- SMS notifications via Twilio/httpx (skips when credentials absent)
+- Real CI across all 6 GitHub workflows (pytest + tsc + next build + terraform)
+- `pytest` (38/38) and `tsc --noEmit` pass
 
 ## Known gaps (be aware of these before suggesting fixes)
 
-1. **Email/SMS are stubs.** `notifications/email_service.py` etc. exist but
-   are not wired to SES or any provider.
-2. **All 6 GitHub workflows are placeholder echos.** No CI runs anything real.
-3. **Tests cover auth gates and route registration, no integration flows.**
-   No coverage for publish/respond/assign or the `/auth/sync` linking
-   path. With `AccessScope` in place, scoped behavior (worker sees only
-   own, org_admin sees only their orgs) is also untested end-to-end.
-4. **`request-create-form.tsx` accepts any `org_id`** without checking the
-   current user's membership against the org list. The backend now
-   restricts `/organizations` GET to the caller's orgs, so the dropdown
-   already self-filters — but the form should also gate that the
-   selected `created_by_user_id` is the current user.
-5. **Backend JWT verification falls back to unverified claims** when
-   `CLERK_JWKS_URL` is empty (i.e. local dev without a Clerk dev instance).
-   That fallback exists by design, but make sure prod always has the JWKS
-   URL set so `_decode_verified()` is taken.
-6. **Org admins without memberships see nothing.** A user signing in
+1. **Optional org layer not implemented.** `staffing_requests.organization_id`
+   is currently NOT NULL. For flat tenants (single-entity clients), there
+   is no org layer — coordinators need to be tenant-scoped. Planned work:
+   make `organization_id` nullable, add tenant-scoped fallback in
+   `AccessScope` when `org_ids` is empty, hide org dropdown in create form
+   for flat tenants. Track in branch `feature/optional-org-layer`.
+2. **Org admins without memberships see nothing.** A user signing in
    with `role=org_admin` but no `organization_memberships` rows will see
-   empty lists across requests, assignments, organizations, reports.
-   Provisioning memberships is a manual DB step today; an
-   admin-management UI / "promote to org" flow is a future addition.
+   empty lists. This is resolved once the optional org layer lands and
+   tenant-scoped coordinators are supported.
+3. **`request-create-form.tsx` accepts any `org_id`** without checking the
+   current user's membership against the org list. The backend restricts
+   `/organizations` GET to the caller's orgs so the dropdown self-filters,
+   but the form should also gate that `created_by_user_id` is the current user.
+4. **Backend JWT verification falls back to unverified claims** when
+   `CLERK_JWKS_URL` is empty (local dev without Clerk). That fallback
+   exists by design — prod must always have the JWKS URL set.
+5. **SMS needs Twilio credentials.** `SmsNotificationService` calls the
+   Twilio REST API via `httpx` and skips gracefully when
+   `TWILIO_ACCOUNT_SID` is empty. Wire up real keys in prod env.
 
 ## Implementation roadmap (Implementation-idea.md alignment)
 
@@ -399,7 +430,9 @@ This roadmap closes the gap between the current code and the product vision in
 `Implementation-idea.md`. Items are ordered by dependency + leverage. Tick
 each as it ships and keep "Current focus" in sync.
 
-**Current focus:** Phase D complete — full implementation roadmap (A–D) shipped. Next work TBD by user.
+**Current focus:** Optional org layer — branch `feature/optional-org-layer`.
+Make `organization_id` nullable on requests, add tenant-scoped coordinator
+fallback in `AccessScope`, hide org dropdown for flat tenants.
 
 ### Phase A — Worker UX core (the doc's heaviest emphasis)
 

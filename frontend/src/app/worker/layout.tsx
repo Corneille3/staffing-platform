@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import React from "react";
+import { usePathname, useRouter } from "next/navigation";
+import React, { useEffect } from "react";
 import { useWorkerSession, WorkerSessionProvider } from "../../lib/worker-session";
 
 export default function WorkerLayout({ children }: { children: React.ReactNode }) {
@@ -15,6 +15,19 @@ export default function WorkerLayout({ children }: { children: React.ReactNode }
 
 function WorkerShell({ children }: { children: React.ReactNode }) {
   const { worker, workers, loading, error, selectWorker } = useWorkerSession();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (worker && !worker.profile && pathname !== "/worker/onboarding") {
+      router.push("/worker/onboarding");
+    }
+  }, [worker, pathname, router]);
+
+  // Onboarding is a standalone full-screen page — skip the shell entirely
+  if (pathname === "/worker/onboarding") {
+    return <>{children}</>;
+  }
 
   if (loading) {
     return (

@@ -4,8 +4,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
+from app.auth.permissions import require_network_admin
 from app.auth.scope import AccessScope, get_access_scope
-from app.schemas.worker import WorkerAvailabilityUpdate, WorkerProfileRead, WorkerRead
+from app.schemas.worker import (
+    WorkerAvailabilityUpdate,
+    WorkerInviteCreate,
+    WorkerOnboardCreate,
+    WorkerProfileRead,
+    WorkerRead,
+)
 from app.services.worker_service import WorkerService
 
 router = APIRouter()
@@ -34,6 +41,16 @@ def list_workers(
     return {'items': [_to_worker_read(worker) for worker in workers]}
 
 
+@router.post('/invite', status_code=201, dependencies=[Depends(require_network_admin)])
+def invite_worker(
+    payload: WorkerInviteCreate,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> WorkerRead:
+    worker = WorkerService(db).invite(payload, scope)
+    return _to_worker_read(worker)
+
+
 @router.get('/{user_id}')
 def get_worker(
     user_id: UUID,
@@ -46,6 +63,19 @@ def get_worker(
     if worker is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Worker not found')
     return _to_worker_read(worker)
+
+
+@router.post('/{user_id}/onboard', status_code=201)
+def onboard_worker(
+    user_id: UUID,
+    payload: WorkerOnboardCreate,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> WorkerProfileRead:
+    if not scope.is_admin and scope.user.id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Out of scope.')
+    profile = WorkerService(db).onboard(user_id, payload)
+    return WorkerProfileRead.model_validate(profile)
 
 
 @router.patch('/{user_id}/availability')

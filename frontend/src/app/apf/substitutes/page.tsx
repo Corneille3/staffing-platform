@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getAssignments, getWorkers } from "../../../lib/api";
 import { Assignment, Worker } from "../../../lib/types";
 
@@ -44,10 +45,29 @@ export default async function SubstitutePoolPage() {
         <h1 style={{ margin: "10px 0 8px", fontSize: "clamp(2rem, 4vw, 3.4rem)", lineHeight: 1.05 }}>
           Network substitute pool.
         </h1>
-        <p style={{ margin: 0, maxWidth: 720, opacity: 0.72, lineHeight: 1.55 }}>
-          Every substitute registered across the APF network — availability status, coverage cities,
-          qualifications, and assignment utilization at a glance.
-        </p>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
+          <p style={{ margin: 0, maxWidth: 640, opacity: 0.72, lineHeight: 1.55 }}>
+            Every substitute registered across the APF network — availability status, coverage cities,
+            qualifications, and assignment utilization at a glance.
+          </p>
+          <Link
+            href="/apf/workers/new"
+            style={{
+              display: "inline-block",
+              padding: "10px 20px",
+              borderRadius: 12,
+              background: "#f7f0df",
+              color: "#183229",
+              fontSize: 14,
+              fontWeight: 800,
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+          >
+            + Add substitute
+          </Link>
+        </div>
       </section>
 
       {/* Summary bar */}

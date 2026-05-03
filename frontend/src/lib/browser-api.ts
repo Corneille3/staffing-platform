@@ -148,3 +148,26 @@ export async function updateWorkerPreferences(
 ): Promise<WorkerProfile> {
   return patchJson<WorkerProfile>(`/api/v1/workers/${workerId}/availability`, payload);
 }
+
+export async function inviteWorker(payload: {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone?: string;
+  preferred_language?: string;
+}): Promise<Worker> {
+  return postJson<Worker>("/api/v1/workers/invite", payload);
+}
+
+export async function onboardWorker(
+  workerId: string,
+  payload: {
+    availability_status: string;
+    urgent_alert_opt_in: boolean;
+    supported_cities: string[];
+    qualifications: string[];
+    certifications: string[];
+  },
+): Promise<WorkerProfile> {
+  return postJson<WorkerProfile>(`/api/v1/workers/${workerId}/onboard`, payload);
+}
