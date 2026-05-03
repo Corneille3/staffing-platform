@@ -92,6 +92,7 @@ export type RequestResponse = {
   worker_user_id: string;
   status: string;
   decline_reason: string | null;
+  viewed_at: string | null;
   responded_at: string | null;
 };
 

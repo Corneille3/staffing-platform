@@ -97,6 +97,15 @@ export async function fetchNotificationFeed(workerUserId: string): Promise<Notif
   return data.items;
 }
 
+export async function markRequestViewed(
+  requestId: string,
+  workerUserId: string,
+): Promise<RequestResponse> {
+  return postJson<RequestResponse>(`/api/v1/requests/${requestId}/responses/view`, {
+    worker_user_id: workerUserId,
+  });
+}
+
 export async function acceptRequest(
   requestId: string,
   workerUserId: string,

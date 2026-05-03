@@ -356,7 +356,7 @@ This roadmap closes the gap between the current code and the product vision in
 `Implementation-idea.md`. Items are ordered by dependency + leverage. Tick
 each as it ships and keep "Current focus" in sync.
 
-**Current focus:** B2 — Response state (viewed + no-response).
+**Current focus:** B3 — Organization type enum.
 
 ### Phase A — Worker UX core (the doc's heaviest emphasis)
 
@@ -443,9 +443,16 @@ each as it ships and keep "Current focus" in sync.
   Bug fixed: assignment cancellation now resets the worker's response to
   `notified` (not `declined`) so they appear back in Pending and can
   re-respond.
-- [ ] **B2. Response state — viewed + no-response.** Add `viewed_at` to
-  `request_responses`; surface "no response" in admin response boards and
-  "Response sent → received" copy on worker side.
+- [x] **B2. Response state — viewed + no-response.** Added `viewed_at` to
+  `request_responses` (model, migration, schema, SQL doc, TS types).
+  `POST /requests/{id}/responses/view` transitions `notified → viewed` and
+  sets `viewed_at` (idempotent; no-op on already-viewed). Worker page calls
+  mark-viewed (fire-and-forget) when opening Accept or Decline modal; copy
+  on accepted cards now distinguishes "Response sent · Awaiting confirmation"
+  vs "Response received by coordinator · Awaiting confirmation" based on
+  `request.status`. Admin `workerResponseLabel` handles `viewed` ("Viewed —
+  awaiting reply") and `no_response` ("No response"); `viewed_at` timestamp
+  shown inline under the worker name in the response board.
 - [ ] **B3. Organization type enum.** childcare / long-term-care /
   community-care / home-care / assisted-living / other. Drives copy + which
   qualification fields appear.

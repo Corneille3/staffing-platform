@@ -18,6 +18,24 @@ class ResponseService:
         self.request_repository = StaffingRequestRepository(db)
         self.audit_service = AuditService(db)
 
+    def mark_viewed(self, request_id: UUID, worker_user_id: UUID) -> RequestResponse:
+        staffing_request = self.request_repository.get(request_id)
+        if staffing_request is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Staffing request not found')
+
+        response = self.response_repository.get_for_request_and_worker(request_id, worker_user_id)
+        if response is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Response not found')
+
+        if response.status == ResponseStatus.NOTIFIED:
+            response.status = ResponseStatus.VIEWED
+            response.viewed_at = datetime.now(timezone.utc)
+            saved = self.response_repository.save(response)
+            self.db.commit()
+            return saved
+
+        return response
+
     def set_status(
         self,
         request_id: UUID,

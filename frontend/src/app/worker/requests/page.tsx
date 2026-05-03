@@ -7,6 +7,7 @@ import {
   fetchRequestEligibility,
   fetchRequestResponses,
   fetchRequests,
+  markRequestViewed,
 } from "../../../lib/browser-api";
 import { pickLocale, workerRequestPerspective } from "../../../lib/status-labels";
 import { EligibilityResult, RequestResponse, StaffingRequest } from "../../../lib/types";
@@ -197,8 +198,18 @@ export default function WorkerRequestsPage() {
                   myUserId={worker.id}
                   locale={locale}
                   busy={busy === request.id}
-                  onAccept={() => setConfirmingRequest(request)}
-                  onDecline={() => setDecliningRequest(request)}
+                  onAccept={() => {
+                    if (worker && (!myResponse || myResponse.status === "notified")) {
+                      markRequestViewed(request.id, worker.id).catch(() => {});
+                    }
+                    setConfirmingRequest(request);
+                  }}
+                  onDecline={() => {
+                    if (worker && (!myResponse || myResponse.status === "notified")) {
+                      markRequestViewed(request.id, worker.id).catch(() => {});
+                    }
+                    setDecliningRequest(request);
+                  }}
                 />
               ))
             )}
@@ -530,7 +541,13 @@ function RequestCard({
 
       {myResponse?.status === "accepted" ? (
         <p style={{ margin: 0, color: "#296246", fontSize: 14, fontWeight: 800 }}>
-          Response sent. The coordinator will confirm.
+          {request.status === "responses_received"
+            ? locale === "fr"
+              ? "Réponse reçue par le coordonnateur · En attente de confirmation."
+              : "Response received by coordinator · Awaiting confirmation."
+            : locale === "fr"
+            ? "Réponse envoyée · En attente de confirmation du coordonnateur."
+            : "Response sent · Awaiting coordinator confirmation."}
         </p>
       ) : myResponse?.status === "declined" && myResponse.decline_reason ? (
         <p style={{ margin: 0, color: "#8c4d3f", fontSize: 13 }}>

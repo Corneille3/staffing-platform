@@ -152,6 +152,8 @@ CREATE TABLE request_responses (
     staffing_request_id UUID NOT NULL REFERENCES staffing_requests(id) ON DELETE CASCADE,
     worker_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     status response_status NOT NULL,
+    decline_reason VARCHAR(255),
+    viewed_at TIMESTAMPTZ,
     responded_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

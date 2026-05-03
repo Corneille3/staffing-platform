@@ -13,6 +13,7 @@ class RequestResponseRead(TimestampedSchema):
     worker_user_id: UUID
     status: ResponseStatus
     decline_reason: str | None = None
+    viewed_at: datetime | None = None
     responded_at: datetime | None = None
 
 

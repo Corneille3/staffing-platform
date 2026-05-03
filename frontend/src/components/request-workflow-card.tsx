@@ -15,8 +15,10 @@ function formatStatus(value: string) {
 function workerResponseLabel(status: string): string {
   switch (status) {
     case "notified": return "Notified — awaiting reply";
+    case "viewed": return "Viewed — awaiting reply";
     case "accepted": return "Accepted";
     case "declined": return "Declined";
+    case "no_response": return "No response";
     default: return formatStatus(status);
   }
 }
@@ -239,6 +241,11 @@ export function RequestWorkflowCard({
                 <div style={{ marginTop: 4, color: "#5d6d66", fontSize: 14 }}>
                   {response ? workerResponseLabel(response.status) : "Not notified"}
                 </div>
+                {response?.viewed_at ? (
+                  <div style={{ marginTop: 2, color: "#8a9e95", fontSize: 12 }}>
+                    Viewed {response.viewed_at.slice(0, 16).replace("T", " ")}
+                  </div>
+                ) : null}
               </div>
               {!isClosed ? (
                 <div style={{ display: "flex", gap: 8 }}>

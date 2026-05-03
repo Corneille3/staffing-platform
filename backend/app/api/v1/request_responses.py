@@ -40,6 +40,22 @@ def list_request_responses(
     }
 
 
+@router.post('/{request_id}/responses/view')
+def view_request_response(
+    request_id: UUID,
+    payload: RequestResponseAction,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> RequestResponseRead:
+    if not scope.is_admin and payload.worker_user_id != scope.user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='Workers may only mark their own responses as viewed.',
+        )
+    saved = ResponseService(db).mark_viewed(request_id, payload.worker_user_id)
+    return RequestResponseRead.model_validate(saved)
+
+
 @router.post('/{request_id}/responses/accept')
 def accept_request_response(
     request_id: UUID,
