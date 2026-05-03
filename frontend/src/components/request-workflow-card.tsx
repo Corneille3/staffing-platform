@@ -23,6 +23,15 @@ function workerResponseLabel(status: string): string {
   }
 }
 
+const RESPONSE_PALETTE: Record<string, { bg: string; chip: string; chipColor: string; label: string }> = {
+  notified:    { bg: "#f0ede4", chip: "#e4ddd0", chipColor: "#5d4c37",  label: "Awaiting reply" },
+  viewed:      { bg: "#e8f0ee", chip: "#b8d8d0", chipColor: "#1f4e43",  label: "Viewed — no reply yet" },
+  accepted:    { bg: "#e2f1e8", chip: "#b8dfc3", chipColor: "#1a4a2e",  label: "Accepted" },
+  declined:    { bg: "#f8e8e4", chip: "#f0c8c0", chipColor: "#7a3526",  label: "Declined" },
+  no_response: { bg: "#eeecea", chip: "#dcdad6", chipColor: "#6b6b64",  label: "No response" },
+  withdrawn:   { bg: "#eeecea", chip: "#dcdad6", chipColor: "#6b6b64",  label: "Withdrawn" },
+};
+
 const COVERAGE_TYPE_LABELS: Record<string, string> = {
   same_day_urgent: "Same-day urgent",
   planned_absence: "Planned absence",
@@ -219,81 +228,112 @@ export function RequestWorkflowCard({
 
       <div style={{ display: "grid", gap: 10 }}>
         <strong style={{ fontSize: 18 }}>Substitute responses</strong>
-        {workerUsers.map((worker) => {
-          const response = responses.find((item) => item.worker_user_id === worker.id);
-          return (
-            <div
-              key={worker.id}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr auto",
-                gap: 12,
-                alignItems: "center",
-                borderRadius: 16,
-                padding: 14,
-                background: "#f7f1e4",
-              }}
-            >
-              <div>
-                <strong>
-                  {worker.first_name} {worker.last_name}
-                </strong>
-                <div style={{ marginTop: 4, color: "#5d6d66", fontSize: 14 }}>
-                  {response ? workerResponseLabel(response.status) : "Not notified"}
+        {responses.length === 0 ? (
+          <p style={{ margin: 0, color: "#5d6d66", fontSize: 14 }}>
+            No substitutes have been notified yet.
+          </p>
+        ) : (
+          responses.map((response) => {
+            const user = users.find((u) => u.id === response.worker_user_id);
+            const palette = RESPONSE_PALETTE[response.status] ?? RESPONSE_PALETTE.notified;
+            return (
+              <div
+                key={response.id}
+                style={{
+                  borderRadius: 16,
+                  padding: 14,
+                  background: palette.bg,
+                  display: "grid",
+                  gap: 8,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "start" }}>
+                  <div>
+                    <strong style={{ fontSize: 15 }}>
+                      {user ? `${user.first_name} ${user.last_name}` : "Unknown substitute"}
+                    </strong>
+                    {user ? (
+                      <div style={{ fontSize: 12, color: "#6b8179", marginTop: 2 }}>{user.email}</div>
+                    ) : null}
+                  </div>
+                  <span
+                    style={{
+                      borderRadius: 999,
+                      padding: "4px 10px",
+                      background: palette.chip,
+                      color: palette.chipColor,
+                      fontSize: 11,
+                      fontWeight: 800,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {palette.label}
+                  </span>
                 </div>
-                {response?.viewed_at ? (
-                  <div style={{ marginTop: 2, color: "#8a9e95", fontSize: 12 }}>
+                {response.viewed_at ? (
+                  <div style={{ fontSize: 12, color: "#6b8179" }}>
                     Viewed {response.viewed_at.slice(0, 16).replace("T", " ")}
                   </div>
                 ) : null}
+                {response.decline_reason ? (
+                  <div style={{ fontSize: 13, color: "#7a3526" }}>
+                    Reason: {response.decline_reason}
+                  </div>
+                ) : null}
+                {!isClosed ? (
+                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                    <button
+                      type="button"
+                      disabled={isPending || response.status === "accepted"}
+                      onClick={() =>
+                        post(`/api/v1/requests/${request.id}/responses/accept`, {
+                          worker_user_id: response.worker_user_id,
+                        })
+                      }
+                      style={{
+                        border: 0,
+                        borderRadius: 999,
+                        padding: "8px 14px",
+                        background: "#214639",
+                        color: "#f7f0df",
+                        cursor: response.status === "accepted" ? "default" : "pointer",
+                        fontWeight: 700,
+                        fontSize: 13,
+                        opacity: response.status === "accepted" ? 0.4 : 1,
+                      }}
+                    >
+                      Accept
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isPending || response.status === "declined"}
+                      onClick={() =>
+                        post(`/api/v1/requests/${request.id}/responses/decline`, {
+                          worker_user_id: response.worker_user_id,
+                        })
+                      }
+                      style={{
+                        border: 0,
+                        borderRadius: 999,
+                        padding: "8px 14px",
+                        background: "#eadfd7",
+                        color: "#7a473f",
+                        cursor: response.status === "declined" ? "default" : "pointer",
+                        fontWeight: 700,
+                        fontSize: 13,
+                        opacity: response.status === "declined" ? 0.4 : 1,
+                      }}
+                    >
+                      Decline
+                    </button>
+                  </div>
+                ) : null}
               </div>
-              {!isClosed ? (
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    type="button"
-                    disabled={isPending || !response || response.status === "accepted"}
-                    onClick={() =>
-                      post(`/api/v1/requests/${request.id}/responses/accept`, {
-                        worker_user_id: worker.id,
-                      })
-                    }
-                    style={{
-                      border: 0,
-                      borderRadius: 999,
-                      padding: "10px 12px",
-                      background: "#214639",
-                      color: "#f7f0df",
-                      cursor: "pointer",
-                      fontWeight: 700,
-                    }}
-                  >
-                    Accept
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isPending || !response || response.status === "declined"}
-                    onClick={() =>
-                      post(`/api/v1/requests/${request.id}/responses/decline`, {
-                        worker_user_id: worker.id,
-                      })
-                    }
-                    style={{
-                      border: 0,
-                      borderRadius: 999,
-                      padding: "10px 12px",
-                      background: "#eadfd7",
-                      color: "#7a473f",
-                      cursor: "pointer",
-                      fontWeight: 700,
-                    }}
-                  >
-                    Decline
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {request.status !== "assigned" && acceptedResponses.length > 0 && orgAdmin ? (

@@ -356,7 +356,7 @@ This roadmap closes the gap between the current code and the product vision in
 `Implementation-idea.md`. Items are ordered by dependency + leverage. Tick
 each as it ships and keep "Current focus" in sync.
 
-**Current focus:** C1 — Rename "Admin Dashboard" → "Coverage Desk / Coverage Board".
+**Current focus:** C4 — Coverage History page.
 
 ### Phase A — Worker UX core (the doc's heaviest emphasis)
 
@@ -472,12 +472,19 @@ each as it ships and keep "Current focus" in sync.
 
 ### Phase C — Coordinator (org admin) surface
 
-- [ ] **C1. Rename "Admin Dashboard" → "Coverage Desk / Coverage Board".**
-  Visual + nav rename, no functional change.
-- [ ] **C2. Per-request Responses board.** Show notified / viewed / accepted
-  / declined / no-response per worker for a given request. Depends on B2.
-- [ ] **C3. Substitute Directory page.** Browse the worker pool with city,
-  qualification, language, availability filters.
+- [x] **C1. Rename "Admin Dashboard" → "Coverage Desk / Coverage Board".**
+  Done as part of B4 copy pass — admin nav now reads "Coverage Desk".
+- [x] **C2. Per-request Responses board.** Request detail page now shows a
+  proper per-response board: one card per notified substitute, color-coded
+  by status (notified/viewed/accepted/declined/no_response), with
+  viewed_at timestamp and decline_reason surfaced. Iterates over responses
+  (not all workers). "Substitute:" label fixed in assignment panel.
+- [x] **C3. Substitute Directory page.** `/admin/workers` now renders a
+  `SubstituteDirectory` client component with filters: availability
+  (All/Available/Unavailable chips), city dropdown, language dropdown,
+  qualification/certification text search. Shows match count and
+  clear-filters action. Each card shows language + city chips plus
+  qualifications/certifications.
 - [ ] **C4. Coverage History page.** Past + cancelled requests with outcome
   and time-to-fill.
 

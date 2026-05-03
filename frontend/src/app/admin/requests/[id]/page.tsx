@@ -162,7 +162,7 @@ export default async function RequestDetailPage({
             {assignment ? (
               <div style={{ display: "grid", gap: 8, color: "#314c42" }}>
                 <span>
-                  <strong>Worker:</strong> {assignedWorker}
+                  <strong>Substitute:</strong> {assignedWorker}
                 </span>
                 <span>
                   <strong>Status:</strong> {formatStatus(assignment.status)}
