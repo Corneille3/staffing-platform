@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db_session
 from app.auth.scope import AccessScope, get_access_scope
 from app.models.assignment import Assignment
+from app.models.organization import Organization
 from app.models.request_notification import RequestNotification
 from app.models.request_response import RequestResponse
 from app.models.staffing_request import StaffingRequest
@@ -22,8 +23,17 @@ def list_notifications(
 ) -> dict[str, list[NotificationRead]]:
     stmt = select(RequestNotification).order_by(RequestNotification.created_at.desc())
 
-    if scope.is_apf:
+    if scope.is_platform_admin:
         items = list(db.scalars(stmt).all())
+    elif scope.is_network_admin:
+        if not scope.tenant_id:
+            items = []
+        else:
+            tenant_org_ids = select(Organization.id).where(Organization.tenant_id == scope.tenant_id)
+            stmt = stmt.join(
+                StaffingRequest, RequestNotification.staffing_request_id == StaffingRequest.id
+            ).where(StaffingRequest.organization_id.in_(tenant_org_ids))
+            items = list(db.scalars(stmt).all())
     elif scope.is_org_admin:
         if not scope.org_ids:
             items = []

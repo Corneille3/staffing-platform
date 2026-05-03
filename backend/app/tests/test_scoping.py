@@ -113,4 +113,4 @@ def test_auth_sync_returns_existing_user(apf_client, seed):
     assert resp.status_code == 200
     data = resp.json()
     assert data['clerk_user_id'] == 'int-apf'
-    assert data['role'] == 'apf_admin'
+    assert data['role'] == 'network_admin'

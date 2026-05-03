@@ -18,13 +18,17 @@ class OrganizationRepository:
 
     def list_for_scope(self, scope: AccessScope) -> list[Organization]:
         stmt = select(Organization).order_by(Organization.name)
-        if scope.is_apf:
+        if scope.is_platform_admin:
             return list(self.db.scalars(stmt).all())
-        # Org admins (and workers) only see orgs they belong to.
+        if scope.is_network_admin:
+            if not scope.tenant_id:
+                return []
+            return list(self.db.scalars(
+                stmt.where(Organization.tenant_id == scope.tenant_id)
+            ).all())
         if not scope.org_ids:
             return []
-        stmt = stmt.where(Organization.id.in_(scope.org_ids))
-        return list(self.db.scalars(stmt).all())
+        return list(self.db.scalars(stmt.where(Organization.id.in_(scope.org_ids))).all())
 
     def get(self, organization_id: UUID) -> Organization | None:
         return self.db.get(Organization, organization_id)

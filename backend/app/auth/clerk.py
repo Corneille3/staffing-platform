@@ -149,6 +149,6 @@ def public_metadata_role(details: dict) -> str | None:
     metadata = details.get('public_metadata') or {}
     if isinstance(metadata, dict):
         candidate = metadata.get('role')
-        if candidate in {'worker', 'org_admin', 'apf_admin'}:
+        if candidate in {'worker', 'org_admin', 'network_admin', 'platform_admin'}:
             return candidate
     return None

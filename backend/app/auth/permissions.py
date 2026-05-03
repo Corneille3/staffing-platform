@@ -3,7 +3,7 @@ from collections.abc import Callable
 from fastapi import Depends, HTTPException, status
 
 from app.auth.current_user import CurrentUserModel, get_current_user
-from app.core.constants import ROLE_APF_ADMIN, ROLE_ORG_ADMIN, ROLE_WORKER
+from app.core.constants import ROLE_NETWORK_ADMIN, ROLE_ORG_ADMIN, ROLE_PLATFORM_ADMIN, ROLE_WORKER
 
 
 def require_role(*allowed_roles: str) -> Callable[..., CurrentUserModel]:
@@ -23,6 +23,10 @@ def require_role(*allowed_roles: str) -> Callable[..., CurrentUserModel]:
 
 
 require_authenticated = get_current_user
-require_admin = require_role(ROLE_APF_ADMIN, ROLE_ORG_ADMIN)
-require_apf = require_role(ROLE_APF_ADMIN)
+require_platform_admin = require_role(ROLE_PLATFORM_ADMIN)
+require_network_admin = require_role(ROLE_PLATFORM_ADMIN, ROLE_NETWORK_ADMIN)
+require_admin = require_role(ROLE_PLATFORM_ADMIN, ROLE_NETWORK_ADMIN, ROLE_ORG_ADMIN)
 require_worker = require_role(ROLE_WORKER)
+
+# Backward-compat alias used by audit_logs route.
+require_apf = require_network_admin

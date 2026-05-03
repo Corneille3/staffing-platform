@@ -14,7 +14,7 @@ branch_labels = None
 depends_on = None
 
 
-user_role = postgresql.ENUM('apf_admin', 'org_admin', 'worker', name='user_role', create_type=False)
+user_role = postgresql.ENUM('platform_admin', 'network_admin', 'org_admin', 'worker', name='user_role', create_type=False)
 organization_type = postgresql.ENUM('childcare', 'long_term_care', 'community_care', 'home_care', 'assisted_living', 'other', name='organization_type', create_type=False)
 request_type = postgresql.ENUM('urgent_replacement', 'planned_replacement', 'open_staffing_need', name='request_type', create_type=False)
 request_status = postgresql.ENUM('draft', 'open', 'notified', 'responses_received', 'assigned', 'completed', 'cancelled', 'expired', name='request_status', create_type=False)
@@ -40,8 +40,18 @@ def upgrade() -> None:
     coverage_type.create(bind, checkfirst=True)
 
     op.create_table(
+        'tenants',
+        sa.Column('id', postgresql.UUID(as_uuid=False), primary_key=True),
+        sa.Column('name', sa.String(length=255), nullable=False),
+        sa.Column('slug', sa.String(length=100), nullable=False, unique=True),
+        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.true()),
+        sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False, server_default=sa.text('NOW()')),
+    )
+
+    op.create_table(
         'organizations',
         sa.Column('id', postgresql.UUID(as_uuid=False), primary_key=True),
+        sa.Column('tenant_id', postgresql.UUID(as_uuid=False), sa.ForeignKey('tenants.id', ondelete='RESTRICT'), nullable=False),
         sa.Column('name', sa.String(length=255), nullable=False),
         sa.Column('type', organization_type, nullable=False),
         sa.Column('city', sa.String(length=100), nullable=False),
@@ -81,6 +91,17 @@ def upgrade() -> None:
         sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False, server_default=sa.text('NOW()')),
         sa.UniqueConstraint('user_id', 'organization_id', name='uq_user_organization_membership'),
+    )
+
+    op.create_table(
+        'tenant_memberships',
+        sa.Column('id', postgresql.UUID(as_uuid=False), primary_key=True),
+        sa.Column('user_id', postgresql.UUID(as_uuid=False), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
+        sa.Column('tenant_id', postgresql.UUID(as_uuid=False), sa.ForeignKey('tenants.id', ondelete='CASCADE'), nullable=False),
+        sa.Column('role', user_role, nullable=False),
+        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.true()),
+        sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False, server_default=sa.text('NOW()')),
+        sa.UniqueConstraint('user_id', 'tenant_id', name='uq_user_tenant_membership'),
     )
 
     op.create_table(
@@ -227,6 +248,8 @@ def upgrade() -> None:
 
     op.create_index('idx_users_role', 'users', ['role'])
     op.create_index('idx_org_memberships_org_id', 'organization_memberships', ['organization_id'])
+    op.create_index('idx_tenant_memberships_tenant_id', 'tenant_memberships', ['tenant_id'])
+    op.create_index('idx_organizations_tenant_id', 'organizations', ['tenant_id'])
     op.create_index('idx_worker_profiles_availability', 'worker_profiles', ['availability_status'])
     op.create_index('idx_worker_regions_city_region', 'worker_regions', ['city', 'region'])
     op.create_index('idx_worker_qualifications_code', 'worker_qualifications', ['qualification_code'])
@@ -242,6 +265,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_index('idx_organizations_tenant_id', table_name='organizations')
+    op.drop_index('idx_tenant_memberships_tenant_id', table_name='tenant_memberships')
     op.drop_index('idx_audit_logs_org_created_at', table_name='audit_logs')
     op.drop_index('idx_request_notifications_request_id', table_name='request_notifications')
     op.drop_index('idx_request_responses_request_id', table_name='request_responses')
@@ -268,8 +293,10 @@ def downgrade() -> None:
     op.drop_table('worker_regions')
     op.drop_table('worker_profiles')
     op.drop_table('organization_memberships')
+    op.drop_table('tenant_memberships')
     op.drop_table('users')
     op.drop_table('organizations')
+    op.drop_table('tenants')
 
     bind = op.get_bind()
     request_requirement_type.drop(bind, checkfirst=True)

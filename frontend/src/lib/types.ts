@@ -1,3 +1,11 @@
+export type Tenant = {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  created_at: string;
+};
+
 export type NetworkSummary = {
   organization_count: number;
   request_count: number;

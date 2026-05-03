@@ -1,13 +1,13 @@
 """Access scope resolution for row-level authorization.
 
-`AccessScope` resolves the Clerk-authenticated caller into the concrete DB
-identity (a `User` row) plus the set of organizations they have admin
-access to. Service / repository code that must filter by ownership takes
-this scope and applies whichever filter the caller's role implies.
+Resolves the authenticated caller into their DB identity plus the set of
+tenants/organizations they have access to. Repositories apply whichever
+filter the caller's role implies:
 
-Resolution requires that POST /auth/sync has run for this Clerk user; if
-the `users.clerk_user_id` is not yet populated, the dependency raises
-401 with a clear message asking the client to call /auth/sync first.
+  platform_admin  — sees everything across all tenants
+  network_admin   — sees everything within their tenant
+  org_admin       — sees their organizations within a tenant
+  worker          — sees only their own data
 """
 
 from dataclasses import dataclass, field
@@ -20,19 +20,26 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db_session
 from app.auth.current_user import CurrentUserModel, get_current_user
 from app.core.config import settings
-from app.core.constants import ROLE_APF_ADMIN, ROLE_ORG_ADMIN, ROLE_WORKER
+from app.core.constants import ROLE_NETWORK_ADMIN, ROLE_ORG_ADMIN, ROLE_PLATFORM_ADMIN, ROLE_WORKER
+from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
+from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 
 
 @dataclass(slots=True)
 class AccessScope:
     user: User
+    tenant_id: UUID | None = None
     org_ids: list[UUID] = field(default_factory=list)
 
     @property
-    def is_apf(self) -> bool:
-        return self.user.role.value == ROLE_APF_ADMIN
+    def is_platform_admin(self) -> bool:
+        return self.user.role.value == ROLE_PLATFORM_ADMIN
+
+    @property
+    def is_network_admin(self) -> bool:
+        return self.user.role.value == ROLE_NETWORK_ADMIN
 
     @property
     def is_org_admin(self) -> bool:
@@ -44,7 +51,7 @@ class AccessScope:
 
     @property
     def is_admin(self) -> bool:
-        return self.is_apf or self.is_org_admin
+        return not self.is_worker
 
 
 def get_access_scope(
@@ -65,16 +72,40 @@ def get_access_scope(
             detail='User not provisioned. Call POST /api/v1/auth/sync first.',
         )
 
-    if user.role.value == ROLE_APF_ADMIN:
+    role = user.role.value
+
+    if role == ROLE_PLATFORM_ADMIN:
         return AccessScope(user=user)
 
-    if user.role.value == ROLE_ORG_ADMIN:
+    if role == ROLE_NETWORK_ADMIN:
+        membership = db.scalar(
+            select(TenantMembership).where(
+                TenantMembership.user_id == user.id,
+                TenantMembership.is_active.is_(True),
+            )
+        )
+        return AccessScope(user=user, tenant_id=membership.tenant_id if membership else None)
+
+    if role == ROLE_ORG_ADMIN:
         memberships = db.scalars(
             select(OrganizationMembership).where(
                 OrganizationMembership.user_id == user.id,
                 OrganizationMembership.is_active.is_(True),
             )
         ).all()
-        return AccessScope(user=user, org_ids=[m.organization_id for m in memberships])
+        org_ids = [m.organization_id for m in memberships]
+        tenant_id = None
+        if org_ids:
+            org = db.get(Organization, org_ids[0])
+            if org:
+                tenant_id = org.tenant_id
+        return AccessScope(user=user, tenant_id=tenant_id, org_ids=org_ids)
 
-    return AccessScope(user=user)
+    # WORKER
+    membership = db.scalar(
+        select(TenantMembership).where(
+            TenantMembership.user_id == user.id,
+            TenantMembership.is_active.is_(True),
+        )
+    )
+    return AccessScope(user=user, tenant_id=membership.tenant_id if membership else None)

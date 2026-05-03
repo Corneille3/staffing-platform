@@ -10,6 +10,7 @@ from app.models.request_notification import RequestNotification
 from app.models.request_requirement import RequestRequirement
 from app.models.request_response import RequestResponse
 from app.models.staffing_request import StaffingRequest
+from app.models.organization import Organization
 from app.repositories.response_repository import ResponseRepository
 from app.repositories.staffing_request_repository import StaffingRequestRepository
 from app.repositories.worker_repository import WorkerRepository
@@ -88,12 +89,18 @@ class StaffingRequestService:
         self.db.commit()
         return created
 
+    def _workers_for_request(self, staffing_request: StaffingRequest):
+        org = self.db.get(Organization, staffing_request.organization_id)
+        if org and org.tenant_id:
+            return self.worker_repository.list_for_tenant(org.tenant_id)
+        return self.worker_repository.list()
+
     def publish(self, request_id: UUID) -> StaffingRequest:
         staffing_request = self._get_required(request_id)
         if staffing_request.status not in {RequestStatus.DRAFT, RequestStatus.OPEN}:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='Request cannot be published')
 
-        workers = self.worker_repository.list()
+        workers = self._workers_for_request(staffing_request)
         eligible_workers = self.matching_service.eligible_workers(staffing_request, workers)
 
         staffing_request.status = RequestStatus.NOTIFIED
@@ -141,7 +148,7 @@ class StaffingRequestService:
                 detail='Request cannot be re-notified in its current state.',
             )
 
-        workers = self.worker_repository.list()
+        workers = self._workers_for_request(staffing_request)
         eligible_workers = self.matching_service.eligible_workers(staffing_request, workers)
 
         staffing_request.status = RequestStatus.NOTIFIED

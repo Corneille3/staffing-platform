@@ -1,5 +1,6 @@
 from uuid import UUID
 
+import sqlalchemy as sa
 from fastapi import HTTPException, status
 from sqlalchemy import distinct, extract, func, select
 from sqlalchemy.orm import Session
@@ -9,6 +10,8 @@ from app.models.assignment import Assignment
 from app.models.enums import AvailabilityStatus, RequestStatus
 from app.models.organization import Organization
 from app.models.staffing_request import StaffingRequest
+from app.models.tenant_membership import TenantMembership
+from app.models.user import User
 from app.models.worker_profile import WorkerProfile
 from app.models.worker_region import WorkerRegion
 
@@ -20,19 +23,58 @@ class ReportingService:
     def __init__(self, db: Session) -> None:
         self.db = db
 
+    def _tenant_org_subq(self, tenant_id):
+        return select(Organization.id).where(Organization.tenant_id == tenant_id)
+
     def _scope_requests(self, stmt, scope: AccessScope):
-        if not scope.is_apf and scope.org_ids:
+        if scope.is_platform_admin:
+            return stmt
+        if scope.is_network_admin:
+            if not scope.tenant_id:
+                return stmt.where(sa.false())
+            return stmt.where(
+                StaffingRequest.organization_id.in_(self._tenant_org_subq(scope.tenant_id))
+            )
+        if scope.org_ids:
             return stmt.where(StaffingRequest.organization_id.in_(scope.org_ids))
-        return stmt
+        return stmt.where(sa.false())
+
+    def _active_substitutes(self, scope: AccessScope) -> int:
+        stmt = (
+            select(func.count()).select_from(WorkerProfile)
+            .where(WorkerProfile.availability_status == AvailabilityStatus.AVAILABLE)
+        )
+        if scope.is_platform_admin:
+            return self.db.scalar(stmt) or 0
+        if scope.is_network_admin and scope.tenant_id:
+            stmt = stmt.join(User, WorkerProfile.user_id == User.id).join(
+                TenantMembership, TenantMembership.user_id == User.id
+            ).where(
+                TenantMembership.tenant_id == scope.tenant_id,
+                TenantMembership.is_active.is_(True),
+            )
+            return self.db.scalar(stmt) or 0
+        return 0
+
+    def _covered_cities(self, scope: AccessScope) -> set[str]:
+        stmt = (
+            select(distinct(WorkerRegion.city))
+            .join(WorkerProfile, WorkerRegion.worker_profile_id == WorkerProfile.id)
+            .where(WorkerProfile.availability_status == AvailabilityStatus.AVAILABLE)
+        )
+        if scope.is_platform_admin:
+            return set(self.db.scalars(stmt).all())
+        if scope.is_network_admin and scope.tenant_id:
+            stmt = stmt.join(User, WorkerProfile.user_id == User.id).join(
+                TenantMembership, TenantMembership.user_id == User.id
+            ).where(
+                TenantMembership.tenant_id == scope.tenant_id,
+                TenantMembership.is_active.is_(True),
+            )
+            return set(self.db.scalars(stmt).all())
+        return set()
 
     def network_overview(self, scope: AccessScope) -> dict:
-        if not scope.is_apf and not scope.org_ids:
-            return {
-                'total_requests': 0, 'filled_count': 0, 'fill_rate': 0,
-                'active_substitutes': 0, 'unfilled_count': 0,
-                'avg_fill_hours': None, 'status_breakdown': {}, 'shortage_cities': [],
-            }
-
         total_requests = self.db.scalar(
             self._scope_requests(select(func.count()).select_from(StaffingRequest), scope)
         ) or 0
@@ -46,11 +88,7 @@ class ReportingService:
         ) or 0
 
         fill_rate = round(filled_count / total_requests * 100) if total_requests else 0
-
-        active_substitutes = self.db.scalar(
-            select(func.count()).select_from(WorkerProfile)
-            .where(WorkerProfile.availability_status == AvailabilityStatus.AVAILABLE)
-        ) or 0
+        active_substitutes = self._active_substitutes(scope)
 
         unfilled_count = self.db.scalar(
             self._scope_requests(
@@ -94,14 +132,7 @@ class ReportingService:
             )
         ).all()
 
-        covered_cities = set(
-            self.db.scalars(
-                select(distinct(WorkerRegion.city))
-                .join(WorkerProfile, WorkerRegion.worker_profile_id == WorkerProfile.id)
-                .where(WorkerProfile.availability_status == AvailabilityStatus.AVAILABLE)
-            ).all()
-        )
-
+        covered_cities = self._covered_cities(scope)
         shortage_cities = sorted(c for c in open_cities if c not in covered_cities)
 
         return {
@@ -116,9 +147,6 @@ class ReportingService:
         }
 
     def network_summary(self, scope: AccessScope) -> dict[str, int]:
-        # APF sees the full network. Org admins see counts limited to their
-        # organizations. Workers shouldn't reach this endpoint (the route
-        # gate stops them) but if they did it would return zeroes.
         org_count_stmt = select(func.count()).select_from(Organization)
         request_stmt = select(func.count()).select_from(StaffingRequest)
         assignment_stmt = (
@@ -127,14 +155,25 @@ class ReportingService:
             .join(StaffingRequest, Assignment.staffing_request_id == StaffingRequest.id)
         )
 
-        if not scope.is_apf:
-            if not scope.org_ids:
+        if scope.is_platform_admin:
+            pass
+        elif scope.is_network_admin:
+            if not scope.tenant_id:
                 return {'organization_count': 0, 'request_count': 0, 'assignment_count': 0}
+            tenant_org_ids = self._tenant_org_subq(scope.tenant_id)
+            org_count_stmt = org_count_stmt.where(Organization.tenant_id == scope.tenant_id)
+            request_stmt = request_stmt.where(StaffingRequest.organization_id.in_(tenant_org_ids))
+            assignment_stmt = assignment_stmt.where(
+                StaffingRequest.organization_id.in_(tenant_org_ids)
+            )
+        elif scope.org_ids:
             org_count_stmt = org_count_stmt.where(Organization.id.in_(scope.org_ids))
             request_stmt = request_stmt.where(StaffingRequest.organization_id.in_(scope.org_ids))
             assignment_stmt = assignment_stmt.where(
                 StaffingRequest.organization_id.in_(scope.org_ids)
             )
+        else:
+            return {'organization_count': 0, 'request_count': 0, 'assignment_count': 0}
 
         return {
             'organization_count': self.db.scalar(org_count_stmt) or 0,
@@ -143,23 +182,29 @@ class ReportingService:
         }
 
     def organization_summary(self, organization_id: UUID, scope: AccessScope) -> dict[str, int]:
-        if not scope.is_apf and organization_id not in scope.org_ids:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail='You do not have access to this organization.',
-            )
+        if not scope.is_platform_admin:
+            if scope.is_network_admin:
+                org = self.db.get(Organization, organization_id)
+                if org is None or org.tenant_id != scope.tenant_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail='You do not have access to this organization.',
+                    )
+            elif organization_id not in scope.org_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail='You do not have access to this organization.',
+                )
         return {
             'request_count': self.db.scalar(
                 select(func.count())
                 .select_from(StaffingRequest)
                 .where(StaffingRequest.organization_id == organization_id)
-            )
-            or 0,
+            ) or 0,
             'assignment_count': self.db.scalar(
                 select(func.count())
                 .select_from(Assignment)
                 .join(StaffingRequest, Assignment.staffing_request_id == StaffingRequest.id)
                 .where(StaffingRequest.organization_id == organization_id)
-            )
-            or 0,
+            ) or 0,
         }

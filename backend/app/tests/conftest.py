@@ -4,7 +4,7 @@ Each test function gets:
   - a fresh DB session wrapped in a transaction that rolls back after the test
     (service-layer commits use SAVEPOINTs, so they're visible within the test
     but never reach the real DB)
-  - a pre-seeded set of entities: org, apf_admin, org_admin, worker_a, worker_b
+  - a pre-seeded set of entities: tenant, org, network_admin, org_admin, worker_a, worker_b
   - per-role TestClient helpers that inject the test session via dependency override
 
 Token strategy: CLERK_JWKS_URL is unset in test env, so decode_token() uses
@@ -30,6 +30,8 @@ from app.main import app
 from app.models.enums import AvailabilityStatus, OrganizationType, UserRole
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
+from app.models.tenant import Tenant
+from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 from app.models.worker_profile import WorkerProfile
 from app.models.worker_qualification import WorkerQualification
@@ -93,13 +95,16 @@ def db_session(db_engine):
 @pytest.fixture
 def seed(db_session) -> SimpleNamespace:
     """Minimal set of entities for integration tests."""
+    tenant = Tenant(id=uuid4(), name='Test Network', slug=f'test-network-{uuid4().hex[:8]}')
+
     org = Organization(
-        id=uuid4(), name='Integration Test Org', type=OrganizationType.CHILDCARE,
-        city='IntTestCity', preferred_language='fr', is_active=True,
+        id=uuid4(), tenant_id=tenant.id, name='Integration Test Org',
+        type=OrganizationType.CHILDCARE, city='IntTestCity',
+        preferred_language='fr', is_active=True,
     )
     apf = User(
         id=uuid4(), clerk_user_id='int-apf', first_name='APF', last_name='Admin',
-        email='apf@inttest.example', role=UserRole.APF_ADMIN, preferred_language='en',
+        email='apf@inttest.example', role=UserRole.NETWORK_ADMIN, preferred_language='en',
     )
     org_admin = User(
         id=uuid4(), clerk_user_id='int-org-admin', first_name='Org', last_name='Admin',
@@ -114,15 +119,21 @@ def seed(db_session) -> SimpleNamespace:
         email='worker.b@inttest.example', role=UserRole.WORKER, preferred_language='fr',
     )
 
-    db_session.add_all([org, apf, org_admin, worker_a, worker_b])
+    db_session.add_all([tenant, org, apf, org_admin, worker_a, worker_b])
     db_session.flush()
 
+    db_session.add(TenantMembership(
+        id=uuid4(), user_id=apf.id, tenant_id=tenant.id, role=UserRole.NETWORK_ADMIN,
+    ))
     db_session.add(OrganizationMembership(
         id=uuid4(), user_id=org_admin.id, organization_id=org.id,
         role=UserRole.ORG_ADMIN, is_active=True,
     ))
 
     for worker in (worker_a, worker_b):
+        db_session.add(TenantMembership(
+            id=uuid4(), user_id=worker.id, tenant_id=tenant.id, role=UserRole.WORKER,
+        ))
         profile = WorkerProfile(
             id=uuid4(), user_id=worker.id,
             availability_status=AvailabilityStatus.AVAILABLE,
@@ -137,10 +148,10 @@ def seed(db_session) -> SimpleNamespace:
 
     db_session.flush()
 
-    s = SimpleNamespace(
-        org=org, apf=apf, org_admin=org_admin, worker_a=worker_a, worker_b=worker_b,
+    return SimpleNamespace(
+        tenant=tenant, org=org, apf=apf, org_admin=org_admin,
+        worker_a=worker_a, worker_b=worker_b,
     )
-    return s
 
 
 # ── per-role client fixtures ──────────────────────────────────────────────────
@@ -157,7 +168,7 @@ def _make_test_client(db_session: Session, sub: str, role: str) -> TestClient:
 
 @pytest.fixture
 def apf_client(db_session, seed):
-    yield _make_test_client(db_session, 'int-apf', 'apf_admin')
+    yield _make_test_client(db_session, 'int-apf', 'network_admin')
     app.dependency_overrides.pop(get_db_session, None)
 
 

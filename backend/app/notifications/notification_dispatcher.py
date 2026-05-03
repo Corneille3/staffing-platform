@@ -6,6 +6,7 @@ from app.models.organization import Organization
 from app.models.staffing_request import StaffingRequest
 from app.models.user import User
 from app.notifications.email_service import EmailMessage, EmailNotificationService
+from app.notifications.sms_service import SmsNotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,8 @@ def _org_name(db: Session, request: StaffingRequest) -> str:
     org = db.get(Organization, request.organization_id)
     return org.name if org else str(request.organization_id)
 
+
+# ── email bodies (bilingual, full detail) ─────────────────────────────────────
 
 def _body_new_request(worker: User, request: StaffingRequest, org_name: str) -> str:
     location = f'{request.location_name}, {request.city}' if request.location_name else request.city
@@ -99,10 +102,63 @@ def _body_assignment_cancelled(worker: User, request: StaffingRequest) -> str:
     )
 
 
+# ── SMS bodies (short, ≤160 chars per segment) ────────────────────────────────
+
+def _sms_new_request(worker: User, request: StaffingRequest) -> str:
+    start = _fmt_time(request.start_time)
+    return (
+        f'[APF] {worker.first_name}: nouveau remplacement / new coverage — '
+        f'{request.title} le/on {request.work_date} à/at {start} ({request.city}). '
+        f'Connectez-vous / Sign in to respond.'
+    )
+
+
+def _sms_assignment_confirmed(worker: User, request: StaffingRequest) -> str:
+    start = _fmt_time(request.start_time)
+    contact = f' Contact: {request.contact_name}' if request.contact_name else ''
+    return (
+        f'[APF] {worker.first_name}: affectation confirmée / assignment confirmed — '
+        f'{request.title} {request.work_date} {start} ({request.city}).{contact}'
+    )
+
+
+def _sms_assignment_cancelled(worker: User, request: StaffingRequest) -> str:
+    return (
+        f'[APF] {worker.first_name}: affectation annulée / assignment cancelled — '
+        f'{request.title} {request.work_date}. '
+        f'Connectez-vous / Sign in for available coverage.'
+    )
+
+
+# ── dispatcher ────────────────────────────────────────────────────────────────
+
 class NotificationDispatcher:
     def __init__(self, db: Session) -> None:
         self.db = db
         self.email = EmailNotificationService()
+        self.sms = SmsNotificationService()
+
+    def _send_to_worker(
+        self,
+        worker: User,
+        subject: str,
+        email_body: str,
+        sms_body: str,
+    ) -> None:
+        try:
+            self.email.send(EmailMessage(
+                to_email=worker.email,
+                subject=subject,
+                body=email_body,
+            ))
+        except Exception:
+            logger.exception('Email failed for worker %s', worker.id)
+
+        if worker.phone:
+            try:
+                self.sms.send(worker.phone, sms_body)
+            except Exception:
+                logger.exception('SMS failed for worker %s', worker.id)
 
     def notify_workers(self, request: StaffingRequest, workers: list[User]) -> None:
         if not workers:
@@ -110,34 +166,28 @@ class NotificationDispatcher:
         org_name = _org_name(self.db, request)
         subject = f'[APF] Nouveau remplacement : {request.title} / New coverage: {request.title}'
         for worker in workers:
-            try:
-                self.email.send(EmailMessage(
-                    to_email=worker.email,
-                    subject=subject,
-                    body=_body_new_request(worker, request, org_name),
-                ))
-            except Exception:
-                logger.exception('notify_workers failed for worker %s', worker.id)
+            self._send_to_worker(
+                worker,
+                subject=subject,
+                email_body=_body_new_request(worker, request, org_name),
+                sms_body=_sms_new_request(worker, request),
+            )
 
     def notify_assignment_confirmed(self, request: StaffingRequest, worker: User) -> None:
         org_name = _org_name(self.db, request)
         subject = f'[APF] Affectation confirmée : {request.title} / Assignment confirmed: {request.title}'
-        try:
-            self.email.send(EmailMessage(
-                to_email=worker.email,
-                subject=subject,
-                body=_body_assignment_confirmed(worker, request, org_name),
-            ))
-        except Exception:
-            logger.exception('notify_assignment_confirmed failed for worker %s', worker.id)
+        self._send_to_worker(
+            worker,
+            subject=subject,
+            email_body=_body_assignment_confirmed(worker, request, org_name),
+            sms_body=_sms_assignment_confirmed(worker, request),
+        )
 
     def notify_assignment_cancelled(self, request: StaffingRequest, worker: User) -> None:
         subject = f'[APF] Affectation annulée : {request.title} / Assignment cancelled: {request.title}'
-        try:
-            self.email.send(EmailMessage(
-                to_email=worker.email,
-                subject=subject,
-                body=_body_assignment_cancelled(worker, request),
-            ))
-        except Exception:
-            logger.exception('notify_assignment_cancelled failed for worker %s', worker.id)
+        self._send_to_worker(
+            worker,
+            subject=subject,
+            email_body=_body_assignment_cancelled(worker, request),
+            sms_body=_sms_assignment_cancelled(worker, request),
+        )

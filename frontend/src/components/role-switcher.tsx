@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Role, ROLE_HOME, ROLE_LABEL, useRole } from "../lib/role-context";
 
-const ROLES: Role[] = ["worker", "org_admin", "apf_admin"];
+const ROLES: Role[] = ["worker", "org_admin", "network_admin"];
 
 export function RoleSwitcher() {
   const router = useRouter();

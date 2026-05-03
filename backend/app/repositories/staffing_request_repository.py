@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth.scope import AccessScope
+from app.models.organization import Organization
 from app.models.request_response import RequestResponse
 from app.models.staffing_request import StaffingRequest
 
@@ -14,28 +15,36 @@ class StaffingRequestRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def list(self) -> list[StaffingRequest]:
-        stmt = (
+    def _base_stmt(self):
+        return (
             select(StaffingRequest)
             .options(selectinload(StaffingRequest.requirements))
-            .order_by(StaffingRequest.work_date, StaffingRequest.start_time)
+            .order_by(StaffingRequest.created_at.desc())
         )
-        return list(self.db.scalars(stmt).all())
+
+    def _tenant_org_ids(self, tenant_id):
+        return select(Organization.id).where(Organization.tenant_id == tenant_id)
+
+    def list(self) -> list[StaffingRequest]:
+        return list(self.db.scalars(self._base_stmt()).all())
 
     def list_for_scope(self, scope: AccessScope) -> list[StaffingRequest]:
-        stmt = (
-            select(StaffingRequest)
-            .options(selectinload(StaffingRequest.requirements))
-            .order_by(StaffingRequest.work_date, StaffingRequest.start_time)
-        )
-        if scope.is_apf:
+        stmt = self._base_stmt()
+        if scope.is_platform_admin:
+            return list(self.db.scalars(stmt).all())
+        if scope.is_network_admin:
+            if not scope.tenant_id:
+                return []
+            stmt = stmt.where(
+                StaffingRequest.organization_id.in_(self._tenant_org_ids(scope.tenant_id))
+            )
             return list(self.db.scalars(stmt).all())
         if scope.is_org_admin:
             if not scope.org_ids:
                 return []
             stmt = stmt.where(StaffingRequest.organization_id.in_(scope.org_ids))
             return list(self.db.scalars(stmt).all())
-        # Worker: requests they have a response row for (i.e. were notified).
+        # Worker: requests they were notified for.
         stmt = stmt.join(
             RequestResponse,
             RequestResponse.staffing_request_id == StaffingRequest.id,
@@ -51,11 +60,15 @@ class StaffingRequestRepository:
         return self.db.scalar(stmt)
 
     def can_access(self, staffing_request: StaffingRequest, scope: AccessScope) -> bool:
-        if scope.is_apf:
+        if scope.is_platform_admin:
             return True
+        if scope.is_network_admin:
+            if not scope.tenant_id:
+                return False
+            org = self.db.get(Organization, staffing_request.organization_id)
+            return org is not None and org.tenant_id == scope.tenant_id
         if scope.is_org_admin:
             return staffing_request.organization_id in scope.org_ids
-        # Worker
         own_response = self.db.scalar(
             select(RequestResponse).where(
                 RequestResponse.staffing_request_id == staffing_request.id,

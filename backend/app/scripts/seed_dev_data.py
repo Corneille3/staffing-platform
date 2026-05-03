@@ -9,6 +9,8 @@ from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
 from app.models.request_requirement import RequestRequirement
 from app.models.staffing_request import StaffingRequest
+from app.models.tenant import Tenant
+from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 from app.models.worker_certification import WorkerCertification
 from app.models.worker_profile import WorkerProfile
@@ -23,8 +25,17 @@ def seed() -> None:
             print('Seed skipped: users already exist')
             return
 
+        tenant = Tenant(
+            id=uuid4(),
+            name='APF Network',
+            slug='apf-network',
+        )
+        db.add(tenant)
+        db.flush()
+
         organization = Organization(
             id=uuid4(),
+            tenant_id=tenant.id,
             name='APF Regina Centre',
             type=OrganizationType.CHILDCARE,
             city='Regina',
@@ -32,13 +43,13 @@ def seed() -> None:
             contact_email='regina@example.org',
             contact_phone='306-555-0100',
         )
-        apf_admin = User(
+        network_admin = User(
             id=uuid4(),
-            clerk_user_id='dev-apf-admin',
+            clerk_user_id='dev-network-admin',
             first_name='Alice',
             last_name='Admin',
             email='alice.admin@example.org',
-            role=UserRole.APF_ADMIN,
+            role=UserRole.NETWORK_ADMIN,
         )
         org_admin = User(
             id=uuid4(),
@@ -66,17 +77,19 @@ def seed() -> None:
             preferred_language='fr',
         )
 
-        db.add_all([organization, apf_admin, org_admin, worker_one, worker_two])
+        db.add_all([organization, network_admin, org_admin, worker_one, worker_two])
         db.flush()
 
-        db.add(
-            OrganizationMembership(
-                id=uuid4(),
-                user_id=org_admin.id,
-                organization_id=organization.id,
-                role=UserRole.ORG_ADMIN,
-            )
-        )
+        db.add(TenantMembership(
+            id=uuid4(), user_id=network_admin.id, tenant_id=tenant.id, role=UserRole.NETWORK_ADMIN,
+        ))
+        db.add(OrganizationMembership(
+            id=uuid4(), user_id=org_admin.id, organization_id=organization.id, role=UserRole.ORG_ADMIN,
+        ))
+        for worker in (worker_one, worker_two):
+            db.add(TenantMembership(
+                id=uuid4(), user_id=worker.id, tenant_id=tenant.id, role=UserRole.WORKER,
+            ))
 
         worker_one_profile = WorkerProfile(
             id=uuid4(),

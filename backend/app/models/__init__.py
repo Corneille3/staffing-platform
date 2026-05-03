@@ -2,6 +2,8 @@ from app.models.assignment import Assignment
 from app.models.audit_log import AuditLog
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
+from app.models.tenant import Tenant
+from app.models.tenant_membership import TenantMembership
 from app.models.request_notification import RequestNotification
 from app.models.request_requirement import RequestRequirement
 from app.models.request_response import RequestResponse
@@ -21,6 +23,8 @@ __all__ = [
     'RequestRequirement',
     'RequestResponse',
     'StaffingRequest',
+    'Tenant',
+    'TenantMembership',
     'User',
     'WorkerCertification',
     'WorkerProfile',

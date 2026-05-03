@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db_session
 from app.auth.clerk import fetch_user_details, primary_email, public_metadata_role
 from app.auth.current_user import CurrentUserModel, get_current_user
-from app.core.constants import ROLE_APF_ADMIN, ROLE_ORG_ADMIN, ROLE_WORKER
+from app.core.constants import ROLE_NETWORK_ADMIN, ROLE_ORG_ADMIN, ROLE_PLATFORM_ADMIN, ROLE_WORKER
 from app.models.enums import UserRole
 from app.models.user import User
 from app.schemas.user import UserRead
@@ -21,7 +21,7 @@ def read_current_user(current_user: CurrentUserModel = Depends(get_current_user)
     return current_user.model_dump()
 
 
-_VALID_ROLES = {ROLE_WORKER, ROLE_ORG_ADMIN, ROLE_APF_ADMIN}
+_VALID_ROLES = {ROLE_WORKER, ROLE_ORG_ADMIN, ROLE_NETWORK_ADMIN, ROLE_PLATFORM_ADMIN}
 
 
 def _names_from(details: dict, email: str) -> tuple[str, str]:

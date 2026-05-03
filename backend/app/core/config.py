@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     smtp_password: str = ''
     smtp_use_tls: bool = False
 
+    twilio_account_sid: str = ''
+    twilio_auth_token: str = ''
+    twilio_from_number: str = ''
+
     @field_validator('app_env')
     @classmethod
     def validate_env(cls, value: str) -> str:

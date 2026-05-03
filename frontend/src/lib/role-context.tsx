@@ -3,7 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
-export type Role = "worker" | "org_admin" | "apf_admin";
+export type Role = "worker" | "org_admin" | "network_admin" | "platform_admin";
 
 const STORAGE_KEY = "apf.devRole";
 const DEFAULT_ROLE: Role = "org_admin";
@@ -18,7 +18,7 @@ type RoleContextValue = {
 const RoleContext = createContext<RoleContextValue | null>(null);
 
 function isRole(value: unknown): value is Role {
-  return value === "worker" || value === "org_admin" || value === "apf_admin";
+  return value === "worker" || value === "org_admin" || value === "network_admin" || value === "platform_admin";
 }
 
 function readStoredOverride(): Role | null {
@@ -93,11 +93,13 @@ export function useRole() {
 export const ROLE_HOME: Record<Role, string> = {
   worker: "/worker",
   org_admin: "/admin",
-  apf_admin: "/apf",
+  network_admin: "/apf",
+  platform_admin: "/apf",
 };
 
 export const ROLE_LABEL: Record<Role, string> = {
-  worker: "Worker",
-  org_admin: "Org Admin",
-  apf_admin: "APF Admin",
+  worker: "Substitute",
+  org_admin: "Coordinator",
+  network_admin: "Network Admin",
+  platform_admin: "Platform Admin",
 };

@@ -4,7 +4,8 @@ from sqlalchemy import Enum as SAEnum
 
 
 class UserRole(str, Enum):
-    APF_ADMIN = 'apf_admin'
+    PLATFORM_ADMIN = 'platform_admin'
+    NETWORK_ADMIN = 'network_admin'
     ORG_ADMIN = 'org_admin'
     WORKER = 'worker'
 

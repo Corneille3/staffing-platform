@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 from app.auth.clerk import ClerkAuthError, decode_token
 from app.core.config import settings
-from app.core.constants import ROLE_APF_ADMIN, ROLE_WORKER
+from app.core.constants import ROLE_NETWORK_ADMIN, ROLE_WORKER
 from app.core.security import bearer_scheme, extract_bearer_token
 
 DEV_AUTH_SUB = 'dev-apf-admin'
@@ -24,7 +24,7 @@ def get_current_user(credentials=Depends(bearer_scheme)) -> CurrentUserModel:
             return CurrentUserModel(
                 sub=DEV_AUTH_SUB,
                 email=DEV_AUTH_EMAIL,
-                role=ROLE_APF_ADMIN,
+                role=ROLE_NETWORK_ADMIN,
             )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

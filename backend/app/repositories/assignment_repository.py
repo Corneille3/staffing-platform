@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth.scope import AccessScope
 from app.models.assignment import Assignment
 from app.models.enums import AssignmentStatus
+from app.models.organization import Organization
 from app.models.staffing_request import StaffingRequest
 
 
@@ -18,7 +19,15 @@ class AssignmentRepository:
 
     def list_for_scope(self, scope: AccessScope) -> list[Assignment]:
         stmt = select(Assignment).order_by(Assignment.assigned_at.desc())
-        if scope.is_apf:
+        if scope.is_platform_admin:
+            return list(self.db.scalars(stmt).all())
+        if scope.is_network_admin:
+            if not scope.tenant_id:
+                return []
+            tenant_org_ids = select(Organization.id).where(Organization.tenant_id == scope.tenant_id)
+            stmt = stmt.join(
+                StaffingRequest, Assignment.staffing_request_id == StaffingRequest.id
+            ).where(StaffingRequest.organization_id.in_(tenant_org_ids))
             return list(self.db.scalars(stmt).all())
         if scope.is_org_admin:
             if not scope.org_ids:
@@ -27,7 +36,7 @@ class AssignmentRepository:
                 StaffingRequest, Assignment.staffing_request_id == StaffingRequest.id
             ).where(StaffingRequest.organization_id.in_(scope.org_ids))
             return list(self.db.scalars(stmt).all())
-        # Worker: only assignments where they are the assignee.
+        # Worker: only their own assignments.
         stmt = stmt.where(Assignment.worker_user_id == scope.user.id)
         return list(self.db.scalars(stmt).all())
 
