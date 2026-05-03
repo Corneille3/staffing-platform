@@ -11,6 +11,14 @@ from app.services.reporting_service import ReportingService
 router = APIRouter(dependencies=[Depends(require_admin)])
 
 
+@router.get('/network-overview')
+def get_network_overview(
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> dict[str, object]:
+    return ReportingService(db).network_overview(scope)
+
+
 @router.get('/network-summary')
 def get_network_summary(
     scope: AccessScope = Depends(get_access_scope),

@@ -1,6 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import {
   Assignment,
+  AuditLog,
+  NetworkOverview,
   NetworkSummary,
   Organization,
   RequestResponse,
@@ -95,5 +97,14 @@ export async function getRequestResponses(requestId: string): Promise<RequestRes
 
 export async function getAssignments(): Promise<Assignment[]> {
   const response = await fetchJson<{ items: Assignment[] }>("/api/v1/assignments");
+  return response.items;
+}
+
+export async function getNetworkOverview(): Promise<NetworkOverview> {
+  return fetchJson<NetworkOverview>("/api/v1/reports/network-overview");
+}
+
+export async function getAuditLogs(): Promise<AuditLog[]> {
+  const response = await fetchJson<{ items: AuditLog[] }>("/api/v1/audit-logs");
   return response.items;
 }

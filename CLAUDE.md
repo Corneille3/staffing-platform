@@ -28,7 +28,20 @@ close-and-reopen the IDE" troubleshooting from prior sessions — the disk
 state is authoritative.
 
 **Last shipped (most recent first):**
-1. B1 — CoverageType enum (same_day_urgent · planned_absence · recurring ·
+1. D1–D3 — Full APF oversight surface. D1: `GET /api/v1/reports/network-overview`
+   aggregates fill rate, avg time-to-fill, active substitutes, unfilled count,
+   status breakdown, and shortage cities (cities with open requests but no
+   available substitute). `NetworkOverview` TS type + `getNetworkOverview()`
+   fetch helper. APF home rebuilt with 6 KPI cards, status bar chart, shortage
+   panel, org activity table, recent-closed feed. D2: `/apf/substitutes` —
+   network-wide substitute pool sorted available-first, with availability badge,
+   language, city chips, qualifications/certifications, and assignment utilization
+   count. D3: `/apf/activity` — full audit-log feed grouped by day, newest-first,
+   with colour-coded action dots, actor name, request title context, relative
+   timestamps, and a sidebar action-breakdown chart. APF nav updated to three
+   links: Overview · Substitute Pool · Activity. `AuditLog` TS type +
+   `getAuditLogs()` fetch helper added.
+2. B1 — CoverageType enum (same_day_urgent · planned_absence · recurring ·
    emergency), create form contact fields, bilingual badge on worker cards.
    Bug fix: assignment cancellation resets worker response to notified
    instead of declined so they can re-respond.
@@ -356,7 +369,7 @@ This roadmap closes the gap between the current code and the product vision in
 `Implementation-idea.md`. Items are ordered by dependency + leverage. Tick
 each as it ships and keep "Current focus" in sync.
 
-**Current focus:** D1 — Network Overview metrics (APF surface).
+**Current focus:** Phase D complete — full implementation roadmap (A–D) shipped. Next work TBD by user.
 
 ### Phase A — Worker UX core (the doc's heaviest emphasis)
 
@@ -495,12 +508,22 @@ each as it ships and keep "Current focus" in sync.
 
 ### Phase D — Network admin (APF) surface
 
-- [ ] **D1. Network Overview metrics.** Fill rate, time-to-fill, shortage by
+- [x] **D1. Network Overview metrics.** Fill rate, time-to-fill, shortage by
   region, active substitute pool, unfilled requests, demand trends.
-  Backend aggregations + dark-themed dashboard cards.
-- [ ] **D2. Substitute Pool view.** Network-wide worker list with status +
+  *Shipped: `GET /api/v1/reports/network-overview` — fill rate, avg
+  time-to-fill (hours), active substitutes, unfilled count, per-status
+  breakdown, shortage cities. APF home rebuilt with KPI cards, status bar
+  chart, shortage panel, org activity table, recent-closed feed.*
+- [x] **D2. Substitute Pool view.** Network-wide worker list with status +
   utilization.
-- [ ] **D3. Activity History.** Network-wide audit-log-style feed.
+  *Shipped: `/apf/substitutes` — sorted available-first; availability badge,
+  language, city chips, qualifications/certifications, total assignment count
+  with active-assignment callout. No new backend endpoint (joins workers +
+  assignments on frontend).*
+- [x] **D3. Activity History.** Network-wide audit-log-style feed.
+  *Shipped: `/apf/activity` — audit logs grouped by day, newest-first, with
+  colour-coded action dots, actor name, request title context, relative
+  timestamps, sticky sidebar with action-breakdown chart and totals.*
 
 ### Working order
 

@@ -4,6 +4,17 @@ export type NetworkSummary = {
   assignment_count: number;
 };
 
+export type NetworkOverview = {
+  total_requests: number;
+  filled_count: number;
+  fill_rate: number;
+  active_substitutes: number;
+  unfilled_count: number;
+  avg_fill_hours: number | null;
+  status_breakdown: Record<string, number>;
+  shortage_cities: string[];
+};
+
 export type Organization = {
   id: string;
   name: string;
@@ -103,6 +114,17 @@ export type NotificationFeedItem = {
   request_title: string;
   request_city: string;
   request_date: string;
+  created_at: string;
+};
+
+export type AuditLog = {
+  id: string;
+  actor_user_id: string;
+  organization_id: string | null;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  payload: Record<string, unknown>;
   created_at: string;
 };
 
