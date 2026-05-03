@@ -58,6 +58,7 @@ export default async function RequestDetailPage({
   const assignment = assignments.find((item) => item.staffing_request_id === request.id && item.status !== "cancelled") || null;
   const assignedWorker = assignment ? formatWorkerName(users, assignment.worker_user_id) : null;
   const counts = responseCounts(responses);
+  const viewedCount = responses.filter((r) => r.viewed_at != null).length;
 
   return (
     <PageFrame
@@ -137,9 +138,14 @@ export default async function RequestDetailPage({
                 gap: 10,
               }}
             >
-              {["notified", "accepted", "declined", "viewed"].map((status) => (
+              {[
+                { label: "Notified", value: counts.notified || 0 },
+                { label: "Opened", value: viewedCount },
+                { label: "Accepted", value: counts.accepted || 0 },
+                { label: "Declined", value: counts.declined || 0 },
+              ].map((stat) => (
                 <div
-                  key={status}
+                  key={stat.label}
                   style={{
                     borderRadius: 14,
                     padding: 14,
@@ -148,10 +154,10 @@ export default async function RequestDetailPage({
                   }}
                 >
                   <div style={{ color: "#5d6d66", fontSize: 13, fontWeight: 800 }}>
-                    {formatStatus(status)}
+                    {stat.label}
                   </div>
                   <strong style={{ display: "block", marginTop: 4, fontSize: 28 }}>
-                    {counts[status] || 0}
+                    {stat.value}
                   </strong>
                 </div>
               ))}

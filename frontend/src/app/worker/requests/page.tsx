@@ -75,6 +75,11 @@ export default function WorkerRequestsPage() {
       }));
       setItems(enriched);
 
+      // Mark all notified responses as viewed now that the worker sees them
+      enriched
+        .filter((item) => item.myResponse?.status === "notified")
+        .forEach((item) => markRequestViewed(item.request.id, worker.id).catch(() => {}));
+
       // Only show "filled" notice for requests where the worker had a response
       const filled = assignedToOther.filter((request, i) =>
         assignedResponses[i].some((res) => res.worker_user_id === worker.id),
@@ -198,18 +203,8 @@ export default function WorkerRequestsPage() {
                   myUserId={worker.id}
                   locale={locale}
                   busy={busy === request.id}
-                  onAccept={() => {
-                    if (worker && (!myResponse || myResponse.status === "notified")) {
-                      markRequestViewed(request.id, worker.id).catch(() => {});
-                    }
-                    setConfirmingRequest(request);
-                  }}
-                  onDecline={() => {
-                    if (worker && (!myResponse || myResponse.status === "notified")) {
-                      markRequestViewed(request.id, worker.id).catch(() => {});
-                    }
-                    setDecliningRequest(request);
-                  }}
+                  onAccept={() => setConfirmingRequest(request)}
+                  onDecline={() => setDecliningRequest(request)}
                 />
               ))
             )}
