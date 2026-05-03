@@ -26,7 +26,7 @@ def seed() -> None:
         organization = Organization(
             id=uuid4(),
             name='APF Regina Centre',
-            type=OrganizationType.COMMUNITY_CENTRE,
+            type=OrganizationType.CHILDCARE,
             city='Regina',
             region='Saskatchewan',
             contact_email='regina@example.org',

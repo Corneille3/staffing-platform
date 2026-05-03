@@ -10,9 +10,12 @@ class UserRole(str, Enum):
 
 
 class OrganizationType(str, Enum):
-    FAMILY_DAYCARE = 'family_daycare'
-    SCHOOL_BASED_SERVICE = 'school_based_service'
-    COMMUNITY_CENTRE = 'community_centre'
+    CHILDCARE = 'childcare'
+    LONG_TERM_CARE = 'long_term_care'
+    COMMUNITY_CARE = 'community_care'
+    HOME_CARE = 'home_care'
+    ASSISTED_LIVING = 'assisted_living'
+    OTHER = 'other'
 
 
 class RequestType(str, Enum):

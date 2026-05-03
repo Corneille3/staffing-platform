@@ -356,7 +356,7 @@ This roadmap closes the gap between the current code and the product vision in
 `Implementation-idea.md`. Items are ordered by dependency + leverage. Tick
 each as it ships and keep "Current focus" in sync.
 
-**Current focus:** B3 — Organization type enum.
+**Current focus:** B4 — Care-sector-neutral copy pass.
 
 ### Phase A — Worker UX core (the doc's heaviest emphasis)
 
@@ -453,9 +453,11 @@ each as it ships and keep "Current focus" in sync.
   `request.status`. Admin `workerResponseLabel` handles `viewed` ("Viewed —
   awaiting reply") and `no_response` ("No response"); `viewed_at` timestamp
   shown inline under the worker name in the response board.
-- [ ] **B3. Organization type enum.** childcare / long-term-care /
-  community-care / home-care / assisted-living / other. Drives copy + which
-  qualification fields appear.
+- [x] **B3. Organization type enum.** Replaced 3-value enum with 6 values:
+  `childcare`, `long_term_care`, `community_care`, `home_care`,
+  `assisted_living`, `other`. Updated migration, model, SQL doc, seed.
+  Human labels in admin Organizations page and as a sub-hint under the
+  org dropdown in the create-request form.
 - [ ] **B4. Care-sector-neutral copy pass.** Audit all UI strings + emails
   for childcare-specific language; replace with care-sector-neutral terms
   that adapt by org type. Lock in the *Coverage Request / Substitute /

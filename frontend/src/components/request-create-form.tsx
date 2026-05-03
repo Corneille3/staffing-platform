@@ -7,6 +7,15 @@ import { Organization, User } from "../lib/types";
 
 const browserApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
+const ORG_TYPE_LABELS: Record<string, string> = {
+  childcare: "Childcare",
+  long_term_care: "Long-term care",
+  community_care: "Community care",
+  home_care: "Home care",
+  assisted_living: "Assisted living",
+  other: "Other",
+};
+
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -132,6 +141,15 @@ export function RequestCreateForm({
               </option>
             ))}
           </select>
+          {(() => {
+            const org = organizations.find((item) => item.id === organizationId);
+            const label = org ? (ORG_TYPE_LABELS[org.type] ?? org.type.replace(/_/g, " ")) : null;
+            return label ? (
+              <span style={{ fontSize: 12, color: "#6b8179", fontWeight: 400 }}>
+                {label}
+              </span>
+            ) : null;
+          })()}
         </label>
 
         <label style={labelStyle}>

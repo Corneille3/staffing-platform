@@ -4,7 +4,7 @@
 -- Core enums
 
 CREATE TYPE user_role AS ENUM ('apf_admin', 'org_admin', 'worker');
-CREATE TYPE organization_type AS ENUM ('family_daycare', 'school_based_service', 'community_centre');
+CREATE TYPE organization_type AS ENUM ('childcare', 'long_term_care', 'community_care', 'home_care', 'assisted_living', 'other');
 CREATE TYPE request_type AS ENUM ('urgent_replacement', 'planned_replacement', 'open_staffing_need');
 CREATE TYPE request_status AS ENUM ('draft', 'open', 'notified', 'responses_received', 'assigned', 'completed', 'cancelled', 'expired');
 CREATE TYPE response_status AS ENUM ('notified', 'viewed', 'accepted', 'declined', 'withdrawn', 'no_response');

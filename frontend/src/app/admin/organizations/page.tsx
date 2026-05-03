@@ -2,6 +2,15 @@ import { PageFrame } from "../../../components/page-frame";
 import { Panel } from "../../../components/panel";
 import { getOrganizations } from "../../../lib/api";
 
+const ORG_TYPE_LABELS: Record<string, string> = {
+  childcare: "Childcare",
+  long_term_care: "Long-term care",
+  community_care: "Community care",
+  home_care: "Home care",
+  assisted_living: "Assisted living",
+  other: "Other",
+};
+
 export default async function OrganizationsPage() {
   const organizations = await getOrganizations();
 
@@ -46,7 +55,7 @@ export default async function OrganizationsPage() {
                   {organization.city}
                   {organization.region ? `, ${organization.region}` : ""}
                 </span>
-                <span>Type: {organization.type.replace(/_/g, " ")}</span>
+                <span>Type: {ORG_TYPE_LABELS[organization.type] ?? organization.type.replace(/_/g, " ")}</span>
                 <span>Preferred language: {organization.preferred_language}</span>
                 <span>Contact: {organization.contact_email || "none"} {organization.contact_phone ? `· ${organization.contact_phone}` : ""}</span>
               </div>

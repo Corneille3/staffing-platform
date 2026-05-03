@@ -15,7 +15,7 @@ depends_on = None
 
 
 user_role = postgresql.ENUM('apf_admin', 'org_admin', 'worker', name='user_role', create_type=False)
-organization_type = postgresql.ENUM('family_daycare', 'school_based_service', 'community_centre', name='organization_type', create_type=False)
+organization_type = postgresql.ENUM('childcare', 'long_term_care', 'community_care', 'home_care', 'assisted_living', 'other', name='organization_type', create_type=False)
 request_type = postgresql.ENUM('urgent_replacement', 'planned_replacement', 'open_staffing_need', name='request_type', create_type=False)
 request_status = postgresql.ENUM('draft', 'open', 'notified', 'responses_received', 'assigned', 'completed', 'cancelled', 'expired', name='request_status', create_type=False)
 response_status = postgresql.ENUM('notified', 'viewed', 'accepted', 'declined', 'withdrawn', 'no_response', name='response_status', create_type=False)
