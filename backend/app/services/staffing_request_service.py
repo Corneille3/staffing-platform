@@ -14,6 +14,7 @@ from app.repositories.response_repository import ResponseRepository
 from app.repositories.staffing_request_repository import StaffingRequestRepository
 from app.repositories.worker_repository import WorkerRepository
 from app.schemas.staffing_request import StaffingRequestCreate
+from app.notifications.notification_dispatcher import NotificationDispatcher
 from app.services.audit_service import AuditService
 from app.services.matching_service import MatchingService
 
@@ -26,6 +27,7 @@ class StaffingRequestService:
         self.response_repository = ResponseRepository(db)
         self.audit_service = AuditService(db)
         self.matching_service = MatchingService()
+        self.dispatcher = NotificationDispatcher(db)
 
     def list(self) -> list[StaffingRequest]:
         return self.repository.list()
@@ -128,6 +130,7 @@ class StaffingRequestService:
         )
         self.db.commit()
         self.db.refresh(staffing_request)
+        self.dispatcher.notify_workers(staffing_request, eligible_workers)
         return staffing_request
 
     def renotify(self, request_id: UUID, actor_user_id: UUID) -> StaffingRequest:
@@ -182,6 +185,7 @@ class StaffingRequestService:
         )
         self.db.commit()
         self.db.refresh(staffing_request)
+        self.dispatcher.notify_workers(staffing_request, eligible_workers)
         return staffing_request
 
     @staticmethod

@@ -16,6 +16,13 @@ services:
       timeout: 5s
       retries: 10
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: apf_mailpit
+    ports:
+      - "8025:8025"   # web UI
+      - "1025:1025"   # SMTP
+
   backend:
     build:
       context: ./backend
@@ -24,6 +31,8 @@ services:
       - ./backend/.env
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/apf_staffing
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
     depends_on:
       db:
         condition: service_healthy

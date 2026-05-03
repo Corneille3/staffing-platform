@@ -10,6 +10,8 @@ from app.repositories.assignment_repository import AssignmentRepository
 from app.repositories.response_repository import ResponseRepository
 from app.repositories.staffing_request_repository import StaffingRequestRepository
 from app.schemas.assignment import AssignmentCancel, AssignmentCreate
+from app.notifications.notification_dispatcher import NotificationDispatcher
+from app.repositories.worker_repository import WorkerRepository
 from app.services.audit_service import AuditService
 
 
@@ -19,7 +21,9 @@ class AssignmentService:
         self.assignment_repository = AssignmentRepository(db)
         self.request_repository = StaffingRequestRepository(db)
         self.response_repository = ResponseRepository(db)
+        self.worker_repository = WorkerRepository(db)
         self.audit_service = AuditService(db)
+        self.dispatcher = NotificationDispatcher(db)
 
     def assign(self, payload: AssignmentCreate) -> Assignment:
         staffing_request = self.request_repository.get(payload.staffing_request_id)
@@ -62,6 +66,9 @@ class AssignmentService:
             payload={'staffing_request_id': str(payload.staffing_request_id), 'worker_user_id': str(payload.worker_user_id)},
         )
         self.db.commit()
+        worker = self.worker_repository.get(payload.worker_user_id)
+        if worker:
+            self.dispatcher.notify_assignment_confirmed(staffing_request, worker)
         return created
 
     def cancel(self, assignment_id: UUID, payload: AssignmentCancel, actor_user_id: UUID) -> Assignment:
@@ -97,6 +104,7 @@ class AssignmentService:
         staffing_request.assigned_at = None
         self.request_repository.save(staffing_request)
 
+        cancelled_worker_id = assignment.worker_user_id
         self.audit_service.log(
             action='assignment.cancelled',
             entity_type='assignment',
@@ -111,6 +119,9 @@ class AssignmentService:
         )
         self.db.commit()
         self.db.refresh(assignment)
+        worker = self.worker_repository.get(cancelled_worker_id)
+        if worker:
+            self.dispatcher.notify_assignment_cancelled(staffing_request, worker)
         return assignment
 
     @staticmethod

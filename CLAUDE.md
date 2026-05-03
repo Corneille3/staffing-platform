@@ -28,7 +28,18 @@ close-and-reopen the IDE" troubleshooting from prior sessions — the disk
 state is authoritative.
 
 **Last shipped (most recent first):**
-1. D1–D3 — Full APF oversight surface. D1: `GET /api/v1/reports/network-overview`
+1. Email notifications — real SMTP via `smtplib`, no extra deps. Mailpit
+   added to Docker Compose (SMTP :1025, web UI :8025) for local capture.
+   `NotificationDispatcher` composes bilingual (FR/EN) emails for:
+   worker notified (publish + renotify), assignment confirmed, assignment
+   cancelled. `EmailNotificationService` reads `SMTP_HOST/PORT/FROM/
+   USERNAME/PASSWORD/USE_TLS` from config — falls back to skipped-log when
+   host is empty. SMS stays a logged stub. Wired into
+   `StaffingRequestService.publish()`, `renotify()`, `AssignmentService.
+   assign()`, `cancel()` — all fire-and-forget (email errors log, never
+   block the business operation). CLAUDE.md, `.env`, `.env.example` updated
+   with SMTP vars.
+2. D1–D3 — Full APF oversight surface. D1: `GET /api/v1/reports/network-overview`
    aggregates fill rate, avg time-to-fill, active substitutes, unfilled count,
    status breakdown, and shortage cities (cities with open requests but no
    available substitute). `NetworkOverview` TS type + `getNetworkOverview()`
@@ -92,7 +103,7 @@ state is authoritative.
 9. `POST /auth/sync` — Clerk → DB user link/provision flow
 
 **Top remaining gaps** (see "Known gaps" section for the full list):
-1. Email/SMS notifications are stubs
+1. SMS notifications are a logged stub (no Twilio/SNS keys configured)
 2. CI workflows are placeholder echos
 3. No integration test coverage (auth gates only)
 

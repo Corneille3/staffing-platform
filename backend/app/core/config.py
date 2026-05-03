@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     allowed_origins: list[str] | str = 'http://localhost:3000'
     log_level: str = 'INFO'
 
+    smtp_host: str = ''
+    smtp_port: int = 1025
+    smtp_from: str = 'APF Platform <noreply@apf-platform.ca>'
+    smtp_username: str = ''
+    smtp_password: str = ''
+    smtp_use_tls: bool = False
+
     @field_validator('app_env')
     @classmethod
     def validate_env(cls, value: str) -> str:
