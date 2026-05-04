@@ -48,10 +48,12 @@ export default function ApfLayout({ children }: { children: React.ReactNode }) {
               Network Visibility
             </strong>
           </div>
-          <nav style={{ display: "flex", gap: 8 }}>
+          <nav style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {[
               { label: "Overview", href: "/apf" },
-              { label: "Substitute Pool", href: "/apf/substitutes" },
+              { label: "Organizations", href: "/apf/organizations" },
+              { label: "Coordinators", href: "/apf/coordinators" },
+              { label: "Substitutes", href: "/apf/substitutes" },
               { label: "Activity", href: "/apf/activity" },
             ].map(({ label, href }) => (
               <Link

@@ -1,14 +1,39 @@
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
+from app.auth.permissions import require_network_admin
 from app.auth.scope import AccessScope, get_access_scope
+from app.models.organization import Organization
 from app.repositories.organization_repository import OrganizationRepository
-from app.schemas.organization import OrganizationRead
+from app.schemas.organization import OrganizationCreate, OrganizationRead
+from app.services.audit_service import AuditService
 
 router = APIRouter()
+
+
+@router.post('', status_code=201, dependencies=[Depends(require_network_admin)])
+def create_organization(
+    payload: OrganizationCreate,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> OrganizationRead:
+    if not scope.tenant_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='No tenant context.')
+    org = Organization(id=uuid4(), tenant_id=scope.tenant_id, **payload.model_dump())
+    db.add(org)
+    AuditService(db).log(
+        action='organization.created',
+        entity_type='organization',
+        entity_id=org.id,
+        actor_user_id=scope.user.id,
+        payload={'name': payload.name, 'city': payload.city, 'tenant_id': str(scope.tenant_id)},
+    )
+    db.commit()
+    db.refresh(org)
+    return OrganizationRead.model_validate(org)
 
 
 @router.get('')
