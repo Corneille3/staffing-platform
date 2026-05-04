@@ -28,7 +28,25 @@ close-and-reopen the IDE" troubleshooting from prior sessions — the disk
 state is authoritative.
 
 **Last shipped (most recent first):**
-1. Worker onboarding flow — network admin pre-registers a worker via
+1. Clerk auth wired end-to-end locally — `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+   + `CLERK_SECRET_KEY` set in `frontend/.env.local`; `CLERK_ISSUER_URL` +
+   `CLERK_JWKS_URL` set in `backend/.env`. Dev auth bypass disabled when
+   Clerk key is present. `/auth/sync` links Clerk users to DB users by
+   email on first sign-in; JIT-creates new user if email not found.
+   JWT template in Clerk dashboard must include `"role": "{{user.public_metadata.role}}"`.
+   Verified working with real Clerk sign-in → APF surface accessible.
+   Known bootstrap gap: first sign-up defaults to `worker` role — must
+   manually set role in DB or Clerk publicMetadata until platform admin
+   surface is built.
+2. Network admin management surface — `POST /api/v1/organizations` (create
+   org under tenant), `GET+POST /api/v1/coordinators` (list + invite
+   coordinator with multi-org assignment). `CoordinatorService.invite()`
+   validates org ownership, creates User (org_admin) + TenantMembership +
+   OrganizationMembership per org. APF nav extended: Organizations +
+   Coordinators pages with list/create forms. Coordinator invite form has
+   toggle-style multi-org picker; coordinators scoped to all assigned orgs
+   via `AccessScope.org_ids` union (already supported, no changes needed).
+3. Worker onboarding flow — network admin pre-registers a worker via
    `POST /api/v1/workers/invite` (creates User + TenantMembership);
    worker signs in and is redirected to `/worker/onboarding` (redirect
    gate in `worker/layout.tsx` fires when `worker.profile === null`).
@@ -148,9 +166,9 @@ state is authoritative.
 9. `POST /auth/sync` — Clerk → DB user link/provision flow
 
 **Top remaining gaps** (see "Known gaps" section for the full list):
-1. Optional org layer not yet implemented — org_admin without memberships
-   sees nothing; flat-tenant coordinators need `organization_id` nullable
-   on requests and tenant-scoped fallback in AccessScope.
+1. Production deployment not done — Vercel (frontend) + AWS EC2/RDS via
+   Terraform (backend). Clerk production instance needed with
+   `staffig.kouamvision.com` domain. Cloudflare DNS for subdomains.
 
 If the user asks "what's next?" — check the Implementation roadmap section.
 
@@ -176,7 +194,9 @@ toggles. Treat each surface as having its own UX language.
   via JWKS, frontend forwards the JWT on every API call
 - **Infra**: Terraform scaffold for AWS (VPC, RDS, EC2 app-runtime, S3+CloudFront,
   SES, Secrets Manager — Clerk keys + issuer URL + JWKS URL stored as
-  secrets) — **not deployed yet, do not deploy**
+  secrets) — **not deployed yet**. Frontend will be on Vercel; S3/CloudFront
+  modules skipped (Vercel replaces them). Backend API on EC2 at
+  `api.staffig.kouamvision.com`. Domain `staffig.kouamvision.com` on Cloudflare.
 
 ## Repository layout
 
@@ -395,24 +415,26 @@ initial migration directly — do not stack compatibility migrations.
   access returns 403.
 - Multi-tenant layer: `tenants` + `tenant_memberships` tables, `platform_admin`
   + `network_admin` roles, all repositories tenant-scoped
+- Network admin management: create orgs, invite multi-org coordinators
+  (`/apf/organizations`, `/apf/coordinators`) with full list/create UI
 - Worker onboarding: invite (network admin) → `/worker/onboarding` (worker),
   redirect gate in worker layout when `profile === null`
 - SMS notifications via Twilio/httpx (skips when credentials absent)
+- Clerk auth verified end-to-end locally: sign-in → JWT verified → role-scoped
+  APF surface accessible. Test keys active; production keys pending.
 - Real CI across all 6 GitHub workflows (pytest + tsc + next build + terraform)
 - `pytest` (38/38) and `tsc --noEmit` pass
 
 ## Known gaps (be aware of these before suggesting fixes)
 
-1. **Optional org layer not implemented.** `staffing_requests.organization_id`
-   is currently NOT NULL. For flat tenants (single-entity clients), there
-   is no org layer — coordinators need to be tenant-scoped. Planned work:
-   make `organization_id` nullable, add tenant-scoped fallback in
-   `AccessScope` when `org_ids` is empty, hide org dropdown in create form
-   for flat tenants. Track in branch `feature/optional-org-layer`.
-2. **Org admins without memberships see nothing.** A user signing in
-   with `role=org_admin` but no `organization_memberships` rows will see
-   empty lists. This is resolved once the optional org layer lands and
-   tenant-scoped coordinators are supported.
+1. **First sign-up bootstrap gap.** Any user who signs up via Clerk for the
+   first time gets `role=worker` in the DB (JIT-created by `/auth/sync`).
+   A network_admin must manually update the role in the DB or Clerk
+   publicMetadata. A platform admin surface (tenant + user provisioning UI)
+   will resolve this permanently.
+2. **No platform admin surface.** Creating new tenants and assigning network
+   admins is a manual DB step. The `platform_admin` role exists but has no
+   UI. This is the next major feature after production deployment.
 3. **`request-create-form.tsx` accepts any `org_id`** without checking the
    current user's membership against the org list. The backend restricts
    `/organizations` GET to the caller's orgs so the dropdown self-filters,
@@ -430,9 +452,11 @@ This roadmap closes the gap between the current code and the product vision in
 `Implementation-idea.md`. Items are ordered by dependency + leverage. Tick
 each as it ships and keep "Current focus" in sync.
 
-**Current focus:** Optional org layer — branch `feature/optional-org-layer`.
-Make `organization_id` nullable on requests, add tenant-scoped coordinator
-fallback in `AccessScope`, hide org dropdown for flat tenants.
+**Current focus:** Production deployment.
+1. Clerk production instance with `staffig.kouamvision.com` domain
+2. Vercel for frontend (Next.js App Router requires Node.js server)
+3. AWS EC2 + RDS via Terraform for backend API at `api.staffig.kouamvision.com`
+4. Cloudflare DNS: `staffig` → Vercel, `api.staffig` → EC2
 
 ### Phase A — Worker UX core (the doc's heaviest emphasis)
 
