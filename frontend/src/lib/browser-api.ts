@@ -2,8 +2,10 @@
 
 import {
   Assignment,
+  Coordinator,
   EligibilityResult,
   NotificationFeedItem,
+  Organization,
   RequestResponse,
   StaffingRequest,
   Worker,
@@ -157,6 +159,34 @@ export async function inviteWorker(payload: {
   preferred_language?: string;
 }): Promise<Worker> {
   return postJson<Worker>("/api/v1/workers/invite", payload);
+}
+
+export async function fetchOrganizationsForTenant(): Promise<Organization[]> {
+  const data = await getJson<{ items: Organization[] }>("/api/v1/organizations");
+  return data.items;
+}
+
+export async function createOrganization(payload: {
+  name: string;
+  type: string;
+  city: string;
+  region?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  preferred_language: string;
+}): Promise<Organization> {
+  return postJson<Organization>("/api/v1/organizations", payload);
+}
+
+export async function inviteCoordinator(payload: {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone?: string;
+  preferred_language: string;
+  org_ids: string[];
+}): Promise<Coordinator> {
+  return postJson<Coordinator>("/api/v1/coordinators/invite", payload);
 }
 
 export async function onboardWorker(

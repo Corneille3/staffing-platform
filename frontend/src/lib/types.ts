@@ -136,6 +136,17 @@ export type AuditLog = {
   created_at: string;
 };
 
+export type Coordinator = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  preferred_language: string;
+  is_active: boolean;
+  organizations: Organization[];
+};
+
 export type Assignment = {
   id: string;
   staffing_request_id: string;

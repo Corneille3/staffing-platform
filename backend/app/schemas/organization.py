@@ -20,5 +20,9 @@ class OrganizationBase(BaseModel):
     is_active: bool = True
 
 
+class OrganizationCreate(OrganizationBase):
+    pass
+
+
 class OrganizationRead(OrganizationBase, TimestampedSchema):
     id: UUID
