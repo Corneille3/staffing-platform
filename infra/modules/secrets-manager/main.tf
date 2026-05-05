@@ -13,5 +13,7 @@ resource "aws_secretsmanager_secret_version" "app_env" {
     CLERK_JWKS_URL        = var.clerk_jwks_url
     APP_ENV               = var.app_env
     APP_PORT              = tostring(var.app_port)
+    ALLOWED_ORIGINS       = var.allowed_origins
+    DEV_AUTH_BYPASS       = "false"
   })
 }

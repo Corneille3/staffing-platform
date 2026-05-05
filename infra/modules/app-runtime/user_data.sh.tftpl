@@ -7,6 +7,14 @@ systemctl enable docker
 systemctl start docker
 usermod -aG docker ec2-user
 
+# Authenticate Docker with ECR using instance role
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --region ${aws_region} --query Account --output text)
+aws ecr get-login-password --region ${aws_region} | \
+  docker login --username AWS --password-stdin "$${AWS_ACCOUNT_ID}.dkr.ecr.${aws_region}.amazonaws.com"
+
+# Pull the image before the service starts
+docker pull ${app_image}
+
 cat >/etc/systemd/system/apf-app.service <<EOF
 [Unit]
 Description=APF Staffing Platform App
@@ -16,8 +24,9 @@ Requires=docker.service
 [Service]
 Restart=always
 ExecStartPre=-/usr/bin/docker rm -f apf-app
+ExecStartPre=/bin/bash -c 'aws ecr get-login-password --region ${aws_region} | docker login --username AWS --password-stdin \$(aws sts get-caller-identity --region ${aws_region} --query Account --output text).dkr.ecr.${aws_region}.amazonaws.com && docker pull ${app_image}'
 ExecStart=/usr/bin/docker run --name apf-app \
-  -p ${app_port}:${app_port} \
+  -p 80:${app_port} \
   -e APP_ENV_SECRET_NAME=${app_env_secret} \
   -e AWS_REGION=${aws_region} \
   ${app_image}

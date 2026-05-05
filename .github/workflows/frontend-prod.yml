@@ -39,10 +39,22 @@ jobs:
           API_BASE_URL: http://localhost:8000
           NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
 
-  # Deploy step — add when infra is provisioned.
-  # deploy:
-  #   needs: build
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Deploy to production
-  #       run: echo "Wire S3/CloudFront deploy here"
+  deploy:
+    name: Deploy to Vercel
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    # Requires these GitHub Actions secrets to be set:
+    #   VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+    # Set them after connecting the repo on vercel.com.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Vercel (production)
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: frontend
+          vercel-args: "--prod"

@@ -14,4 +14,5 @@ variable "clerk_issuer_url" { type = string }
 variable "clerk_jwks_url" { type = string }
 variable "app_env" { type = string }
 variable "app_port" { type = number }
+variable "allowed_origins" { type = string }
 variable "tags" { type = map(string) }

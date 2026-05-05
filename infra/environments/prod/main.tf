@@ -8,6 +8,34 @@ locals {
   }
 }
 
+resource "aws_ecr_repository" "backend" {
+  name                 = "${local.name_prefix}-backend"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = local.tags
+}
+
+resource "aws_ecr_lifecycle_policy" "backend" {
+  repository = aws_ecr_repository.backend.name
+
+  policy = jsonencode({
+    rules = [{
+      rulePriority = 1
+      description  = "Keep last 10 images"
+      selection = {
+        tagStatus   = "any"
+        countType   = "imageCountMoreThan"
+        countNumber = 10
+      }
+      action = { type = "expire" }
+    }]
+  })
+}
+
 module "vpc" {
   source               = "../../modules/vpc"
   name_prefix          = local.name_prefix
@@ -25,20 +53,9 @@ module "security_groups" {
   tags              = local.tags
 }
 
-module "frontend" {
-  source      = "../../modules/s3-frontend"
-  name_prefix = local.name_prefix
-  tags        = local.tags
-}
-
-module "cloudfront" {
-  source                      = "../../modules/cloudfront"
-  name_prefix                 = local.name_prefix
-  bucket_name                 = module.frontend.bucket_name
-  bucket_arn                  = module.frontend.bucket_arn
-  bucket_regional_domain_name = module.frontend.bucket_regional_domain_name
-  tags                        = local.tags
-}
+# Frontend is deployed on Vercel — S3 + CloudFront are not used.
+# module "frontend" { ... }
+# module "cloudfront" { ... }
 
 module "db" {
   source                  = "../../modules/rds-postgres"
@@ -65,6 +82,7 @@ module "secrets" {
   clerk_jwks_url        = var.clerk_jwks_url
   app_env               = var.environment
   app_port              = var.app_port
+  allowed_origins       = var.allowed_origins
   tags                  = local.tags
 }
 

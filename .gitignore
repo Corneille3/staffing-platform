@@ -21,6 +21,10 @@ infra/environments/prod/backend.hcl
 **/.terraform/*
 **/.terraform.lock.hcl
 *.tfplan
+*.tfstate
+*.tfstate.backup
+infra/environments/prod/terraform.tfvars
+infra/environments/dev/terraform.tfvars
 
 # OS
 .DS_Store

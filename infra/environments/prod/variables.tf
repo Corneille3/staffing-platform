@@ -25,3 +25,4 @@ variable "clerk_secret_key" {
 }
 variable "clerk_issuer_url" { type = string }
 variable "clerk_jwks_url" { type = string }
+variable "allowed_origins" { type = string }

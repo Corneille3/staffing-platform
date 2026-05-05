@@ -1,5 +1,27 @@
+import json
+import os
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _load_aws_secrets() -> None:
+    """Pull app config from AWS Secrets Manager when APP_ENV_SECRET_NAME is set."""
+    secret_name = os.environ.get("APP_ENV_SECRET_NAME")
+    region = os.environ.get("AWS_REGION", "ca-central-1")
+    if not secret_name:
+        return
+    try:
+        import boto3
+        client = boto3.client("secretsmanager", region_name=region)
+        response = client.get_secret_value(SecretId=secret_name)
+        for key, value in json.loads(response["SecretString"]).items():
+            os.environ.setdefault(key.upper(), str(value))
+    except Exception as exc:
+        print(f"[config] AWS Secrets Manager load skipped: {exc}")
+
+
+_load_aws_secrets()
 
 
 class Settings(BaseSettings):

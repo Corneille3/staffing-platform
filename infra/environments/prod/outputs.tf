@@ -1,3 +1,7 @@
+output "ecr_repository_url" {
+  value = aws_ecr_repository.backend.repository_url
+}
+
 output "vpc_id" {
   value = module.vpc.vpc_id
 }
@@ -16,14 +20,6 @@ output "app_public_ip" {
 
 output "app_instance_id" {
   value = module.app_runtime.instance_id
-}
-
-output "frontend_bucket_name" {
-  value = module.frontend.bucket_name
-}
-
-output "cloudfront_domain_name" {
-  value = module.cloudfront.domain_name
 }
 
 output "db_endpoint" {
