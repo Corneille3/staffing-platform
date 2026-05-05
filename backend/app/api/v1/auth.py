@@ -51,6 +51,12 @@ def sync_current_user(
     """
     existing = db.scalar(select(User).where(User.clerk_user_id == current_user.sub))
     if existing is not None:
+        details = fetch_user_details(current_user.sub)
+        new_role = current_user.role or public_metadata_role(details)
+        if new_role and new_role in _VALID_ROLES and existing.role.value != new_role:
+            existing.role = UserRole(new_role)
+            db.commit()
+            db.refresh(existing)
         return existing
 
     details = fetch_user_details(current_user.sub)
