@@ -28,7 +28,29 @@ close-and-reopen the IDE" troubleshooting from prior sessions — the disk
 state is authoritative.
 
 **Last shipped (most recent first):**
-1. Clerk auth wired end-to-end locally — `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+1. Production deployment (partially live) — AWS infrastructure provisioned
+   via Terraform (VPC, RDS db.t4g.micro, EC2 t3.small, ECR, Secrets Manager,
+   S3 remote state). Backend Docker image built and pushed to ECR; runs
+   `alembic upgrade head` via `docker-entrypoint.sh` on every deploy.
+   Secrets Manager loader added to `config.py` (boto3, reads
+   `APP_ENV_SECRET_NAME` env var). Vercel project live at
+   `staffig.kouamvision.com`. Clerk production instance at
+   `clerk.kouamvision.com` with all 5 DNS records verified. CI deploy jobs
+   wired: backend-prod builds/pushes to ECR + SSM restarts EC2; frontend-prod
+   deploys to Vercel. Makefile `db-stop/start/status` targets added.
+   **Blocking issue:** Vercel server components fetch `API_BASE_URL` over
+   HTTPS but the EC2 backend only serves HTTP on port 80. Cloudflare proxy
+   is enabled for `api.kouamvision.com` → `99.79.127.227` but SSL handshake
+   fails (Cloudflare Flexible SSL set but not resolving yet). Root cause
+   options to fix: (A) add nginx + Let's Encrypt on EC2 for proper HTTPS,
+   (B) use Cloudflare Origin Certificate on EC2, (C) set `API_BASE_URL` to
+   `http://` and accept unencrypted Vercel→EC2 traffic (not ideal).
+   Infrastructure IDs: EC2 `i-04a60b0aaf80c1528`, RDS endpoint
+   `apf-staffing-platform-prod-postgres.cbeimeeggn80.ca-central-1.rds.amazonaws.com`,
+   ECR `515275664907.dkr.ecr.ca-central-1.amazonaws.com/apf-staffing-platform-prod-backend`.
+   **Still needed after HTTPS fixed:** bootstrap first `network_admin` user
+   in prod DB, set GitHub Actions secrets for CI/CD.
+2. Clerk auth wired end-to-end locally — `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
    + `CLERK_SECRET_KEY` set in `frontend/.env.local`; `CLERK_ISSUER_URL` +
    `CLERK_JWKS_URL` set in `backend/.env`. Dev auth bypass disabled when
    Clerk key is present. `/auth/sync` links Clerk users to DB users by
@@ -166,9 +188,11 @@ state is authoritative.
 9. `POST /auth/sync` — Clerk → DB user link/provision flow
 
 **Top remaining gaps** (see "Known gaps" section for the full list):
-1. Production deployment not done — Vercel (frontend) + AWS EC2/RDS via
-   Terraform (backend). Clerk production instance needed with
-   `staffig.kouamvision.com` domain. Cloudflare DNS for subdomains.
+1. HTTPS on the backend API — Vercel server components can't reach the EC2
+   backend over HTTPS. Fix options: nginx + Let's Encrypt on EC2, or
+   Cloudflare Origin Certificate. See "Last shipped" note #1 above for full
+   context. Once fixed: bootstrap network_admin user + set GitHub Actions
+   secrets.
 
 If the user asks "what's next?" — check the Implementation roadmap section.
 
