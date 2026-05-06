@@ -1,5 +1,8 @@
 import React from "react";
 import { AdminNavigation } from "../../components/admin-navigation";
+import { HeaderSignOutButton } from "../../components/header-sign-out-button";
+
+const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -46,7 +49,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               Operations Console
             </strong>
           </div>
-          <AdminNavigation />
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <AdminNavigation />
+            {CLERK_ENABLED ? <HeaderSignOutButton /> : null}
+          </div>
         </div>
       </div>
       {children}
