@@ -42,7 +42,7 @@ export default async function RequestsPage() {
       description="Publish requests, collect substitute responses, and confirm assignments without leaving the operations queue."
     >
       <Panel title="Create request" subtitle="New coverage need">
-        <RequestCreateForm organizations={organizations} users={users} />
+        <RequestCreateForm organizations={organizations} />
       </Panel>
 
       <div style={{ height: 22 }} />

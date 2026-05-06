@@ -10,10 +10,15 @@ from app.auth.clerk import fetch_user_details, primary_email, public_metadata_ro
 from app.auth.current_user import CurrentUserModel, get_current_user
 from app.core.constants import ROLE_NETWORK_ADMIN, ROLE_ORG_ADMIN, ROLE_PLATFORM_ADMIN, ROLE_WORKER
 from app.models.enums import UserRole
+from app.models.tenant import Tenant
+from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 from app.schemas.user import UserRead
 
 router = APIRouter()
+
+DEFAULT_TENANT_NAME = 'APF Network'
+DEFAULT_TENANT_SLUG = 'apf-network'
 
 
 @router.get('/me')
@@ -37,6 +42,58 @@ def _names_from(details: dict, email: str) -> tuple[str, str]:
     return (parts[0].capitalize() if parts else 'New'), 'User'
 
 
+def _sync_role_from_clerk(user: User, role_str: str | None) -> None:
+    if role_str in _VALID_ROLES and user.role.value != role_str:
+        user.role = UserRole(role_str)
+
+
+def _default_tenant(db: Session) -> Tenant:
+    tenant = db.scalar(select(Tenant).where(Tenant.slug == DEFAULT_TENANT_SLUG))
+    if tenant is not None:
+        return tenant
+
+    tenant = Tenant(id=uuid4(), name=DEFAULT_TENANT_NAME, slug=DEFAULT_TENANT_SLUG)
+    db.add(tenant)
+    db.flush()
+    return tenant
+
+
+def _ensure_network_admin_tenant_membership(db: Session, user: User) -> None:
+    if user.role != UserRole.NETWORK_ADMIN:
+        return
+
+    active_membership = db.scalar(
+        select(TenantMembership).where(
+            TenantMembership.user_id == user.id,
+            TenantMembership.is_active.is_(True),
+        )
+    )
+    if active_membership is not None:
+        if active_membership.role != UserRole.NETWORK_ADMIN:
+            active_membership.role = UserRole.NETWORK_ADMIN
+        return
+
+    tenant = _default_tenant(db)
+    default_membership = db.scalar(
+        select(TenantMembership).where(
+            TenantMembership.user_id == user.id,
+            TenantMembership.tenant_id == tenant.id,
+        )
+    )
+    if default_membership is not None:
+        default_membership.role = UserRole.NETWORK_ADMIN
+        default_membership.is_active = True
+        return
+
+    db.add(TenantMembership(
+        id=uuid4(),
+        user_id=user.id,
+        tenant_id=tenant.id,
+        role=UserRole.NETWORK_ADMIN,
+        is_active=True,
+    ))
+
+
 @router.post('/sync', response_model=UserRead)
 def sync_current_user(
     current_user: CurrentUserModel = Depends(get_current_user),
@@ -51,6 +108,10 @@ def sync_current_user(
     """
     existing = db.scalar(select(User).where(User.clerk_user_id == current_user.sub))
     if existing is not None:
+        _sync_role_from_clerk(existing, current_user.role)
+        _ensure_network_admin_tenant_membership(db, existing)
+        db.commit()
+        db.refresh(existing)
         return existing
 
     details = fetch_user_details(current_user.sub)
@@ -64,6 +125,8 @@ def sync_current_user(
     by_email = db.scalar(select(User).where(User.email == email))
     if by_email is not None:
         by_email.clerk_user_id = current_user.sub
+        _sync_role_from_clerk(by_email, current_user.role or public_metadata_role(details))
+        _ensure_network_admin_tenant_membership(db, by_email)
         db.commit()
         db.refresh(by_email)
         return by_email
@@ -83,6 +146,7 @@ def sync_current_user(
         role=UserRole(role_str),
     )
     db.add(user)
+    _ensure_network_admin_tenant_membership(db, user)
     try:
         db.commit()
     except IntegrityError:

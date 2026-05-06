@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import React, { useEffect } from "react";
-import { useWorkerSession, WorkerSessionProvider } from "../../lib/worker-session";
+import {
+  canUseWorkerOverride,
+  useWorkerSession,
+  WorkerSessionProvider,
+} from "../../lib/worker-session";
 
 export default function WorkerLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -17,6 +21,7 @@ function WorkerShell({ children }: { children: React.ReactNode }) {
   const { worker, workers, loading, error, selectWorker } = useWorkerSession();
   const pathname = usePathname();
   const router = useRouter();
+  const showWorkerPicker = canUseWorkerOverride();
 
   useEffect(() => {
     if (worker && !worker.profile && pathname !== "/worker/onboarding") {
@@ -48,6 +53,21 @@ function WorkerShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!worker) {
+    if (!showWorkerPicker) {
+      return (
+        <Screen>
+          <Centered>
+            <div style={{ maxWidth: 420, textAlign: "center", padding: "0 20px" }}>
+              <h1 style={{ margin: "0 0 8px", fontSize: 28 }}>Account not ready</h1>
+              <p style={{ margin: 0, opacity: 0.78, lineHeight: 1.5 }}>
+                Your substitute account is not linked yet. Use the invited email address or contact the network administrator.
+              </p>
+            </div>
+          </Centered>
+        </Screen>
+      );
+    }
+
     return (
       <Screen>
         <div style={{ maxWidth: 480, margin: "60px auto", padding: "0 20px" }}>
@@ -63,7 +83,7 @@ function WorkerShell({ children }: { children: React.ReactNode }) {
           </p>
           <h1 style={{ margin: "8px 0 6px", fontSize: 32 }}>Choose your account</h1>
           <p style={{ margin: 0, opacity: 0.78, lineHeight: 1.5 }}>
-            Pick which worker you are signing in as. (Real authentication coming soon.)
+            Pick which worker you are previewing locally.
           </p>
           <div style={{ display: "grid", gap: 12, marginTop: 28 }}>
             {workers.length === 0 ? (

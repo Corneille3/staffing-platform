@@ -1,6 +1,6 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
 export type Role = "worker" | "org_admin" | "network_admin" | "platform_admin";
@@ -8,6 +8,12 @@ export type Role = "worker" | "org_admin" | "network_admin" | "platform_admin";
 const STORAGE_KEY = "apf.devRole";
 const DEFAULT_ROLE: Role = "org_admin";
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const DEV_ROLE_OVERRIDE_ENABLED = process.env.NODE_ENV !== "production";
+
+type SyncedUser = {
+  role: string;
+};
 
 type RoleContextValue = {
   role: Role;
@@ -46,29 +52,64 @@ function DevRoleProvider({ children }: { children: ReactNode }) {
 }
 
 function ClerkRoleProvider({ children }: { children: ReactNode }) {
-  const { user, isLoaded } = useUser();
-  const [override, setOverride] = useState<Role | null>(null);
-  const [hydrated, setHydrated] = useState(false);
+  const { isLoaded, isSignedIn } = useUser();
+  const { getToken } = useAuth();
+  const [role, setRoleState] = useState<Role>(DEFAULT_ROLE);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setOverride(readStoredOverride());
-    setHydrated(true);
-  }, []);
+    let alive = true;
 
-  const metadataRole = (() => {
-    const candidate = user?.publicMetadata?.role;
-    return isRole(candidate) ? candidate : null;
-  })();
+    async function syncCurrentUser() {
+      if (!isLoaded) return;
+      if (!isSignedIn) {
+        if (alive) setReady(true);
+        return;
+      }
 
-  const role: Role = override ?? metadataRole ?? DEFAULT_ROLE;
+      if (alive) setReady(false);
+      try {
+        const token = await getToken();
+        if (!token) {
+          if (alive) setReady(true);
+          return;
+        }
+
+        const response = await fetch(`${API_BASE}/api/v1/auth/sync`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) {
+          throw new Error(`User sync failed (${response.status})`);
+        }
+
+        const syncedUser = (await response.json()) as SyncedUser;
+        const syncedRole = isRole(syncedUser.role) ? syncedUser.role : DEFAULT_ROLE;
+        const override = DEV_ROLE_OVERRIDE_ENABLED ? readStoredOverride() : null;
+        if (alive) setRoleState(override ?? syncedRole);
+      } catch (err) {
+        console.error("User sync error:", err);
+        if (alive) setRoleState(DEFAULT_ROLE);
+      } finally {
+        if (alive) setReady(true);
+      }
+    }
+
+    void syncCurrentUser();
+    return () => {
+      alive = false;
+    };
+  }, [getToken, isLoaded, isSignedIn]);
 
   function setRole(next: Role) {
-    setOverride(next);
+    if (!DEV_ROLE_OVERRIDE_ENABLED) return;
+    setRoleState(next);
     window.localStorage.setItem(STORAGE_KEY, next);
   }
 
   return (
-    <RoleContext.Provider value={{ role, setRole, ready: isLoaded && hydrated }}>
+    <RoleContext.Provider value={{ role, setRole, ready }}>
       {children}
     </RoleContext.Provider>
   );

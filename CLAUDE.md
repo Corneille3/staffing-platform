@@ -28,7 +28,20 @@ close-and-reopen the IDE" troubleshooting from prior sessions — the disk
 state is authoritative.
 
 **Last shipped (most recent first):**
-1. Production deployment (partially live) — AWS infrastructure provisioned
+1. Production onboarding hardening — `/auth/sync` now preserves invited DB
+   roles when Clerk has no explicit role claim, updates DB roles only from an
+   explicit valid Clerk role, and self-heals `network_admin` tenant context by
+   creating/reactivating the APF tenant membership (`slug=apf-network`).
+   Frontend routing now waits for `/auth/sync` and uses the synced DB role
+   rather than Clerk publicMetadata/localStorage. Production hides the dev role
+   switcher and worker account picker; dev preview overrides still work
+   outside production. Request creation now sends Clerk auth, ignores client
+   `created_by_user_id`, and validates organization scope server-side.
+   `/users` is scoped by caller: platform_admin all users, network_admin tenant
+   users, org_admin assigned-org users plus tenant workers needed for dispatch
+   UI, workers blocked. Verified locally: backend `pytest` 46/46 and frontend
+   `tsc --noEmit` pass. **Not yet tested in production.**
+2. Production deployment (partially live) — AWS infrastructure provisioned
    via Terraform (VPC, RDS db.t4g.micro, EC2 t3.small, ECR, Secrets Manager,
    S3 remote state). Backend Docker image built and pushed to ECR; runs
    `alembic upgrade head` via `docker-entrypoint.sh` on every deploy.
@@ -48,8 +61,8 @@ state is authoritative.
    Infrastructure IDs: EC2 `i-04a60b0aaf80c1528`, RDS endpoint
    `apf-staffing-platform-prod-postgres.cbeimeeggn80.ca-central-1.rds.amazonaws.com`,
    ECR `515275664907.dkr.ecr.ca-central-1.amazonaws.com/apf-staffing-platform-prod-backend`.
-   **Still needed after HTTPS fixed:** bootstrap first `network_admin` user
-   in prod DB, set GitHub Actions secrets for CI/CD.
+   **Still needed after HTTPS fixed:** set GitHub Actions secrets for CI/CD.
+   (network_admin bootstrap now handled automatically by `/auth/sync`.)
 2. Clerk auth wired end-to-end locally — `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
    + `CLERK_SECRET_KEY` set in `frontend/.env.local`; `CLERK_ISSUER_URL` +
    `CLERK_JWKS_URL` set in `backend/.env`. Dev auth bypass disabled when
@@ -57,9 +70,8 @@ state is authoritative.
    email on first sign-in; JIT-creates new user if email not found.
    JWT template in Clerk dashboard must include `"role": "{{user.public_metadata.role}}"`.
    Verified working with real Clerk sign-in → APF surface accessible.
-   Known bootstrap gap: first sign-up defaults to `worker` role — must
-   manually set role in DB or Clerk publicMetadata until platform admin
-   surface is built.
+   First network_admin bootstrap is now handled by `/auth/sync` once Clerk
+   issues a valid `network_admin` role claim.
 2. Network admin management surface — `POST /api/v1/organizations` (create
    org under tenant), `GET+POST /api/v1/coordinators` (list + invite
    coordinator with multi-org assignment). `CoordinatorService.invite()`
@@ -190,9 +202,12 @@ state is authoritative.
 **Top remaining gaps** (see "Known gaps" section for the full list):
 1. HTTPS on the backend API — Vercel server components can't reach the EC2
    backend over HTTPS. Fix options: nginx + Let's Encrypt on EC2, or
-   Cloudflare Origin Certificate. See "Last shipped" note #1 above for full
-   context. Once fixed: bootstrap network_admin user + set GitHub Actions
-   secrets.
+   Cloudflare Origin Certificate. See "Last shipped" note #2 above for full
+   context. Once fixed: set GitHub Actions secrets.
+2. Production onboarding hardening is implemented but not yet prod-tested.
+   After deploying, smoke-test the full flow: network_admin sign-in → org
+   create → coordinator invite/sign-in → substitute invite/sign-in/onboard →
+   request create/publish.
 
 If the user asks "what's next?" — check the Implementation roadmap section.
 
@@ -293,33 +308,39 @@ activated** based on whether `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is set:
   - `ClerkProvider` wraps the app
   - `clerkMiddleware` (in `src/middleware.ts`) protects every route except
     `/sign-in/*` and `/sign-up/*`
-  - `ClerkSyncBoundary` (mounted in the root layout) fires
-    `POST /api/v1/auth/sync` once when a user becomes signed in. The
-    backend resolves the Clerk identity to a `users` row: lookup by
+  - `RoleProvider` is the authoritative frontend sync gate. After Clerk loads,
+    it calls `POST /api/v1/auth/sync`, waits for the synced DB user, and routes
+    from the returned DB role. This prevents post-login redirects from racing
+    ahead of backend user provisioning.
+  - The backend resolves the Clerk identity to a `users` row: lookup by
     `clerk_user_id` → lookup by email (link if found) → JIT-create. Names
     and email are pulled from JWT claims when present, otherwise from the
     Clerk Backend API (`GET /v1/users/{id}`) using `CLERK_SECRET_KEY`.
-  - `RoleProvider` reads role from `useUser().publicMetadata.role`
-    (with the dev role-switcher available as a preview override)
+    Existing invited DB roles are preserved unless Clerk sends an explicit
+    valid role claim; `network_admin` users get an active APF tenant membership
+    automatically.
   - `WorkerSessionProvider` auto-picks the worker whose `clerk_user_id`
-    equals the signed-in `useUser().user.id`; manual override still wins
+    equals the signed-in `useUser().user.id`. Manual worker override is disabled
+    in production and only available for local/dev preview.
   - `lib/api.ts` and `lib/browser-api.ts` attach
     `Authorization: Bearer <Clerk JWT>` to every request
   - Backend (`auth/clerk.py`) verifies the JWT signature against the
     Clerk JWKS (cached for 1h) and enforces the issuer claim
   - Every `/api/v1/*` route requires authentication. `auth/permissions.py`
-    exposes `require_admin` (apf_admin or org_admin) and `require_apf`
-    (apf_admin only); these are applied as dependencies on writes,
+    exposes `require_admin` (platform/network/org admins),
+    `require_network_admin`, and `require_apf` (network admin alias);
+    these are applied as dependencies on writes,
     assignments, reports, and audit logs. Routes accept/decline workers
     can hit (worker actions, GET request listings) stay open to all
     authenticated roles
   - Row-level scoping via `auth/scope.py`: `get_access_scope` resolves
     the caller's `users` row + active `organization_memberships` into an
-    `AccessScope` (`is_apf`, `is_org_admin`, `is_worker`, `org_ids`).
-    Repositories expose `list_for_scope(scope)` methods that filter by
-    role: APF sees all rows; org_admin filtered by `org_ids`; worker
-    filtered by `user.id` (responses, assignments) or membership
-    (notifications). Routes that fetch a single resource call
+    `AccessScope` (`is_platform_admin`, `is_network_admin`, `is_org_admin`,
+    `is_worker`, `tenant_id`, `org_ids`). Repositories expose
+    `list_for_scope(scope)` methods that filter by role: platform_admin sees
+    all rows; network_admin sees their tenant; org_admin filtered by
+    `org_ids`; worker filtered by `user.id` (responses, assignments) or
+    membership (notifications). Routes that fetch a single resource call
     `repo.can_access(resource, scope)` and return 403 on mismatch.
 - **Key absent** → middleware passes through, no `ClerkProvider`, the dev
   role switcher + worker picker run as the only auth shim, no
@@ -352,20 +373,22 @@ To turn on Clerk locally:
    ```
 5. Visit `/sign-in` to authenticate.
 
-### Dev role + worker selection (always available)
+### Dev role + worker selection (dev/local only)
 
 A floating **role-switcher** pill (bottom-right) writes
 `localStorage["apf.devRole"]` and navigates to the matching surface. The root
-`/` redirects based on that role.
+`/` redirects based on that role. This switcher is hidden in production.
 
 The worker surface additionally uses a **WorkerSession** context. On first
 visit to `/worker/*`, users pick which worker they are previewing as
-(`localStorage["apf.workerId"]`). Sign-out from the profile page clears it.
+(`localStorage["apf.workerId"]`). This picker/override is disabled in
+production; production worker sessions must match the signed-in Clerk user's
+`clerk_user_id`.
 
-These dev shims still run even when Clerk is enabled — they act as
-preview overrides on top of the real Clerk session, useful for jumping
+These dev shims may still run when Clerk is enabled outside production — they
+act as preview overrides on top of the real Clerk session, useful for jumping
 between roles or impersonating a specific worker without juggling multiple
-Clerk users.
+Clerk users. They must not be relied on for production behavior.
 
 ### Two API helpers
 
@@ -426,7 +449,7 @@ initial migration directly — do not stack compatibility migrations.
 - Clerk integration (when keys are configured): sign-in, sign-up,
   middleware-protected routes, JWT forwarded server-side and client-side,
   signature-verified backend JWKS check, role read from
-  `publicMetadata.role`, `/auth/sync` links/provisions a `users` row on
+  the synced DB user, `/auth/sync` links/provisions a `users` row on
   first sign-in, worker matched by `clerk_user_id`
 - Backend RBAC: every `/api/v1/*` route requires authentication via the
   global `require_authenticated` dependency. Per-route role gates use
@@ -443,30 +466,33 @@ initial migration directly — do not stack compatibility migrations.
   (`/apf/organizations`, `/apf/coordinators`) with full list/create UI
 - Worker onboarding: invite (network admin) → `/worker/onboarding` (worker),
   redirect gate in worker layout when `profile === null`
+- Production onboarding hardening: first network_admin tenant bootstrap via
+  `/auth/sync`; invited DB roles preserved unless Clerk sends an explicit
+  valid role claim; production routing uses the synced DB role; dev role/worker
+  overrides hidden in production; request creation is authenticated and scoped;
+  `/users` is scoped by caller
 - SMS notifications via Twilio/httpx (skips when credentials absent)
 - Clerk auth verified end-to-end locally: sign-in → JWT verified → role-scoped
   APF surface accessible. Test keys active; production keys pending.
 - Real CI across all 6 GitHub workflows (pytest + tsc + next build + terraform)
-- `pytest` (38/38) and `tsc --noEmit` pass
+- `pytest` (46/46) and `tsc --noEmit` pass
 
 ## Known gaps (be aware of these before suggesting fixes)
 
-1. **First sign-up bootstrap gap.** Any user who signs up via Clerk for the
-   first time gets `role=worker` in the DB (JIT-created by `/auth/sync`).
-   A network_admin must manually update the role in the DB or Clerk
-   publicMetadata. A platform admin surface (tenant + user provisioning UI)
-   will resolve this permanently.
-2. **No platform admin surface.** Creating new tenants and assigning network
-   admins is a manual DB step. The `platform_admin` role exists but has no
-   UI. This is the next major feature after production deployment.
-3. **`request-create-form.tsx` accepts any `org_id`** without checking the
-   current user's membership against the org list. The backend restricts
-   `/organizations` GET to the caller's orgs so the dropdown self-filters,
-   but the form should also gate that `created_by_user_id` is the current user.
-4. **Backend JWT verification falls back to unverified claims** when
+1. **Production onboarding hardening not yet prod-tested.** The local code now
+   handles first network_admin tenant bootstrap, preserves invited DB roles,
+   routes by synced DB role, hides dev overrides in production, scopes request
+   creation, and scopes `/users`. This passes locally but still needs a full
+   production smoke test: network_admin sign-in → org create → coordinator
+   invite/sign-in → substitute invite/sign-in/onboard → request create/publish.
+2. **No platform admin surface.** Creating additional tenants and assigning
+   tenant-specific network admins is still a manual DB/admin-ops step. The
+   default APF tenant bootstrap is automatic, but multi-tenant platform admin
+   management has no UI yet.
+3. **Backend JWT verification falls back to unverified claims** when
    `CLERK_JWKS_URL` is empty (local dev without Clerk). That fallback
    exists by design — prod must always have the JWKS URL set.
-5. **SMS needs Twilio credentials.** `SmsNotificationService` calls the
+4. **SMS needs Twilio credentials.** `SmsNotificationService` calls the
    Twilio REST API via `httpx` and skips gracefully when
    `TWILIO_ACCOUNT_SID` is empty. Wire up real keys in prod env.
 

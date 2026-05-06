@@ -7,6 +7,11 @@ import { Worker } from "./types";
 
 const STORAGE_KEY = "apf.workerId";
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+const DEV_WORKER_OVERRIDE_ENABLED = process.env.NODE_ENV !== "production";
+
+export function canUseWorkerOverride() {
+  return DEV_WORKER_OVERRIDE_ENABLED;
+}
 
 type WorkerSessionValue = {
   worker: Worker | null;
@@ -48,12 +53,17 @@ function useSharedState(): SharedState {
   }
 
   useEffect(() => {
+    if (!DEV_WORKER_OVERRIDE_ENABLED) {
+      load();
+      return;
+    }
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (stored) setOverride(stored);
     load();
   }, []);
 
   function selectWorker(id: string) {
+    if (!DEV_WORKER_OVERRIDE_ENABLED) return;
     setOverride(id);
     window.localStorage.setItem(STORAGE_KEY, id);
   }
@@ -79,10 +89,12 @@ function ClerkWorkerSessionProvider({ children }: { children: ReactNode }) {
   const { workers, override, loading, error, selectWorker, refresh } = useSharedState();
 
   const matchedByClerk = user ? workers.find((w) => w.clerk_user_id === user.id) || null : null;
-  const overrideWorker = override ? workers.find((w) => w.id === override) || null : null;
+  const overrideWorker = DEV_WORKER_OVERRIDE_ENABLED && override
+    ? workers.find((w) => w.id === override) || null
+    : null;
 
-  // Prefer explicit override (so the dev picker can still preview another
-  // worker), then the Clerk-linked worker, then nothing.
+  // In local dev, an explicit override can preview another worker. Production
+  // always uses the Clerk-linked worker.
   const worker = overrideWorker ?? matchedByClerk;
 
   return (

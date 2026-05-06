@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { CSSProperties } from "react";
-import { FormEvent, useMemo, useState, useTransition } from "react";
-import { Organization, User } from "../lib/types";
+import { FormEvent, useState, useTransition } from "react";
+import { useAuth } from "@clerk/nextjs";
+import { Organization } from "../lib/types";
 
 const browserApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -29,17 +30,14 @@ function splitList(value: string) {
 
 export function RequestCreateForm({
   organizations,
-  users,
 }: {
   organizations: Organization[];
-  users: User[];
 }) {
   const router = useRouter();
+  const { getToken } = useAuth();
   const [isPending, startTransition] = useTransition();
-  const orgAdmins = useMemo(() => users.filter((user) => user.role === "org_admin"), [users]);
   const [error, setError] = useState<string | null>(null);
   const [organizationId, setOrganizationId] = useState(organizations[0]?.id || "");
-  const [createdByUserId, setCreatedByUserId] = useState(orgAdmins[0]?.id || "");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [city, setCity] = useState(organizations[0]?.city || "");
@@ -60,13 +58,16 @@ export function RequestCreateForm({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    const token = await getToken();
 
     const response = await fetch(`${browserApiBaseUrl}/api/v1/requests`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({
         organization_id: organizationId,
-        created_by_user_id: createdByUserId,
         request_type: "urgent_replacement",
         coverage_type: coverageType,
         title,
@@ -119,55 +120,37 @@ export function RequestCreateForm({
 
   return (
     <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12 }}>
-        <label style={labelStyle}>
-          Organization
-          <select
-            value={organizationId}
-            onChange={(event) => {
-              const nextId = event.target.value;
-              setOrganizationId(nextId);
-              const organization = organizations.find((item) => item.id === nextId);
-              if (organization) {
-                setCity(organization.city);
-              }
-            }}
-            style={inputStyle}
-            required
-          >
-            {organizations.map((organization) => (
-              <option key={organization.id} value={organization.id}>
-                {organization.name}
-              </option>
-            ))}
-          </select>
-          {(() => {
-            const org = organizations.find((item) => item.id === organizationId);
-            const label = org ? (ORG_TYPE_LABELS[org.type] ?? org.type.replace(/_/g, " ")) : null;
-            return label ? (
-              <span style={{ fontSize: 12, color: "#6b8179", fontWeight: 400 }}>
-                {label}
-              </span>
-            ) : null;
-          })()}
-        </label>
-
-        <label style={labelStyle}>
-          Created by
-          <select
-            value={createdByUserId}
-            onChange={(event) => setCreatedByUserId(event.target.value)}
-            style={inputStyle}
-            required
-          >
-            {orgAdmins.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.first_name} {user.last_name}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <label style={labelStyle}>
+        Organization
+        <select
+          value={organizationId}
+          onChange={(event) => {
+            const nextId = event.target.value;
+            setOrganizationId(nextId);
+            const organization = organizations.find((item) => item.id === nextId);
+            if (organization) {
+              setCity(organization.city);
+            }
+          }}
+          style={inputStyle}
+          required
+        >
+          {organizations.map((organization) => (
+            <option key={organization.id} value={organization.id}>
+              {organization.name}
+            </option>
+          ))}
+        </select>
+        {(() => {
+          const org = organizations.find((item) => item.id === organizationId);
+          const label = org ? (ORG_TYPE_LABELS[org.type] ?? org.type.replace(/_/g, " ")) : null;
+          return label ? (
+            <span style={{ fontSize: 12, color: "#6b8179", fontWeight: 400 }}>
+              {label}
+            </span>
+          ) : null;
+        })()}
+      </label>
 
       <label style={labelStyle}>
         Title
@@ -295,7 +278,7 @@ export function RequestCreateForm({
 
       <button
         type="submit"
-        disabled={isPending || !organizationId || !createdByUserId}
+        disabled={isPending || !organizationId}
         style={{
           border: 0,
           borderRadius: 12,

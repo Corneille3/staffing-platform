@@ -82,6 +82,97 @@ def test_org_admin_cannot_access_other_org_report(apf_client, org_admin_client, 
     assert resp.status_code == 403
 
 
+def test_org_admin_can_create_request_for_assigned_org(org_admin_client, seed):
+    resp = org_admin_client.post(
+        '/api/v1/requests',
+        json=request_payload(seed.org.id, seed.apf.id, title='Created by org admin'),
+    )
+
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data['organization_id'] == str(seed.org.id)
+    assert data['created_by_user_id'] == str(seed.org_admin.id)
+
+
+def test_org_admin_cannot_spoof_request_creator(org_admin_client, seed):
+    resp = org_admin_client.post(
+        '/api/v1/requests',
+        json=request_payload(seed.org.id, seed.apf.id, title='Spoofed creator'),
+    )
+
+    assert resp.status_code == 201
+    assert resp.json()['created_by_user_id'] == str(seed.org_admin.id)
+
+
+def test_org_admin_cannot_create_request_for_other_org(apf_client, org_admin_client, seed):
+    other_org = apf_client.post('/api/v1/organizations', json={
+        'name': 'Other Create Org',
+        'type': 'childcare',
+        'city': 'OtherCreateCity',
+        'preferred_language': 'en',
+    })
+    assert other_org.status_code == 201
+
+    resp = org_admin_client.post(
+        '/api/v1/requests',
+        json=request_payload(other_org.json()['id'], seed.org_admin.id, title='Out of scope create'),
+    )
+
+    assert resp.status_code == 403
+
+
+def test_org_admin_users_are_scoped_to_org_and_tenant_workers(
+    org_admin_client, db_session, seed
+):
+    from uuid import uuid4
+
+    from app.models.enums import OrganizationType, UserRole
+    from app.models.organization import Organization
+    from app.models.organization_membership import OrganizationMembership
+    from app.models.user import User
+
+    other_org = Organization(
+        id=uuid4(),
+        tenant_id=seed.tenant.id,
+        name='Other User Scope Org',
+        type=OrganizationType.CHILDCARE,
+        city='OtherUserCity',
+    )
+    other_admin = User(
+        id=uuid4(),
+        clerk_user_id='other-org-admin',
+        first_name='Other',
+        last_name='Admin',
+        email='other.admin@example.org',
+        role=UserRole.ORG_ADMIN,
+    )
+    db_session.add_all([other_org, other_admin])
+    db_session.flush()
+    db_session.add(OrganizationMembership(
+        id=uuid4(),
+        user_id=other_admin.id,
+        organization_id=other_org.id,
+        role=UserRole.ORG_ADMIN,
+    ))
+    db_session.flush()
+
+    resp = org_admin_client.get('/api/v1/users')
+
+    assert resp.status_code == 200
+    ids = {item['id'] for item in resp.json()['items']}
+    assert str(seed.org_admin.id) in ids
+    assert str(seed.worker_a.id) in ids
+    assert str(seed.worker_b.id) in ids
+    assert str(seed.apf.id) not in ids
+    assert str(other_admin.id) not in ids
+
+
+def test_worker_cannot_list_users(worker_a_client):
+    resp = worker_a_client.get('/api/v1/users')
+
+    assert resp.status_code == 403
+
+
 # ── APF scoping ───────────────────────────────────────────────────────────────
 
 def test_apf_sees_all_organizations(apf_client, seed):
@@ -114,3 +205,103 @@ def test_auth_sync_returns_existing_user(apf_client, seed):
     data = resp.json()
     assert data['clerk_user_id'] == 'int-apf'
     assert data['role'] == 'network_admin'
+
+
+def test_auth_sync_bootstraps_network_admin_tenant_membership(apf_client, db_session, seed):
+    from sqlalchemy import delete, select
+
+    from app.models.tenant import Tenant
+    from app.models.tenant_membership import TenantMembership
+
+    db_session.execute(delete(TenantMembership).where(TenantMembership.user_id == seed.apf.id))
+    db_session.flush()
+
+    resp = apf_client.post('/api/v1/auth/sync')
+
+    assert resp.status_code == 200
+    membership = db_session.scalar(
+        select(TenantMembership).where(
+            TenantMembership.user_id == seed.apf.id,
+            TenantMembership.is_active.is_(True),
+        )
+    )
+    assert membership is not None
+    assert membership.role.value == 'network_admin'
+    tenant = db_session.scalar(select(Tenant).where(Tenant.id == membership.tenant_id))
+    assert tenant is not None
+    assert tenant.slug == 'apf-network'
+
+
+def test_auth_sync_updates_existing_user_role_from_clerk(db_session, seed):
+    from fastapi.testclient import TestClient
+    from sqlalchemy import select
+
+    from app.api.deps import get_db_session
+    from app.main import app
+    from app.models.tenant_membership import TenantMembership
+    from app.models.user import User
+    from app.tests.conftest import make_token
+
+    seed.worker_a.clerk_user_id = 'role-upgrade-user'
+    db_session.flush()
+
+    def _override():
+        yield db_session
+
+    app.dependency_overrides[get_db_session] = _override
+    try:
+        client = TestClient(
+            app,
+            headers={'Authorization': f'Bearer {make_token("role-upgrade-user", "network_admin")}'},
+        )
+        resp = client.post('/api/v1/auth/sync')
+    finally:
+        app.dependency_overrides.pop(get_db_session, None)
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data['role'] == 'network_admin'
+
+    user = db_session.scalar(select(User).where(User.clerk_user_id == 'role-upgrade-user'))
+    assert user is not None
+    assert user.role.value == 'network_admin'
+    membership = db_session.scalar(
+        select(TenantMembership).where(
+            TenantMembership.user_id == user.id,
+            TenantMembership.is_active.is_(True),
+        )
+    )
+    assert membership is not None
+    assert membership.role.value == 'network_admin'
+
+
+def test_auth_sync_preserves_invited_user_role_when_clerk_role_missing(db_session, seed):
+    from fastapi.testclient import TestClient
+    from jose import jwt as jose_jwt
+    from sqlalchemy import select
+
+    from app.api.deps import get_db_session
+    from app.main import app
+    from app.models.user import User
+
+    seed.org_admin.clerk_user_id = 'missing-role-user'
+    db_session.flush()
+
+    def _override():
+        yield db_session
+
+    token = jose_jwt.encode({'sub': 'missing-role-user'}, 'test-secret', algorithm='HS256')
+    app.dependency_overrides[get_db_session] = _override
+    try:
+        client = TestClient(app, headers={'Authorization': f'Bearer {token}'})
+        resp = client.post('/api/v1/auth/sync')
+    finally:
+        app.dependency_overrides.pop(get_db_session, None)
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data['role'] == 'org_admin'
+
+    user = db_session.scalar(select(User).where(User.clerk_user_id == 'missing-role-user'))
+    assert user is not None
+    assert user.role.value == 'org_admin'

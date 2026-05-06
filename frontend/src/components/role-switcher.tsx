@@ -4,12 +4,13 @@ import { useRouter } from "next/navigation";
 import { Role, ROLE_HOME, ROLE_LABEL, useRole } from "../lib/role-context";
 
 const ROLES: Role[] = ["worker", "org_admin", "network_admin"];
+const DEV_ROLE_SWITCHER_ENABLED = process.env.NODE_ENV !== "production";
 
 export function RoleSwitcher() {
   const router = useRouter();
   const { role, setRole, ready } = useRole();
 
-  if (!ready) return null;
+  if (!DEV_ROLE_SWITCHER_ENABLED || !ready) return null;
 
   function pick(next: Role) {
     setRole(next);

@@ -1,16 +1,25 @@
 "use client";
 
+import { useClerk } from "@clerk/nextjs";
 import { useWorkerSession } from "../../../lib/worker-session";
+
+const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+const SIGN_OUT_BUTTON_STYLE = {
+  border: 0,
+  borderRadius: 14,
+  padding: "16px 18px",
+  background: "#eadfd7",
+  color: "#7a473f",
+  fontSize: 15,
+  fontWeight: 800,
+  cursor: "pointer",
+};
 
 export default function WorkerProfilePage() {
   const { worker } = useWorkerSession();
 
   if (!worker) return null;
-
-  function signOut() {
-    window.localStorage.removeItem("apf.workerId");
-    window.location.reload();
-  }
 
   return (
     <div style={{ display: "grid", gap: 24, paddingTop: 16 }}>
@@ -40,23 +49,37 @@ export default function WorkerProfilePage() {
         />
       </Card>
 
-      <button
-        type="button"
-        onClick={signOut}
-        style={{
-          border: 0,
-          borderRadius: 14,
-          padding: "16px 18px",
-          background: "#eadfd7",
-          color: "#7a473f",
-          fontSize: 15,
-          fontWeight: 800,
-          cursor: "pointer",
-        }}
-      >
-        Sign out
-      </button>
+      {CLERK_ENABLED ? <ClerkSignOutButton /> : <DevSignOutButton />}
     </div>
+  );
+}
+
+function ClerkSignOutButton() {
+  const { signOut } = useClerk();
+
+  async function handleSignOut() {
+    window.localStorage.removeItem("apf.workerId");
+    window.localStorage.removeItem("apf.devRole");
+    await signOut({ redirectUrl: "/sign-in" });
+  }
+
+  return (
+    <button type="button" onClick={handleSignOut} style={SIGN_OUT_BUTTON_STYLE}>
+      Sign out
+    </button>
+  );
+}
+
+function DevSignOutButton() {
+  function handleSignOut() {
+    window.localStorage.removeItem("apf.workerId");
+    window.location.reload();
+  }
+
+  return (
+    <button type="button" onClick={handleSignOut} style={SIGN_OUT_BUTTON_STYLE}>
+      Sign out
+    </button>
   );
 }
 

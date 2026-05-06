@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 from app.auth.clerk import ClerkAuthError, decode_token
 from app.core.config import settings
-from app.core.constants import ROLE_NETWORK_ADMIN, ROLE_WORKER
+from app.core.constants import ROLE_NETWORK_ADMIN
 from app.core.security import bearer_scheme, extract_bearer_token
 
 DEV_AUTH_SUB = 'dev-apf-admin'
@@ -13,7 +13,7 @@ DEV_AUTH_EMAIL = 'alice.admin@example.org'
 class CurrentUserModel(BaseModel):
     sub: str
     email: str | None = None
-    role: str = ROLE_WORKER
+    role: str | None = None
     is_authenticated: bool = True
 
 
@@ -39,5 +39,5 @@ def get_current_user(credentials=Depends(bearer_scheme)) -> CurrentUserModel:
     return CurrentUserModel(
         sub=payload.sub,
         email=payload.email,
-        role=payload.role or ROLE_WORKER,
+        role=payload.role,
     )

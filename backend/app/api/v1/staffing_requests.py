@@ -73,9 +73,10 @@ def get_request_eligibility(
 @router.post('', status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)])
 def create_staffing_request(
     payload: StaffingRequestCreate,
+    scope: AccessScope = Depends(get_access_scope),
     db: Session = Depends(get_db_session),
 ) -> StaffingRequestRead:
-    staffing_request = StaffingRequestService(db).create(payload)
+    staffing_request = StaffingRequestService(db).create(payload, scope)
     return StaffingRequestRead.model_validate(staffing_request)
 
 

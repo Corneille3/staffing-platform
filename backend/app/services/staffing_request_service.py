@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.auth.scope import AccessScope
 from app.models.enums import NotificationChannel, RequestStatus, ResponseStatus
 from app.models.enums import RequestRequirementType
 from app.models.request_notification import RequestNotification
@@ -36,11 +37,17 @@ class StaffingRequestService:
     def get(self, request_id: UUID) -> StaffingRequest | None:
         return self.repository.get(request_id)
 
-    def create(self, payload: StaffingRequestCreate) -> StaffingRequest:
+    def create(self, payload: StaffingRequestCreate, scope: AccessScope) -> StaffingRequest:
+        organization = self.db.get(Organization, payload.organization_id)
+        if organization is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Organization not found')
+        if not self._can_create_for_organization(organization, scope):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Out of scope.')
+
         staffing_request = StaffingRequest(
             id=uuid4(),
             organization_id=payload.organization_id,
-            created_by_user_id=payload.created_by_user_id,
+            created_by_user_id=scope.user.id,
             request_type=payload.request_type,
             title=payload.title,
             description=payload.description,
@@ -88,6 +95,16 @@ class StaffingRequestService:
         )
         self.db.commit()
         return created
+
+    @staticmethod
+    def _can_create_for_organization(organization: Organization, scope: AccessScope) -> bool:
+        if scope.is_platform_admin:
+            return True
+        if scope.is_network_admin:
+            return scope.tenant_id is not None and organization.tenant_id == scope.tenant_id
+        if scope.is_org_admin:
+            return organization.id in scope.org_ids
+        return False
 
     def _workers_for_request(self, staffing_request: StaffingRequest):
         org = self.db.get(Organization, staffing_request.organization_id)
