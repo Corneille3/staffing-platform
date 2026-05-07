@@ -1,10 +1,14 @@
 import React from "react";
 import Link from "next/link";
 import { HeaderSignOutButton } from "../../components/header-sign-out-button";
+import { requireServerSession } from "../../lib/api";
 
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-export default function ApfLayout({ children }: { children: React.ReactNode }) {
+export default async function ApfLayout({ children }: { children: React.ReactNode }) {
+  if (CLERK_ENABLED) {
+    await requireServerSession(["network_admin", "platform_admin"]);
+  }
   return (
     <div
       style={{

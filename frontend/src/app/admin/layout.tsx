@@ -1,10 +1,14 @@
 import React from "react";
 import { AdminNavigation } from "../../components/admin-navigation";
 import { HeaderSignOutButton } from "../../components/header-sign-out-button";
+import { requireServerSession } from "../../lib/api";
 
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  if (CLERK_ENABLED) {
+    await requireServerSession(["org_admin", "network_admin", "platform_admin"]);
+  }
   return (
     <div
       style={{
