@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuth, useClerk, useUser } from "@clerk/nextjs";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
 export type Role = "worker" | "org_admin" | "network_admin" | "platform_admin";
@@ -54,6 +54,7 @@ function DevRoleProvider({ children }: { children: ReactNode }) {
 function ClerkRoleProvider({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn } = useUser();
   const { getToken } = useAuth();
+  const { signOut } = useClerk();
   const [role, setRoleState] = useState<Role>(DEFAULT_ROLE);
   const [ready, setReady] = useState(false);
 
@@ -80,6 +81,18 @@ function ClerkRoleProvider({ children }: { children: ReactNode }) {
           cache: "no-store",
           headers: { Authorization: `Bearer ${token}` },
         });
+
+        if (response.status === 403) {
+          // Signed in to Clerk but no DB row exists for this identity.
+          // The DB is the source of truth for who can use the platform;
+          // sign the user out of Clerk and route to /not-invited rather
+          // than letting them land on a role-shell with no data.
+          window.localStorage.removeItem("apf.workerId");
+          window.localStorage.removeItem("apf.devRole");
+          await signOut({ redirectUrl: "/not-invited" });
+          return;
+        }
+
         if (!response.ok) {
           throw new Error(`User sync failed (${response.status})`);
         }
@@ -100,7 +113,7 @@ function ClerkRoleProvider({ children }: { children: ReactNode }) {
     return () => {
       alive = false;
     };
-  }, [getToken, isLoaded, isSignedIn]);
+  }, [getToken, isLoaded, isSignedIn, signOut]);
 
   function setRole(next: Role) {
     if (!DEV_ROLE_OVERRIDE_ENABLED) return;

@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.scope import AccessScope
+from app.core.config import settings
 from app.models.enums import AvailabilityStatus, UserRole
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
@@ -14,6 +15,7 @@ from app.models.worker_certification import WorkerCertification
 from app.models.worker_profile import WorkerProfile
 from app.models.worker_qualification import WorkerQualification
 from app.models.worker_region import WorkerRegion
+from app.notifications.email_service import EmailMessage, EmailNotificationService
 from app.repositories.worker_repository import WorkerRepository
 from app.schemas.worker import WorkerInviteCreate, WorkerOnboardCreate
 from app.services.audit_service import AuditService
@@ -23,7 +25,31 @@ class WorkerService:
     def __init__(self, db: Session) -> None:
         self.repository = WorkerRepository(db)
         self.audit_service = AuditService(db)
+        self.email = EmailNotificationService()
         self.db = db
+
+    def _portal_url(self) -> str:
+        if settings.allowed_origins:
+            return settings.allowed_origins[0].rstrip('/')
+        return 'http://localhost:3000'
+
+    def _send_invite_email(self, user: User) -> None:
+        portal_url = self._portal_url()
+        subject = '[APF] Invitation to join the substitute pool'
+        body = (
+            f'Bonjour {user.first_name},\n\n'
+            f'You have been invited to join the APF substitute pool.\n\n'
+            f'Sign in or create your Clerk account with this email address:\n'
+            f'{portal_url}/sign-in\n\n'
+            f'After sign-in, you will be prompted to complete your profile.\n'
+            f'\n---\n\n'
+            f'Hello {user.first_name},\n\n'
+            f'You have been invited to join the APF substitute pool.\n\n'
+            f'Sign in or create your Clerk account with this email address:\n'
+            f'{portal_url}/sign-in\n\n'
+            f'After sign-in, you will be prompted to complete your profile.\n'
+        )
+        self.email.send(EmailMessage(to_email=user.email, subject=subject, body=body))
 
     def list(self) -> list[User]:
         return self.repository.list()
@@ -77,6 +103,11 @@ class WorkerService:
         )
         self.db.commit()
         self.db.refresh(user)
+        try:
+            self._send_invite_email(user)
+        except Exception:
+            # Invitation creation is the primary action; email delivery is best-effort.
+            pass
         return user
 
     def onboard(self, worker_user_id: UUID, payload: WorkerOnboardCreate) -> WorkerProfile:

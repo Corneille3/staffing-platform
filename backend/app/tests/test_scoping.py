@@ -195,6 +195,57 @@ def test_apf_network_overview_includes_test_org(apf_client, seed):
     assert data['active_substitutes'] >= 2  # both test workers are available
 
 
+def test_coordinator_invite_sends_email(apf_client, monkeypatch, seed):
+    from app.notifications import email_service
+
+    sent: list[email_service.EmailMessage] = []
+
+    def fake_send(self, message):
+        sent.append(message)
+        return {'channel': 'email', 'delivery_status': 'sent', 'recipient': message.to_email}
+
+    monkeypatch.setattr(email_service.EmailNotificationService, 'send', fake_send)
+
+    resp = apf_client.post('/api/v1/coordinators/invite', json={
+        'first_name': 'Casey',
+        'last_name': 'Manager',
+        'email': f'casey-{uuid4().hex[:8]}@example.org',
+        'phone': '+15145550000',
+        'preferred_language': 'en',
+        'org_ids': [str(seed.org.id)],
+    })
+
+    assert resp.status_code == 201
+    assert sent
+    assert sent[0].to_email.startswith('casey-')
+    assert 'sign-in' in sent[0].body
+
+
+def test_worker_invite_sends_email(apf_client, monkeypatch):
+    from app.notifications import email_service
+
+    sent: list[email_service.EmailMessage] = []
+
+    def fake_send(self, message):
+        sent.append(message)
+        return {'channel': 'email', 'delivery_status': 'sent', 'recipient': message.to_email}
+
+    monkeypatch.setattr(email_service.EmailNotificationService, 'send', fake_send)
+
+    resp = apf_client.post('/api/v1/workers/invite', json={
+        'first_name': 'Wendy',
+        'last_name': 'Substitute',
+        'email': f'wendy-{uuid4().hex[:8]}@example.org',
+        'phone': '+15145550001',
+        'preferred_language': 'fr',
+    })
+
+    assert resp.status_code == 201
+    assert sent
+    assert sent[0].to_email.startswith('wendy-')
+    assert 'sign-in' in sent[0].body
+
+
 # ── auth/sync ─────────────────────────────────────────────────────────────────
 
 def test_auth_sync_returns_existing_user(apf_client, seed):
@@ -207,72 +258,91 @@ def test_auth_sync_returns_existing_user(apf_client, seed):
     assert data['role'] == 'network_admin'
 
 
-def test_auth_sync_bootstraps_network_admin_tenant_membership(apf_client, db_session, seed):
-    from sqlalchemy import delete, select
-
-    from app.models.tenant import Tenant
-    from app.models.tenant_membership import TenantMembership
-
-    db_session.execute(delete(TenantMembership).where(TenantMembership.user_id == seed.apf.id))
-    db_session.flush()
-
-    resp = apf_client.post('/api/v1/auth/sync')
-
-    assert resp.status_code == 200
-    membership = db_session.scalar(
-        select(TenantMembership).where(
-            TenantMembership.user_id == seed.apf.id,
-            TenantMembership.is_active.is_(True),
-        )
-    )
-    assert membership is not None
-    assert membership.role.value == 'network_admin'
-    tenant = db_session.scalar(select(Tenant).where(Tenant.id == membership.tenant_id))
-    assert tenant is not None
-    assert tenant.slug == 'apf-network'
-
-
-def test_auth_sync_updates_existing_user_role_from_clerk(db_session, seed):
+def test_auth_sync_rejects_uninvited_email(db_session, seed):
+    """Anyone with a Clerk identity but no DB row gets 403. The DB
+    must be the source of truth for who is allowed in; signing up to
+    Clerk is not the same as being invited to the platform."""
     from fastapi.testclient import TestClient
+    from jose import jwt as jose_jwt
+
+    from app.api.deps import get_db_session
+    from app.main import app
+
+    def _override():
+        yield db_session
+
+    token = jose_jwt.encode(
+        {'sub': 'stranger-clerk-id', 'email': 'never-invited@nowhere.example'},
+        'test-secret',
+        algorithm='HS256',
+    )
+    app.dependency_overrides[get_db_session] = _override
+    try:
+        client = TestClient(app, headers={'Authorization': f'Bearer {token}'})
+        resp = client.post('/api/v1/auth/sync')
+    finally:
+        app.dependency_overrides.pop(get_db_session, None)
+
+    assert resp.status_code == 403
+    assert 'Not invited' in resp.json()['detail']
+
+
+def test_auth_sync_links_by_email_preserves_db_role(db_session, seed):
+    """Pre-invited DB user (no clerk_user_id yet) signs in for the
+    first time. Even if the JWT carries a different role claim, the
+    DB role wins; Clerk is only used to link the identity."""
+    from fastapi.testclient import TestClient
+    from jose import jwt as jose_jwt
     from sqlalchemy import select
 
     from app.api.deps import get_db_session
     from app.main import app
-    from app.models.tenant_membership import TenantMembership
+    from app.models.enums import UserRole
     from app.models.user import User
-    from app.tests.conftest import make_token
 
-    seed.worker_a.clerk_user_id = 'role-upgrade-user'
+    invited_email = f'invited-{uuid4().hex[:8]}@example.org'
+    invited = User(
+        id=uuid4(),
+        clerk_user_id=None,
+        first_name='Invited',
+        last_name='Coordinator',
+        email=invited_email,
+        role=UserRole.ORG_ADMIN,
+        preferred_language='en',
+    )
+    db_session.add(invited)
     db_session.flush()
+
+    fresh_clerk_id = f'fresh-clerk-{uuid4().hex[:8]}'
+    token = jose_jwt.encode(
+        {
+            'sub': fresh_clerk_id,
+            'email': invited_email,
+            'public_metadata': {'role': 'worker'},  # deliberately wrong; must be ignored
+        },
+        'test-secret',
+        algorithm='HS256',
+    )
 
     def _override():
         yield db_session
 
     app.dependency_overrides[get_db_session] = _override
     try:
-        client = TestClient(
-            app,
-            headers={'Authorization': f'Bearer {make_token("role-upgrade-user", "network_admin")}'},
-        )
+        client = TestClient(app, headers={'Authorization': f'Bearer {token}'})
         resp = client.post('/api/v1/auth/sync')
     finally:
         app.dependency_overrides.pop(get_db_session, None)
 
     assert resp.status_code == 200
     data = resp.json()
-    assert data['role'] == 'network_admin'
+    assert data['email'] == invited_email
+    assert data['role'] == 'org_admin'
 
-    user = db_session.scalar(select(User).where(User.clerk_user_id == 'role-upgrade-user'))
-    assert user is not None
-    assert user.role.value == 'network_admin'
-    membership = db_session.scalar(
-        select(TenantMembership).where(
-            TenantMembership.user_id == user.id,
-            TenantMembership.is_active.is_(True),
-        )
-    )
-    assert membership is not None
-    assert membership.role.value == 'network_admin'
+    refreshed = db_session.scalar(select(User).where(User.email == invited_email))
+    assert refreshed is not None
+    assert refreshed.clerk_user_id == fresh_clerk_id
+    assert refreshed.role.value == 'org_admin'
 
 
 def test_auth_sync_preserves_invited_user_role_when_clerk_role_missing(db_session, seed):

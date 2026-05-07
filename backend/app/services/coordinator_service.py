@@ -7,12 +7,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.scope import AccessScope
+from app.core.config import settings
 from app.models.enums import UserRole
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 from app.schemas.coordinator import CoordinatorInviteCreate
+from app.notifications.email_service import EmailMessage, EmailNotificationService
 from app.services.audit_service import AuditService
 
 
@@ -20,6 +22,31 @@ class CoordinatorService:
     def __init__(self, db: Session) -> None:
         self.db = db
         self.audit_service = AuditService(db)
+        self.email = EmailNotificationService()
+
+    def _portal_url(self) -> str:
+        if settings.allowed_origins:
+            return settings.allowed_origins[0].rstrip('/')
+        return 'http://localhost:3000'
+
+    def _send_invite_email(self, user: User, orgs: list[Organization]) -> None:
+        portal_url = self._portal_url()
+        org_names = ', '.join(org.name for org in orgs) if orgs else 'your assigned organization(s)'
+        subject = f'[APF] Invitation to coordinate {org_names}'
+        body = (
+            f'Bonjour {user.first_name},\n\n'
+            f'You have been invited as a coordinator for {org_names}.\n\n'
+            f'Sign in or create your Clerk account with this email address:\n'
+            f'{portal_url}/sign-in\n\n'
+            f'When you sign in, the platform will link your account to the assigned APF role automatically.\n'
+            f'\n---\n\n'
+            f'Hello {user.first_name},\n\n'
+            f'You have been invited as a coordinator for {org_names}.\n\n'
+            f'Sign in or create your Clerk account with this email address:\n'
+            f'{portal_url}/sign-in\n\n'
+            f'When you sign in, the platform will link your account to the assigned APF role automatically.\n'
+        )
+        self.email.send(EmailMessage(to_email=user.email, subject=subject, body=body))
 
     def invite(self, payload: CoordinatorInviteCreate, scope: AccessScope) -> tuple[User, list[Organization]]:
         if not scope.tenant_id:
@@ -93,6 +120,11 @@ class CoordinatorService:
         )
         self.db.commit()
         self.db.refresh(user)
+        try:
+            self._send_invite_email(user, orgs)
+        except Exception:
+            # Invitation creation is the primary action; email delivery is best-effort.
+            pass
         return user, orgs
 
     def list_for_tenant(self, tenant_id: UUID) -> list[tuple[User, list[Organization]]]:
