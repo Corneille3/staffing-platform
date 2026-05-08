@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { availabilityStatusLabel } from "../lib/status-labels";
 import { Assignment, RequestResponse, StaffingRequest, User, Worker } from "../lib/types";
 
@@ -60,6 +61,7 @@ export function RequestWorkflowCard({
   assignment: Assignment | null;
 }) {
   const router = useRouter();
+  const { getToken } = useAuth();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [cancelAssignmentOpen, setCancelAssignmentOpen] = useState(false);
@@ -75,9 +77,13 @@ export function RequestWorkflowCard({
 
   async function post(path: string, payload?: object) {
     setError(null);
+    const token = await getToken();
     const response = await fetch(`${browserApiBaseUrl}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: payload ? JSON.stringify(payload) : undefined,
     });
 
