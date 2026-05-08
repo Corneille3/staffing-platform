@@ -9,7 +9,11 @@ from app.schemas.common import TimestampedSchema
 
 class StaffingRequestBase(BaseModel):
     organization_id: UUID
-    created_by_user_id: UUID
+    # created_by_user_id is server-derived from the authenticated caller
+    # (StaffingRequestService overrides whatever the client sends with
+    # scope.user.id). Optional here so the create payload can omit it; the
+    # read response always carries the real creator from the DB.
+    created_by_user_id: UUID | None = None
     request_type: RequestType
     title: str
     description: str | None = None
