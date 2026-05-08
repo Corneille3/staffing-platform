@@ -28,50 +28,90 @@ close-and-reopen the IDE" troubleshooting from prior sessions — the disk
 state is authoritative.
 
 **Last shipped (most recent first):**
-1. Production onboarding hardening — `/auth/sync` now preserves invited DB
-   roles when Clerk has no explicit role claim, updates DB roles only from an
-   explicit valid Clerk role, and self-heals `network_admin` tenant context by
-   creating/reactivating the APF tenant membership (`slug=apf-network`).
-   Frontend routing now waits for `/auth/sync` and uses the synced DB role
-   rather than Clerk publicMetadata/localStorage. Production hides the dev role
-   switcher and worker account picker; dev preview overrides still work
-   outside production. Request creation now sends Clerk auth, ignores client
-   `created_by_user_id`, and validates organization scope server-side.
-   `/users` is scoped by caller: platform_admin all users, network_admin tenant
-   users, org_admin assigned-org users plus tenant workers needed for dispatch
-   UI, workers blocked. Verified locally: backend `pytest` 46/46 and frontend
-   `tsc --noEmit` pass. **Not yet tested in production.**
-2. Production deployment (partially live) — AWS infrastructure provisioned
-   via Terraform (VPC, RDS db.t4g.micro, EC2 t3.small, ECR, Secrets Manager,
-   S3 remote state). Backend Docker image built and pushed to ECR; runs
-   `alembic upgrade head` via `docker-entrypoint.sh` on every deploy.
-   Secrets Manager loader added to `config.py` (boto3, reads
+1. **DB-owns-roles architecture, fully deployed and partially verified live.**
+   Clerk is now strictly an identity layer; DB rows are the source of truth
+   for roles and memberships. After the one-time bootstrap, every user must
+   be pre-created via an invite endpoint before they can sign in. See the
+   **Onboarding model** section below for the full 8-step flow.
+
+   Commits (in order, all pushed and live):
+   - `50ca992` — `/auth/sync` rewrite (169→60 lines): existing-user path
+     returns the row untouched; link-by-email path links `clerk_user_id`
+     and **preserves the DB role**; uninvited email returns 403. Removed
+     `_sync_role_from_clerk`, `_ensure_network_admin_tenant_membership`,
+     `public_metadata_role` fallbacks, JIT-create-from-Clerk-metadata.
+     New Alembic migration `20260507_0003` seeds the APF tenant + first
+     `network_admin` + `TenantMembership`, gated on `APF_BOOTSTRAP_EMAIL`
+     env var (no-op otherwise; idempotent). Coordinator + worker invite
+     endpoints send a bilingual sign-in invite email (silently skipped
+     today because SMTP is not configured in prod). Frontend
+     `ClerkRoleProvider` detects 403 from `/auth/sync`, clears local
+     overrides, signs the user out, and redirects to `/not-invited` (new
+     bilingual EN/FR page; route added to public middleware).
+   - `46aa1e4` — Server-side role guards on `/apf` and `/admin` layouts.
+     New `requireServerSession()` (in `lib/api.ts`) calls `/auth/sync`
+     server-side from the layout (idempotent — links the DB row before
+     any page-level data fetch runs), redirects to `/not-invited` on
+     403, and redirects to `ROLE_HOME` on role mismatch. Fixes the
+     "fresh sign-up SSR crashes with 401/403 because the DB row isn't
+     linked yet" bug, and the "wrong-role user lands on /apf and gets
+     500" bug. Worker shell stays client-only; its existing
+     `ClerkRoleProvider` already handles the same flow client-side.
+   - `0b8b4ce` — `require_role` uses the DB role via `AccessScope`,
+     not the JWT role. After `/auth/sync` stopped reading Clerk roles,
+     `current_user.role` is None for every signed-in user; the old
+     `require_admin`/`require_apf` were checking that and rejecting
+     everything. Switched the role check to `scope.user.role.value`,
+     which is the DB-resolved role.
+   - `f1aa544` — `created_by_user_id` is now `Optional[UUID]` on
+     `StaffingRequestCreate`. The form stopped sending it after the
+     "Created by" dropdown was removed in `2977f2b` (backend already
+     overrode it with `scope.user.id`); the schema still required it,
+     causing 422.
+   - `1b74c3d` — Coverage-board action buttons (publish, assign, cancel,
+     renotify) now attach the Clerk JWT. The local `post()` helper in
+     `RequestWorkflowCard` was doing a raw `fetch()` with no
+     `Authorization` header → every action button got 401. Same fix as
+     `request-create-form.tsx` from `2977f2b`.
+
+   **Verified live so far:** APF admin sign-in still works; uninvited
+   sign-up routes to `/not-invited`; pre-invited org_admin links via
+   `/auth/sync` and lands on `/admin`; coordinator can create + publish
+   a coverage request (via the workflow card, with auth header).
+   **Not yet exercised in production:** worker invite → worker
+   sign-up/onboard → match → accept → assign → cancel. See the
+   "End-to-end operator-flow test plan" section near the bottom of
+   this file.
+
+2. Production deployment — fully live. AWS infrastructure provisioned
+   via Terraform (VPC, RDS db.t4g.micro, EC2 t3.small, ECR, Secrets
+   Manager, S3 remote state). Backend Docker image built and pushed to
+   ECR; runs `alembic upgrade head` via `docker-entrypoint.sh` on every
+   deploy. Secrets Manager loader added to `config.py` (boto3, reads
    `APP_ENV_SECRET_NAME` env var). Vercel project live at
-   `staffig.kouamvision.com`. Clerk production instance at
-   `clerk.kouamvision.com` with all 5 DNS records verified. CI deploy jobs
-   wired: backend-prod builds/pushes to ECR + SSM restarts EC2; frontend-prod
-   deploys to Vercel. Makefile `db-stop/start/status` targets added.
-   **Blocking issue:** Vercel server components fetch `API_BASE_URL` over
-   HTTPS but the EC2 backend only serves HTTP on port 80. Cloudflare proxy
-   is enabled for `api.kouamvision.com` → `99.79.127.227` but SSL handshake
-   fails (Cloudflare Flexible SSL set but not resolving yet). Root cause
-   options to fix: (A) add nginx + Let's Encrypt on EC2 for proper HTTPS,
-   (B) use Cloudflare Origin Certificate on EC2, (C) set `API_BASE_URL` to
-   `http://` and accept unencrypted Vercel→EC2 traffic (not ideal).
-   Infrastructure IDs: EC2 `i-04a60b0aaf80c1528`, RDS endpoint
-   `apf-staffing-platform-prod-postgres.cbeimeeggn80.ca-central-1.rds.amazonaws.com`,
+   `staffig.kouamvision.com`, backend at `api.kouamvision.com`
+   (second-level subdomain — Cloudflare free SSL doesn't cover
+   `api.staffig.*`). Clerk production instance at
+   `clerk.kouamvision.com` with all 5 DNS records verified. **HTTPS
+   chain:** Cloudflare Flexible SSL — encrypted client→Cloudflare,
+   plain HTTP Cloudflare→EC2 origin. Bot Fight Mode is **off** (it was
+   blocking Vercel SSR datacenter IPs with 403). Long-term HTTPS
+   hardening: nginx + Let's Encrypt on EC2 or Cloudflare Origin
+   Certificate. Infrastructure IDs: EC2 `i-04a60b0aaf80c1528`, RDS
+   endpoint `apf-staffing-platform-prod-postgres.cbeimeeggn80.ca-central-1.rds.amazonaws.com`,
    ECR `515275664907.dkr.ecr.ca-central-1.amazonaws.com/apf-staffing-platform-prod-backend`.
-   **Still needed after HTTPS fixed:** set GitHub Actions secrets for CI/CD.
-   (network_admin bootstrap now handled automatically by `/auth/sync`.)
-2. Clerk auth wired end-to-end locally — `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-   + `CLERK_SECRET_KEY` set in `frontend/.env.local`; `CLERK_ISSUER_URL` +
+   CI deploy workflows exist but are gated on missing secrets
+   (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `VERCEL_TOKEN`,
+   `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`). Until those are set, deploys
+   are manual — see "Manual deploy procedure" below.
+2. Clerk auth wired end-to-end — `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` +
+   `CLERK_SECRET_KEY` set in `frontend/.env.local`; `CLERK_ISSUER_URL` +
    `CLERK_JWKS_URL` set in `backend/.env`. Dev auth bypass disabled when
-   Clerk key is present. `/auth/sync` links Clerk users to DB users by
-   email on first sign-in; JIT-creates new user if email not found.
-   JWT template in Clerk dashboard must include `"role": "{{user.public_metadata.role}}"`.
-   Verified working with real Clerk sign-in → APF surface accessible.
-   First network_admin bootstrap is now handled by `/auth/sync` once Clerk
-   issues a valid `network_admin` role claim.
+   Clerk key is present. ⚠️ The historical JWT-template advice
+   (`"role": "{{user.public_metadata.role}}"`) is now obsolete: under the
+   DB-owns-roles model, Clerk JWTs no longer carry a `role` claim and
+   nothing reads `publicMetadata.role`. The template can stay or be removed
+   — the backend ignores it either way.
 2. Network admin management surface — `POST /api/v1/organizations` (create
    org under tenant), `GET+POST /api/v1/coordinators` (list + invite
    coordinator with multi-org assignment). `CoordinatorService.invite()`
@@ -200,16 +240,185 @@ state is authoritative.
 9. `POST /auth/sync` — Clerk → DB user link/provision flow
 
 **Top remaining gaps** (see "Known gaps" section for the full list):
-1. HTTPS on the backend API — Vercel server components can't reach the EC2
-   backend over HTTPS. Fix options: nginx + Let's Encrypt on EC2, or
-   Cloudflare Origin Certificate. See "Last shipped" note #2 above for full
-   context. Once fixed: set GitHub Actions secrets.
-2. Production onboarding hardening is implemented but not yet prod-tested.
-   After deploying, smoke-test the full flow: network_admin sign-in → org
-   create → coordinator invite/sign-in → substitute invite/sign-in/onboard →
-   request create/publish.
+1. **SMTP not configured in prod.** Invite emails (coordinator + worker)
+   and notification emails (request published, worker accepted, assignment
+   confirmed/cancelled) are silently skipped — `EmailNotificationService`
+   logs and returns `delivery_status: skipped` when `settings.smtp_host`
+   is empty, which it is in the prod Secrets Manager. Pick AWS SES,
+   Resend/Postmark/SendGrid, or Gmail SMTP and add `SMTP_HOST/PORT/FROM/
+   USERNAME/PASSWORD/USE_TLS` to the prod Secrets Manager. Without this,
+   invites only work if you tell the invitee out-of-band.
+2. **End-to-end operator-flow not exercised in prod.** Phases 1-6 of the
+   test plan (APF sign-in → org create → coordinator invite → coordinator
+   sign-up → request create + publish) are verified live. Phases 7-8
+   (worker invite → worker sign-up/onboard → match → accept → assign →
+   cancel) are pending. See "End-to-end operator-flow test plan" below.
+3. **GitHub Actions deploy secrets unset.** `AWS_ACCESS_KEY_ID`,
+   `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `ECR_REPOSITORY_URL`,
+   `EC2_INSTANCE_ID`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
+   Until set, every backend deploy is manual. See "Manual deploy
+   procedure" below.
+4. **SSM agent never registered for `i-04a60b0aaf80c1528`.**
+   `aws ssm send-command` returns `InvalidInstanceId`. Workaround:
+   `aws ec2 reboot-instances` to roll a new image (the systemd unit
+   pulls `:latest` on every start). Long-term: debug the SSM agent or
+   replace the instance.
+5. **HTTPS hardening.** Currently Cloudflare Flexible SSL (encrypted
+   client→Cloudflare, plain HTTP Cloudflare→EC2). Long-term: nginx +
+   Let's Encrypt on EC2 or Cloudflare Origin Certificate.
 
 If the user asks "what's next?" — check the Implementation roadmap section.
+
+## Onboarding model (DB-owns-roles, invite-only)
+
+This is the architecture the project converged on. **Clerk is identity
+only. The DB owns roles and memberships.** After the one-time bootstrap,
+nobody manually edits Clerk roles or `publicMetadata` — every account
+exists because some authorised user invited it via an in-app endpoint.
+
+The 8-step flow:
+
+1. **One-time APF bootstrap.** Alembic migration `20260507_0003`
+   inserts the APF tenant (`slug=apf-network`), the first
+   `network_admin` user, and a `TenantMembership` linking them. Driven
+   by env vars `APF_BOOTSTRAP_EMAIL` (+ optional
+   `APF_BOOTSTRAP_FIRST_NAME` / `APF_BOOTSTRAP_LAST_NAME`). Skipped
+   when unset; idempotent on re-runs.
+2. **APF admin signs in.** Goes to `/sign-in`, Clerk authenticates,
+   `/auth/sync` links their Clerk identity to the pre-seeded DB row.
+   They land on `/apf`.
+3. **APF admin creates a client organization** at
+   `/apf/organizations/new`. Org belongs to the APF tenant.
+4. **APF admin invites a coordinator** at `/apf/coordinators/new`.
+   `CoordinatorService.invite()` creates `User(role=org_admin)` +
+   `TenantMembership` + one `OrganizationMembership` per assigned org.
+   An invite email is queued (silently skipped today — no SMTP).
+5. **Coordinator signs up** at `/sign-up` with the invited email.
+   Clerk creates the identity. `/auth/sync` finds the pre-existing
+   DB user by email, links `clerk_user_id`, **preserves the DB role**
+   (no Clerk metadata is read or trusted). They land on `/admin`.
+6. **Coordinator manages their org** — creates coverage requests,
+   publishes them, assigns substitutes. All data scoped via
+   `AccessScope.org_ids`.
+7. **APF admin invites a worker** at `/apf/workers/new`.
+   `WorkerService.invite()` creates `User(role=worker)` +
+   `TenantMembership`. Invite email queued (skipped — no SMTP).
+8. **Worker signs up**, `/auth/sync` links them, lands on `/worker`.
+   Worker layout sees `profile === null` → redirects to
+   `/worker/onboarding`. Worker fills cities/qualifications/certs →
+   profile created → can start receiving requests.
+
+Critical invariants (don't break these):
+
+- `/auth/sync` **never** reads role from the JWT or Clerk metadata.
+  It links by `clerk_user_id` (existing-user fast path) or by email
+  (link-by-email path); a pre-existing DB role is preserved.
+- An uninvited Clerk sign-up gets **403** from `/auth/sync`. The
+  frontend catches that, signs the user out of Clerk, and redirects
+  to `/not-invited`.
+- `require_admin` / `require_apf` / `require_network_admin` /
+  `require_platform_admin` use the **DB role** via `AccessScope`, not
+  the JWT role. The `current_user.role` field is allowed to be `None`
+  and is no longer trusted for authorisation.
+- Role-shell layouts (`/apf`, `/admin`) call `requireServerSession()`
+  server-side before rendering, which both links the DB row (if first
+  sign-in) and enforces a role allowlist. `/worker` does the
+  equivalent client-side via `ClerkRoleProvider`.
+- All client-side action calls (publish, assign, cancel, renotify,
+  invite, accept/decline, etc.) MUST attach the Clerk JWT. Use the
+  helpers in `lib/browser-api.ts` whenever possible — they call
+  `authHeaders()` automatically. If a component needs a one-off
+  `fetch()`, it must call `useAuth().getToken()` and add the
+  `Authorization: Bearer …` header explicitly.
+
+## End-to-end operator-flow test plan
+
+Phases 1-6 are verified live (`josycorneille3@gmail.com` as APF admin
+and `edenmaeleva@yahoo.com` as a coordinator have walked through them
+in production). Phases 7-8 are pending.
+
+| Phase | Action | Expected |
+|---|---|---|
+| 1 | APF admin signs in | lands on `/apf`; `/auth/sync` → `200` with `role=network_admin` |
+| 2 | APF creates an organization at `/apf/organizations/new` | org appears in the list, scoped to APF tenant |
+| 3 | APF invites a coordinator at `/apf/coordinators/new` | DB user + tenant + org memberships created; invite email skipped |
+| 4 | Coordinator signs up with the invited email | `/auth/sync` links them; lands on `/admin`; role=org_admin |
+| 5 | Coordinator creates a coverage request at `/admin/requests` | request created (status=draft), `created_by_user_id` server-derived |
+| 6 | Coordinator publishes the request | matching runs, eligible workers notified, status=notified |
+| 7 | APF invites a worker at `/apf/workers/new` | DB user (role=worker) + TenantMembership; invite email skipped |
+| 8 | Worker signs up with the invited email, fills onboarding | redirected to `/worker/onboarding` because profile=null; submit creates WorkerProfile + cities/quals/certs |
+| 9 | Worker sees the published request on `/worker/requests` | only if request city/quals/lang match worker; else use "Re-notify workers" on the admin card after onboarding |
+| 10 | Worker accepts via the confirm-availability modal | response status=accepted; coordinator card shows the worker |
+| 11 | Coordinator confirms the substitute | assignment created (pending_confirmation→confirmed); request status=assigned |
+| 12 | Worker sees assignment on `/worker/assignments` | contact info, calendar link, arrival instructions surfaced |
+| 13 | Coordinator cancels the assignment with a reason | request rolls back to responses_received; worker response → notified |
+
+Failure-mode checklist (the bugs we hit on the first run, listed so we
+catch regressions):
+
+- An action button returns 401 → some client-side `fetch()` is missing
+  the Bearer header. Audit `frontend/src/components/` and
+  `frontend/src/app/*/page.tsx` for raw `fetch(\`${browserApiBaseUrl}…\`)`
+  patterns.
+- Submitting a coverage request returns 422 → the Pydantic schema
+  requires a field the frontend stopped sending. Compare the form
+  body to `StaffingRequestCreate`.
+- An admin endpoint returns 403 with a valid session → the role check
+  is reading the JWT instead of the DB. Replace with
+  `Depends(require_role(...))` from `app.auth.permissions` (which now
+  goes through `AccessScope`).
+- SSR crashes on `/apf` or `/admin` for the first request after sign-up
+  → the server-side `requireServerSession` is missing on that layout,
+  or `/auth/sync` returned non-200 server-side.
+
+## Manual deploy procedure (until CI secrets are set)
+
+**Frontend:** Vercel auto-deploys on push to `main` (the project is
+GitHub-connected). Just `git push origin main`. If a deploy needs a
+manual nudge, click "Redeploy" on the latest commit in the Vercel
+dashboard.
+
+**Backend:** the EC2 systemd unit pulls `:latest` from ECR on every
+service start, so a reboot is enough to roll a new image. Sequence:
+
+```
+# 1. Auth to ECR (token expires every ~12h)
+aws ecr get-login-password --region ca-central-1 \
+  | docker login --username AWS --password-stdin \
+    515275664907.dkr.ecr.ca-central-1.amazonaws.com
+
+# 2. Build for amd64 (EC2 is x86_64)
+cd backend
+docker build --platform linux/amd64 \
+  -t 515275664907.dkr.ecr.ca-central-1.amazonaws.com/apf-staffing-platform-prod-backend:latest .
+
+# 3. Tag with the commit SHA for rollback
+docker tag \
+  515275664907.dkr.ecr.ca-central-1.amazonaws.com/apf-staffing-platform-prod-backend:latest \
+  515275664907.dkr.ecr.ca-central-1.amazonaws.com/apf-staffing-platform-prod-backend:sha-<COMMIT>
+
+# 4. Push both
+docker push 515275664907.dkr.ecr.ca-central-1.amazonaws.com/apf-staffing-platform-prod-backend:latest
+docker push 515275664907.dkr.ecr.ca-central-1.amazonaws.com/apf-staffing-platform-prod-backend:sha-<COMMIT>
+
+# 5. Reboot EC2 (SSM is broken — use ec2 reboot-instances)
+aws ec2 reboot-instances --region ca-central-1 --instance-ids i-04a60b0aaf80c1528
+
+# 6. Poll the *direct* IP, not Cloudflare (which can serve stale 5xx
+#    while the origin is restarting)
+until [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
+  http://99.79.127.227/openapi.json 2>/dev/null)" = "200" ]; do
+    sleep 10
+done
+echo "API up"
+```
+
+Typical downtime: ~60–90s. If polling Cloudflare instead of the direct
+IP, expect the loop to take much longer (Cloudflare can serve stale
+non-200 responses while the origin is fine).
+
+**To rollback** to a prior image: `docker pull <repo>:sha-<old>` →
+`docker tag :sha-<old> :latest` → push → reboot.
 
 ## What this project is
 
@@ -479,22 +688,30 @@ initial migration directly — do not stack compatibility migrations.
 
 ## Known gaps (be aware of these before suggesting fixes)
 
-1. **Production onboarding hardening not yet prod-tested.** The local code now
-   handles first network_admin tenant bootstrap, preserves invited DB roles,
-   routes by synced DB role, hides dev overrides in production, scopes request
-   creation, and scopes `/users`. This passes locally but still needs a full
-   production smoke test: network_admin sign-in → org create → coordinator
-   invite/sign-in → substitute invite/sign-in/onboard → request create/publish.
-2. **No platform admin surface.** Creating additional tenants and assigning
-   tenant-specific network admins is still a manual DB/admin-ops step. The
-   default APF tenant bootstrap is automatic, but multi-tenant platform admin
-   management has no UI yet.
-3. **Backend JWT verification falls back to unverified claims** when
+1. **Operator-flow phases 7-8 not exercised in prod.** Phases 1-6 of the
+   end-to-end test plan (APF sign-in → org create → coordinator invite →
+   coordinator sign-up → request create/publish) are verified live.
+   Worker invite/sign-up/onboard → match → accept → assign → cancel are
+   pending — see "End-to-end operator-flow test plan" above.
+2. **SMTP not configured in prod.** Invite emails (coordinator + worker)
+   and notification emails (publish, accept, assign, cancel) are silently
+   skipped because `settings.smtp_host` is empty in the prod Secrets
+   Manager. Pick AWS SES / Resend / Postmark / SendGrid / Gmail SMTP and
+   add `SMTP_HOST/PORT/FROM/USERNAME/PASSWORD/USE_TLS`. Until then,
+   tell invitees out-of-band.
+3. **No platform admin surface.** Creating additional tenants and
+   assigning tenant-specific network admins is still a manual DB step
+   (or a tweak to `APF_BOOTSTRAP_EMAIL` + re-running migrations). The
+   `platform_admin` role exists but has no UI.
+4. **Backend JWT verification falls back to unverified claims** when
    `CLERK_JWKS_URL` is empty (local dev without Clerk). That fallback
    exists by design — prod must always have the JWKS URL set.
-4. **SMS needs Twilio credentials.** `SmsNotificationService` calls the
+5. **SMS needs Twilio credentials.** `SmsNotificationService` calls the
    Twilio REST API via `httpx` and skips gracefully when
    `TWILIO_ACCOUNT_SID` is empty. Wire up real keys in prod env.
+6. **SSM agent unregistered** for `i-04a60b0aaf80c1528` —
+   `aws ssm send-command` returns `InvalidInstanceId`. Backend deploys
+   currently use `aws ec2 reboot-instances` instead.
 
 ## Implementation roadmap (Implementation-idea.md alignment)
 
