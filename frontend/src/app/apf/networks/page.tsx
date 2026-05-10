@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getNetworks, requireServerSession } from "../../../lib/api";
+import { OrphanUserCleanup } from "../../../components/orphan-user-cleanup";
 import { RemoveNetworkButton } from "../../../components/remove-network-button";
 
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -211,6 +212,8 @@ export default async function NetworksPage() {
           )}
         </div>
       </div>
+
+      <OrphanUserCleanup />
     </main>
   );
 }

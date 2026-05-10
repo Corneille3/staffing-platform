@@ -177,6 +177,14 @@ export async function removeUser(userId: string): Promise<{ id: string; is_activ
   return deleteJson<{ id: string; is_active: boolean }>(`/api/v1/users/${userId}`);
 }
 
+export async function removeUserByEmail(email: string): Promise<{
+  id: string;
+  email: string;
+  is_active: boolean;
+}> {
+  return postJson("/api/v1/users/remove-by-email", { email });
+}
+
 export async function fetchOrganizationsForTenant(): Promise<Organization[]> {
   const data = await getJson<{ items: Organization[] }>("/api/v1/organizations");
   return data.items;

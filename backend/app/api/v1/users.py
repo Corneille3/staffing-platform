@@ -4,8 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from pydantic import BaseModel, EmailStr
+
 from app.api.deps import get_db_session
-from app.auth.permissions import require_admin, require_network_admin
+from app.auth.permissions import require_admin, require_network_admin, require_platform_admin
 from app.auth.scope import AccessScope, get_access_scope
 from app.models.enums import UserRole
 from app.models.organization_membership import OrganizationMembership
@@ -45,6 +47,23 @@ def remove_user(
     db: Session = Depends(get_db_session),
 ) -> UserRead:
     target = UserService(db).remove(user_id, scope)
+    return UserRead.model_validate(target)
+
+
+class RemoveByEmailPayload(BaseModel):
+    email: EmailStr
+
+
+@router.post('/remove-by-email')
+def remove_user_by_email(
+    payload: RemoveByEmailPayload,
+    scope: AccessScope = Depends(require_platform_admin),
+    db: Session = Depends(get_db_session),
+) -> UserRead:
+    """Platform-admin cleanup tool for orphan users whose email is in
+    the ``users`` table but who don't appear in any management listing
+    (no active TenantMembership or OrganizationMembership)."""
+    target = UserService(db).remove_by_email(payload.email, scope)
     return UserRead.model_validate(target)
 
 

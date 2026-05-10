@@ -653,3 +653,56 @@ def test_platform_admin_cannot_remove_own_tenant(platform_admin_client, seed):
 def test_network_admin_cannot_remove_network(apf_client, seed):
     resp = apf_client.delete(f'/api/v1/networks/{seed.tenant.id}')
     assert resp.status_code == 403
+
+
+def test_platform_admin_can_remove_orphan_user_by_email(
+    platform_admin_client, db_session, monkeypatch
+):
+    """Orphan user (no memberships) can be cleaned up by email."""
+    from app.auth import clerk as clerk_module
+    monkeypatch.setattr(clerk_module, 'delete_clerk_user', lambda _user_id: True)
+
+    from sqlalchemy import select
+    from app.models.enums import UserRole
+    from app.models.user import User
+
+    orphan_email = f'orphan-{uuid4().hex[:8]}@example.org'
+    orphan = User(
+        id=uuid4(),
+        clerk_user_id=f'orphan-clerk-{uuid4().hex[:8]}',
+        first_name='Orphan',
+        last_name='User',
+        email=orphan_email,
+        role=UserRole.WORKER,  # any role; no memberships either way
+        preferred_language='fr',
+    )
+    db_session.add(orphan)
+    db_session.flush()
+
+    resp = platform_admin_client.post(
+        '/api/v1/users/remove-by-email',
+        json={'email': orphan_email},
+    )
+    assert resp.status_code == 200, resp.text
+
+    refreshed = db_session.scalar(select(User).where(User.id == orphan.id))
+    assert refreshed.is_active is False
+    assert '+removed-' in refreshed.email
+    # Original email free again
+    assert not db_session.scalar(select(User).where(User.email == orphan_email))
+
+
+def test_remove_by_email_returns_404_for_unknown(platform_admin_client):
+    resp = platform_admin_client.post(
+        '/api/v1/users/remove-by-email',
+        json={'email': f'ghost-{uuid4().hex[:8]}@nowhere.example'},
+    )
+    assert resp.status_code == 404
+
+
+def test_network_admin_cannot_remove_by_email(apf_client):
+    resp = apf_client.post(
+        '/api/v1/users/remove-by-email',
+        json={'email': 'anything@example.org'},
+    )
+    assert resp.status_code == 403

@@ -25,6 +25,26 @@ class UserService:
         self.db = db
         self.audit_service = AuditService(db)
 
+    def remove_by_email(self, email: str, scope: AccessScope) -> User:
+        """Platform-admin cleanup for orphan users.
+
+        Looks up the user by email and routes them through ``remove``.
+        Useful when an email is bound to a user row that doesn't appear
+        in any listing — e.g. a leftover from a pre-DB-owns-roles
+        JIT-create on /auth/sync, where the row has no membership and
+        is therefore invisible to /apf/coordinators, /apf/substitutes,
+        and /apf/networks but still blocks new invitations by holding
+        the unique email.
+        """
+        normalized = email.strip().lower()
+        target = self.db.scalar(select(User).where(User.email == normalized))
+        if target is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail='No user with that email.',
+            )
+        return self.remove(target.id, scope)
+
     def remove(self, user_id: UUID, scope: AccessScope) -> User:
         """Soft-delete a user. Network admins can remove users in their
         own tenant; platform admins can remove anyone except other platform
