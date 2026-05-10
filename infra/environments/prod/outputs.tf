@@ -29,3 +29,12 @@ output "db_endpoint" {
 output "app_env_secret_name" {
   value = module.secrets.app_env_secret_name
 }
+
+output "ses_dkim_cname_records" {
+  description = "Add these CNAMEs to Cloudflare for the SES domain to verify."
+  value       = module.ses.dkim_cname_records
+}
+
+output "ses_domain" {
+  value = module.ses.domain
+}

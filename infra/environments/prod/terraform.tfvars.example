@@ -20,3 +20,13 @@ clerk_secret_key        = "sk_live_..."
 clerk_issuer_url        = "https://clerk.yourdomain.com"
 clerk_jwks_url          = "https://clerk.yourdomain.com/.well-known/jwks.json"
 allowed_origins         = "https://staffig.yourdomain.com"
+
+# SES outbound email
+ses_domain_name          = "staffig.yourdomain.com"
+ses_mail_from_address    = "noreply@staffig.yourdomain.com"
+
+# Bootstrap admin (used by Alembic migrations to seed and promote
+# the first network/platform admin)
+apf_bootstrap_email      = "you@yourdomain.com"
+apf_bootstrap_first_name = "Your"
+apf_bootstrap_last_name  = "Name"

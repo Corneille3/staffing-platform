@@ -83,7 +83,19 @@ module "secrets" {
   app_env               = var.environment
   app_port              = var.app_port
   allowed_origins       = var.allowed_origins
-  tags                  = local.tags
+
+  smtp_host     = module.ses.smtp_host
+  smtp_port     = module.ses.smtp_port
+  smtp_use_tls  = module.ses.smtp_use_tls
+  smtp_username = module.ses.smtp_username
+  smtp_password = module.ses.smtp_password
+  smtp_from     = module.ses.smtp_from
+
+  apf_bootstrap_email      = var.apf_bootstrap_email
+  apf_bootstrap_first_name = var.apf_bootstrap_first_name
+  apf_bootstrap_last_name  = var.apf_bootstrap_last_name
+
+  tags = local.tags
 }
 
 module "app_runtime" {
@@ -101,7 +113,10 @@ module "app_runtime" {
 }
 
 module "ses" {
-  source      = "../../modules/ses"
-  name_prefix = local.name_prefix
-  tags        = local.tags
+  source            = "../../modules/ses"
+  name_prefix       = local.name_prefix
+  aws_region        = var.aws_region
+  domain_name       = var.ses_domain_name
+  mail_from_address = var.ses_mail_from_address
+  tags              = local.tags
 }

@@ -26,3 +26,24 @@ variable "clerk_secret_key" {
 variable "clerk_issuer_url" { type = string }
 variable "clerk_jwks_url" { type = string }
 variable "allowed_origins" { type = string }
+
+# SES email
+variable "ses_domain_name" {
+  description = "DNS zone to verify with SES (e.g. staffig.kouamvision.com)."
+  type        = string
+}
+variable "ses_mail_from_address" {
+  description = "From address used by the backend (e.g. noreply@staffig.kouamvision.com). Must be under ses_domain_name."
+  type        = string
+}
+
+# Bootstrap admin
+variable "apf_bootstrap_email" { type = string }
+variable "apf_bootstrap_first_name" {
+  type    = string
+  default = "APF"
+}
+variable "apf_bootstrap_last_name" {
+  type    = string
+  default = "Admin"
+}

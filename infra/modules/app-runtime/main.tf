@@ -80,6 +80,18 @@ resource "aws_instance" "this" {
     http_tokens = "required"
   }
 
+  # The data.aws_ami.amazon_linux data source resolves to "most_recent",
+  # which drifts as AWS publishes new Amazon Linux 2023 images.
+  # Without this lifecycle rule, every terraform apply would replace the
+  # instance just to pick up the new AMI — losing the public IP that's
+  # wired into Cloudflare DNS. The running instance still gets OS
+  # security updates via the dnf auto-update in user_data + systemd.
+  # When you want to rebuild on a fresh AMI, do it deliberately:
+  # remove the ignore_changes line, run apply, restore it.
+  lifecycle {
+    ignore_changes = [ami]
+  }
+
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-app"
   })

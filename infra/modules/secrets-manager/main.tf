@@ -15,5 +15,23 @@ resource "aws_secretsmanager_secret_version" "app_env" {
     APP_PORT              = tostring(var.app_port)
     ALLOWED_ORIGINS       = var.allowed_origins
     DEV_AUTH_BYPASS       = "false"
+
+    # SMTP — sourced from the SES module. The backend's
+    # EmailNotificationService reads these directly.
+    SMTP_HOST     = var.smtp_host
+    SMTP_PORT     = tostring(var.smtp_port)
+    SMTP_USE_TLS  = tostring(var.smtp_use_tls)
+    SMTP_USERNAME = var.smtp_username
+    SMTP_PASSWORD = var.smtp_password
+    SMTP_FROM     = var.smtp_from
+
+    # Bootstrap admin — used by Alembic migration 20260507_0003 to
+    # seed the first network admin, and by 20260510_0004 to bump them
+    # to platform_admin. Bringing into Terraform so reruns don't
+    # clobber the value (we previously set this via the AWS CLI; that
+    # would now be overwritten by Terraform).
+    APF_BOOTSTRAP_EMAIL      = var.apf_bootstrap_email
+    APF_BOOTSTRAP_FIRST_NAME = var.apf_bootstrap_first_name
+    APF_BOOTSTRAP_LAST_NAME  = var.apf_bootstrap_last_name
   })
 }
