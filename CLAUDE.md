@@ -1030,12 +1030,33 @@ they get prioritised.
   than from taste.
 - [ ] **E3. Case-study entry on `kouamvision.com/work/`.**
   Staffig is a KouamVision project — sign-in already brands it as
-  "STAFFIG PLATFORM by KouamVision". No standalone marketing site
-  needed (`staffig.kouamvision.com` itself is the app). All that's
-  left is a case-study entry under the parent portfolio: project
-  copy, screenshots, the "what it does / who it's for" pitch,
-  inheriting the existing KouamVision design system. Decoupled
-  from anything in this repo.
+  "STAFFIG PLATFORM by KouamVision". A case-study entry under the
+  parent portfolio: project copy, screenshots, the "what it does /
+  who it's for" pitch, inheriting the existing KouamVision design
+  system. Decoupled from anything in this repo.
+- [ ] **E4. (Optional) Standalone landing at
+  `staffig.kouamvision.com` — same pattern as
+  `korneva.kouamvision.com`.** Marketing landing page at the apex,
+  app moved to `app.staffig.kouamvision.com`. Becomes worth doing
+  if/when Staffig grows enough to want a shareable, ad-targetable
+  product URL distinct from the parent portfolio. ~20 min of
+  config once decided:
+  - Cloudflare DNS: add `app.staffig` CNAME → Vercel; keep apex
+    pointing to a separate marketing project (or KouamVision's
+    static site pipeline).
+  - Vercel: add `app.staffig.kouamvision.com` to the app project,
+    remove the apex from it; spin up a separate project (or static
+    site) for the landing.
+  - Clerk Production → Domains: add `app.staffig.kouamvision.com`;
+    update sign-in / sign-up callback URLs to the new domain.
+  - Update `ALLOWED_ORIGINS` in the prod Secrets Manager (and the
+    `allowed_origins` tfvar) to the new app domain. Backend CORS +
+    invite-email sign-in links pick this up automatically. Then
+    `make deploy-backend` so the EC2 reloads the secret.
+  - SES `noreply@staffig.kouamvision.com` keeps working — domain
+    identity is on the apex, covers all mailboxes regardless of
+    where the app lives.
+  - The marketing landing itself is separate work; not in this repo.
 
 ### Working order
 
