@@ -228,6 +228,10 @@ export async function createNetwork(payload: {
   return postJson<TenantNetwork>("/api/v1/networks", payload);
 }
 
+export async function removeNetwork(tenantId: string): Promise<TenantNetwork> {
+  return deleteJson<TenantNetwork>(`/api/v1/networks/${tenantId}`);
+}
+
 export async function inviteCoordinator(payload: {
   first_name: string;
   last_name: string;

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getNetworks, requireServerSession } from "../../../lib/api";
+import { RemoveNetworkButton } from "../../../components/remove-network-button";
 
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -18,8 +19,10 @@ function formatDate(value: string) {
 }
 
 export default async function NetworksPage() {
+  let actorUserId: string | null = null;
   if (CLERK_ENABLED) {
-    await requireServerSession(["platform_admin"]);
+    const session = await requireServerSession(["platform_admin"]);
+    actorUserId = session.id;
   }
   const networks = await getNetworks();
 
@@ -97,7 +100,7 @@ export default async function NetworksPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1.6fr 0.8fr 2fr 0.8fr 0.8fr",
+            gridTemplateColumns: "1.6fr 0.8fr 2fr 0.8fr 0.8fr 0.7fr",
             gap: 12,
             padding: "8px 14px",
             fontSize: 11,
@@ -111,6 +114,7 @@ export default async function NetworksPage() {
           <span>Network admin</span>
           <span>Created</span>
           <span>Status</span>
+          <span></span>
         </div>
 
         <div style={{ display: "grid", gap: 6 }}>
@@ -119,7 +123,7 @@ export default async function NetworksPage() {
               key={network.id}
               style={{
                 display: "grid",
-                gridTemplateColumns: "1.6fr 0.8fr 2fr 0.8fr 0.8fr",
+                gridTemplateColumns: "1.6fr 0.8fr 2fr 0.8fr 0.8fr 0.7fr",
                 gap: 12,
                 padding: "14px",
                 borderRadius: 14,
@@ -185,6 +189,18 @@ export default async function NetworksPage() {
               >
                 {network.is_active ? "Active" : "Inactive"}
               </span>
+
+              <div style={{ justifySelf: "end" }}>
+                <RemoveNetworkButton
+                  tenantId={network.id}
+                  tenantName={network.name}
+                  isActive={network.is_active}
+                  isOwnTenant={
+                    actorUserId !== null &&
+                    network.network_admin?.id === actorUserId
+                  }
+                />
+              </div>
             </div>
           ))}
 

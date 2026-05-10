@@ -548,3 +548,99 @@ def test_platform_admin_apf_view_stays_tenant_scoped(platform_admin_client, seed
     # Sanity: the response should be the seed tenant's orgs only.
     # (Seed creates one tenant and one org.)
     assert len(org_ids) == 1
+
+
+def test_removed_email_can_be_re_invited(apf_client, db_session, seed, monkeypatch):
+    """After a user is removed, the same email can be invited again."""
+    from app.auth import clerk as clerk_module
+    monkeypatch.setattr(clerk_module, 'delete_clerk_user', lambda _user_id: True)
+
+    from sqlalchemy import select
+    from app.models.user import User
+
+    # Remove the existing org_admin coordinator.
+    resp = apf_client.delete(f'/api/v1/users/{seed.org_admin.id}')
+    assert resp.status_code == 200
+
+    # The original email should be freed (the row's email was rewritten with
+    # a +removed- marker).
+    refreshed = db_session.scalar(select(User).where(User.id == seed.org_admin.id))
+    assert refreshed.is_active is False
+    assert '+removed-' in refreshed.email
+    assert not db_session.scalar(
+        select(User).where(User.email == 'orgadmin@inttest.example')
+    )
+
+    # Re-invite the same email — should succeed (not 409).
+    resp = apf_client.post('/api/v1/coordinators/invite', json={
+        'first_name': 'Org',
+        'last_name': 'Admin Reborn',
+        'email': 'orgadmin@inttest.example',
+        'phone': '+15145550010',
+        'preferred_language': 'en',
+        'org_ids': [str(seed.org.id)],
+    })
+    assert resp.status_code == 201, resp.text
+    new_user = resp.json()
+    assert new_user['email'] == 'orgadmin@inttest.example'
+    assert new_user['id'] != str(seed.org_admin.id)  # fresh row, not the old one
+
+
+def test_platform_admin_can_remove_other_network(platform_admin_client, db_session, monkeypatch):
+    from app.auth import clerk as clerk_module
+    monkeypatch.setattr(clerk_module, 'delete_clerk_user', lambda _user_id: True)
+
+    from sqlalchemy import select
+    from app.models.tenant import Tenant
+    from app.models.tenant_membership import TenantMembership
+    from app.models.user import User
+
+    suffix = uuid4().hex[:8]
+    payload = {
+        'name': f'Doomed Network {suffix}',
+        'slug': f'doomed-{suffix}',
+        'admin_first_name': 'Doomed',
+        'admin_last_name': 'Owner',
+        'admin_email': f'doomed-{suffix}@example.org',
+        'admin_preferred_language': 'en',
+    }
+    create_resp = platform_admin_client.post('/api/v1/networks', json=payload)
+    assert create_resp.status_code == 201
+    new_tenant_id = create_resp.json()['id']
+    new_admin_email = payload['admin_email']
+
+    # Sanity: new admin and tenant active.
+    new_admin = db_session.scalar(select(User).where(User.email == new_admin_email))
+    assert new_admin is not None
+    assert new_admin.is_active is True
+
+    # Remove the network.
+    del_resp = platform_admin_client.delete(f'/api/v1/networks/{new_tenant_id}')
+    assert del_resp.status_code == 200, del_resp.text
+
+    # Tenant inactive.
+    tenant = db_session.scalar(select(Tenant).where(Tenant.id == new_tenant_id))
+    assert tenant.is_active is False
+
+    # Admin deactivated, email tombstoned, original email free for re-use.
+    db_session.refresh(new_admin)
+    assert new_admin.is_active is False
+    assert '+removed-' in new_admin.email
+    assert not db_session.scalar(select(User).where(User.email == new_admin_email))
+
+    # TenantMembership for that tenant inactive.
+    memberships = db_session.scalars(
+        select(TenantMembership).where(TenantMembership.tenant_id == new_tenant_id)
+    ).all()
+    assert all(m.is_active is False for m in memberships)
+
+
+def test_platform_admin_cannot_remove_own_tenant(platform_admin_client, seed):
+    resp = platform_admin_client.delete(f'/api/v1/networks/{seed.tenant.id}')
+    assert resp.status_code == 400
+    assert 'own network' in resp.json()['detail'].lower()
+
+
+def test_network_admin_cannot_remove_network(apf_client, seed):
+    resp = apf_client.delete(f'/api/v1/networks/{seed.tenant.id}')
+    assert resp.status_code == 403

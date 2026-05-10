@@ -6,6 +6,8 @@ in Clerk separately; ``/auth/sync`` links their identity by email and
 they land scoped to their own tenant.
 """
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -55,4 +57,21 @@ def create_network(
         is_active=tenant.is_active,
         created_at=tenant.created_at,
         network_admin=TenantAdminRead.model_validate(admin),
+    )
+
+
+@router.delete('/{tenant_id}')
+def remove_network(
+    tenant_id: UUID,
+    scope: AccessScope = Depends(require_platform_admin),
+    db: Session = Depends(get_db_session),
+) -> TenantNetworkRead:
+    tenant = TenantService(db).remove_tenant(tenant_id, scope)
+    return TenantNetworkRead(
+        id=tenant.id,
+        name=tenant.name,
+        slug=tenant.slug,
+        is_active=tenant.is_active,
+        created_at=tenant.created_at,
+        network_admin=None,
     )

@@ -1,4 +1,4 @@
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy import select, update
@@ -11,6 +11,13 @@ from app.models.organization_membership import OrganizationMembership
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 from app.services.audit_service import AuditService
+
+# Marker for the email-tombstone applied on remove. The original email
+# moves to the right of this marker so the unique-by-email constraint
+# frees up for re-invitation while the audit log payload still carries
+# the original. Kept short and unambiguous so future code can still
+# parse it back if needed.
+REMOVED_EMAIL_MARKER = '+removed-'
 
 
 class UserService:
@@ -63,7 +70,16 @@ class UserService:
                     detail='Out of scope.',
                 )
 
+        original_email = target.email
         target.is_active = False
+        # Free the email for future re-invitation. Insert a unique marker
+        # in the local-part (before the '@') so the new email stays
+        # syntactically valid for EmailStr but no longer collides with the
+        # unique-by-email constraint. Original email is preserved in the
+        # audit log payload below.
+        if REMOVED_EMAIL_MARKER not in target.email:
+            local, _, domain = original_email.partition('@')
+            target.email = f'{local}{REMOVED_EMAIL_MARKER}{uuid4().hex[:12]}@{domain}'
 
         self.db.execute(
             update(TenantMembership)
@@ -87,7 +103,7 @@ class UserService:
             entity_id=target.id,
             actor_user_id=scope.user.id,
             payload={
-                'email': target.email,
+                'email': original_email,
                 'role': target.role.value,
                 'clerk_user_id': clerk_user_id,
                 'clerk_deleted': clerk_deleted,
