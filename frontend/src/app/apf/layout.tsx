@@ -49,7 +49,7 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
                 opacity: 0.7,
               }}
             >
-              APF Oversight
+              Staffig Oversight
             </p>
             <strong style={{ display: "block", marginTop: 4, fontSize: 20 }}>
               Network Visibility

@@ -18,7 +18,7 @@ export default async function OrganizationsPage() {
     <PageFrame
       eyebrow="Network Directory"
       title="Organizations"
-      description="Each organization operates independently, while APF keeps network-level visibility across sites, contacts, and language preferences."
+      description="Each organization operates independently, while Staffig keeps network-level visibility across sites, contacts, and language preferences."
     >
       <Panel title="Active organizations" subtitle={`${organizations.length} listed`}>
         <div style={{ display: "grid", gap: 16 }}>

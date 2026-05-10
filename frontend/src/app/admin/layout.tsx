@@ -47,7 +47,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 textTransform: "uppercase",
               }}
             >
-              APF Staffing Platform
+              STAFFIG PLATFORM
             </p>
             <strong style={{ display: "block", marginTop: 4, fontSize: 20 }}>
               Operations Console

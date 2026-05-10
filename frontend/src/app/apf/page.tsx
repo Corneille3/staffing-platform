@@ -70,7 +70,7 @@ export default async function ApfHomePage() {
           Network-wide staffing health.
         </h1>
         <p style={{ margin: 0, maxWidth: 720, opacity: 0.72, lineHeight: 1.55 }}>
-          Aggregate visibility across every APF-affiliated organization. Read-only metrics for
+          Aggregate visibility across every Staffig-affiliated organization. Read-only metrics for
           oversight, accountability, and pattern detection — not for day-to-day dispatch.
         </p>
       </section>
@@ -261,7 +261,7 @@ export default async function ApfHomePage() {
       )}
 
       <p style={{ marginTop: 32, opacity: 0.45, fontSize: 13 }}>
-        APF oversight surface · read-only · D2 Substitute Pool + D3 Activity History coming next.
+        Staffig oversight surface · read-only · D2 Substitute Pool + D3 Activity History coming next.
       </p>
     </main>
   );

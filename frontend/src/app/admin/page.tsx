@@ -13,7 +13,7 @@ export default async function AdminDashboardPage() {
 
   return (
     <PageFrame
-      eyebrow="APF Network Pilot"
+      eyebrow="Staffig Network"
       title="Coverage operations in one view."
       description="Local substitute dispatch is running end to end: coverage requests, substitute responses, assignments, and reporting are all coming from the live FastAPI backend."
     >

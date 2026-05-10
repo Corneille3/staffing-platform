@@ -35,17 +35,17 @@ class WorkerService:
 
     def _send_invite_email(self, user: User) -> None:
         portal_url = self._portal_url()
-        subject = '[APF] Invitation to join the substitute pool'
+        subject = '[Staffig] Invitation to join the substitute pool'
         body = (
             f'Bonjour {user.first_name},\n\n'
-            f'You have been invited to join the APF substitute pool.\n\n'
-            f'Sign in or create your Clerk account with this email address:\n'
+            f'You have been invited to join the Staffig substitute pool.\n\n'
+            f'Sign in or create your Staffig account with this email address:\n'
             f'{portal_url}/sign-in\n\n'
             f'After sign-in, you will be prompted to complete your profile.\n'
             f'\n---\n\n'
             f'Hello {user.first_name},\n\n'
-            f'You have been invited to join the APF substitute pool.\n\n'
-            f'Sign in or create your Clerk account with this email address:\n'
+            f'You have been invited to join the Staffig substitute pool.\n\n'
+            f'Sign in or create your Staffig account with this email address:\n'
             f'{portal_url}/sign-in\n\n'
             f'After sign-in, you will be prompted to complete your profile.\n'
         )

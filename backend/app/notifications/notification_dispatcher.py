@@ -38,7 +38,7 @@ def _body_new_request(worker: User, request: StaffingRequest, org_name: str) -> 
         f'Heure       : {start} – {end}\n'
         f'Lieu        : {location}\n'
         f'Organisation: {org_name}\n\n'
-        f'Connectez-vous à la plateforme APF pour accepter ou refuser cette demande.\n'
+        f'Connectez-vous à la plateforme Staffig pour accepter ou refuser cette demande.\n'
         f'\n---\n\n'
         f'Hello {worker.first_name},\n\n'
         f'A new coverage request is available.\n\n'
@@ -47,7 +47,7 @@ def _body_new_request(worker: User, request: StaffingRequest, org_name: str) -> 
         f'Time        : {start} – {end}\n'
         f'Location    : {location}\n'
         f'Organization: {org_name}\n\n'
-        f'Sign in to the APF platform to accept or decline this request.\n'
+        f'Sign in to the Staffig platform to accept or decline this request.\n'
     )
 
 
@@ -94,11 +94,11 @@ def _body_assignment_cancelled(worker: User, request: StaffingRequest) -> str:
     return (
         f'Bonjour {worker.first_name},\n\n'
         f'Votre affectation pour « {request.title} » le {request.work_date} a été annulée.\n\n'
-        f'Connectez-vous à la plateforme APF pour voir les demandes disponibles.\n'
+        f'Connectez-vous à la plateforme Staffig pour voir les demandes disponibles.\n'
         f'\n---\n\n'
         f'Hello {worker.first_name},\n\n'
         f'Your assignment for "{request.title}" on {request.work_date} has been cancelled.\n\n'
-        f'Sign in to the APF platform to browse available requests.\n'
+        f'Sign in to the Staffig platform to browse available requests.\n'
     )
 
 
@@ -107,7 +107,7 @@ def _body_assignment_cancelled(worker: User, request: StaffingRequest) -> str:
 def _sms_new_request(worker: User, request: StaffingRequest) -> str:
     start = _fmt_time(request.start_time)
     return (
-        f'[APF] {worker.first_name}: nouveau remplacement / new coverage — '
+        f'[Staffig] {worker.first_name}: nouveau remplacement / new coverage — '
         f'{request.title} le/on {request.work_date} à/at {start} ({request.city}). '
         f'Connectez-vous / Sign in to respond.'
     )
@@ -117,14 +117,14 @@ def _sms_assignment_confirmed(worker: User, request: StaffingRequest) -> str:
     start = _fmt_time(request.start_time)
     contact = f' Contact: {request.contact_name}' if request.contact_name else ''
     return (
-        f'[APF] {worker.first_name}: affectation confirmée / assignment confirmed — '
+        f'[Staffig] {worker.first_name}: affectation confirmée / assignment confirmed — '
         f'{request.title} {request.work_date} {start} ({request.city}).{contact}'
     )
 
 
 def _sms_assignment_cancelled(worker: User, request: StaffingRequest) -> str:
     return (
-        f'[APF] {worker.first_name}: affectation annulée / assignment cancelled — '
+        f'[Staffig] {worker.first_name}: affectation annulée / assignment cancelled — '
         f'{request.title} {request.work_date}. '
         f'Connectez-vous / Sign in for available coverage.'
     )
@@ -164,7 +164,7 @@ class NotificationDispatcher:
         if not workers:
             return
         org_name = _org_name(self.db, request)
-        subject = f'[APF] Nouveau remplacement : {request.title} / New coverage: {request.title}'
+        subject = f'[Staffig] Nouveau remplacement : {request.title} / New coverage: {request.title}'
         for worker in workers:
             self._send_to_worker(
                 worker,
@@ -175,7 +175,7 @@ class NotificationDispatcher:
 
     def notify_assignment_confirmed(self, request: StaffingRequest, worker: User) -> None:
         org_name = _org_name(self.db, request)
-        subject = f'[APF] Affectation confirmée : {request.title} / Assignment confirmed: {request.title}'
+        subject = f'[Staffig] Affectation confirmée : {request.title} / Assignment confirmed: {request.title}'
         self._send_to_worker(
             worker,
             subject=subject,
@@ -184,7 +184,7 @@ class NotificationDispatcher:
         )
 
     def notify_assignment_cancelled(self, request: StaffingRequest, worker: User) -> None:
-        subject = f'[APF] Affectation annulée : {request.title} / Assignment cancelled: {request.title}'
+        subject = f'[Staffig] Affectation annulée : {request.title} / Assignment cancelled: {request.title}'
         self._send_to_worker(
             worker,
             subject=subject,

@@ -48,7 +48,7 @@ export default async function SubstitutePoolPage() {
         </h1>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
           <p style={{ margin: 0, maxWidth: 640, opacity: 0.72, lineHeight: 1.55 }}>
-            Every substitute registered across the APF network — availability status, coverage cities,
+            Every substitute registered across the Staffig network — availability status, coverage cities,
             qualifications, and assignment utilization at a glance.
           </p>
           <Link
@@ -254,7 +254,7 @@ export default async function SubstitutePoolPage() {
       </div>
 
       <p style={{ marginTop: 32, opacity: 0.45, fontSize: 13 }}>
-        APF oversight surface · read-only · D3 Activity History coming next.
+        Staffig oversight surface · read-only · D3 Activity History coming next.
       </p>
     </main>
   );

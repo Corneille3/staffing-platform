@@ -32,7 +32,7 @@ export default function NotInvitedPage() {
             color: "#5d6d66",
           }}
         >
-          APF Staffing Platform
+          STAFFIG PLATFORM
         </p>
         <h1 style={{ margin: "10px 0 12px", fontSize: 30 }}>
           Account not invited
@@ -45,10 +45,10 @@ export default function NotInvitedPage() {
             color: "#3d564c",
           }}
         >
-          The email you just signed in with is not associated with an APF
-          Staffing account. Access is granted by invitation only — please
-          contact your network administrator to be added, or sign in with a
-          different email.
+          The email you just signed in with is not associated with a Staffig
+          account. Access is granted by invitation only — please contact your
+          network administrator to be added, or sign in with a different
+          email.
         </p>
         <p
           style={{
@@ -59,9 +59,9 @@ export default function NotInvitedPage() {
           }}
         >
           Le courriel utilisé pour vous connecter n&apos;est pas associé à un
-          compte APF. L&apos;accès est sur invitation seulement — communiquez
-          avec votre administrateur réseau, ou connectez-vous avec un autre
-          courriel.
+          compte Staffig. L&apos;accès est sur invitation seulement —
+          communiquez avec votre administrateur réseau, ou connectez-vous
+          avec un autre courriel.
         </p>
         <Link
           href="/sign-in"

@@ -271,7 +271,7 @@ export default async function ActivityPage() {
       </div>
 
       <p style={{ marginTop: 40, opacity: 0.45, fontSize: 13 }}>
-        APF oversight surface · read-only · Phase D complete.
+        Staffig oversight surface · read-only · Phase D complete.
       </p>
     </main>
   );

@@ -32,19 +32,19 @@ class CoordinatorService:
     def _send_invite_email(self, user: User, orgs: list[Organization]) -> None:
         portal_url = self._portal_url()
         org_names = ', '.join(org.name for org in orgs) if orgs else 'your assigned organization(s)'
-        subject = f'[APF] Invitation to coordinate {org_names}'
+        subject = f'[Staffig] Invitation to coordinate {org_names}'
         body = (
             f'Bonjour {user.first_name},\n\n'
             f'You have been invited as a coordinator for {org_names}.\n\n'
-            f'Sign in or create your Clerk account with this email address:\n'
+            f'Sign in or create your Staffig account with this email address:\n'
             f'{portal_url}/sign-in\n\n'
-            f'When you sign in, the platform will link your account to the assigned APF role automatically.\n'
+            f'When you sign in, the platform will link your account to your assigned role automatically.\n'
             f'\n---\n\n'
             f'Hello {user.first_name},\n\n'
             f'You have been invited as a coordinator for {org_names}.\n\n'
-            f'Sign in or create your Clerk account with this email address:\n'
+            f'Sign in or create your Staffig account with this email address:\n'
             f'{portal_url}/sign-in\n\n'
-            f'When you sign in, the platform will link your account to the assigned APF role automatically.\n'
+            f'When you sign in, the platform will link your account to your assigned role automatically.\n'
         )
         self.email.send(EmailMessage(to_email=user.email, subject=subject, body=body))
 

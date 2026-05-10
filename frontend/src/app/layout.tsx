@@ -5,8 +5,8 @@ import { RoleProvider } from "../lib/role-context";
 import { RoleSwitcher } from "../components/role-switcher";
 
 export const metadata: Metadata = {
-  title: "APF Staffing Platform",
-  description: "APF bilingual substitute dispatch",
+  title: "Staffig",
+  description: "Staffig — bilingual substitute dispatch",
 };
 
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
