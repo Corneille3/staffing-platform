@@ -5,13 +5,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
-from app.auth.permissions import require_admin
+from app.auth.permissions import require_admin, require_network_admin
 from app.auth.scope import AccessScope, get_access_scope
 from app.models.enums import UserRole
 from app.models.organization_membership import OrganizationMembership
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 from app.schemas.user import UserRead
+from app.services.user_service import UserService
 
 router = APIRouter(dependencies=[Depends(require_admin)])
 
@@ -35,6 +36,16 @@ def get_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
     return UserRead.model_validate(user)
+
+
+@router.delete('/{user_id}', dependencies=[Depends(require_network_admin)])
+def remove_user(
+    user_id: UUID,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> UserRead:
+    target = UserService(db).remove(user_id, scope)
+    return UserRead.model_validate(target)
 
 
 def _list_users_for_scope(db: Session, scope: AccessScope) -> list[User]:

@@ -31,6 +31,11 @@ def sync_current_user(
     """
     existing = db.scalar(select(User).where(User.clerk_user_id == current_user.sub))
     if existing is not None:
+        if not existing.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail='Account has been deactivated.',
+            )
         return existing
 
     email = current_user.email or primary_email(fetch_user_details(current_user.sub))
@@ -45,6 +50,11 @@ def sync_current_user(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail='Not invited. Contact your network administrator to be added.',
+        )
+    if not by_email.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='Account has been deactivated.',
         )
 
     by_email.clerk_user_id = current_user.sub

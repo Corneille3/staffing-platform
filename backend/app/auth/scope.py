@@ -72,6 +72,12 @@ def get_access_scope(
             detail='User not provisioned. Call POST /api/v1/auth/sync first.',
         )
 
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='Account has been deactivated.',
+        )
+
     role = user.role.value
 
     if role == ROLE_PLATFORM_ADMIN:

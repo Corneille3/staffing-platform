@@ -375,3 +375,65 @@ def test_auth_sync_preserves_invited_user_role_when_clerk_role_missing(db_sessio
     user = db_session.scalar(select(User).where(User.clerk_user_id == 'missing-role-user'))
     assert user is not None
     assert user.role.value == 'org_admin'
+
+
+# ── user removal ──────────────────────────────────────────────────────────────
+
+def test_apf_can_remove_coordinator_in_tenant(apf_client, db_session, seed, monkeypatch):
+    from app.auth import clerk as clerk_module
+    monkeypatch.setattr(clerk_module, 'delete_clerk_user', lambda _user_id: True)
+
+    from sqlalchemy import select
+    from app.models.organization_membership import OrganizationMembership
+    from app.models.tenant_membership import TenantMembership
+    from app.models.user import User
+
+    target_id = str(seed.org_admin.id)
+    resp = apf_client.delete(f'/api/v1/users/{target_id}')
+
+    assert resp.status_code == 200
+    refreshed = db_session.scalar(select(User).where(User.id == seed.org_admin.id))
+    assert refreshed.is_active is False
+
+    tenant_membership_active = db_session.scalar(
+        select(TenantMembership.is_active).where(TenantMembership.user_id == seed.org_admin.id)
+    )
+    assert tenant_membership_active is False
+
+    org_membership_active = db_session.scalar(
+        select(OrganizationMembership.is_active).where(
+            OrganizationMembership.user_id == seed.org_admin.id,
+        )
+    )
+    if org_membership_active is not None:
+        assert org_membership_active is False
+
+
+def test_remove_user_blocks_self_removal(apf_client, seed):
+    resp = apf_client.delete(f'/api/v1/users/{seed.apf.id}')
+    assert resp.status_code == 400
+    assert 'own account' in resp.json()['detail'].lower()
+
+
+def test_remove_user_blocks_org_admin(org_admin_client, seed):
+    resp = org_admin_client.delete(f'/api/v1/users/{seed.worker_a.id}')
+    # require_network_admin gate: org_admin not allowed to remove anyone.
+    assert resp.status_code == 403
+
+
+def test_inactive_user_auth_sync_returns_403(apf_client, db_session, seed):
+    seed.apf.is_active = False
+    db_session.flush()
+
+    resp = apf_client.post('/api/v1/auth/sync')
+    assert resp.status_code == 403
+    assert 'deactivated' in resp.json()['detail'].lower()
+
+
+def test_inactive_user_blocked_from_admin_endpoints(apf_client, db_session, seed):
+    seed.apf.is_active = False
+    db_session.flush()
+
+    resp = apf_client.get('/api/v1/organizations')
+    assert resp.status_code == 403
+    assert 'deactivated' in resp.json()['detail'].lower()

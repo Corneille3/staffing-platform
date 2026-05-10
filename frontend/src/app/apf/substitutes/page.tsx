@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getAssignments, getWorkers } from "../../../lib/api";
 import { Assignment, Worker } from "../../../lib/types";
+import { RemoveUserButton } from "../../../components/remove-user-button";
 
 const LANG_LABEL: Record<string, string> = { fr: "FR", en: "EN", bilingual: "Bilingual" };
 
@@ -103,7 +104,7 @@ export default async function SubstitutePoolPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1.6fr 0.7fr 1.2fr 1.6fr 1.6fr 0.9fr",
+            gridTemplateColumns: "1.6fr 0.7fr 1.2fr 1.6fr 1.6fr 0.9fr 0.7fr",
             gap: 12,
             padding: "8px 14px",
             fontSize: 11,
@@ -118,6 +119,7 @@ export default async function SubstitutePoolPage() {
           <span>Cities</span>
           <span>Qualifications</span>
           <span>Utilization</span>
+          <span></span>
         </div>
 
         <div style={{ display: "grid", gap: 6 }}>
@@ -130,7 +132,7 @@ export default async function SubstitutePoolPage() {
                 key={worker.id}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1.6fr 0.7fr 1.2fr 1.6fr 1.6fr 0.9fr",
+                  gridTemplateColumns: "1.6fr 0.7fr 1.2fr 1.6fr 1.6fr 0.9fr 0.7fr",
                   gap: 12,
                   padding: "14px 14px",
                   borderRadius: 14,
@@ -231,6 +233,15 @@ export default async function SubstitutePoolPage() {
                   {active > 0 && (
                     <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>{active} active</div>
                   )}
+                </div>
+
+                {/* Remove */}
+                <div style={{ justifySelf: "end" }}>
+                  <RemoveUserButton
+                    userId={worker.id}
+                    userName={`${worker.first_name} ${worker.last_name}`}
+                    isActive={worker.is_active}
+                  />
                 </div>
               </div>
             );

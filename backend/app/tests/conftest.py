@@ -125,6 +125,11 @@ def seed(db_session) -> SimpleNamespace:
     db_session.add(TenantMembership(
         id=uuid4(), user_id=apf.id, tenant_id=tenant.id, role=UserRole.NETWORK_ADMIN,
     ))
+    # Mirror production: CoordinatorService.invite() creates a TenantMembership
+    # alongside the per-org OrganizationMembership(s).
+    db_session.add(TenantMembership(
+        id=uuid4(), user_id=org_admin.id, tenant_id=tenant.id, role=UserRole.ORG_ADMIN,
+    ))
     db_session.add(OrganizationMembership(
         id=uuid4(), user_id=org_admin.id, organization_id=org.id,
         role=UserRole.ORG_ADMIN, is_active=True,

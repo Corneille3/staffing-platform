@@ -46,6 +46,18 @@ async function postJson<T>(path: string, body?: object): Promise<T> {
   return response.json();
 }
 
+async function deleteJson<T>(path: string): Promise<T> {
+  const response = await fetch(`${BASE}${path}`, {
+    method: "DELETE",
+    headers: await authHeaders(),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `DELETE ${path} failed (${response.status})`);
+  }
+  return response.json();
+}
+
 async function patchJson<T>(path: string, body: object): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
     method: "PATCH",
@@ -159,6 +171,10 @@ export async function inviteWorker(payload: {
   preferred_language?: string;
 }): Promise<Worker> {
   return postJson<Worker>("/api/v1/workers/invite", payload);
+}
+
+export async function removeUser(userId: string): Promise<{ id: string; is_active: boolean }> {
+  return deleteJson<{ id: string; is_active: boolean }>(`/api/v1/users/${userId}`);
 }
 
 export async function fetchOrganizationsForTenant(): Promise<Organization[]> {

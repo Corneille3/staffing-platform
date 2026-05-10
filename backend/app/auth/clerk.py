@@ -133,6 +133,31 @@ def fetch_user_details(user_id: str) -> dict:
         return {}
 
 
+def delete_clerk_user(user_id: str) -> bool:
+    """Delete a Clerk user via the Backend API.
+
+    Returns True on success (or no-op when ``clerk_secret_key`` is not
+    configured — local dev case). Returns False on a real failure so
+    callers can decide whether to surface it. Soft-deleting the DB row
+    is the source of truth; the Clerk delete is a best-effort cleanup
+    so the deactivated user can't continue using their existing Clerk
+    session.
+    """
+    if not settings.clerk_secret_key:
+        return True
+    try:
+        response = httpx.delete(
+            f'https://api.clerk.com/v1/users/{user_id}',
+            headers={'Authorization': f'Bearer {settings.clerk_secret_key}'},
+            timeout=5.0,
+        )
+        if response.status_code in (200, 204, 404):
+            return True
+        return False
+    except httpx.HTTPError:
+        return False
+
+
 def primary_email(details: dict) -> str | None:
     primary_id = details.get('primary_email_address_id')
     addresses = details.get('email_addresses') or []

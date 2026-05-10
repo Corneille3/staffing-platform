@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCoordinators } from "../../../lib/api";
+import { RemoveUserButton } from "../../../components/remove-user-button";
 
 const LANG_LABEL: Record<string, string> = { fr: "FR", en: "EN", bilingual: "Bilingual" };
 
@@ -38,11 +39,12 @@ export default async function CoordinatorsPage() {
           <span style={{ fontSize: 13, opacity: 0.55 }}>{coordinators.length} records</span>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1.8fr 0.6fr 2.4fr 0.8fr", gap: 12, padding: "8px 14px", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", opacity: 0.5 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.8fr 0.6fr 2.4fr 0.8fr 0.7fr", gap: 12, padding: "8px 14px", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", opacity: 0.5 }}>
           <span>Name</span>
           <span>Lang</span>
           <span>Assigned organizations</span>
           <span>Status</span>
+          <span></span>
         </div>
 
         <div style={{ display: "grid", gap: 6 }}>
@@ -50,7 +52,7 @@ export default async function CoordinatorsPage() {
             <div
               key={coord.id}
               style={{
-                display: "grid", gridTemplateColumns: "1.8fr 0.6fr 2.4fr 0.8fr", gap: 12,
+                display: "grid", gridTemplateColumns: "1.8fr 0.6fr 2.4fr 0.8fr 0.7fr", gap: 12,
                 padding: "14px", borderRadius: 14, alignItems: "center",
                 background: "rgba(247,240,223,0.03)", border: "1px solid rgba(247,240,223,0.06)",
               }}
@@ -89,6 +91,14 @@ export default async function CoordinatorsPage() {
               }}>
                 {coord.is_active ? "Active" : "Inactive"}
               </span>
+
+              <div style={{ justifySelf: "end" }}>
+                <RemoveUserButton
+                  userId={coord.id}
+                  userName={`${coord.first_name} ${coord.last_name}`}
+                  isActive={coord.is_active}
+                />
+              </div>
             </div>
           ))}
 
