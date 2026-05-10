@@ -28,7 +28,96 @@ close-and-reopen the IDE" troubleshooting from prior sessions — the disk
 state is authoritative.
 
 **Last shipped (most recent first):**
-1. **DB-owns-roles architecture, fully deployed and partially verified live.**
+1. **Lifecycle management, multi-tenant onboarding, and outbound email
+   via AWS SES.** Platform admin can now create + remove tenants from
+   the UI, the in-app invite endpoints actually deliver email, and the
+   "removed user blocks the email" wart is gone. Verified live
+   2026-05-10 (coordinator-invite email delivered to a verified
+   Gmail+alias inbox; full operator flow walked through earlier in
+   the same session).
+
+   **Multi-tenant onboarding (Option A)**: `POST /api/v1/networks`
+   (gated `require_platform_admin`) creates Tenant + first
+   network_admin + TenantMembership atomically. New UI at
+   `/apf/networks` (list with Remove buttons) and `/apf/networks/new`
+   (form). "Networks" nav item conditionally rendered when
+   `session.role === "platform_admin"`. `AccessScope` change
+   ("Option ii"): platform_admin behaves as network_admin-of-their-
+   primary-tenant for day-to-day queries; only the new
+   `/apf/networks` and `/api/v1/networks` are platform-only.
+   Migration `20260510_0004` bumps the `APF_BOOTSTRAP_EMAIL` user to
+   `platform_admin`.
+
+   **User removal**: `DELETE /api/v1/users/{id}` (network_admin /
+   platform_admin) soft-deletes the user, cascades all memberships
+   inactive, and best-effort deletes the Clerk identity. Email is
+   tombstoned (`+removed-<short-uuid>` marker in the local-part) so
+   the address is free for re-invitation without violating the
+   unique constraint. Migration `20260510_0005` retroactively
+   tombstones inactive rows already in the DB.
+
+   **Tenant removal**: `DELETE /api/v1/networks/{tenant_id}`
+   (platform_admin only) cascades the same to every active member of
+   the tenant + sets `Tenant.is_active=False`. Refuses to remove a
+   tenant the actor is a member of (prevents self-lockout). UI:
+   Remove pill on each `/apf/networks` row except your own
+   ("your network" placeholder).
+
+   **Orphan user cleanup**: `POST /api/v1/users/remove-by-email`
+   (platform_admin only) handles users whose email is in the DB but
+   who don't appear in any management listing (typical leftover from
+   the pre-DB-owns-roles `/auth/sync` JIT-create path). UI:
+   collapsible "Force-remove orphan user" section at the bottom of
+   `/apf/networks`.
+
+   **Outbound email via AWS SES** (replaces the silent-skip
+   placeholder):
+   - `infra/modules/ses` provisions the domain identity, DKIM, and
+     an IAM user whose access key's `ses_smtp_password_v4` attribute
+     is the SMTP password.
+   - `infra/modules/secrets-manager` now also feeds
+     `SMTP_HOST/PORT/USE_TLS/USERNAME/PASSWORD/FROM` into the prod
+     secret. Backend's existing `EmailNotificationService` picks
+     them up.
+   - `infra/environments/prod/terraform.tfvars` sets
+     `ses_domain_name`, `ses_mail_from_address`, plus the bootstrap
+     admin keys (now Terraform-managed; previously set out-of-band
+     via `aws secretsmanager update-secret`).
+   - SES domain `staffig.kouamvision.com` verified in
+     `ca-central-1` via 3 DKIM CNAMEs added to Cloudflare (DNS-only,
+     not orange-proxied — the proxy breaks DKIM signature
+     verification).
+   - **SES sandbox**: until production access is granted (request
+     submitted via the AWS console; ~24–48h turnaround), only
+     recipient addresses pre-verified via
+     `aws sesv2 create-email-identity` actually receive mail. The
+     backend logs "skipped" on rejected sends; the invite endpoint
+     still returns 201 (DB row is created either way).
+
+   **Listing audit visibility**: `/apf/coordinators` and
+   `/apf/substitutes` now include inactive members (rendered with a
+   muted "removed" tag instead of the action button). The substitute
+   page overrides the availability badge to "Removed" for inactive
+   workers and excludes them from the summary counters
+   ("Available now", etc.).
+
+   **Operational hardening**:
+   - `scripts/deploy-backend.sh` + `make deploy-backend` for one-
+     command manual deploys. Two-phase polling waits for the origin
+     to go down then come back up, then verifies the new image via
+     a known-route check on `/openapi.json`. Polls the direct EC2 IP
+     (Cloudflare can serve stale 5xx during restart and confused
+     earlier deploys).
+   - `infra/modules/app-runtime` adds
+     `lifecycle.ignore_changes = [ami]` to `aws_instance.this`.
+     `data.aws_ami.amazon_linux` is `most_recent=true`, which would
+     otherwise replace the EC2 every apply just to pick up a new
+     Amazon Linux 2023 image (losing the public IP wired into
+     Cloudflare DNS).
+   - Worker session 401 race fix: `WorkerSessionProvider` now
+     defers `fetchWorkers()` until `useAuth().isLoaded` is true.
+
+2. **DB-owns-roles architecture, fully deployed and partially verified live.**
    Clerk is now strictly an identity layer; DB rows are the source of truth
    for roles and memberships. After the one-time bootstrap, every user must
    be pre-created via an invite endpoint before they can sign in. See the
@@ -240,28 +329,44 @@ state is authoritative.
 9. `POST /auth/sync` — Clerk → DB user link/provision flow
 
 **Top remaining gaps** (see "Known gaps" section for the full list):
-1. **SMTP not configured in prod.** Invite emails (coordinator + worker)
-   and notification emails (request published, worker accepted, assignment
-   confirmed/cancelled) are silently skipped — `EmailNotificationService`
-   logs and returns `delivery_status: skipped` when `settings.smtp_host`
-   is empty, which it is in the prod Secrets Manager. Pick AWS SES,
-   Resend/Postmark/SendGrid, or Gmail SMTP and add `SMTP_HOST/PORT/FROM/
-   USERNAME/PASSWORD/USE_TLS` to the prod Secrets Manager. Without this,
-   invites only work if you tell the invitee out-of-band.
-2. **End-to-end operator-flow not exercised in prod.** Phases 1-6 of the
-   test plan (APF sign-in → org create → coordinator invite → coordinator
-   sign-up → request create + publish) are verified live. Phases 7-8
-   (worker invite → worker sign-up/onboard → match → accept → assign →
-   cancel) are pending. See "End-to-end operator-flow test plan" below.
+1. **SES sandbox release pending.** Domain + SMTP creds are wired and
+   verified; emails fire correctly, but in the ca-central-1 sandbox
+   only pre-verified recipients receive them. Production-access
+   request was submitted via the AWS console — typical turnaround
+   24–48h. While it's pending, verify each test recipient via
+   `aws sesv2 create-email-identity --region ca-central-1
+   --email-identity <email>` and have them click the AWS verification
+   link.
+2. **Final round of full end-to-end testing pending** (post-SES
+   production-access). Once arbitrary recipient addresses can receive
+   email, walk the operator chain again with real coordinator and
+   substitute invitees getting their actual invitation emails, then
+   accept / assign / cancel and verify each notification lands. The
+   pre-SES walkthrough on 2026-05-10 covered everything except real
+   email delivery.
 3. **GitHub Actions deploy secrets unset.** `AWS_ACCESS_KEY_ID`,
    `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `ECR_REPOSITORY_URL`,
    `EC2_INSTANCE_ID`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
-   Until set, every backend deploy is manual. See "Manual deploy
-   procedure" below.
-4. **SSM agent never registered for `i-04a60b0aaf80c1528`.**
+   Until set, every backend deploy is manual via
+   `make deploy-backend`.
+4. **SMS notifications not wired (Twilio credentials missing).**
+   Real product gap, not just nice-to-have — substitutes check SMS
+   far more reliably than email, and the same-day-urgent coverage
+   path lives or dies on response latency. `SmsNotificationService`
+   already calls the Twilio REST API via `httpx`; it skips
+   gracefully when `TWILIO_ACCOUNT_SID` is empty.
+   `NotificationDispatcher._send_to_worker()` already fires SMS
+   alongside email when `worker.phone` is set, and
+   `WorkerProfile.urgent_alert_opt_in` exists as the consent toggle.
+   To turn on: provision a Twilio account (or AWS SNS as the
+   AWS-native alternative), add the credentials to the prod
+   Secrets Manager, and re-deploy. ~30 min of work end-to-end once
+   the provider is chosen.
+5. **SSM agent never registered for `i-04a60b0aaf80c1528`.**
    `aws ssm send-command` returns `InvalidInstanceId`. Workaround:
    `aws ec2 reboot-instances` to roll a new image (the systemd unit
-   pulls `:latest` on every start). Long-term: debug the SSM agent or
+   pulls `:latest` on every start) — already encoded in
+   `scripts/deploy-backend.sh`. Long-term: debug the agent or
    replace the instance.
 5. **HTTPS hardening.** Currently Cloudflare Flexible SSL (encrypted
    client→Cloudflare, plain HTTP Cloudflare→EC2). Long-term: nginx +
@@ -682,42 +787,57 @@ initial migration directly — do not stack compatibility migrations.
 - Worker onboarding: invite (network admin) → `/worker/onboarding` (worker),
   redirect gate in worker layout when `profile === null`
 - Production onboarding hardening: first network_admin tenant bootstrap via
-  `/auth/sync`; invited DB roles preserved unless Clerk sends an explicit
-  valid role claim; production routing uses the synced DB role; dev role/worker
+  Alembic migration `20260507_0003`; invited DB roles preserved (no Clerk
+  metadata reads); production routing uses the synced DB role; dev role/worker
   overrides hidden in production; request creation is authenticated and scoped;
   `/users` is scoped by caller
-- SMS notifications via Twilio/httpx (skips when credentials absent)
-- Clerk auth verified end-to-end locally: sign-in → JWT verified → role-scoped
-  APF surface accessible. Test keys active; production keys pending.
+- Multi-tenant onboarding (Option A): platform_admin creates tenants from
+  `/apf/networks/new` (UI gated to `platform_admin` only). Each tenant is
+  fully isolated by tenant_id; new admin signs up via Clerk → `/auth/sync`
+  links → lands scoped to their own tenant.
+- User and tenant removal: `DELETE /api/v1/users/{id}` (network/platform
+  admin) and `DELETE /api/v1/networks/{id}` (platform admin only) cascade-
+  deactivate memberships, delete the Clerk identity, and tombstone the
+  email so the address is free for re-invitation. UI buttons on
+  `/apf/coordinators`, `/apf/substitutes`, and `/apf/networks`. Orphan
+  cleanup tool at the bottom of `/apf/networks` for users not visible in
+  any management list.
+- Outbound email via AWS SES (verified domain `staffig.kouamvision.com`,
+  ca-central-1 sandbox until production access is granted). All four
+  email triggers fire: coordinator/worker invite, request published,
+  assignment confirmed, assignment cancelled.
+- SMS notifications via Twilio/httpx (skips when credentials absent —
+  not yet wired in prod)
+- Clerk auth in production: sign-in → JWT verified → role-scoped APF
+  surface accessible.
 - Real CI across all 6 GitHub workflows (pytest + tsc + next build + terraform)
-- `pytest` (46/46) and `tsc --noEmit` pass
+- `pytest` (67/67) and `tsc --noEmit` pass
+- One-command manual deploy via `make deploy-backend` (build → push to
+  ECR → reboot EC2 → poll direct IP → verify new image)
 
 ## Known gaps (be aware of these before suggesting fixes)
 
-1. **Operator-flow phases 7-8 not exercised in prod.** Phases 1-6 of the
-   end-to-end test plan (APF sign-in → org create → coordinator invite →
-   coordinator sign-up → request create/publish) are verified live.
-   Worker invite/sign-up/onboard → match → accept → assign → cancel are
-   pending — see "End-to-end operator-flow test plan" above.
-2. **SMTP not configured in prod.** Invite emails (coordinator + worker)
-   and notification emails (publish, accept, assign, cancel) are silently
-   skipped because `settings.smtp_host` is empty in the prod Secrets
-   Manager. Pick AWS SES / Resend / Postmark / SendGrid / Gmail SMTP and
-   add `SMTP_HOST/PORT/FROM/USERNAME/PASSWORD/USE_TLS`. Until then,
-   tell invitees out-of-band.
-3. **No platform admin surface.** Creating additional tenants and
-   assigning tenant-specific network admins is still a manual DB step
-   (or a tweak to `APF_BOOTSTRAP_EMAIL` + re-running migrations). The
-   `platform_admin` role exists but has no UI.
+1. **Final post-SES end-to-end pass pending.** The full operator
+   chain (multi-tenant onboarding → org create → coordinator invite →
+   coordinator sign-up → substitute invite → substitute onboarding →
+   request publish → accept → assign → cancel) was walked through on
+   2026-05-10 with the email side silently skipped. After SES
+   production access is granted, repeat the chain with real recipient
+   addresses and verify each notification email lands.
+2. **SES sandbox release pending.** Production-access request was
+   submitted to AWS for the ca-central-1 SES account. Until approved
+   (~24–48h), only pre-verified recipient addresses receive mail —
+   verify each test recipient via `aws sesv2 create-email-identity
+   --region ca-central-1 --email-identity <email>`.
 4. **Backend JWT verification falls back to unverified claims** when
    `CLERK_JWKS_URL` is empty (local dev without Clerk). That fallback
    exists by design — prod must always have the JWKS URL set.
-5. **SMS needs Twilio credentials.** `SmsNotificationService` calls the
-   Twilio REST API via `httpx` and skips gracefully when
-   `TWILIO_ACCOUNT_SID` is empty. Wire up real keys in prod env.
-6. **SSM agent unregistered** for `i-04a60b0aaf80c1528` —
+5. **SSM agent unregistered** for `i-04a60b0aaf80c1528` —
    `aws ssm send-command` returns `InvalidInstanceId`. Backend deploys
    currently use `aws ec2 reboot-instances` instead.
+
+(SMS notifications — see "Top remaining gaps" #4. Marked as a real
+product priority since substitute response latency depends on it.)
 
 ## Implementation roadmap (Implementation-idea.md alignment)
 
