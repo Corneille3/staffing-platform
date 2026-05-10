@@ -23,18 +23,25 @@ export default async function SubstitutePoolPage() {
   const enriched = workers
     .map((w) => ({ worker: w, ...activeLabel(w, assignments) }))
     .sort((a, b) => {
-      // Available first, then by assignment count desc
+      // Active before removed, then available before unavailable, then
+      // by assignment count desc.
+      const aActive = a.worker.is_active ? 0 : 1;
+      const bActive = b.worker.is_active ? 0 : 1;
+      if (aActive !== bActive) return aActive - bActive;
       const aAvail = a.worker.profile?.availability_status === "available" ? 0 : 1;
       const bAvail = b.worker.profile?.availability_status === "available" ? 0 : 1;
       if (aAvail !== bAvail) return aAvail - bAvail;
       return b.count - a.count;
     });
 
-  const availableCount = enriched.filter(
+  // Summary counts exclude removed workers so they don't inflate
+  // "Available now" with stale availability_status flags.
+  const activeEntries = enriched.filter((e) => e.worker.is_active);
+  const availableCount = activeEntries.filter(
     (e) => e.worker.profile?.availability_status === "available",
   ).length;
-  const unavailableCount = enriched.length - availableCount;
-  const withProfile = enriched.filter((e) => e.worker.profile !== null).length;
+  const unavailableCount = activeEntries.length - availableCount;
+  const withProfile = activeEntries.filter((e) => e.worker.profile !== null).length;
 
   return (
     <main style={{ maxWidth: 1280, margin: "0 auto", padding: "40px 20px 80px" }}>
@@ -165,22 +172,42 @@ export default async function SubstitutePoolPage() {
                   {LANG_LABEL[worker.preferred_language] ?? worker.preferred_language.toUpperCase()}
                 </span>
 
-                {/* Availability */}
-                <span
-                  style={{
-                    padding: "3px 10px",
-                    borderRadius: 999,
-                    background: available ? "rgba(164,200,163,0.15)" : "rgba(214,160,140,0.15)",
-                    color: available ? "#a4c8a3" : "#d6a08c",
-                    fontSize: 11,
-                    fontWeight: 800,
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    width: "fit-content",
-                  }}
-                >
-                  {available ? "Available" : "Unavailable"}
-                </span>
+                {/* Availability — overridden to "Removed" for inactive
+                    users so the row's status doesn't claim "Available"
+                    when the account is actually deactivated. */}
+                {worker.is_active ? (
+                  <span
+                    style={{
+                      padding: "3px 10px",
+                      borderRadius: 999,
+                      background: available ? "rgba(164,200,163,0.15)" : "rgba(214,160,140,0.15)",
+                      color: available ? "#a4c8a3" : "#d6a08c",
+                      fontSize: 11,
+                      fontWeight: 800,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      width: "fit-content",
+                    }}
+                  >
+                    {available ? "Available" : "Unavailable"}
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      padding: "3px 10px",
+                      borderRadius: 999,
+                      background: "rgba(214,160,140,0.18)",
+                      color: "#d6a08c",
+                      fontSize: 11,
+                      fontWeight: 800,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      width: "fit-content",
+                    }}
+                  >
+                    Removed
+                  </span>
+                )}
 
                 {/* Cities */}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>

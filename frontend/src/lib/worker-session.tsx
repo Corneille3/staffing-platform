@@ -1,6 +1,6 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { fetchWorkers } from "./browser-api";
 import { Worker } from "./types";
@@ -33,7 +33,7 @@ type SharedState = {
   refresh: () => Promise<void>;
 };
 
-function useSharedState(): SharedState {
+function useSharedState(enabled: boolean): SharedState {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [override, setOverride] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,6 +53,11 @@ function useSharedState(): SharedState {
   }
 
   useEffect(() => {
+    // Wait until the caller signals it's safe to fetch (e.g. Clerk session
+    // has finished hydrating). Without this guard, on page refresh the
+    // fetch can fire before the Clerk JWT is ready and the backend
+    // rejects with 401 "no Bearer token".
+    if (!enabled) return;
     if (!DEV_WORKER_OVERRIDE_ENABLED) {
       load();
       return;
@@ -60,7 +65,7 @@ function useSharedState(): SharedState {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (stored) setOverride(stored);
     load();
-  }, []);
+  }, [enabled]);
 
   function selectWorker(id: string) {
     if (!DEV_WORKER_OVERRIDE_ENABLED) return;
@@ -72,7 +77,8 @@ function useSharedState(): SharedState {
 }
 
 function DevWorkerSessionProvider({ children }: { children: ReactNode }) {
-  const { workers, override, loading, error, selectWorker, refresh } = useSharedState();
+  // Dev path has no Clerk; always safe to fetch immediately.
+  const { workers, override, loading, error, selectWorker, refresh } = useSharedState(true);
   const worker = override ? workers.find((w) => w.id === override) || null : null;
 
   return (
@@ -86,7 +92,10 @@ function DevWorkerSessionProvider({ children }: { children: ReactNode }) {
 
 function ClerkWorkerSessionProvider({ children }: { children: ReactNode }) {
   const { user } = useUser();
-  const { workers, override, loading, error, selectWorker, refresh } = useSharedState();
+  const { isLoaded } = useAuth();
+  // Defer the workers fetch until Clerk has hydrated the session, so
+  // ``authHeaders()`` can actually attach a Bearer token.
+  const { workers, override, loading, error, selectWorker, refresh } = useSharedState(isLoaded);
 
   const matchedByClerk = user ? workers.find((w) => w.clerk_user_id === user.id) || null : null;
   const overrideWorker = DEV_WORKER_OVERRIDE_ENABLED && override
