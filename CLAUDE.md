@@ -1028,11 +1028,14 @@ they get prioritised.
   app for 2–4 weeks first, capture the friction points and the
   parts they ignore, and brief the designer from that spec rather
   than from taste.
-- [ ] **E3. Brand identity / marketing site.** Logo, colour
-  system, typeface, marketing site for `staffig.kouamvision.com`'s
-  public surface. Decoupled from E2 — can run any time, doesn't
-  block app work. A one-off designer engagement is appropriate
-  here regardless of pilot data.
+- [ ] **E3. Case-study entry on `kouamvision.com/work/`.**
+  Staffig is a KouamVision project — sign-in already brands it as
+  "STAFFIG PLATFORM by KouamVision". No standalone marketing site
+  needed (`staffig.kouamvision.com` itself is the app). All that's
+  left is a case-study entry under the parent portfolio: project
+  copy, screenshots, the "what it does / who it's for" pitch,
+  inheriting the existing KouamVision design system. Decoupled
+  from anything in this repo.
 
 ### Working order
 
