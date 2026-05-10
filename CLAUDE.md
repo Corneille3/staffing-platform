@@ -378,47 +378,53 @@ GitHub-connected). Just `git push origin main`. If a deploy needs a
 manual nudge, click "Redeploy" on the latest commit in the Vercel
 dashboard.
 
-**Backend:** the EC2 systemd unit pulls `:latest` from ECR on every
-service start, so a reboot is enough to roll a new image. Sequence:
+**Backend:** one command — `make deploy-backend` (calls
+`scripts/deploy-backend.sh`). It runs the full sequence in-process:
 
+  1. ECR login (token expires every ~12h)
+  2. `docker build --platform linux/amd64` → tag `:latest` and `:sha-<COMMIT>`
+  3. Push both tags
+  4. `aws ec2 reboot-instances` (SSM agent never registered for this
+     instance, so reboot is the only restart path; the systemd unit
+     pulls `:latest` on every start)
+  5. Poll the **direct** EC2 IP `99.79.127.227` — not Cloudflare,
+     which can serve stale 5xx during the restart and confuses
+     downtime detection. Wait until origin is observed down at least
+     once (proves the reboot took effect), then wait until it's
+     back up. Verify the new image actually rolled by checking that
+     `DELETE /api/v1/users/{user_id}` is in `/openapi.json`.
+
+Typical end-to-end: ~90–120 s.
+
+**Things that have bitten us, codified in the script:**
+- Earlier we ran the steps as inline `&& | tail` chains. When one
+  step stalled, the chain died silently and we left orphan
+  `docker push` processes holding ECR registry locks. Future pushes
+  blocked indefinitely. If you ever see this again:
+  `pgrep -fa "docker push"`, then `sudo snap restart docker` (or
+  `sudo systemctl restart docker`) — regular `kill -9` won't work
+  because Docker Snap runs in its own confinement.
+- Cloudflare Flexible SSL caches non-200 responses while the origin
+  is restarting. Polling `https://api.kouamvision.com` can show
+  60+ minutes of "downtime" when the actual origin recovered in 90s.
+  Always poll the direct IP for deploy verification.
+- `aws ec2 reboot-instances` is async; the instance keeps serving
+  the old image for 10–30s after the call returns. The script's
+  two-phase polling (wait-for-down, then wait-for-up) avoids
+  false-positive success.
+
+**To rollback** to a prior image:
 ```
-# 1. Auth to ECR (token expires every ~12h)
-aws ecr get-login-password --region ca-central-1 \
-  | docker login --username AWS --password-stdin \
-    515275664907.dkr.ecr.ca-central-1.amazonaws.com
-
-# 2. Build for amd64 (EC2 is x86_64)
-cd backend
-docker build --platform linux/amd64 \
-  -t 515275664907.dkr.ecr.ca-central-1.amazonaws.com/apf-staffing-platform-prod-backend:latest .
-
-# 3. Tag with the commit SHA for rollback
-docker tag \
-  515275664907.dkr.ecr.ca-central-1.amazonaws.com/apf-staffing-platform-prod-backend:latest \
-  515275664907.dkr.ecr.ca-central-1.amazonaws.com/apf-staffing-platform-prod-backend:sha-<COMMIT>
-
-# 4. Push both
-docker push 515275664907.dkr.ecr.ca-central-1.amazonaws.com/apf-staffing-platform-prod-backend:latest
-docker push 515275664907.dkr.ecr.ca-central-1.amazonaws.com/apf-staffing-platform-prod-backend:sha-<COMMIT>
-
-# 5. Reboot EC2 (SSM is broken — use ec2 reboot-instances)
+./scripts/deploy-backend.sh <old-sha>     # builds from current source!
+```
+…actually that's wrong — to roll back to a *previous* image, pull
+the tagged version from ECR and re-push it as `:latest`:
+```
+docker pull 515275664907.dkr.ecr.ca-central-1.amazonaws.com/apf-staffing-platform-prod-backend:sha-<old>
+docker tag <repo>:sha-<old> <repo>:latest
+docker push <repo>:latest
 aws ec2 reboot-instances --region ca-central-1 --instance-ids i-04a60b0aaf80c1528
-
-# 6. Poll the *direct* IP, not Cloudflare (which can serve stale 5xx
-#    while the origin is restarting)
-until [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
-  http://99.79.127.227/openapi.json 2>/dev/null)" = "200" ]; do
-    sleep 10
-done
-echo "API up"
 ```
-
-Typical downtime: ~60–90s. If polling Cloudflare instead of the direct
-IP, expect the loop to take much longer (Cloudflare can serve stale
-non-200 responses while the origin is fine).
-
-**To rollback** to a prior image: `docker pull <repo>:sha-<old>` →
-`docker tag :sha-<old> :latest` → push → reboot.
 
 ## What this project is
 

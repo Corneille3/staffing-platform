@@ -40,3 +40,8 @@ db-start:
 db-status:
 	@aws rds describe-db-instances --db-instance-identifier $(PROD_DB_ID) --region $(PROD_REGION) \
 		--query 'DBInstances[0].DBInstanceStatus' --output text
+
+# Manual prod backend deploy: ECR login → build → tag → push → reboot EC2 → poll.
+# Use until CI deploy secrets (AWS + Vercel) are wired.
+deploy-backend:
+	@./scripts/deploy-backend.sh
