@@ -204,7 +204,14 @@ class TenantService:
         return tenant
 
     def list_all(self) -> list[tuple[Tenant, User | None]]:
-        """All tenants + each tenant's primary network admin (if any)."""
+        """All tenants + each tenant's primary admin (if any).
+
+        Either a ``network_admin`` or a ``platform_admin`` counts — the
+        first APF admin is a platform_admin after migration 20260510_0004
+        but is still the operational admin of the APF tenant via their
+        active TenantMembership. The lookup picks the oldest active
+        membership-holder per tenant.
+        """
         tenants = list(self.db.scalars(select(Tenant).order_by(Tenant.created_at.desc())).all())
 
         result: list[tuple[Tenant, User | None]] = []
@@ -215,7 +222,7 @@ class TenantService:
                 .where(
                     TenantMembership.tenant_id == tenant.id,
                     TenantMembership.is_active.is_(True),
-                    User.role == UserRole.NETWORK_ADMIN,
+                    User.role.in_([UserRole.NETWORK_ADMIN, UserRole.PLATFORM_ADMIN]),
                     User.is_active.is_(True),
                 )
                 .order_by(User.created_at.asc())

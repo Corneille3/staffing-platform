@@ -493,6 +493,15 @@ def test_platform_admin_can_list_networks(platform_admin_client, seed):
     slugs = {row['slug'] for row in items}
     assert seed.tenant.slug in slugs
 
+    # The seed admin is now platform_admin (the fixture bumps it) but
+    # is still the operational admin of the seed tenant via their active
+    # TenantMembership. The list response must surface them as the
+    # network_admin of the row so the frontend can identify "your own
+    # network" and hide the Remove button. Regression guard.
+    seed_row = next(row for row in items if row['slug'] == seed.tenant.slug)
+    assert seed_row['network_admin'] is not None
+    assert seed_row['network_admin']['id'] == str(seed.apf.id)
+
 
 def test_network_admin_cannot_create_network(apf_client):
     payload = {
