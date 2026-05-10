@@ -6,9 +6,19 @@ import { requireServerSession } from "../../lib/api";
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 export default async function ApfLayout({ children }: { children: React.ReactNode }) {
+  let isPlatformAdmin = false;
   if (CLERK_ENABLED) {
-    await requireServerSession(["network_admin", "platform_admin"]);
+    const session = await requireServerSession(["network_admin", "platform_admin"]);
+    isPlatformAdmin = session.role === "platform_admin";
   }
+  const navItems = [
+    { label: "Overview", href: "/apf" },
+    { label: "Organizations", href: "/apf/organizations" },
+    { label: "Coordinators", href: "/apf/coordinators" },
+    { label: "Substitutes", href: "/apf/substitutes" },
+    { label: "Activity", href: "/apf/activity" },
+    ...(isPlatformAdmin ? [{ label: "Networks", href: "/apf/networks" }] : []),
+  ];
   return (
     <div
       style={{
@@ -57,13 +67,7 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <nav style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {[
-                { label: "Overview", href: "/apf" },
-                { label: "Organizations", href: "/apf/organizations" },
-                { label: "Coordinators", href: "/apf/coordinators" },
-                { label: "Substitutes", href: "/apf/substitutes" },
-                { label: "Activity", href: "/apf/activity" },
-              ].map(({ label, href }) => (
+              {navItems.map(({ label, href }) => (
                 <Link
                   key={href}
                   href={href}

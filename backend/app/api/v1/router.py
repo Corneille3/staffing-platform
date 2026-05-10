@@ -5,6 +5,7 @@ from app.api.v1 import (
     audit_logs,
     auth,
     coordinators,
+    networks,
     notifications,
     organizations,
     reports,
@@ -26,3 +27,4 @@ api_router.include_router(assignments.router, prefix='/assignments', tags=['assi
 api_router.include_router(notifications.router, prefix='/notifications', tags=['notifications'])
 api_router.include_router(reports.router, prefix='/reports', tags=['reports'])
 api_router.include_router(audit_logs.router, prefix='/audit-logs', tags=['audit_logs'])
+api_router.include_router(networks.router, prefix='/networks', tags=['networks'])

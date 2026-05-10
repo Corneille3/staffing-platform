@@ -178,6 +178,17 @@ def apf_client(db_session, seed):
 
 
 @pytest.fixture
+def platform_admin_client(db_session, seed):
+    """A platform admin scoped to the seed APF tenant. Bumps the seed's
+    apf user role to platform_admin and reuses their TenantMembership
+    so they behave as network_admin-of-APF + can manage networks."""
+    seed.apf.role = UserRole.PLATFORM_ADMIN
+    db_session.flush()
+    yield _make_test_client(db_session, 'int-apf', 'platform_admin')
+    app.dependency_overrides.pop(get_db_session, None)
+
+
+@pytest.fixture
 def org_admin_client(db_session, seed):
     yield _make_test_client(db_session, 'int-org-admin', 'org_admin')
     app.dependency_overrides.pop(get_db_session, None)

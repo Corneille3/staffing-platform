@@ -437,3 +437,114 @@ def test_inactive_user_blocked_from_admin_endpoints(apf_client, db_session, seed
     resp = apf_client.get('/api/v1/organizations')
     assert resp.status_code == 403
     assert 'deactivated' in resp.json()['detail'].lower()
+
+
+# ── network (tenant) management ───────────────────────────────────────────────
+
+def test_platform_admin_can_create_network(platform_admin_client, db_session):
+    from sqlalchemy import select
+    from app.models.tenant import Tenant
+    from app.models.tenant_membership import TenantMembership
+    from app.models.user import User
+
+    suffix = uuid4().hex[:8]
+    payload = {
+        'name': f'Acme Network {suffix}',
+        'slug': f'acme-{suffix}',
+        'admin_first_name': 'Alice',
+        'admin_last_name': 'Owner',
+        'admin_email': f'alice-{suffix}@acme.example',
+        'admin_phone': '+15145550001',
+        'admin_preferred_language': 'en',
+    }
+
+    resp = platform_admin_client.post('/api/v1/networks', json=payload)
+    assert resp.status_code == 201, resp.text
+
+    data = resp.json()
+    assert data['slug'] == payload['slug']
+    assert data['network_admin']['email'] == payload['admin_email']
+    assert data['network_admin']['is_active'] is True
+
+    tenant = db_session.scalar(select(Tenant).where(Tenant.slug == payload['slug']))
+    assert tenant is not None
+
+    admin = db_session.scalar(select(User).where(User.email == payload['admin_email']))
+    assert admin is not None
+    assert admin.role.value == 'network_admin'
+    assert admin.clerk_user_id is None  # links on first sign-in
+
+    membership = db_session.scalar(
+        select(TenantMembership).where(
+            TenantMembership.user_id == admin.id,
+            TenantMembership.tenant_id == tenant.id,
+        )
+    )
+    assert membership is not None
+    assert membership.role.value == 'network_admin'
+    assert membership.is_active is True
+
+
+def test_platform_admin_can_list_networks(platform_admin_client, seed):
+    resp = platform_admin_client.get('/api/v1/networks')
+    assert resp.status_code == 200
+    items = resp.json()['items']
+    # Seed creates one tenant; should appear in the list.
+    slugs = {row['slug'] for row in items}
+    assert seed.tenant.slug in slugs
+
+
+def test_network_admin_cannot_create_network(apf_client):
+    payload = {
+        'name': 'Forbidden Inc',
+        'slug': f'forbidden-{uuid4().hex[:6]}',
+        'admin_first_name': 'No',
+        'admin_last_name': 'Way',
+        'admin_email': f'no-{uuid4().hex[:6]}@forbidden.example',
+        'admin_preferred_language': 'fr',
+    }
+    resp = apf_client.post('/api/v1/networks', json=payload)
+    assert resp.status_code == 403
+
+
+def test_network_admin_cannot_list_networks(apf_client):
+    resp = apf_client.get('/api/v1/networks')
+    assert resp.status_code == 403
+
+
+def test_create_network_rejects_duplicate_slug(platform_admin_client, seed):
+    payload = {
+        'name': 'Conflict',
+        'slug': seed.tenant.slug,
+        'admin_first_name': 'Conflict',
+        'admin_last_name': 'Admin',
+        'admin_email': f'conflict-{uuid4().hex[:6]}@example.org',
+        'admin_preferred_language': 'fr',
+    }
+    resp = platform_admin_client.post('/api/v1/networks', json=payload)
+    assert resp.status_code == 409
+
+
+def test_create_network_rejects_duplicate_email(platform_admin_client, seed):
+    payload = {
+        'name': 'Other Network',
+        'slug': f'other-{uuid4().hex[:6]}',
+        'admin_first_name': 'Other',
+        'admin_last_name': 'Admin',
+        'admin_email': seed.org_admin.email,
+        'admin_preferred_language': 'fr',
+    }
+    resp = platform_admin_client.post('/api/v1/networks', json=payload)
+    assert resp.status_code == 409
+
+
+def test_platform_admin_apf_view_stays_tenant_scoped(platform_admin_client, seed):
+    """Option (ii): platform admin sees only their tenant's data on
+    day-to-day endpoints, not a global flat list."""
+    resp = platform_admin_client.get('/api/v1/organizations')
+    assert resp.status_code == 200
+    org_ids = {row['id'] for row in resp.json()['items']}
+    assert str(seed.org.id) in org_ids
+    # Sanity: the response should be the seed tenant's orgs only.
+    # (Seed creates one tenant and one org.)
+    assert len(org_ids) == 1

@@ -98,9 +98,7 @@ class StaffingRequestService:
 
     @staticmethod
     def _can_create_for_organization(organization: Organization, scope: AccessScope) -> bool:
-        if scope.is_platform_admin:
-            return True
-        if scope.is_network_admin:
+        if scope.is_platform_admin or scope.is_network_admin:
             return scope.tenant_id is not None and organization.tenant_id == scope.tenant_id
         if scope.is_org_admin:
             return organization.id in scope.org_ids

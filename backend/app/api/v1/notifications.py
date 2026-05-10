@@ -23,9 +23,7 @@ def list_notifications(
 ) -> dict[str, list[NotificationRead]]:
     stmt = select(RequestNotification).order_by(RequestNotification.created_at.desc())
 
-    if scope.is_platform_admin:
-        items = list(db.scalars(stmt).all())
-    elif scope.is_network_admin:
+    if scope.is_platform_admin or scope.is_network_admin:
         if not scope.tenant_id:
             items = []
         else:

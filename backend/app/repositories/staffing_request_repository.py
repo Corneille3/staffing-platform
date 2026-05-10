@@ -30,9 +30,7 @@ class StaffingRequestRepository:
 
     def list_for_scope(self, scope: AccessScope) -> list[StaffingRequest]:
         stmt = self._base_stmt()
-        if scope.is_platform_admin:
-            return list(self.db.scalars(stmt).all())
-        if scope.is_network_admin:
+        if scope.is_platform_admin or scope.is_network_admin:
             if not scope.tenant_id:
                 return []
             stmt = stmt.where(
@@ -60,9 +58,7 @@ class StaffingRequestRepository:
         return self.db.scalar(stmt)
 
     def can_access(self, staffing_request: StaffingRequest, scope: AccessScope) -> bool:
-        if scope.is_platform_admin:
-            return True
-        if scope.is_network_admin:
+        if scope.is_platform_admin or scope.is_network_admin:
             if not scope.tenant_id:
                 return False
             org = self.db.get(Organization, staffing_request.organization_id)

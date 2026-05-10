@@ -184,3 +184,25 @@ export async function getCoordinators(): Promise<Coordinator[]> {
   const response = await fetchJson<{ items: Coordinator[] }>("/api/v1/coordinators");
   return response.items;
 }
+
+export type ServerTenantNetwork = {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  created_at: string;
+  network_admin: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    preferred_language: string;
+    clerk_user_id: string | null;
+    is_active: boolean;
+  } | null;
+};
+
+export async function getNetworks(): Promise<ServerTenantNetwork[]> {
+  const response = await fetchJson<{ items: ServerTenantNetwork[] }>("/api/v1/networks");
+  return response.items;
+}

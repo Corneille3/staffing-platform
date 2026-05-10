@@ -194,6 +194,40 @@ export async function createOrganization(payload: {
   return postJson<Organization>("/api/v1/organizations", payload);
 }
 
+export type TenantNetwork = {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  created_at: string;
+  network_admin: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    preferred_language: string;
+    clerk_user_id: string | null;
+    is_active: boolean;
+  } | null;
+};
+
+export async function listNetworks(): Promise<TenantNetwork[]> {
+  const data = await getJson<{ items: TenantNetwork[] }>("/api/v1/networks");
+  return data.items;
+}
+
+export async function createNetwork(payload: {
+  name: string;
+  slug: string;
+  admin_first_name: string;
+  admin_last_name: string;
+  admin_email: string;
+  admin_phone?: string;
+  admin_preferred_language: string;
+}): Promise<TenantNetwork> {
+  return postJson<TenantNetwork>("/api/v1/networks", payload);
+}
+
 export async function inviteCoordinator(payload: {
   first_name: string;
   last_name: string;

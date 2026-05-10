@@ -51,10 +51,7 @@ def remove_user(
 def _list_users_for_scope(db: Session, scope: AccessScope) -> list[User]:
     stmt = select(User).order_by(User.first_name, User.last_name)
 
-    if scope.is_platform_admin:
-        return list(db.scalars(stmt).all())
-
-    if scope.is_network_admin:
+    if scope.is_platform_admin or scope.is_network_admin:
         if not scope.tenant_id:
             return []
         stmt = (

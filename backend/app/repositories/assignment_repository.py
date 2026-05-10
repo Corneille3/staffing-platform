@@ -19,9 +19,7 @@ class AssignmentRepository:
 
     def list_for_scope(self, scope: AccessScope) -> list[Assignment]:
         stmt = select(Assignment).order_by(Assignment.assigned_at.desc())
-        if scope.is_platform_admin:
-            return list(self.db.scalars(stmt).all())
-        if scope.is_network_admin:
+        if scope.is_platform_admin or scope.is_network_admin:
             if not scope.tenant_id:
                 return []
             tenant_org_ids = select(Organization.id).where(Organization.tenant_id == scope.tenant_id)

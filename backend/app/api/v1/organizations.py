@@ -54,10 +54,9 @@ def get_organization(
     organization = OrganizationRepository(db).get(organization_id)
     if organization is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Organization not found')
-    if not scope.is_platform_admin:
-        if scope.is_network_admin:
-            if not scope.tenant_id or organization.tenant_id != scope.tenant_id:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Out of scope.')
-        elif organization.id not in scope.org_ids:
+    if scope.is_platform_admin or scope.is_network_admin:
+        if not scope.tenant_id or organization.tenant_id != scope.tenant_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Out of scope.')
+    elif organization.id not in scope.org_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Out of scope.')
     return OrganizationRead.model_validate(organization)

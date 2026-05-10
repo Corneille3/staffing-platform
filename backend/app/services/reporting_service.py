@@ -27,9 +27,7 @@ class ReportingService:
         return select(Organization.id).where(Organization.tenant_id == tenant_id)
 
     def _scope_requests(self, stmt, scope: AccessScope):
-        if scope.is_platform_admin:
-            return stmt
-        if scope.is_network_admin:
+        if scope.is_platform_admin or scope.is_network_admin:
             if not scope.tenant_id:
                 return stmt.where(sa.false())
             return stmt.where(
@@ -44,9 +42,7 @@ class ReportingService:
             select(func.count()).select_from(WorkerProfile)
             .where(WorkerProfile.availability_status == AvailabilityStatus.AVAILABLE)
         )
-        if scope.is_platform_admin:
-            return self.db.scalar(stmt) or 0
-        if scope.is_network_admin and scope.tenant_id:
+        if (scope.is_platform_admin or scope.is_network_admin) and scope.tenant_id:
             stmt = stmt.join(User, WorkerProfile.user_id == User.id).join(
                 TenantMembership, TenantMembership.user_id == User.id
             ).where(
@@ -62,9 +58,7 @@ class ReportingService:
             .join(WorkerProfile, WorkerRegion.worker_profile_id == WorkerProfile.id)
             .where(WorkerProfile.availability_status == AvailabilityStatus.AVAILABLE)
         )
-        if scope.is_platform_admin:
-            return set(self.db.scalars(stmt).all())
-        if scope.is_network_admin and scope.tenant_id:
+        if (scope.is_platform_admin or scope.is_network_admin) and scope.tenant_id:
             stmt = stmt.join(User, WorkerProfile.user_id == User.id).join(
                 TenantMembership, TenantMembership.user_id == User.id
             ).where(
@@ -155,9 +149,7 @@ class ReportingService:
             .join(StaffingRequest, Assignment.staffing_request_id == StaffingRequest.id)
         )
 
-        if scope.is_platform_admin:
-            pass
-        elif scope.is_network_admin:
+        if scope.is_platform_admin or scope.is_network_admin:
             if not scope.tenant_id:
                 return {'organization_count': 0, 'request_count': 0, 'assignment_count': 0}
             tenant_org_ids = self._tenant_org_subq(scope.tenant_id)
@@ -182,19 +174,18 @@ class ReportingService:
         }
 
     def organization_summary(self, organization_id: UUID, scope: AccessScope) -> dict[str, int]:
-        if not scope.is_platform_admin:
-            if scope.is_network_admin:
-                org = self.db.get(Organization, organization_id)
-                if org is None or org.tenant_id != scope.tenant_id:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail='You do not have access to this organization.',
-                    )
-            elif organization_id not in scope.org_ids:
+        if scope.is_platform_admin or scope.is_network_admin:
+            org = self.db.get(Organization, organization_id)
+            if org is None or org.tenant_id != scope.tenant_id:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail='You do not have access to this organization.',
                 )
+        elif organization_id not in scope.org_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail='You do not have access to this organization.',
+            )
         return {
             'request_count': self.db.scalar(
                 select(func.count())

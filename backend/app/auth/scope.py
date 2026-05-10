@@ -80,10 +80,13 @@ def get_access_scope(
 
     role = user.role.value
 
-    if role == ROLE_PLATFORM_ADMIN:
-        return AccessScope(user=user)
-
-    if role == ROLE_NETWORK_ADMIN:
+    if role in (ROLE_PLATFORM_ADMIN, ROLE_NETWORK_ADMIN):
+        # Platform admin = network admin of their primary tenant + the
+        # extra capability to manage other tenants. ``tenant_id`` is
+        # derived the same way as for a plain network admin so day-to-day
+        # data queries (coordinators, substitutes, requests) stay scoped
+        # to their tenant. Tenant-management endpoints check the role
+        # itself via require_platform_admin.
         membership = db.scalar(
             select(TenantMembership).where(
                 TenantMembership.user_id == user.id,

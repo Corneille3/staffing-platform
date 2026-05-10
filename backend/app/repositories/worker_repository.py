@@ -49,9 +49,7 @@ class WorkerRepository:
 
     def list_for_scope(self, scope: AccessScope) -> list[User]:
         stmt = self._base_list_stmt()
-        if scope.is_platform_admin:
-            return list(self.db.scalars(stmt).unique().all())
-        if scope.is_network_admin or scope.is_org_admin:
+        if scope.is_platform_admin or scope.is_network_admin or scope.is_org_admin:
             if not scope.tenant_id:
                 return []
             return list(self.db.scalars(self._with_tenant(stmt, scope.tenant_id)).unique().all())

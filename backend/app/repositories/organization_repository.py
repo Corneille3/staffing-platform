@@ -18,9 +18,7 @@ class OrganizationRepository:
 
     def list_for_scope(self, scope: AccessScope) -> list[Organization]:
         stmt = select(Organization).order_by(Organization.name)
-        if scope.is_platform_admin:
-            return list(self.db.scalars(stmt).all())
-        if scope.is_network_admin:
+        if scope.is_platform_admin or scope.is_network_admin:
             if not scope.tenant_id:
                 return []
             return list(self.db.scalars(
