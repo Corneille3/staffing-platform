@@ -23,7 +23,17 @@ export default function SignUpPage() {
               color: "#496158",
             }}
           >
-            APF Staffing Platform
+            STAFFIG PLATFORM
+          </p>
+          <p
+            style={{
+              margin: "6px 0 0",
+              fontSize: 12,
+              color: "#496158",
+              textAlign: "center",
+            }}
+          >
+            by KouamVision
           </p>
           <h1 style={{ margin: "8px 0 0", fontSize: 28 }}>Create your account</h1>
         </div>
