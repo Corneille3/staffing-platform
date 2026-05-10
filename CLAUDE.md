@@ -1005,12 +1005,43 @@ each as it ships and keep "Current focus" in sync.
   colour-coded action dots, actor name, request title context, relative
   timestamps, sticky sidebar with action-breakdown chart and totals.*
 
+### Phase E — Polish + pilot follow-ups
+
+Tracked here so they're not forgotten. None are blocking; all wait
+for the SES production-access approval + final end-to-end pass before
+they get prioritised.
+
+- [ ] **E1. Mobile nav (hamburger) on `/apf` and `/admin`.** Both
+  headers currently flex-wrap on narrow viewports — the nav pills
+  drop to a second/third row and the Sign out button drifts. Below
+  ~768px, hide the nav pill row and render a hamburger icon that
+  toggles a slide-out drawer containing the same links + sign-out
+  at the bottom. `/worker` already has the bottom-nav pattern and
+  needs no change. ~1–2 hours of work; pure frontend, no backend
+  changes.
+- [ ] **E2. Worker UI polish pass (post-pilot).** Functional bones
+  are right (mobile-first, large touch targets, card-based,
+  bilingual). What's missing is the typography hierarchy,
+  micro-interactions, contrast/accessibility audit, and a coherent
+  visual identity beyond inline styles. **Don't hire a designer
+  before pilot data lands** — let 10–20 real substitutes use the
+  app for 2–4 weeks first, capture the friction points and the
+  parts they ignore, and brief the designer from that spec rather
+  than from taste.
+- [ ] **E3. Brand identity / marketing site.** Logo, colour
+  system, typeface, marketing site for `staffig.kouamvision.com`'s
+  public surface. Decoupled from E2 — can run any time, doesn't
+  block app work. A one-off designer engagement is appropriate
+  here regardless of pilot data.
+
 ### Working order
 
-We work top-to-bottom but Phase B items can be pulled forward when an A item
-needs them (e.g., A6's "Response sent" copy benefits from B2's `viewed_at`).
-Don't start C or D until Phase A is materially done — the worker surface is
-the unique product surface and CLAUDE.md already names it the priority.
+Phases A–D are materially shipped. Phase E waits on pilot — don't start
+E2/E3 (worker polish, brand identity) before real-user feedback is in
+hand; E1 (mobile nav) can be pulled in earlier if a tester complains.
+Historical: we worked top-to-bottom but pulled Phase B items forward
+when an A item needed them (e.g., A6's "Response sent" copy benefited
+from B2's `viewed_at`).
 
 ## Working agreements
 
