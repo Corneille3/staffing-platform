@@ -17,6 +17,8 @@ class WorkerRepository:
         self.db = db
 
     def _base_list_stmt(self):
+        # Active users sort first; inactive (removed) come after for audit
+        # visibility — the frontend renders them with a muted "removed" tag.
         return (
             select(User)
             .where(User.role == UserRole.WORKER)
@@ -25,13 +27,16 @@ class WorkerRepository:
                 selectinload(User.worker_profile).selectinload(WorkerProfile.qualification_records),
                 selectinload(User.worker_profile).selectinload(WorkerProfile.certification_records),
             )
-            .order_by(User.first_name, User.last_name)
+            .order_by(User.is_active.desc(), User.first_name, User.last_name)
         )
 
     def _with_tenant(self, stmt, tenant_id: UUID):
+        # Note: no ``TenantMembership.is_active`` filter — we want soft-deleted
+        # users to remain visible in the listing as "removed" entries. They're
+        # excluded from operational logic (matching, dispatch) elsewhere via
+        # ``User.is_active`` checks.
         return stmt.join(TenantMembership, TenantMembership.user_id == User.id).where(
             TenantMembership.tenant_id == tenant_id,
-            TenantMembership.is_active.is_(True),
         )
 
     def list(self) -> list[User]:
