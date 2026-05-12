@@ -28,16 +28,44 @@ export type Organization = {
   name: string;
   type: string;
   city: string;
+  neighbourhood: string | null;
   region: string | null;
+  latitude: number | null;
+  longitude: number | null;
   contact_email: string | null;
   contact_phone: string | null;
   preferred_language: string;
   is_active: boolean;
 };
 
+export type RequestRole =
+  | "educator"
+  | "assistant_educator"
+  | "psw"
+  | "nurse"
+  | "food_handler"
+  | "other";
+
+export type SlotPeriod = "morning" | "afternoon" | "evening" | "overnight";
+
+export type Availability = {
+  id: string;
+  user_id: string;
+  day_of_week: number | null;
+  specific_date: string | null;
+  slot: SlotPeriod;
+  available: boolean;
+  created_at: string;
+};
+
 export type WorkerProfile = {
   availability_status: string;
   urgent_alert_opt_in: boolean;
+  notify_far: boolean;
+  notify_weekend_overnight: boolean;
+  travel_radius_km: number | null;
+  home_latitude: number | null;
+  home_longitude: number | null;
   supported_cities: string[];
   qualifications: string[];
   certifications: string[];
@@ -59,6 +87,7 @@ export type StaffingRequest = {
   organization_id: string;
   created_by_user_id: string;
   request_type: string;
+  role: RequestRole | null;
   title: string;
   description: string | null;
   city: string;
@@ -70,6 +99,7 @@ export type StaffingRequest = {
   urgency_level: number;
   language_requirement: string | null;
   coverage_type: "same_day_urgent" | "planned_absence" | "recurring" | "emergency" | null;
+  hourly_rate: number | null;
   contact_name: string | null;
   contact_phone: string | null;
   contact_email: string | null;
@@ -157,5 +187,8 @@ export type Assignment = {
   confirmed_at: string | null;
   cancelled_at: string | null;
   completed_at: string | null;
+  checked_in_at: string | null;
+  checked_in_latitude: number | null;
+  checked_in_longitude: number | null;
   notes: string | null;
 };

@@ -1,5 +1,6 @@
 from app.models.assignment import Assignment
 from app.models.audit_log import AuditLog
+from app.models.availability import Availability
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
 from app.models.tenant import Tenant
@@ -17,6 +18,7 @@ from app.models.worker_region import WorkerRegion
 __all__ = [
     'Assignment',
     'AuditLog',
+    'Availability',
     'Organization',
     'OrganizationMembership',
     'RequestNotification',

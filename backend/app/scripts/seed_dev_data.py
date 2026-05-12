@@ -1,10 +1,22 @@
 from datetime import date, time
+from decimal import Decimal
 from uuid import uuid4
 
 import app.models  # noqa: F401
 
 from app.db.session import SessionLocal
-from app.models.enums import AvailabilityStatus, CoverageType, OrganizationType, RequestRequirementType, RequestStatus, RequestType, UserRole
+from app.models.availability import Availability
+from app.models.enums import (
+    AvailabilityStatus,
+    CoverageType,
+    OrganizationType,
+    RequestRequirementType,
+    RequestRole,
+    RequestStatus,
+    RequestType,
+    SlotPeriod,
+    UserRole,
+)
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
 from app.models.request_requirement import RequestRequirement
@@ -36,12 +48,15 @@ def seed() -> None:
         organization = Organization(
             id=uuid4(),
             tenant_id=tenant.id,
-            name='APF Regina Centre',
+            name='Les Petits Lutins',
             type=OrganizationType.CHILDCARE,
-            city='Regina',
-            region='Saskatchewan',
-            contact_email='regina@example.org',
-            contact_phone='306-555-0100',
+            city='Montréal',
+            neighbourhood='Plateau',
+            region='Québec',
+            latitude=Decimal('45.5230'),
+            longitude=Decimal('-73.5810'),
+            contact_email='lespetitslutins@example.org',
+            contact_phone='514-555-0142',
         )
         network_admin = User(
             id=uuid4(),
@@ -95,9 +110,12 @@ def seed() -> None:
             id=uuid4(),
             user_id=worker_one.id,
             availability_status=AvailabilityStatus.AVAILABLE,
+            home_latitude=Decimal('45.5180'),
+            home_longitude=Decimal('-73.5710'),
+            travel_radius_km=15,
         )
         worker_one_profile.region_records = [
-            WorkerRegion(id=uuid4(), city='Regina', region='Saskatchewan'),
+            WorkerRegion(id=uuid4(), city='Montréal', region='Québec'),
         ]
         worker_one_profile.qualification_records = [
             WorkerQualification(id=uuid4(), qualification_code='ECE_LEVEL_1', qualification_label='ECE Level 1'),
@@ -110,10 +128,14 @@ def seed() -> None:
             id=uuid4(),
             user_id=worker_two.id,
             availability_status=AvailabilityStatus.AVAILABLE,
+            home_latitude=Decimal('45.5365'),
+            home_longitude=Decimal('-73.5890'),
+            travel_radius_km=20,
+            notify_far=True,
         )
         worker_two_profile.region_records = [
-            WorkerRegion(id=uuid4(), city='Regina', region='Saskatchewan'),
-            WorkerRegion(id=uuid4(), city='Saskatoon', region='Saskatchewan'),
+            WorkerRegion(id=uuid4(), city='Montréal', region='Québec'),
+            WorkerRegion(id=uuid4(), city='Laval', region='Québec'),
         ]
         worker_two_profile.qualification_records = [
             WorkerQualification(id=uuid4(), qualification_code='ECE_LEVEL_1', qualification_label='ECE Level 1'),
@@ -125,15 +147,29 @@ def seed() -> None:
 
         db.add_all([worker_one_profile, worker_two_profile])
 
+        # Seed a default weekly availability grid for both workers
+        # (Mon–Fri morning + afternoon)
+        for worker in (worker_one, worker_two):
+            for dow in range(0, 5):  # Mon=0 through Fri=4
+                for slot in (SlotPeriod.MORNING, SlotPeriod.AFTERNOON):
+                    db.add(Availability(
+                        id=uuid4(),
+                        user_id=worker.id,
+                        day_of_week=dow,
+                        slot=slot,
+                        available=True,
+                    ))
+
         staffing_request = StaffingRequest(
             id=uuid4(),
             organization_id=organization.id,
             created_by_user_id=org_admin.id,
             request_type=RequestType.URGENT_REPLACEMENT,
+            role=RequestRole.EDUCATOR,
             status=RequestStatus.DRAFT,
             title='Educator replacement - morning shift',
             description='Need coverage for preschool group.',
-            city='Regina',
+            city='Montréal',
             location_name='Site A - Preschool room',
             work_date=date.today(),
             start_time=time(hour=8),
@@ -141,8 +177,9 @@ def seed() -> None:
             urgency_level=3,
             language_requirement='fr',
             coverage_type=CoverageType.SAME_DAY_URGENT,
+            hourly_rate=Decimal('26.00'),
             contact_name='Marie-Claude Bergeron',
-            contact_phone='306-555-0147',
+            contact_phone='514-555-0147',
             contact_email='mc.bergeron@example.org',
             arrival_instructions='Enter through the side door on Rue des Érables. Sign in at the front desk and ask for Marie-Claude.',
         )

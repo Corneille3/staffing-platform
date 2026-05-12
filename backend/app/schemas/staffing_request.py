@@ -1,9 +1,10 @@
 from datetime import date, datetime, time
+from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import CoverageType, RequestStatus, RequestType
+from app.models.enums import CoverageType, RequestRole, RequestStatus, RequestType
 from app.schemas.common import TimestampedSchema
 
 
@@ -15,6 +16,7 @@ class StaffingRequestBase(BaseModel):
     # read response always carries the real creator from the DB.
     created_by_user_id: UUID | None = None
     request_type: RequestType
+    role: RequestRole | None = None
     title: str
     description: str | None = None
     city: str
@@ -25,6 +27,7 @@ class StaffingRequestBase(BaseModel):
     urgency_level: int = 1
     language_requirement: str | None = 'fr'
     coverage_type: CoverageType | None = None
+    hourly_rate: Decimal | None = None
     contact_name: str | None = None
     contact_phone: str | None = None
     contact_email: str | None = None

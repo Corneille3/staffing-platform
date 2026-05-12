@@ -1,7 +1,8 @@
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -19,7 +20,11 @@ class WorkerProfile(Base):
         server_default=AvailabilityStatus.AVAILABLE.value,
     )
     urgent_alert_opt_in: Mapped[bool] = mapped_column(Boolean, default=True, server_default='true')
+    notify_far: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false')
+    notify_weekend_overnight: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false')
     travel_radius_km: Mapped[int | None] = mapped_column(Integer)
+    home_latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+    home_longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

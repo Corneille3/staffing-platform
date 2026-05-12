@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -17,6 +18,9 @@ class AssignmentRead(ORMModel):
     confirmed_at: datetime | None = None
     cancelled_at: datetime | None = None
     completed_at: datetime | None = None
+    checked_in_at: datetime | None = None
+    checked_in_latitude: Decimal | None = None
+    checked_in_longitude: Decimal | None = None
     notes: str | None = None
 
 
@@ -30,3 +34,8 @@ class AssignmentCreate(BaseModel):
 class AssignmentCancel(BaseModel):
     reason: str
     notes: str | None = None
+
+
+class AssignmentCheckIn(BaseModel):
+    latitude: Decimal | None = None
+    longitude: Decimal | None = None

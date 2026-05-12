@@ -25,6 +25,22 @@ class RequestType(str, Enum):
     OPEN_STAFFING_NEED = 'open_staffing_need'
 
 
+class RequestRole(str, Enum):
+    EDUCATOR = 'educator'
+    ASSISTANT_EDUCATOR = 'assistant_educator'
+    PSW = 'psw'
+    NURSE = 'nurse'
+    FOOD_HANDLER = 'food_handler'
+    OTHER = 'other'
+
+
+class SlotPeriod(str, Enum):
+    MORNING = 'morning'        # 06–12
+    AFTERNOON = 'afternoon'    # 12–18
+    EVENING = 'evening'        # 18–24
+    OVERNIGHT = 'overnight'    # 00–06
+
+
 class CoverageType(str, Enum):
     SAME_DAY_URGENT = 'same_day_urgent'
     PLANNED_ABSENCE = 'planned_absence'
