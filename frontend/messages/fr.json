@@ -9,7 +9,19 @@
     "on": "Activées",
     "off": "Désactivées",
     "yes": "Oui",
-    "no": "Non"
+    "no": "Non",
+    "edit": "Modifier",
+    "back": "Retour",
+    "confirm": "Confirmer",
+    "decline": "Refuser",
+    "urgent": "Urgent",
+    "filled": "Pourvu"
+  },
+  "time": {
+    "justNow": "à l'instant",
+    "minutesAgo": "il y a {n} min",
+    "hoursAgo": "il y a {n} h",
+    "daysAgo": "il y a {n} j"
   },
   "worker": {
     "nav": {
@@ -18,6 +30,140 @@
       "alerts": "Alertes",
       "availability": "Disponibilités",
       "profile": "Profil"
+    },
+    "shell": {
+      "accountNotReady": "Compte non prêt",
+      "accountNotReadyBody": "Votre compte de remplaçant·e n'est pas encore lié. Utilisez l'adresse courriel invitée ou contactez l'administrateur du réseau.",
+      "localPreview": "Aperçu local",
+      "chooseAccount": "Choisissez votre",
+      "chooseAccountAccent": "compte",
+      "pickWorker": "Sélectionnez le remplaçant que vous voulez prévisualiser localement.",
+      "noWorkersSeeded": "Aucun remplaçant n'existe encore. Initialisez la base de données."
+    },
+    "home": {
+      "greetingMorning": "Bonjour",
+      "greetingAfternoon": "Bon après-midi",
+      "greetingEvening": "Bonsoir",
+      "headlinePre": "Vos",
+      "headlineAccent": "opportunités",
+      "availableToday": "Disponible aujourd'hui",
+      "unavailable": "Indisponible",
+      "tabActive": "Actif",
+      "tabHistory": "Historique",
+      "noActive": "Aucune demande active.",
+      "noHistory": "Aucun historique.",
+      "thatsAll": "C'est tout pour l'instant.",
+      "chipNew": "Nouvelle demande",
+      "chipSent": "Réponse envoyée",
+      "iCanTakeIt": "Je peux le prendre",
+      "waitingForConfirmation": "En attente de confirmation"
+    },
+    "schedule": {
+      "noShifts": "Aucun quart",
+      "upcomingCount": "{n} à venir",
+      "headlinePre": "Vos",
+      "headlineAccent": "quarts",
+      "noUpcoming": "Aucun quart à venir.",
+      "comingUp": "À venir",
+      "history": "Historique",
+      "contact": "Contact",
+      "arrival": "À l'arrivée",
+      "addToCalendar": "Ajouter au calendrier"
+    },
+    "notifications": {
+      "noAlerts": "Aucune alerte",
+      "countOne": "{n} notification",
+      "countOther": "{n} notifications",
+      "headlinePre": "Vos",
+      "headlineAccent": "alertes",
+      "emptyState": "Aucune notification. Elles apparaissent ici une fois que vous êtes mis en correspondance avec une demande.",
+      "labels": {
+        "urgent": "Urgent",
+        "newRequest": "Nouvelle demande",
+        "assigned": "Confirmée",
+        "notSelected": "Non retenu·e",
+        "cancelled": "Annulée"
+      },
+      "bodies": {
+        "urgent": "Remplacement urgent : {title} à {city}",
+        "newRequest": "Nouvelle demande de remplacement : {title} à {city}",
+        "assigned": "Vous êtes confirmé·e pour {title} à {city}",
+        "notSelected": "Un·e autre remplaçant·e a été choisi·e pour {title} à {city}",
+        "cancelled": "Votre affectation pour {title} à {city} a été annulée"
+      }
+    },
+    "availability": {
+      "eyebrow": "Disponibilités",
+      "headlinePre": "Quand vous êtes",
+      "headlineAccent": "disponible",
+      "currentStatus": "Statut actuel",
+      "info": "Quand vous êtes <strong>non disponible</strong>, vous ne serez pas mis en correspondance avec de nouvelles demandes. Vous pouvez toujours voir celles qui vous ont déjà été envoyées.",
+      "preferredCities": "Villes préférées",
+      "citiesInfo": "Seules les demandes dans ces villes vous seront proposées.",
+      "noCities": "Aucune ville ajoutée.",
+      "addCityPlaceholder": "Ajouter une ville…",
+      "preferences": "Préférences",
+      "urgentAlerts": "Alertes urgentes",
+      "urgentAlertsSub": "M'avertir pour les demandes du jour même",
+      "available": "Disponible",
+      "unavailable": "Indisponible"
+    },
+    "requests": {
+      "eyebrow": "Remplacements disponibles",
+      "headlinePre": "Trouvez un",
+      "headlineAccent": "remplacement",
+      "unavailableNotice": "Vous êtes indisponible. Mettez-vous disponible pour recevoir des demandes.",
+      "filledByOther": "Ce remplacement a été pourvu par un·e autre remplaçant·e.",
+      "confirmModalSub": "Votre réponse sera envoyée au coordonnateur pour confirmation finale.",
+      "declineModalSub": "{title} · {city} · {date}",
+      "subtitleNew": "Choisissez un quart qui correspond à vos compétences et votre lieu.",
+      "subtitleAccepted": "Vos réponses sont en cours d'examen par les coordonnateurs.",
+      "tabAll": "Tous",
+      "tabUrgent": "Urgent",
+      "tabToday": "Aujourd'hui",
+      "tabWeek": "Cette semaine",
+      "filterCity": "Toutes les villes",
+      "filterUrgent": "Urgent seulement",
+      "clearFilters": "Effacer",
+      "pendingCount": "En attente ({n})",
+      "acceptedCount": "Accepté ({n})",
+      "declinedCount": "Refusé ({n})",
+      "filledCount": "Pourvu ({n})",
+      "noPending": "Aucune demande en attente.",
+      "responseReceived": "Réponse reçue · En attente de confirmation.",
+      "responseSent": "Réponse envoyée · En attente du coordonnateur.",
+      "reasonPrefix": "Raison : ",
+      "iCanTakeIt": "Je peux le prendre",
+      "decline": "Refuser",
+      "filledNotice": "Ce remplacement a été pourvu.",
+      "confirmModal": {
+        "headlinePre": "Confirmer la",
+        "headlineAccent": "disponibilité",
+        "body": "En confirmant, vous indiquez au coordonnateur que vous pouvez prendre ce quart. Il confirmera sous peu.",
+        "back": "Retour",
+        "confirm": "Confirmer"
+      },
+      "declineModal": {
+        "headlinePre": "Refuser la",
+        "headlineAccent": "demande",
+        "reasonLabel": "Raison (optionnel)",
+        "noReason": "Aucune raison",
+        "back": "Retour",
+        "decline": "Refuser"
+      },
+      "declineReasons": {
+        "notAvailable": "Non disponible",
+        "tooFar": "Trop loin",
+        "notInterested": "Pas intéressé·e",
+        "conflict": "Conflit avec une autre affectation",
+        "other": "Autre"
+      },
+      "coverage": {
+        "same_day_urgent": "Urgent même jour",
+        "planned_absence": "Absence planifiée",
+        "recurring": "Récurrent",
+        "emergency": "Urgence"
+      }
     },
     "profile": {
       "language": "Langue",

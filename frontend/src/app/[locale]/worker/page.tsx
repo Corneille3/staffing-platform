@@ -1,15 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Calendar, MapPin } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { Link } from "../../../i18n/navigation";
 import {
   fetchAssignments,
   fetchRequestResponses,
   fetchRequests,
   updateWorkerPreferences,
 } from "../../../lib/browser-api";
-import { pickLocale } from "../../../lib/status-labels";
 import { Assignment, RequestResponse, StaffingRequest } from "../../../lib/types";
 import { useWorkerSession } from "../../../lib/worker-session";
 import { Avatar, Chip, Meta, Mono } from "../../../components/ui";
@@ -23,8 +23,11 @@ interface InboxItem {
 
 export default function WorkerHome() {
   const { worker, refresh } = useWorkerSession();
+  const t = useTranslations("worker.home");
+  const tCommon = useTranslations("common");
+  const tTime = useTranslations("time");
   const [requests, setRequests] = useState<StaffingRequest[]>([]);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [, setAssignments] = useState<Assignment[]>([]);
   const [responses, setResponses] = useState<RequestResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"active" | "history">("active");
@@ -54,10 +57,8 @@ export default function WorkerHome() {
 
   if (!worker) return null;
 
-  const locale = pickLocale(worker.preferred_language);
   const availabilityStatus = worker.profile?.availability_status || "unavailable";
   const available = availabilityStatus === "available";
-  const urgentAlertsEnabled = worker.profile?.urgent_alert_opt_in ?? false;
 
   const inboxItems: InboxItem[] = requests.map((req) => {
     const myResponse = responses.find((r) => r.staffing_request_id === req.id);
@@ -77,9 +78,7 @@ export default function WorkerHome() {
   const firstName = worker.first_name;
   const hour = new Date().getHours();
   const greeting =
-    locale === "fr"
-      ? hour < 12 ? "Bonjour" : hour < 18 ? "Bonsoir" : "Bonsoir"
-      : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+    hour < 12 ? t("greetingMorning") : hour < 18 ? t("greetingAfternoon") : t("greetingEvening");
 
   async function toggleAvailability() {
     if (!worker) return;
@@ -106,9 +105,7 @@ export default function WorkerHome() {
             {greeting}, {firstName}
           </div>
           <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, lineHeight: 1.05, margin: "4px 0 0" }}>
-            {locale === "fr"
-              ? <>Vos <em style={{ fontStyle: "italic" }}>opportunités</em></>
-              : <>Today's <em style={{ fontStyle: "italic" }}>opportunities</em></>}
+            {t("headlinePre")} <em style={{ fontStyle: "italic" }}>{t("headlineAccent")}</em>
           </h1>
         </div>
         <Avatar
@@ -147,13 +144,9 @@ export default function WorkerHome() {
           }}
         />
         <div style={{ flex: 1, fontSize: 13, color: available ? "var(--moss)" : "var(--ink-3)", fontWeight: 500 }}>
-          {available
-            ? (locale === "fr" ? "Disponible aujourd'hui" : "Available today")
-            : (locale === "fr" ? "Indisponible" : "Unavailable")}
+          {available ? t("availableToday") : t("unavailable")}
         </div>
-        <span style={{ fontSize: 11, color: "var(--ink-3)" }}>
-          {locale === "fr" ? "Modifier" : "Edit"}
-        </span>
+        <span style={{ fontSize: 11, color: "var(--ink-3)" }}>{tCommon("edit")}</span>
       </button>
 
       {preferenceError && (
@@ -162,12 +155,12 @@ export default function WorkerHome() {
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 0, marginBottom: 12, borderBottom: "0.5px solid var(--line)" }}>
-        {(["active", "history"] as const).map((t) => {
-          const count = t === "active" ? activeItems.length : historyItems.length;
+        {(["active", "history"] as const).map((tabKey) => {
+          const count = tabKey === "active" ? activeItems.length : historyItems.length;
           return (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={tabKey}
+              onClick={() => setTab(tabKey)}
               style={{
                 border: "none",
                 background: "transparent",
@@ -175,16 +168,14 @@ export default function WorkerHome() {
                 marginRight: 20,
                 fontFamily: "var(--ui)",
                 fontSize: 14,
-                fontWeight: tab === t ? 600 : 400,
-                color: tab === t ? "var(--ink)" : "var(--ink-3)",
-                borderBottom: tab === t ? "1.5px solid var(--ink)" : "1.5px solid transparent",
+                fontWeight: tab === tabKey ? 600 : 400,
+                color: tab === tabKey ? "var(--ink)" : "var(--ink-3)",
+                borderBottom: tab === tabKey ? "1.5px solid var(--ink)" : "1.5px solid transparent",
                 marginBottom: -1,
                 cursor: "pointer",
               }}
             >
-              {t === "active"
-                ? (locale === "fr" ? "Actif" : "Active")
-                : (locale === "fr" ? "Historique" : "History")}
+              {tabKey === "active" ? t("tabActive") : t("tabHistory")}
               {" "}
               <span style={{ color: "var(--ink-3)", fontWeight: 400 }}>{count}</span>
             </button>
@@ -195,22 +186,27 @@ export default function WorkerHome() {
       {/* Request list */}
       {loading ? (
         <div style={{ padding: "32px 0", textAlign: "center", color: "var(--ink-3)", fontSize: 14 }}>
-          {locale === "fr" ? "Chargement…" : "Loading…"}
+          {tCommon("loading")}
         </div>
       ) : displayed.length === 0 ? (
         <div style={{ padding: "32px 0", textAlign: "center", color: "var(--ink-3)", fontSize: 14 }}>
-          {tab === "active"
-            ? (locale === "fr" ? "Aucune demande active." : "No active requests.")
-            : (locale === "fr" ? "Aucun historique." : "Nothing in history yet.")}
+          {tab === "active" ? t("noActive") : t("noHistory")}
         </div>
       ) : (
         displayed.map(({ request, status }) => (
-          <RequestCard key={request.id} request={request} status={status} locale={locale} />
+          <RequestCard
+            key={request.id}
+            request={request}
+            status={status}
+            t={t}
+            tCommon={tCommon}
+            tTime={tTime}
+          />
         ))
       )}
 
       <div style={{ textAlign: "center", padding: "20px 0 8px", color: "var(--ink-4)", fontSize: 12 }}>
-        {locale === "fr" ? "C'est tout pour l'instant." : "That's all for now."}
+        {t("thatsAll")}
       </div>
     </div>
   );
@@ -219,14 +215,18 @@ export default function WorkerHome() {
 function RequestCard({
   request,
   status,
-  locale,
+  t,
+  tCommon,
+  tTime,
 }: {
   request: StaffingRequest;
   status: CardStatus;
-  locale: "en" | "fr";
+  t: ReturnType<typeof useTranslations>;
+  tCommon: ReturnType<typeof useTranslations>;
+  tTime: ReturnType<typeof useTranslations>;
 }) {
   const urgent = request.urgency_level >= 3;
-  const timeAgo = formatTimeAgo(request.created_at, locale);
+  const timeAgo = formatTimeAgo(request.created_at, tTime);
 
   return (
     <div
@@ -250,10 +250,10 @@ function RequestCard({
       {/* Top row: chips + time */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {urgent && <Chip variant="urgent" dot>{locale === "fr" ? "Urgent" : "Urgent"}</Chip>}
-          {status === "new"    && <Chip variant="terra" dot>{locale === "fr" ? "Nouvelle demande" : "New request"}</Chip>}
-          {status === "sent"   && <Chip variant="sand"  dot>{locale === "fr" ? "Réponse envoyée" : "Reply sent"}</Chip>}
-          {status === "filled" && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{locale === "fr" ? "Pourvu" : "Filled"}</Chip>}
+          {urgent && <Chip variant="urgent" dot>{tCommon("urgent")}</Chip>}
+          {status === "new"    && <Chip variant="terra" dot>{t("chipNew")}</Chip>}
+          {status === "sent"   && <Chip variant="sand"  dot>{t("chipSent")}</Chip>}
+          {status === "filled" && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{tCommon("filled")}</Chip>}
         </div>
         <Mono style={{ fontSize: 10, color: "var(--ink-3)" }}>{timeAgo}</Mono>
       </div>
@@ -297,7 +297,7 @@ function RequestCard({
               fontFamily: "var(--ui)",
             }}
           >
-            {locale === "fr" ? "Je peux le prendre" : "I can take it"}
+            {t("iCanTakeIt")}
           </Link>
           <Link
             href={`/worker/requests`}
@@ -313,7 +313,7 @@ function RequestCard({
               fontFamily: "var(--ui)",
             }}
           >
-            {locale === "fr" ? "Refuser" : "Decline"}
+            {tCommon("decline")}
           </Link>
         </div>
       )}
@@ -329,28 +329,21 @@ function RequestCard({
             borderRadius: 12,
           }}
         >
-          {locale === "fr" ? "En attente de confirmation" : "Waiting for confirmation"}
+          {t("waitingForConfirmation")}
         </div>
       )}
     </div>
   );
 }
 
-function formatTimeAgo(createdAt: string | undefined, locale: "en" | "fr"): string {
+function formatTimeAgo(createdAt: string | undefined, tTime: ReturnType<typeof useTranslations>): string {
   if (!createdAt) return "";
   const diff = Date.now() - new Date(createdAt).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return locale === "fr" ? `${mins} min` : `${mins} min ago`;
+  if (mins < 1) return tTime("justNow");
+  if (mins < 60) return tTime("minutesAgo", { n: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return locale === "fr" ? `${hours} h` : `${hours}h ago`;
+  if (hours < 24) return tTime("hoursAgo", { n: hours });
   const days = Math.floor(hours / 24);
-  return locale === "fr" ? `${days} j` : `${days}d ago`;
-}
-
-function compareRequestsByStart(left: StaffingRequest, right: StaffingRequest): number {
-  return requestStartTime(left) - requestStartTime(right);
-}
-
-function requestStartTime(request: StaffingRequest): number {
-  return new Date(`${request.work_date}T${request.start_time}`).getTime();
+  return tTime("daysAgo", { n: days });
 }

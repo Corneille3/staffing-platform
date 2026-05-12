@@ -36,6 +36,8 @@ function WorkerShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const showWorkerPicker = canUseWorkerOverride();
   const navItems = useNavItems();
+  const tShell = useTranslations("worker.shell");
+  const tCommon = useTranslations("common");
 
   useEffect(() => {
     if (worker && !worker.profile && pathname !== "/worker/onboarding") {
@@ -51,7 +53,7 @@ function WorkerShell({ children }: { children: React.ReactNode }) {
     return (
       <Screen>
         <Centered>
-          <span style={{ color: "var(--ink-3)", fontSize: 14 }}>Loading…</span>
+          <span style={{ color: "var(--ink-3)", fontSize: 14 }}>{tCommon("loading")}</span>
         </Centered>
       </Screen>
     );
@@ -74,11 +76,10 @@ function WorkerShell({ children }: { children: React.ReactNode }) {
           <Centered>
             <div style={{ maxWidth: 380, textAlign: "center", padding: "0 20px" }}>
               <h1 style={{ margin: "0 0 10px", fontSize: 28, fontFamily: "var(--serif)" }}>
-                Account not ready
+                {tShell("accountNotReady")}
               </h1>
               <p style={{ margin: 0, color: "var(--ink-2)", lineHeight: 1.6, fontSize: 14 }}>
-                Your substitute account is not linked yet. Use the invited email address or
-                contact the network administrator.
+                {tShell("accountNotReadyBody")}
               </p>
             </div>
           </Centered>
@@ -90,17 +91,17 @@ function WorkerShell({ children }: { children: React.ReactNode }) {
       <Screen>
         <div style={{ maxWidth: 480, margin: "80px auto", padding: "0 20px" }}>
           <div style={{ fontSize: 10, letterSpacing: ".2em", textTransform: "uppercase", color: "var(--ink-3)", fontWeight: 500, marginBottom: 8 }}>
-            Local preview
+            {tShell("localPreview")}
           </div>
           <h1 style={{ margin: "0 0 6px", fontSize: 28, fontFamily: "var(--serif)" }}>
-            Choose your <em style={{ fontStyle: "italic" }}>account</em>
+            {tShell("chooseAccount")} <em style={{ fontStyle: "italic" }}>{tShell("chooseAccountAccent")}</em>
           </h1>
           <p style={{ margin: "0 0 28px", color: "var(--ink-2)", lineHeight: 1.6, fontSize: 14 }}>
-            Pick which worker you are previewing locally.
+            {tShell("pickWorker")}
           </p>
           <div style={{ display: "grid", gap: 10 }}>
             {workers.length === 0 ? (
-              <p style={{ color: "var(--ink-3)", fontSize: 14 }}>No workers exist yet. Seed the database first.</p>
+              <p style={{ color: "var(--ink-3)", fontSize: 14 }}>{tShell("noWorkersSeeded")}</p>
             ) : (
               workers.map((w) => (
                 <button

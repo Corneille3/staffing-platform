@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { MapPin, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { updateAvailability, updateWorkerPreferences } from "../../../../lib/browser-api";
-import { availabilityStatusLabel, pickLocale } from "../../../../lib/status-labels";
 import { useWorkerSession } from "../../../../lib/worker-session";
 import { Eyebrow } from "../../../../components/ui";
 
 export default function WorkerAvailabilityPage() {
   const { worker, refresh } = useWorkerSession();
+  const t = useTranslations("worker.availability");
+  const tCommon = useTranslations("common");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cityInput, setCityInput] = useState("");
@@ -16,7 +18,6 @@ export default function WorkerAvailabilityPage() {
   const [cityError, setCityError] = useState<string | null>(null);
 
   if (!worker) return null;
-  const locale = pickLocale(worker.preferred_language);
 
   const status = worker.profile?.availability_status || "unknown";
   const cities: string[] = worker.profile?.supported_cities ?? [];
@@ -74,16 +75,14 @@ export default function WorkerAvailabilityPage() {
     saveCities(cities.filter((c) => c !== city));
   }
 
+  const statusLabel = status === "available" ? t("available") : status === "unavailable" ? t("unavailable") : "—";
+
   return (
     <div style={{ display: "grid", gap: 24, paddingTop: 16 }}>
       <header>
-        <Eyebrow style={{ marginBottom: 4 }}>
-          {locale === "fr" ? "Disponibilités" : "Availability"}
-        </Eyebrow>
+        <Eyebrow style={{ marginBottom: 4 }}>{t("eyebrow")}</Eyebrow>
         <h1 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 30, lineHeight: 1.05 }}>
-          {locale === "fr"
-            ? <>Quand vous êtes <em style={{ fontStyle: "italic" }}>disponible</em></>
-            : <>When you're <em style={{ fontStyle: "italic" }}>open</em></>}
+          {t("headlinePre")} <em style={{ fontStyle: "italic" }}>{t("headlineAccent")}</em>
         </h1>
       </header>
 
@@ -98,11 +97,9 @@ export default function WorkerAvailabilityPage() {
         gap: 12,
       }}>
         <div style={{ flex: 1 }}>
-          <Eyebrow style={{ marginBottom: 4 }}>
-            {locale === "fr" ? "Statut actuel" : "Current status"}
-          </Eyebrow>
+          <Eyebrow style={{ marginBottom: 4 }}>{t("currentStatus")}</Eyebrow>
           <div style={{ fontFamily: "var(--serif)", fontSize: 22, lineHeight: 1, marginTop: 4 }}>
-            {availabilityStatusLabel(status, locale)}
+            {statusLabel}
           </div>
         </div>
         <div style={{
@@ -134,7 +131,7 @@ export default function WorkerAvailabilityPage() {
             fontFamily: "inherit",
           }}
         >
-          {availabilityStatusLabel("available", locale)}
+          {t("available")}
         </button>
         <button
           type="button"
@@ -154,7 +151,7 @@ export default function WorkerAvailabilityPage() {
             fontFamily: "inherit",
           }}
         >
-          {availabilityStatusLabel("unavailable", locale)}
+          {t("unavailable")}
         </button>
       </div>
 
@@ -163,19 +160,18 @@ export default function WorkerAvailabilityPage() {
       ) : null}
 
       {/* info note */}
-      <div style={{
-        padding: "12px 16px",
-        borderRadius: 12,
-        background: "var(--card)",
-        border: "0.5px solid var(--line)",
-        color: "var(--ink-2)",
-        fontSize: 13,
-        lineHeight: 1.5,
-      }}>
-        {locale === "fr"
-          ? <>Quand vous êtes <strong>non disponible</strong>, vous ne serez pas mis en correspondance avec de nouvelles demandes. Vous pouvez toujours voir celles qui vous ont déjà été envoyées.</>
-          : <>When <strong>unavailable</strong>, you won't be matched to new requests. You can still see ones already sent to you.</>}
-      </div>
+      <div
+        style={{
+          padding: "12px 16px",
+          borderRadius: 12,
+          background: "var(--card)",
+          border: "0.5px solid var(--line)",
+          color: "var(--ink-2)",
+          fontSize: 13,
+          lineHeight: 1.5,
+        }}
+        dangerouslySetInnerHTML={{ __html: t.raw("info") as string }}
+      />
 
       {/* preferred cities */}
       <section style={{
@@ -188,20 +184,16 @@ export default function WorkerAvailabilityPage() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <MapPin size={14} style={{ color: "var(--ink-3)" }} />
-          <Eyebrow>{locale === "fr" ? "Villes préférées" : "Preferred cities"}</Eyebrow>
+          <Eyebrow>{t("preferredCities")}</Eyebrow>
         </div>
 
         <p style={{ margin: 0, fontSize: 13, color: "var(--ink-2)", lineHeight: 1.45 }}>
-          {locale === "fr"
-            ? "Seules les demandes dans ces villes vous seront proposées."
-            : "Only requests in these cities will be matched to you."}
+          {t("citiesInfo")}
         </p>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {cities.length === 0 ? (
-            <span style={{ color: "var(--ink-3)", fontSize: 13 }}>
-              {locale === "fr" ? "Aucune ville ajoutée." : "No cities added yet."}
-            </span>
+            <span style={{ color: "var(--ink-3)", fontSize: 13 }}>{t("noCities")}</span>
           ) : (
             cities.map((city) => (
               <span
@@ -247,7 +239,7 @@ export default function WorkerAvailabilityPage() {
           <input
             type="text"
             value={cityInput}
-            placeholder={locale === "fr" ? "Ajouter une ville…" : "Add a city…"}
+            placeholder={t("addCityPlaceholder")}
             onChange={(e) => setCityInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCity(); } }}
             disabled={cityBusy}
@@ -282,7 +274,7 @@ export default function WorkerAvailabilityPage() {
               minHeight: 44,
             }}
           >
-            {locale === "fr" ? "Ajouter" : "Add"}
+            {tCommon("add")}
           </button>
         </div>
 
@@ -293,9 +285,7 @@ export default function WorkerAvailabilityPage() {
 
       {/* preferences */}
       <section>
-        <Eyebrow style={{ marginBottom: 10 }}>
-          {locale === "fr" ? "Préférences" : "Preferences"}
-        </Eyebrow>
+        <Eyebrow style={{ marginBottom: 10 }}>{t("preferences")}</Eyebrow>
         <div style={{
           background: "var(--card)",
           border: "0.5px solid var(--line)",
@@ -303,10 +293,8 @@ export default function WorkerAvailabilityPage() {
           overflow: "hidden",
         }}>
           <ToggleRow
-            label={locale === "fr" ? "Alertes urgentes" : "Urgent alerts"}
-            sub={locale === "fr"
-              ? "M'avertir pour les demandes du jour même"
-              : "Notify me for same-day requests"}
+            label={t("urgentAlerts")}
+            sub={t("urgentAlertsSub")}
             on={urgentAlertsOn}
             onToggle={toggleUrgentAlerts}
             disabled={busy}

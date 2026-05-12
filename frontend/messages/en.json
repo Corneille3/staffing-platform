@@ -9,7 +9,19 @@
     "on": "On",
     "off": "Off",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "edit": "Edit",
+    "back": "Go back",
+    "confirm": "Confirm",
+    "decline": "Decline",
+    "urgent": "Urgent",
+    "filled": "Filled"
+  },
+  "time": {
+    "justNow": "just now",
+    "minutesAgo": "{n}m ago",
+    "hoursAgo": "{n}h ago",
+    "daysAgo": "{n}d ago"
   },
   "worker": {
     "nav": {
@@ -18,6 +30,140 @@
       "alerts": "Alerts",
       "availability": "Availability",
       "profile": "Profile"
+    },
+    "shell": {
+      "accountNotReady": "Account not ready",
+      "accountNotReadyBody": "Your substitute account is not linked yet. Use the invited email address or contact the network administrator.",
+      "localPreview": "Local preview",
+      "chooseAccount": "Choose your",
+      "chooseAccountAccent": "account",
+      "pickWorker": "Pick which worker you are previewing locally.",
+      "noWorkersSeeded": "No workers exist yet. Seed the database first."
+    },
+    "home": {
+      "greetingMorning": "Good morning",
+      "greetingAfternoon": "Good afternoon",
+      "greetingEvening": "Good evening",
+      "headlinePre": "Today's",
+      "headlineAccent": "opportunities",
+      "availableToday": "Available today",
+      "unavailable": "Unavailable",
+      "tabActive": "Active",
+      "tabHistory": "History",
+      "noActive": "No active requests.",
+      "noHistory": "Nothing in history yet.",
+      "thatsAll": "That's all for now.",
+      "chipNew": "New request",
+      "chipSent": "Reply sent",
+      "iCanTakeIt": "I can take it",
+      "waitingForConfirmation": "Waiting for confirmation"
+    },
+    "schedule": {
+      "noShifts": "No shifts",
+      "upcomingCount": "{n} upcoming",
+      "headlinePre": "Your",
+      "headlineAccent": "shifts",
+      "noUpcoming": "No upcoming shifts.",
+      "comingUp": "Coming up",
+      "history": "History",
+      "contact": "Contact",
+      "arrival": "Arrival",
+      "addToCalendar": "Add to calendar"
+    },
+    "notifications": {
+      "noAlerts": "No alerts",
+      "countOne": "{n} notification",
+      "countOther": "{n} notifications",
+      "headlinePre": "Your",
+      "headlineAccent": "alerts",
+      "emptyState": "No notifications yet. They appear here once you're matched to a coverage request.",
+      "labels": {
+        "urgent": "Urgent",
+        "newRequest": "New request",
+        "assigned": "Confirmed",
+        "notSelected": "Not selected",
+        "cancelled": "Cancelled"
+      },
+      "bodies": {
+        "urgent": "Urgent coverage needed: {title} in {city}",
+        "newRequest": "New coverage request: {title} in {city}",
+        "assigned": "You've been confirmed for {title} in {city}",
+        "notSelected": "Another substitute was chosen for {title} in {city}",
+        "cancelled": "Your assignment for {title} in {city} was cancelled"
+      }
+    },
+    "availability": {
+      "eyebrow": "Availability",
+      "headlinePre": "When you're",
+      "headlineAccent": "open",
+      "currentStatus": "Current status",
+      "info": "When <strong>unavailable</strong>, you won't be matched to new requests. You can still see ones already sent to you.",
+      "preferredCities": "Preferred cities",
+      "citiesInfo": "Only requests in these cities will be matched to you.",
+      "noCities": "No cities added yet.",
+      "addCityPlaceholder": "Add a city…",
+      "preferences": "Preferences",
+      "urgentAlerts": "Urgent alerts",
+      "urgentAlertsSub": "Notify me for same-day requests",
+      "available": "Available",
+      "unavailable": "Unavailable"
+    },
+    "requests": {
+      "eyebrow": "Available coverage",
+      "headlinePre": "Find a",
+      "headlineAccent": "shift",
+      "unavailableNotice": "You are unavailable. Set your availability to receive new requests.",
+      "filledByOther": "This request has been filled by another substitute.",
+      "confirmModalSub": "Your response will be sent to the coordinator for final confirmation.",
+      "declineModalSub": "{title} · {city} · {date}",
+      "subtitleNew": "Pick a shift that matches your skills and location.",
+      "subtitleAccepted": "Your responses are being reviewed by coordinators.",
+      "tabAll": "All",
+      "tabUrgent": "Urgent",
+      "tabToday": "Today",
+      "tabWeek": "This week",
+      "filterCity": "Any city",
+      "filterUrgent": "Urgent only",
+      "clearFilters": "Clear filters",
+      "pendingCount": "Pending ({n})",
+      "acceptedCount": "Accepted ({n})",
+      "declinedCount": "Declined ({n})",
+      "filledCount": "Filled ({n})",
+      "noPending": "No pending requests.",
+      "responseReceived": "Response received · Awaiting confirmation.",
+      "responseSent": "Response sent · Awaiting coordinator.",
+      "reasonPrefix": "Reason: ",
+      "iCanTakeIt": "I can take it",
+      "decline": "Decline",
+      "filledNotice": "This request has been filled.",
+      "confirmModal": {
+        "headlinePre": "Confirm",
+        "headlineAccent": "availability",
+        "body": "By confirming, you're telling the coordinator you can take this shift. They'll confirm shortly.",
+        "back": "Go back",
+        "confirm": "Confirm"
+      },
+      "declineModal": {
+        "headlinePre": "Decline",
+        "headlineAccent": "request",
+        "reasonLabel": "Reason (optional)",
+        "noReason": "No reason provided",
+        "back": "Go back",
+        "decline": "Decline"
+      },
+      "declineReasons": {
+        "notAvailable": "Not available",
+        "tooFar": "Too far",
+        "notInterested": "Not interested",
+        "conflict": "Conflict with another assignment",
+        "other": "Other"
+      },
+      "coverage": {
+        "same_day_urgent": "Same-day urgent",
+        "planned_absence": "Planned absence",
+        "recurring": "Recurring",
+        "emergency": "Emergency"
+      }
     },
     "profile": {
       "language": "Language",

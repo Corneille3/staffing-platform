@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Calendar, Mail, MapPin, Phone, User } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { fetchAssignments, fetchRequests } from "../../../../lib/browser-api";
-import { assignmentStatusLabel, pickLocale } from "../../../../lib/status-labels";
+import { assignmentStatusLabel } from "../../../../lib/status-labels";
 import { Assignment, StaffingRequest } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
 import { Chip, Eyebrow, Mono } from "../../../../components/ui";
@@ -13,8 +14,11 @@ type EnrichedAssignment = {
   request: StaffingRequest | null;
 };
 
-export default function WorkerAssignmentsPage() {
+export default function WorkerSchedulePage() {
   const { worker } = useWorkerSession();
+  const locale = useLocale() as "fr" | "en";
+  const t = useTranslations("worker.schedule");
+  const tCommon = useTranslations("common");
   const [items, setItems] = useState<EnrichedAssignment[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,7 +49,6 @@ export default function WorkerAssignmentsPage() {
   }, [worker]);
 
   if (!worker) return null;
-  const locale = pickLocale(worker.preferred_language);
 
   const upcoming = items.filter(
     (i) => i.assignment.status === "pending_confirmation" || i.assignment.status === "confirmed",
@@ -61,19 +64,15 @@ export default function WorkerAssignmentsPage() {
     <div style={{ display: "grid", gap: 24, paddingTop: 16 }}>
       <header>
         <Eyebrow style={{ marginBottom: 4 }}>
-          {upcoming.length === 0
-            ? (locale === "fr" ? "Aucun quart" : "No shifts")
-            : `${upcoming.length} upcoming`}
+          {upcoming.length === 0 ? t("noShifts") : t("upcomingCount", { n: upcoming.length })}
         </Eyebrow>
         <h1 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 30, lineHeight: 1.05 }}>
-          {locale === "fr"
-            ? <>Vos <em style={{ fontStyle: "italic" }}>quarts</em></>
-            : <>Your <em style={{ fontStyle: "italic" }}>shifts</em></>}
+          {t("headlinePre")} <em style={{ fontStyle: "italic" }}>{t("headlineAccent")}</em>
         </h1>
       </header>
 
       {loading ? (
-        <p style={{ color: "var(--ink-3)", fontSize: 14 }}>Loading…</p>
+        <p style={{ color: "var(--ink-3)", fontSize: 14 }}>{tCommon("loading")}</p>
       ) : upcoming.length === 0 ? (
         <div style={{
           padding: 24,
@@ -85,19 +84,22 @@ export default function WorkerAssignmentsPage() {
           fontSize: 14,
           lineHeight: 1.5,
         }}>
-          {locale === "fr" ? "Aucun quart à venir." : "No upcoming shifts."}
+          {t("noUpcoming")}
         </div>
       ) : (
         <>
           {hero && hero.request && (
-            <HeroCard assignment={hero.assignment} request={hero.request} locale={locale} />
+            <HeroCard
+              assignment={hero.assignment}
+              request={hero.request}
+              locale={locale}
+              t={t}
+            />
           )}
 
           {rest.length > 0 && (
             <section>
-              <Eyebrow style={{ marginBottom: 10 }}>
-                {locale === "fr" ? "À venir" : "Coming up"}
-              </Eyebrow>
+              <Eyebrow style={{ marginBottom: 10 }}>{t("comingUp")}</Eyebrow>
               <div style={{
                 background: "var(--card)",
                 border: "0.5px solid var(--line)",
@@ -123,9 +125,7 @@ export default function WorkerAssignmentsPage() {
 
       {past.length > 0 && (
         <section>
-          <Eyebrow style={{ marginBottom: 10 }}>
-            {locale === "fr" ? "Historique" : "History"}
-          </Eyebrow>
+          <Eyebrow style={{ marginBottom: 10 }}>{t("history")}</Eyebrow>
           <div style={{ display: "grid", gap: 8 }}>
             {past.map(({ assignment, request }) =>
               request ? (
@@ -143,10 +143,12 @@ function HeroCard({
   assignment,
   request,
   locale,
+  t,
 }: {
   assignment: Assignment;
   request: StaffingRequest;
   locale: "en" | "fr";
+  t: ReturnType<typeof useTranslations>;
 }) {
   return (
     <article style={{
@@ -216,7 +218,7 @@ function HeroCard({
           gap: 10,
         }}>
           <Eyebrow style={{ color: "rgba(246,244,238,.45)", letterSpacing: ".16em" }}>
-            {locale === "fr" ? "Contact" : "Contact"}
+            {t("contact")}
           </Eyebrow>
           {request.contact_name && (
             <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--paper)" }}>
@@ -255,7 +257,7 @@ function HeroCard({
           gap: 6,
         }}>
           <Eyebrow style={{ color: "rgba(246,244,238,.45)", letterSpacing: ".16em" }}>
-            {locale === "fr" ? "À l'arrivée" : "Arrival"}
+            {t("arrival")}
           </Eyebrow>
           <p style={{ margin: 0, fontSize: 13, color: "rgba(246,244,238,.78)", lineHeight: 1.5 }}>
             {request.arrival_instructions}
@@ -284,7 +286,7 @@ function HeroCard({
         }}
       >
         <Calendar size={15} />
-        {locale === "fr" ? "Ajouter au calendrier" : "Add to calendar"}
+        {t("addToCalendar")}
       </a>
     </article>
   );
