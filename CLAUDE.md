@@ -1075,8 +1075,10 @@ from B2's `viewed_at`).
   the worker surface.
 - **Don't add backwards-compatibility shims for the schema** — there's no prod
   data; correct migrations in place.
-- **Don't introduce a UI library** (Tailwind, shadcn, Mantine, etc.) without
-  discussing it first. The codebase is intentionally on inline styles.
+- **Don't introduce a component library** (shadcn, Mantine, etc.) without
+  discussing it first. Tailwind CSS v4 is now the styling foundation.
+  Existing pages still use inline styles — migrate them surface by surface
+  as part of the design-port work, don't refactor them in isolation.
 - **Don't claim a feature works without exercising it.** Type-checking the code
   is necessary but not sufficient — the user wants behavioral verification.
 - **Three distinct shells.** Don't fold worker / admin / apf into one shared
@@ -1122,3 +1124,110 @@ docker compose exec frontend npx tsc --noEmit
   `.env.example`, `frontend/.env.local.example`, and the Terraform
   `terraform.tfvars` + `secrets-manager` module in sync. Drift across
   these is the most common source of subtle breakage.
+- **New UI component** → add to `frontend/src/components/ui/`, export
+  from `components/ui/index.ts`. Use CSS custom properties (`var(--terra)`,
+  `var(--ink)` etc.) for styling — not hardcoded hex values.
+
+## Git workflow
+
+The repo uses a **feature branch → develop → main** model.
+
+```
+main      — production only. No direct pushes (branch protection enabled).
+develop   — integration branch. All feature branches merge here first.
+feature/* — one branch per feature, cut from develop.
+fix/*     — hotfixes cut from main, merged back to both main and develop.
+```
+
+**Starting any piece of work:**
+```bash
+git checkout develop
+git pull origin develop
+git checkout -b feature/<name>   # or fix/<name> for a hotfix
+```
+
+**Finishing:**
+```bash
+git push origin feature/<name>
+# Open a PR on GitHub targeting develop
+# → CI runs tsc + pytest automatically
+# → Vercel posts a preview URL as a PR comment
+# Test the preview URL end-to-end against prod API, then merge
+```
+
+**Shipping to production:**
+```bash
+# Open a PR from develop → main on GitHub
+# Merge → Vercel auto-deploys to staffig.kouamvision.com
+# Backend: run make deploy-backend manually (CI deploy secrets not yet set)
+```
+
+**GitHub Actions secrets required** (set in repo Settings → Secrets → Actions):
+- `VERCEL_TOKEN` — from vercel.com/account/tokens
+- `VERCEL_ORG_ID` — User ID from vercel.com/account (personal account = user ID)
+- `VERCEL_PROJECT_ID` — from Vercel project Settings → General
+
+Note: preview deployments hit the **prod backend** (`api.kouamvision.com`).
+There is no deployed staging backend — local Docker Compose is the dev backend.
+
+## Design system
+
+The frontend uses a custom design system defined in `frontend/src/app/globals.css`
+and `frontend/src/components/ui/`. Do **not** introduce shadcn, Mantine, or
+any other component library without discussion.
+
+**Design reference:** `frontend/New design by Claude Design/HANDOFF.md` is the
+authoritative spec. The `.jsx` files in that folder are visual prototypes — port
+them surface by surface to `.tsx`, replacing inline styles with the CSS custom
+properties and primitive components below.
+
+**Approach: visual port only.** The FastAPI backend is kept as-is. Only the
+frontend visual layer is being rebuilt. No stack changes (no Drizzle, no Inngest,
+no Resend).
+
+### Token reference
+
+| Variable | Value | Use |
+|---|---|---|
+| `--paper` | `#F6F4EE` | Page background (never `#fff` as bg) |
+| `--card` | `#FFFFFF` | Card surfaces on top of paper |
+| `--ink` | `#15140F` | Primary text + primary CTA on light surfaces |
+| `--ink-2` | `#56544B` | Body text |
+| `--ink-3` | `#8E8B7E` | Labels, eyebrows, placeholders |
+| `--terra` | `#DC5A2A` | Signature accent — urgent affordances, CTAs on dark surfaces |
+| `--moss` | `#25684A` | Available / confirmed states |
+| `--sand` | `#E8C97A` | Waiting / viewed states |
+| `--rose` | `#C53A2A` | Urgent / cancelled / declined |
+| `--line` | `#E5E1D3` | Hairline borders (`0.5px solid var(--line)`) |
+| `--ui` | Inter Tight | All UI text |
+| `--serif` | Instrument Serif | Display headings — always italicize one word |
+| `--mono` | JetBrains Mono | Times, IDs, numbers |
+| `--r-xs/sm/md/lg/xl` | 6/10/14/20/28px | Border radii |
+
+Tailwind utilities also work: `bg-paper`, `bg-terra`, `text-moss`, `rounded-lg` etc.
+
+### Visual rules (from HANDOFF.md §3)
+
+1. No gradients in the product UI.
+2. No emoji — use Lucide icons (1.5–1.8px stroke, currentColor).
+3. Hairline borders only — `0.5px solid var(--line)`.
+4. Status via color chips with a 6px dot, never icons alone.
+5. Display headings always italicize one word: `When you're <em>open</em>`.
+6. Big numerics use `--serif`, not sans.
+7. `--terra` used sparingly — primary CTAs on dark surfaces and urgent only.
+8. 44px minimum touch targets on mobile.
+9. Page bg is `--paper`, never `#fff`.
+
+### Primitive components (`components/ui/`)
+
+| Component | Props | Notes |
+|---|---|---|
+| `<Chip>` | `variant`, `dot` | urgent/moss/sand/terra/ink/default |
+| `<Button>` | `variant` | primary/terra/moss/ghost/danger |
+| `<Card>` | `style`, `className` | white card on paper bg |
+| `<Eyebrow>` | `style` | 10px uppercase label |
+| `<Display>` | `style` | Instrument Serif heading |
+| `<Mono>` | `style` | JetBrains Mono span for numbers/times |
+| `<Avatar>` | `initials`, `tone`, `size` | paper/terra/moss tones |
+
+Import from `@/components/ui`.
