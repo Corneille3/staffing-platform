@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-paper: #F6F4EE;
+  --color-paper-2: #EFEBE0;
+  --color-card: #FFFFFF;
+  --color-ink: #15140F;
+  --color-ink-2: #56544B;
+  --color-ink-3: #8E8B7E;
+  --color-ink-4: #BAB6A8;
+  --color-line: #E5E1D3;
+  --color-line-soft: #EFEBDD;
+  --color-terra: #DC5A2A;
+  --color-terra-soft: #FBE4D7;
+  --color-terra-ink: #8A2F0E;
+  --color-moss: #25684A;
+  --color-moss-soft: #E0EBDF;
+  --color-sand: #E8C97A;
+  --color-sand-soft: #F5EAC8;
+  --color-rose: #C53A2A;
+  --color-rose-soft: #F5DDD8;
+  --color-slate: #2D3340;
+
+  /* Fonts */
+  --font-ui: var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-instrument-serif), ui-serif, Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, Menlo, monospace;
+
+  /* Radii */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+}
+
+/* Shorthand aliases — keeps var(--paper), var(--terra), var(--ui) etc. working */
+:root {
+  --paper: #F6F4EE;
+  --paper-2: #EFEBE0;
+  --card: #FFFFFF;
+  --ink: #15140F;
+  --ink-2: #56544B;
+  --ink-3: #8E8B7E;
+  --ink-4: #BAB6A8;
+  --line: #E5E1D3;
+  --line-soft: #EFEBDD;
+  --terra: #DC5A2A;
+  --terra-soft: #FBE4D7;
+  --terra-ink: #8A2F0E;
+  --moss: #25684A;
+  --moss-soft: #E0EBDF;
+  --sand: #E8C97A;
+  --sand-soft: #F5EAC8;
+  --rose: #C53A2A;
+  --rose-soft: #F5DDD8;
+  --slate: #2D3340;
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --ui: var(--font-inter-tight, "Inter Tight"), ui-sans-serif, system-ui, sans-serif;
+  --serif: var(--font-instrument-serif, "Instrument Serif"), ui-serif, Georgia, serif;
+  --mono: var(--font-jetbrains-mono, "JetBrains Mono"), ui-monospace, Menlo, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
