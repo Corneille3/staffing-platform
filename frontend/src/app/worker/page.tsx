@@ -2,15 +2,24 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Calendar, MapPin } from "lucide-react";
 import {
   fetchAssignments,
   fetchRequestResponses,
   fetchRequests,
   updateWorkerPreferences,
 } from "../../lib/browser-api";
-import { assignmentStatusLabel, availabilityStatusLabel, pickLocale } from "../../lib/status-labels";
+import { pickLocale } from "../../lib/status-labels";
 import { Assignment, RequestResponse, StaffingRequest } from "../../lib/types";
 import { useWorkerSession } from "../../lib/worker-session";
+import { Avatar, Chip, Meta, Mono } from "../../components/ui";
+
+type CardStatus = "new" | "sent" | "filled";
+
+interface InboxItem {
+  request: StaffingRequest;
+  status: CardStatus;
+}
 
 export default function WorkerHome() {
   const { worker, refresh } = useWorkerSession();
@@ -18,6 +27,7 @@ export default function WorkerHome() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [responses, setResponses] = useState<RequestResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"active" | "history">("active");
   const [preferenceBusy, setPreferenceBusy] = useState(false);
   const [preferenceError, setPreferenceError] = useState<string | null>(null);
 
@@ -39,45 +49,46 @@ export default function WorkerHome() {
       setResponses(responseLists.flat().filter((r) => r.worker_user_id === worker.id));
       setLoading(false);
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [worker]);
 
   if (!worker) return null;
 
-  const workerId = worker.id;
   const locale = pickLocale(worker.preferred_language);
   const availabilityStatus = worker.profile?.availability_status || "unavailable";
-  const canReceiveRequests = availabilityStatus === "available";
+  const available = availabilityStatus === "available";
   const urgentAlertsEnabled = worker.profile?.urgent_alert_opt_in ?? false;
-  const openForMe = canReceiveRequests ? requests.filter(
-    (request) => ["open", "notified", "responses_received"].includes(request.status),
-  ) : [];
-  const urgentRequests = openForMe
-    .filter((request) => request.urgency_level >= 3)
-    .sort(compareRequestsByNewest);
-  const nearbyCoverage = openForMe
-    .filter((request) => request.urgency_level < 3)
-    .sort(compareRequestsByNewest);
-  const myAssignments = assignments.filter(
-    (a) => a.worker_user_id === worker.id && a.status !== "completed" && a.status !== "cancelled",
-  );
-  const upcomingAssignment = myAssignments
-    .map((assignment) => ({
-      assignment,
-      request: requests.find((request) => request.id === assignment.staffing_request_id) || null,
-    }))
-    .filter((item): item is { assignment: Assignment; request: StaffingRequest } => Boolean(item.request))
-    .sort((left, right) => compareRequestsByStart(left.request, right.request))[0] || null;
-  async function updatePreferences(payload: {
-    availability_status?: "available" | "unavailable";
-    urgent_alert_opt_in?: boolean;
-  }) {
+
+  const inboxItems: InboxItem[] = requests.map((req) => {
+    const myResponse = responses.find((r) => r.staffing_request_id === req.id);
+    let status: CardStatus = "new";
+    if (["assigned", "completed", "cancelled", "expired"].includes(req.status)) {
+      status = "filled";
+    } else if (myResponse && ["accepted", "viewed"].includes(myResponse.status)) {
+      status = "sent";
+    }
+    return { request: req, status };
+  });
+
+  const activeItems = inboxItems.filter((i) => i.status !== "filled");
+  const historyItems = inboxItems.filter((i) => i.status === "filled");
+  const displayed = tab === "active" ? activeItems : historyItems;
+
+  const firstName = worker.first_name;
+  const hour = new Date().getHours();
+  const greeting =
+    locale === "fr"
+      ? hour < 12 ? "Bonjour" : hour < 18 ? "Bonsoir" : "Bonsoir"
+      : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
+  async function toggleAvailability() {
+    if (!worker) return;
     setPreferenceBusy(true);
     setPreferenceError(null);
     try {
-      await updateWorkerPreferences(workerId, payload);
+      await updateWorkerPreferences(worker.id, {
+        availability_status: available ? "unavailable" : "available",
+      });
       await refresh();
     } catch (err) {
       setPreferenceError(err instanceof Error ? err.message : "Update failed");
@@ -87,415 +98,259 @@ export default function WorkerHome() {
   }
 
   return (
-    <div style={{ display: "grid", gap: 24 }}>
-      <HomeTopCard
-        firstName={worker.first_name}
-        availabilityStatus={availabilityStatus}
-        urgentAlertsEnabled={urgentAlertsEnabled}
-        locale={locale}
-        busy={preferenceBusy}
-        error={preferenceError}
-        openRequestCount={openForMe.length}
-        canReceiveRequests={canReceiveRequests}
-        onSetUnavailable={() => updatePreferences({ availability_status: "unavailable" })}
-        onToggleUrgentAlerts={() =>
-          updatePreferences({ urgent_alert_opt_in: !urgentAlertsEnabled })
-        }
-      />
-
-      <Section title="Urgent Requests" actionLabel="See all" actionHref="/worker/requests">
-        {loading ? (
-          <Placeholder>Loading…</Placeholder>
-        ) : !canReceiveRequests ? (
-          <Placeholder>You are unavailable, so urgent requests are hidden.</Placeholder>
-        ) : urgentRequests.length === 0 ? (
-          <Placeholder>No urgent requests right now.</Placeholder>
-        ) : (
-          urgentRequests.slice(0, 3).map((request) => (
-            <RequestPreviewCard key={request.id} request={request} emphasis="urgent" />
-          ))
-        )}
-      </Section>
-
-      <Section title="Available Coverage Near You" actionLabel="Browse all" actionHref="/worker/requests">
-        {loading ? (
-          <Placeholder>Loading…</Placeholder>
-        ) : !canReceiveRequests ? (
-          <Placeholder>You are unavailable, so coverage requests are hidden.</Placeholder>
-        ) : nearbyCoverage.length === 0 ? (
-          <Placeholder>No nearby coverage requests right now.</Placeholder>
-        ) : (
-          nearbyCoverage.slice(0, 4).map((request) => (
-            <RequestPreviewCard key={request.id} request={request} />
-          ))
-        )}
-      </Section>
-
-      <Section title="Upcoming Assignment" actionLabel="See all" actionHref="/worker/assignments">
-        {loading ? (
-          <Placeholder>Loading…</Placeholder>
-        ) : !upcomingAssignment ? (
-          <Placeholder>No assigned shift yet.</Placeholder>
-        ) : (
-          <AssignmentPreviewCard
-            request={upcomingAssignment.request}
-            assignment={upcomingAssignment.assignment}
-            locale={locale}
-          />
-        )}
-      </Section>
-    </div>
-  );
-}
-
-function HomeTopCard({
-  firstName,
-  availabilityStatus,
-  urgentAlertsEnabled,
-  locale,
-  busy,
-  error,
-  openRequestCount,
-  canReceiveRequests,
-  onSetUnavailable,
-  onToggleUrgentAlerts,
-}: {
-  firstName: string;
-  availabilityStatus: string;
-  urgentAlertsEnabled: boolean;
-  locale: "en" | "fr";
-  busy: boolean;
-  error: string | null;
-  openRequestCount: number;
-  canReceiveRequests: boolean;
-  onSetUnavailable: () => void;
-  onToggleUrgentAlerts: () => void;
-}) {
-  const available = availabilityStatus === "available";
-
-  return (
-    <section
-      style={{
-        marginTop: 12,
-        background: "#fffdf7",
-        borderRadius: 22,
-        padding: 20,
-        boxShadow: "0 8px 18px rgba(24, 50, 41, 0.08)",
-        display: "grid",
-        gap: 18,
-      }}
-    >
-      <div>
-        <h1 style={{ margin: 0, fontSize: 28, lineHeight: 1.15 }}>
-          Hello, {firstName}.
-        </h1>
-        <p style={{ margin: "6px 0 0", color: "#496158" }}>
-          {!canReceiveRequests
-            ? "You are unavailable. New request alerts are paused."
-            : openRequestCount > 0
-            ? `${openRequestCount} new request${openRequestCount === 1 ? "" : "s"} available.`
-            : "No new requests right now."}
-        </p>
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-          gap: 10,
-        }}
-      >
-        <StatusPill
-          label="Availability"
-          value={availabilityStatusLabel(availabilityStatus, locale)}
-          tone={available ? "good" : "muted"}
-        />
-        <StatusPill
-          label="Urgent alerts"
-          value={urgentAlertsEnabled ? "On" : "Off"}
-          tone={urgentAlertsEnabled ? "good" : "muted"}
+    <div style={{ paddingTop: 24 }}>
+      {/* Greeting header */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+        <div>
+          <div style={{ fontSize: 11, color: "var(--ink-3)", letterSpacing: ".14em", textTransform: "uppercase", fontWeight: 500 }}>
+            {greeting}, {firstName}
+          </div>
+          <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, lineHeight: 1.05, margin: "4px 0 0" }}>
+            {locale === "fr"
+              ? <>Vos <em style={{ fontStyle: "italic" }}>opportunités</em></>
+              : <>Today's <em style={{ fontStyle: "italic" }}>opportunities</em></>}
+          </h1>
+        </div>
+        <Avatar
+          initials={`${worker.first_name[0]}${worker.last_name[0]}`}
+          tone="terra"
+          size={38}
         />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <QuickButton
-          disabled={busy || !available}
-          onClick={onSetUnavailable}
-          tone="muted"
-        >
-          Set unavailable
-        </QuickButton>
-        <QuickButton
-          disabled={busy}
-          onClick={onToggleUrgentAlerts}
-          tone={urgentAlertsEnabled ? "muted" : "primary"}
-        >
-          {urgentAlertsEnabled ? "Turn alerts off" : "Turn alerts on"}
-        </QuickButton>
-        <QuickLink href="/worker/availability">Update availability</QuickLink>
-        <QuickLink href="/worker/requests">View available coverage</QuickLink>
-      </div>
-
-      {error ? <p style={{ margin: 0, color: "#7a3526", fontWeight: 800 }}>{error}</p> : null}
-    </section>
-  );
-}
-
-function StatusPill({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: "good" | "muted";
-}) {
-  const palette =
-    tone === "good"
-      ? { bg: "#e2f1e8", color: "#214639" }
-      : { bg: "#eadfd7", color: "#7a473f" };
-
-  return (
-    <div
-      style={{
-        borderRadius: 16,
-        background: palette.bg,
-        color: palette.color,
-        padding: 14,
-        display: "grid",
-        gap: 4,
-      }}
-    >
-      <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-        {label}
-      </span>
-      <strong style={{ fontSize: 16 }}>{value}</strong>
-    </div>
-  );
-}
-
-function QuickButton({
-  disabled,
-  onClick,
-  tone,
-  children,
-}: {
-  disabled: boolean;
-  onClick: () => void;
-  tone: "primary" | "muted";
-  children: React.ReactNode;
-}) {
-  const palette =
-    tone === "primary"
-      ? { bg: "#214639", color: "#f7f0df" }
-      : { bg: "#eadfd7", color: "#7a473f" };
-
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      style={{
-        border: 0,
-        borderRadius: 14,
-        minHeight: 48,
-        padding: "12px 14px",
-        background: palette.bg,
-        color: palette.color,
-        fontSize: 14,
-        fontWeight: 800,
-        cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.58 : 1,
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function QuickLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      style={{
-        borderRadius: 14,
-        minHeight: 48,
-        padding: "12px 14px",
-        background: "#dbe4dd",
-        color: "#214639",
-        fontSize: 14,
-        fontWeight: 800,
-        textDecoration: "none",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        textAlign: "center",
-      }}
-    >
-      {children}
-    </Link>
-  );
-}
-
-function Section({
-  title,
-  actionLabel,
-  actionHref,
-  children,
-}: {
-  title: string;
-  actionLabel?: string;
-  actionHref?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section>
-      <div
+      {/* Availability strip */}
+      <button
+        onClick={toggleAvailability}
+        disabled={preferenceBusy}
         style={{
+          width: "100%",
           display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
-          marginBottom: 12,
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 14px",
+          background: available ? "var(--moss-soft)" : "var(--paper-2)",
+          border: `0.5px solid ${available ? "#C8DCC1" : "var(--line)"}`,
+          borderRadius: 14,
+          marginBottom: 20,
+          cursor: "pointer",
+          fontFamily: "var(--ui)",
+          textAlign: "left",
         }}
       >
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{title}</h2>
-        {actionHref && actionLabel ? (
-          <Link href={actionHref} style={{ color: "#214639", fontSize: 13, fontWeight: 700 }}>
-            {actionLabel} →
-          </Link>
-        ) : null}
-      </div>
-      <div style={{ display: "grid", gap: 12 }}>{children}</div>
-    </section>
-  );
-}
+        <div
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 99,
+            background: available ? "var(--moss)" : "var(--ink-4)",
+            flexShrink: 0,
+          }}
+        />
+        <div style={{ flex: 1, fontSize: 13, color: available ? "var(--moss)" : "var(--ink-3)", fontWeight: 500 }}>
+          {available
+            ? (locale === "fr" ? "Disponible aujourd'hui" : "Available today")
+            : (locale === "fr" ? "Indisponible" : "Unavailable")}
+        </div>
+        <span style={{ fontSize: 11, color: "var(--ink-3)" }}>
+          {locale === "fr" ? "Modifier" : "Edit"}
+        </span>
+      </button>
 
-function Placeholder({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        padding: 18,
-        borderRadius: 14,
-        background: "rgba(255, 253, 247, 0.7)",
-        border: "1px dashed rgba(24, 50, 41, 0.18)",
-        color: "#5d6d66",
-        textAlign: "center",
-        fontSize: 14,
-      }}
-    >
-      {children}
+      {preferenceError && (
+        <p style={{ margin: "-12px 0 16px", fontSize: 12, color: "var(--rose)" }}>{preferenceError}</p>
+      )}
+
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 0, marginBottom: 12, borderBottom: "0.5px solid var(--line)" }}>
+        {(["active", "history"] as const).map((t) => {
+          const count = t === "active" ? activeItems.length : historyItems.length;
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              style={{
+                border: "none",
+                background: "transparent",
+                padding: "8px 0",
+                marginRight: 20,
+                fontFamily: "var(--ui)",
+                fontSize: 14,
+                fontWeight: tab === t ? 600 : 400,
+                color: tab === t ? "var(--ink)" : "var(--ink-3)",
+                borderBottom: tab === t ? "1.5px solid var(--ink)" : "1.5px solid transparent",
+                marginBottom: -1,
+                cursor: "pointer",
+              }}
+            >
+              {t === "active"
+                ? (locale === "fr" ? "Actif" : "Active")
+                : (locale === "fr" ? "Historique" : "History")}
+              {" "}
+              <span style={{ color: "var(--ink-3)", fontWeight: 400 }}>{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Request list */}
+      {loading ? (
+        <div style={{ padding: "32px 0", textAlign: "center", color: "var(--ink-3)", fontSize: 14 }}>
+          {locale === "fr" ? "Chargement…" : "Loading…"}
+        </div>
+      ) : displayed.length === 0 ? (
+        <div style={{ padding: "32px 0", textAlign: "center", color: "var(--ink-3)", fontSize: 14 }}>
+          {tab === "active"
+            ? (locale === "fr" ? "Aucune demande active." : "No active requests.")
+            : (locale === "fr" ? "Aucun historique." : "Nothing in history yet.")}
+        </div>
+      ) : (
+        displayed.map(({ request, status }) => (
+          <RequestCard key={request.id} request={request} status={status} locale={locale} />
+        ))
+      )}
+
+      <div style={{ textAlign: "center", padding: "20px 0 8px", color: "var(--ink-4)", fontSize: 12 }}>
+        {locale === "fr" ? "C'est tout pour l'instant." : "That's all for now."}
+      </div>
     </div>
   );
 }
 
-function RequestPreviewCard({
+function RequestCard({
   request,
-  emphasis = "normal",
+  status,
+  locale,
 }: {
   request: StaffingRequest;
-  emphasis?: "normal" | "urgent";
+  status: CardStatus;
+  locale: "en" | "fr";
 }) {
   const urgent = request.urgency_level >= 3;
-  return (
-    <Link
-      href={`/worker/requests`}
-      style={{
-        display: "block",
-        textDecoration: "none",
-        color: "inherit",
-        background: emphasis === "urgent" ? "#f8e6df" : "#fffdf7",
-        borderRadius: 18,
-        padding: 18,
-        border: emphasis === "urgent" ? "1px solid rgba(122, 53, 38, 0.18)" : "1px solid transparent",
-        boxShadow: emphasis === "urgent" ? "0 8px 18px rgba(122, 53, 38, 0.1)" : "0 8px 18px rgba(24, 50, 41, 0.08)",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
-        <strong style={{ fontSize: 17 }}>{request.title}</strong>
-        {urgent ? (
-          <span
-            style={{
-              borderRadius: 999,
-              padding: "4px 10px",
-              background: "#f4d4cc",
-              color: "#7a3526",
-              fontSize: 11,
-              fontWeight: 800,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-            }}
-          >
-            Urgent
-          </span>
-        ) : null}
-      </div>
-      <div style={{ marginTop: 8, color: "#496158", fontSize: 14 }}>
-        {request.city} · {request.work_date}
-      </div>
-      <div style={{ marginTop: 4, color: "#496158", fontSize: 14 }}>
-        {request.start_time.slice(0, 5)} – {request.end_time.slice(0, 5)}
-      </div>
-    </Link>
-  );
-}
+  const timeAgo = formatTimeAgo(request.created_at, locale);
 
-function AssignmentPreviewCard({
-  request,
-  assignment,
-  locale,
-}: {
-  request: StaffingRequest;
-  assignment: Assignment;
-  locale: "en" | "fr";
-}) {
   return (
     <div
       style={{
-        background: "#214639",
-        color: "#f7f0df",
+        background: "#fff",
         borderRadius: 18,
-        padding: 18,
-        boxShadow: "0 8px 18px rgba(24, 50, 41, 0.18)",
+        padding: "14px 16px",
+        marginBottom: 10,
+        border: `0.5px solid ${urgent ? "#F2C5B0" : "var(--line)"}`,
+        boxShadow: urgent
+          ? "0 1px 0 rgba(220,90,42,.04), 0 8px 24px -16px rgba(220,90,42,.18)"
+          : "none",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
-        <strong style={{ fontSize: 17 }}>{request.title}</strong>
-        <span
+      {urgent && (
+        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--terra)" }} />
+      )}
+
+      {/* Top row: chips + time */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {urgent && <Chip variant="urgent" dot>{locale === "fr" ? "Urgent" : "Urgent"}</Chip>}
+          {status === "new"    && <Chip variant="terra" dot>{locale === "fr" ? "Nouvelle demande" : "New request"}</Chip>}
+          {status === "sent"   && <Chip variant="sand"  dot>{locale === "fr" ? "Réponse envoyée" : "Reply sent"}</Chip>}
+          {status === "filled" && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{locale === "fr" ? "Pourvu" : "Filled"}</Chip>}
+        </div>
+        <Mono style={{ fontSize: 10, color: "var(--ink-3)" }}>{timeAgo}</Mono>
+      </div>
+
+      {/* Org name */}
+      <div style={{ fontFamily: "var(--serif)", fontSize: 22, lineHeight: 1.15, marginBottom: 2 }}>
+        {request.title}
+      </div>
+      <div style={{ fontSize: 12, color: "var(--ink-2)", marginBottom: 10 }}>
+        {request.city}
+      </div>
+
+      {/* Meta grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 12 }}>
+        <Meta
+          icon={<Calendar size={13} />}
+          label={request.work_date}
+          sub={`${request.start_time.slice(0, 5)} → ${request.end_time.slice(0, 5)}`}
+        />
+        <Meta
+          icon={<MapPin size={13} />}
+          label={request.city}
+        />
+      </div>
+
+      {/* CTAs */}
+      {status === "new" && (
+        <div style={{ display: "flex", gap: 8 }}>
+          <Link
+            href={`/worker/requests`}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 12,
+              background: "var(--ink)",
+              color: "var(--paper)",
+              fontSize: 14,
+              fontWeight: 500,
+              textAlign: "center",
+              textDecoration: "none",
+              fontFamily: "var(--ui)",
+            }}
+          >
+            {locale === "fr" ? "Je peux le prendre" : "I can take it"}
+          </Link>
+          <Link
+            href={`/worker/requests`}
+            style={{
+              padding: "11px 14px",
+              borderRadius: 12,
+              border: "0.5px solid var(--line)",
+              background: "transparent",
+              color: "var(--ink)",
+              fontSize: 14,
+              fontWeight: 500,
+              textDecoration: "none",
+              fontFamily: "var(--ui)",
+            }}
+          >
+            {locale === "fr" ? "Refuser" : "Decline"}
+          </Link>
+        </div>
+      )}
+
+      {status === "sent" && (
+        <div
           style={{
-            borderRadius: 999,
-            padding: "4px 10px",
-            background: "rgba(247, 240, 223, 0.18)",
-            fontSize: 11,
-            fontWeight: 800,
-            letterSpacing: "0.06em",
-            textTransform: "uppercase",
+            padding: "11px 0",
+            textAlign: "center",
+            color: "var(--ink-3)",
+            fontSize: 13,
+            border: "0.5px dashed var(--line)",
+            borderRadius: 12,
           }}
         >
-          {assignmentStatusLabel(assignment.status, locale)}
-        </span>
-      </div>
-      <div style={{ marginTop: 8, opacity: 0.85, fontSize: 14 }}>
-        {request.city} · {request.work_date}
-      </div>
-      <div style={{ marginTop: 4, opacity: 0.85, fontSize: 14 }}>
-        {request.start_time.slice(0, 5)} – {request.end_time.slice(0, 5)}
-      </div>
+          {locale === "fr" ? "En attente de confirmation" : "Waiting for confirmation"}
+        </div>
+      )}
     </div>
   );
+}
+
+function formatTimeAgo(createdAt: string | undefined, locale: "en" | "fr"): string {
+  if (!createdAt) return "";
+  const diff = Date.now() - new Date(createdAt).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return locale === "fr" ? `${mins} min` : `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return locale === "fr" ? `${hours} h` : `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return locale === "fr" ? `${days} j` : `${days}d ago`;
 }
 
 function compareRequestsByStart(left: StaffingRequest, right: StaffingRequest): number {
   return requestStartTime(left) - requestStartTime(right);
 }
 
-function compareRequestsByNewest(left: StaffingRequest, right: StaffingRequest): number {
-  return requestCreatedTime(right) - requestCreatedTime(left) || compareRequestsByStart(left, right);
-}
-
 function requestStartTime(request: StaffingRequest): number {
   return new Date(`${request.work_date}T${request.start_time}`).getTime();
-}
-
-function requestCreatedTime(request: StaffingRequest): number {
-  return request.created_at ? new Date(request.created_at).getTime() : 0;
 }
