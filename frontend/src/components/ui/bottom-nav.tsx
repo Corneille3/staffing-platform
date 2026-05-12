@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { LucideIcon } from "lucide-react";
+import { Link, usePathname } from "../../i18n/navigation";
 
 interface NavItem {
   href: string;

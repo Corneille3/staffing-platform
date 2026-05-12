@@ -1,0 +1,36 @@
+{
+  "common": {
+    "loading": "Chargement…",
+    "add": "Ajouter",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "remove": "Retirer",
+    "signOut": "Se déconnecter",
+    "on": "Activées",
+    "off": "Désactivées",
+    "yes": "Oui",
+    "no": "Non"
+  },
+  "worker": {
+    "nav": {
+      "inbox": "Boîte",
+      "schedule": "Horaire",
+      "alerts": "Alertes",
+      "availability": "Disponibilités",
+      "profile": "Profil"
+    },
+    "profile": {
+      "language": "Langue",
+      "identity": "Identité",
+      "firstName": "Prénom",
+      "lastName": "Nom",
+      "email": "Courriel",
+      "languageField": "Langue",
+      "workProfile": "Profil de travail",
+      "cities": "Villes",
+      "qualifications": "Qualifications",
+      "certifications": "Certifications",
+      "urgentAlerts": "Alertes urgentes"
+    }
+  }
+}

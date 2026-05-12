@@ -1,0 +1,36 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "add": "Add",
+    "cancel": "Cancel",
+    "save": "Save",
+    "remove": "Remove",
+    "signOut": "Sign out",
+    "on": "On",
+    "off": "Off",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "worker": {
+    "nav": {
+      "inbox": "Inbox",
+      "schedule": "Schedule",
+      "alerts": "Alerts",
+      "availability": "Availability",
+      "profile": "Profile"
+    },
+    "profile": {
+      "language": "Language",
+      "identity": "Identity",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email",
+      "languageField": "Language",
+      "workProfile": "Work profile",
+      "cities": "Cities",
+      "qualifications": "Qualifications",
+      "certifications": "Certifications",
+      "urgentAlerts": "Urgent alerts"
+    }
+  }
+}
