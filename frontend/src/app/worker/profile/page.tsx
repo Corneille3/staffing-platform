@@ -1,53 +1,84 @@
 "use client";
 
 import { useClerk } from "@clerk/nextjs";
+import { LogOut, MapPin } from "lucide-react";
 import { useWorkerSession } from "../../../lib/worker-session";
+import { Avatar, Eyebrow } from "../../../components/ui";
 
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-const SIGN_OUT_BUTTON_STYLE = {
-  border: 0,
-  borderRadius: 14,
-  padding: "16px 18px",
-  background: "#eadfd7",
-  color: "#7a473f",
-  fontSize: 15,
-  fontWeight: 800,
-  cursor: "pointer",
-};
 
 export default function WorkerProfilePage() {
   const { worker } = useWorkerSession();
 
   if (!worker) return null;
 
+  const initials = `${worker.first_name[0]}${worker.last_name[0]}`.toUpperCase();
+
   return (
     <div style={{ display: "grid", gap: 24, paddingTop: 16 }}>
-      <header>
-        <h1 style={{ margin: 0, fontSize: 26 }}>Profile</h1>
-        <p style={{ margin: "6px 0 0", color: "#496158" }}>
-          Your contact details and qualifications. Editing comes soon.
-        </p>
-      </header>
+      {/* identity header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <Avatar initials={initials} tone="terra" size={56} />
+        <div>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 24, lineHeight: 1.1 }}>
+            {worker.first_name}{" "}
+            <em style={{ fontStyle: "italic" }}>{worker.last_name}</em>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 3 }}>{worker.email}</div>
+        </div>
+      </div>
 
-      <Card>
-        <Field label="Name" value={`${worker.first_name} ${worker.last_name}`} />
+      {/* contact card */}
+      <section style={{
+        background: "var(--card)",
+        border: "0.5px solid var(--line)",
+        borderRadius: 18,
+        padding: 18,
+        display: "grid",
+        gap: 16,
+      }}>
+        <Eyebrow>Identity</Eyebrow>
+        <Field label="First name" value={worker.first_name} />
+        <Field label="Last name" value={worker.last_name} />
         <Field label="Email" value={worker.email} />
-        <Field label="Preferred language" value={worker.preferred_language.toUpperCase()} />
-      </Card>
-
-      <Card>
         <Field
-          label="Cities I can work in"
+          label="Language"
+          value={worker.preferred_language === "fr" ? "Français" : "English"}
+        />
+      </section>
+
+      {/* work profile card */}
+      <section style={{
+        background: "var(--card)",
+        border: "0.5px solid var(--line)",
+        borderRadius: 18,
+        padding: 18,
+        display: "grid",
+        gap: 16,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <MapPin size={14} style={{ color: "var(--ink-3)" }} />
+          <Eyebrow>Work profile</Eyebrow>
+        </div>
+        <Field
+          label="Cities"
           value={worker.profile?.supported_cities.join(", ") || "—"}
         />
-        <Field label="Qualifications" value={worker.profile?.qualifications.join(", ") || "—"} />
-        <Field label="Certifications" value={worker.profile?.certifications.join(", ") || "—"} />
+        <Field
+          label="Qualifications"
+          value={worker.profile?.qualifications.join(", ") || "—"}
+        />
+        <Field
+          label="Certifications"
+          value={worker.profile?.certifications.join(", ") || "—"}
+        />
         <Field
           label="Urgent alerts"
-          value={worker.profile?.urgent_alert_opt_in ? "Yes" : "No"}
+          value={worker.profile?.urgent_alert_opt_in
+            ? (worker.preferred_language === "fr" ? "Activées" : "On")
+            : (worker.preferred_language === "fr" ? "Désactivées" : "Off")}
         />
-      </Card>
+      </section>
 
       {CLERK_ENABLED ? <ClerkSignOutButton /> : <DevSignOutButton />}
     </div>
@@ -64,7 +95,12 @@ function ClerkSignOutButton() {
   }
 
   return (
-    <button type="button" onClick={handleSignOut} style={SIGN_OUT_BUTTON_STYLE}>
+    <button
+      type="button"
+      onClick={handleSignOut}
+      style={signOutStyle}
+    >
+      <LogOut size={15} />
       Sign out
     </button>
   );
@@ -77,44 +113,39 @@ function DevSignOutButton() {
   }
 
   return (
-    <button type="button" onClick={handleSignOut} style={SIGN_OUT_BUTTON_STYLE}>
+    <button
+      type="button"
+      onClick={handleSignOut}
+      style={signOutStyle}
+    >
+      <LogOut size={15} />
       Sign out
     </button>
   );
 }
 
-function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <section
-      style={{
-        background: "#fffdf7",
-        borderRadius: 20,
-        padding: 18,
-        boxShadow: "0 8px 18px rgba(24, 50, 41, 0.08)",
-        display: "grid",
-        gap: 14,
-      }}
-    >
-      {children}
-    </section>
-  );
-}
+const signOutStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  border: "0.5px solid var(--line)",
+  borderRadius: 14,
+  padding: "14px 18px",
+  background: "var(--card)",
+  color: "var(--rose)",
+  fontSize: 14,
+  fontWeight: 600,
+  cursor: "pointer",
+  fontFamily: "inherit",
+  minHeight: 44,
+};
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p
-        style={{
-          margin: 0,
-          fontSize: 11,
-          letterSpacing: "0.16em",
-          textTransform: "uppercase",
-          color: "#5d6d66",
-        }}
-      >
-        {label}
-      </p>
-      <p style={{ margin: "4px 0 0", fontSize: 16, color: "#183229" }}>{value}</p>
+      <Eyebrow style={{ fontSize: 9, marginBottom: 4 }}>{label}</Eyebrow>
+      <p style={{ margin: 0, fontSize: 15, color: "var(--ink)", fontWeight: 500 }}>{value}</p>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import { Calendar, MapPin, Check, X, AlertTriangle } from "lucide-react";
 import {
   acceptRequest,
   declineRequest,
@@ -12,6 +13,7 @@ import {
 import { pickLocale, workerRequestPerspective } from "../../../lib/status-labels";
 import { EligibilityResult, RequestResponse, StaffingRequest } from "../../../lib/types";
 import { useWorkerSession } from "../../../lib/worker-session";
+import { Chip, Eyebrow, Meta, Mono } from "../../../components/ui";
 
 type RequestWithMyResponse = {
   request: StaffingRequest;
@@ -20,13 +22,6 @@ type RequestWithMyResponse = {
 };
 
 type CoverageTab = "all" | "urgent" | "today" | "week";
-
-const COVERAGE_TABS: { id: CoverageTab; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "urgent", label: "Urgent" },
-  { id: "today", label: "Today" },
-  { id: "week", label: "This Week" },
-];
 
 export default function WorkerRequestsPage() {
   const { worker } = useWorkerSession();
@@ -57,30 +52,23 @@ export default function WorkerRequestsPage() {
       const open = all.filter((r) =>
         ["open", "notified", "responses_received"].includes(r.status),
       );
-      // Assigned requests where this worker was notified (has a response row)
       const assignedToOther = all.filter(
         (r) => r.status === "assigned" && r.assigned_worker_user_id !== worker.id,
       );
-
       const [responses, eligibilityResults, assignedResponses] = await Promise.all([
         Promise.all(open.map((r) => fetchRequestResponses(r.id))),
         Promise.all(open.map((r) => fetchRequestEligibility(r.id, worker.id).catch(() => null))),
         Promise.all(assignedToOther.map((r) => fetchRequestResponses(r.id))),
       ]);
-
       const enriched: RequestWithMyResponse[] = open.map((request, i) => ({
         request,
         myResponse: responses[i].find((res) => res.worker_user_id === worker.id) || null,
         eligibility: eligibilityResults[i],
       }));
       setItems(enriched);
-
-      // Mark all notified responses as viewed now that the worker sees them
       enriched
         .filter((item) => item.myResponse?.status === "notified")
         .forEach((item) => markRequestViewed(item.request.id, worker.id).catch(() => {}));
-
-      // Only show "filled" notice for requests where the worker had a response
       const filled = assignedToOther.filter((request, i) =>
         assignedResponses[i].some((res) => res.worker_user_id === worker.id),
       );
@@ -92,32 +80,30 @@ export default function WorkerRequestsPage() {
     }
   }
 
-  useEffect(() => {
-    load();
-  }, [worker]);
+  useEffect(() => { load(); }, [worker]);
 
   const cityOptions = useMemo(
     () => Array.from(new Set(items.map((item) => item.request.city))).sort(),
     [items],
   );
   const filteredItems = useMemo(
-    () =>
-      items.filter((item) =>
-        matchesTab(item.request, activeTab) &&
-        matchesCity(item.request, cityFilter) &&
-        matchesDate(item.request, dateFilter) &&
-        (!urgentOnly || isUrgent(item.request)),
-      ),
+    () => items.filter((item) =>
+      matchesTab(item.request, activeTab) &&
+      matchesCity(item.request, cityFilter) &&
+      matchesDate(item.request, dateFilter) &&
+      (!urgentOnly || isUrgent(item.request)),
+    ),
     [items, activeTab, cityFilter, dateFilter, urgentOnly],
   );
 
-  const undecided = filteredItems.filter((i) => !i.myResponse || i.myResponse.status === "notified" || i.myResponse.status === "viewed");
-  const accepted = filteredItems.filter((i) => i.myResponse?.status === "accepted");
-  const declined = filteredItems.filter((i) => i.myResponse?.status === "declined");
+  const undecided = filteredItems.filter((i) => !i.myResponse || ["notified", "viewed"].includes(i.myResponse.status));
+  const accepted  = filteredItems.filter((i) => i.myResponse?.status === "accepted");
+  const declined  = filteredItems.filter((i) => i.myResponse?.status === "declined");
 
   if (!worker) return null;
   const locale = pickLocale(worker.preferred_language);
-  const canReceiveRequests = worker.profile?.availability_status === "available";
+  const canReceive = worker.profile?.availability_status === "available";
+  const hasFilters = activeTab !== "all" || cityFilter || dateFilter || urgentOnly;
 
   async function respond(requestId: string, action: "accept" | "decline", reason?: string) {
     if (!worker) return;
@@ -141,58 +127,114 @@ export default function WorkerRequestsPage() {
   }
 
   return (
-    <div style={{ display: "grid", gap: 24, paddingTop: 16 }}>
-      <header>
-        <h1 style={{ margin: 0, fontSize: 26 }}>Available coverage</h1>
-        <p style={{ margin: "6px 0 0", color: "#496158" }}>
-          {canReceiveRequests
-            ? "Tap a request to accept or decline."
-            : "You are unavailable. New request alerts are paused."}
-        </p>
-      </header>
+    <div style={{ paddingTop: 24 }}>
+      {/* Heading */}
+      <div style={{ marginBottom: 20 }}>
+        <Eyebrow style={{ marginBottom: 4 }}>
+          {locale === "fr" ? "Remplacements disponibles" : "Available coverage"}
+        </Eyebrow>
+        <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, lineHeight: 1.05, margin: 0 }}>
+          {locale === "fr"
+            ? <>Trouvez un <em style={{ fontStyle: "italic" }}>remplacement</em></>
+            : <>Find a <em style={{ fontStyle: "italic" }}>shift</em></>}
+        </h1>
+      </div>
 
-      {error ? (
-        <div
-          style={{
-            padding: 14,
-            borderRadius: 12,
-            background: "#f4d4cc",
-            color: "#7a3526",
-            fontWeight: 700,
-            fontSize: 14,
-          }}
-        >
+      {error && (
+        <div style={{ padding: "12px 14px", borderRadius: 12, background: "var(--rose-soft)", color: "var(--rose)", fontSize: 14, marginBottom: 16 }}>
           {error}
         </div>
-      ) : null}
+      )}
 
-      {loading ? (
-        <p style={{ color: "#496158" }}>Loading…</p>
-      ) : !canReceiveRequests ? (
-        <Empty>Set your availability to available to receive new requests.</Empty>
+      {!canReceive ? (
+        <div style={{ padding: "20px 16px", borderRadius: 16, background: "#fff", border: "0.5px solid var(--line)", textAlign: "center" }}>
+          <div style={{ fontSize: 14, color: "var(--ink-3)", lineHeight: 1.6 }}>
+            {locale === "fr"
+              ? "Vous êtes indisponible. Mettez-vous disponible pour recevoir des demandes."
+              : "You are unavailable. Set your availability to receive new requests."}
+          </div>
+        </div>
+      ) : loading ? (
+        <div style={{ padding: "32px 0", textAlign: "center", color: "var(--ink-3)", fontSize: 14 }}>
+          {locale === "fr" ? "Chargement…" : "Loading…"}
+        </div>
       ) : (
         <>
-          <CoverageFilters
-            activeTab={activeTab}
-            cityFilter={cityFilter}
-            cityOptions={cityOptions}
-            dateFilter={dateFilter}
-            urgentOnly={urgentOnly}
-            onTabChange={setActiveTab}
-            onCityChange={setCityFilter}
-            onDateChange={setDateFilter}
-            onUrgentOnlyChange={setUrgentOnly}
-            onClear={() => {
-              setActiveTab("all");
-              setCityFilter("");
-              setDateFilter("");
-              setUrgentOnly(false);
-            }}
-          />
+          {/* Tabs */}
+          <div style={{ display: "flex", gap: 6, marginBottom: 14, overflowX: "auto", paddingBottom: 2 }}>
+            {(["all", "urgent", "today", "week"] as CoverageTab[]).map((tab) => {
+              const labels: Record<CoverageTab, { en: string; fr: string }> = {
+                all:    { en: "All",       fr: "Tous" },
+                urgent: { en: "Urgent",    fr: "Urgent" },
+                today:  { en: "Today",     fr: "Aujourd'hui" },
+                week:   { en: "This Week", fr: "Cette semaine" },
+              };
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  style={{
+                    flexShrink: 0,
+                    border: activeTab === tab ? "none" : "0.5px solid var(--line)",
+                    borderRadius: 999,
+                    padding: "8px 16px",
+                    background: activeTab === tab ? "var(--ink)" : "#fff",
+                    color: activeTab === tab ? "var(--paper)" : "var(--ink-2)",
+                    fontSize: 13,
+                    fontWeight: activeTab === tab ? 600 : 400,
+                    cursor: "pointer",
+                    fontFamily: "var(--ui)",
+                    minHeight: 36,
+                  }}
+                >
+                  {labels[tab][locale]}
+                </button>
+              );
+            })}
+          </div>
 
-          <Group title={`Pending (${undecided.length})`}>
+          {/* Filters row */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+            <select
+              value={cityFilter}
+              onChange={(e) => setCityFilter(e.target.value)}
+              style={inputStyle}
+            >
+              <option value="">{locale === "fr" ? "Toutes les villes" : "Any city"}</option>
+              {cityOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--ink-2)", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={urgentOnly}
+                onChange={(e) => setUrgentOnly(e.target.checked)}
+                style={{ width: 16, height: 16, accentColor: "var(--terra)" }}
+              />
+              {locale === "fr" ? "Urgent seulement" : "Urgent only"}
+            </label>
+            {hasFilters && (
+              <button
+                onClick={() => { setActiveTab("all"); setCityFilter(""); setDateFilter(""); setUrgentOnly(false); }}
+                style={{ border: "none", background: "transparent", color: "var(--ink-3)", fontSize: 13, cursor: "pointer", fontFamily: "var(--ui)" }}
+              >
+                {locale === "fr" ? "Effacer" : "Clear filters"}
+              </button>
+            )}
+          </div>
+
+          {/* Pending group */}
+          <Group label={locale === "fr" ? `En attente (${undecided.length})` : `Pending (${undecided.length})`}>
             {undecided.length === 0 ? (
-              <Empty>{filteredItems.length === 0 ? "No requests match these filters." : "No pending requests."}</Empty>
+              <Empty>{locale === "fr" ? "Aucune demande en attente." : "No pending requests."}</Empty>
             ) : (
               undecided.map(({ request, myResponse, eligibility }) => (
                 <RequestCard
@@ -210,8 +252,8 @@ export default function WorkerRequestsPage() {
             )}
           </Group>
 
-          {accepted.length > 0 ? (
-            <Group title={`Accepted (${accepted.length})`}>
+          {accepted.length > 0 && (
+            <Group label={locale === "fr" ? `Accepté (${accepted.length})` : `Accepted (${accepted.length})`}>
               {accepted.map(({ request, myResponse, eligibility }) => (
                 <RequestCard
                   key={request.id}
@@ -225,10 +267,10 @@ export default function WorkerRequestsPage() {
                 />
               ))}
             </Group>
-          ) : null}
+          )}
 
-          {declined.length > 0 ? (
-            <Group title={`Declined (${declined.length})`}>
+          {declined.length > 0 && (
+            <Group label={locale === "fr" ? `Refusé (${declined.length})` : `Declined (${declined.length})`}>
               {declined.map(({ request, myResponse, eligibility }) => (
                 <RequestCard
                   key={request.id}
@@ -242,226 +284,69 @@ export default function WorkerRequestsPage() {
                 />
               ))}
             </Group>
-          ) : null}
+          )}
 
-          {filledItems.length > 0 ? (
-            <Group title={`Filled (${filledItems.length})`}>
+          {filledItems.length > 0 && (
+            <Group label={locale === "fr" ? `Pourvu (${filledItems.length})` : `Filled (${filledItems.length})`}>
               {filledItems.map((request) => (
-                <FilledRequestCard key={request.id} request={request} locale={locale} />
+                <FilledCard key={request.id} request={request} locale={locale} />
               ))}
             </Group>
-          ) : null}
-
-          {confirmingRequest ? (
-            <ConfirmAvailabilityModal
-              request={confirmingRequest}
-              busy={busy === confirmingRequest.id}
-              onCancel={() => setConfirmingRequest(null)}
-              onConfirm={() => respond(confirmingRequest.id, "accept")}
-            />
-          ) : null}
-          {decliningRequest ? (
-            <DeclineModal
-              request={decliningRequest}
-              reason={declineReason}
-              busy={busy === decliningRequest.id}
-              onReasonChange={setDeclineReason}
-              onCancel={() => { setDecliningRequest(null); setDeclineReason(""); }}
-              onConfirm={() => respond(decliningRequest.id, "decline", declineReason || undefined)}
-            />
-          ) : null}
+          )}
         </>
+      )}
+
+      {confirmingRequest && (
+        <ConfirmModal
+          request={confirmingRequest}
+          busy={busy === confirmingRequest.id}
+          locale={locale}
+          onCancel={() => setConfirmingRequest(null)}
+          onConfirm={() => respond(confirmingRequest.id, "accept")}
+        />
+      )}
+      {decliningRequest && (
+        <DeclineModal
+          request={decliningRequest}
+          reason={declineReason}
+          busy={busy === decliningRequest.id}
+          locale={locale}
+          onReasonChange={setDeclineReason}
+          onCancel={() => { setDecliningRequest(null); setDeclineReason(""); }}
+          onConfirm={() => respond(decliningRequest.id, "decline", declineReason || undefined)}
+        />
       )}
     </div>
   );
 }
 
-function CoverageFilters({
-  activeTab,
-  cityFilter,
-  cityOptions,
-  dateFilter,
-  urgentOnly,
-  onTabChange,
-  onCityChange,
-  onDateChange,
-  onUrgentOnlyChange,
-  onClear,
-}: {
-  activeTab: CoverageTab;
-  cityFilter: string;
-  cityOptions: string[];
-  dateFilter: string;
-  urgentOnly: boolean;
-  onTabChange: (tab: CoverageTab) => void;
-  onCityChange: (city: string) => void;
-  onDateChange: (date: string) => void;
-  onUrgentOnlyChange: (urgentOnly: boolean) => void;
-  onClear: () => void;
-}) {
-  const hasFilters = activeTab !== "all" || cityFilter || dateFilter || urgentOnly;
-
+function Group({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <section style={{ display: "grid", gap: 12 }}>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-          gap: 8,
-        }}
-      >
-        {COVERAGE_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => onTabChange(tab.id)}
-            aria-pressed={activeTab === tab.id}
-            style={{
-              minHeight: 44,
-              border: activeTab === tab.id ? "1px solid #214639" : "1px solid rgba(24, 50, 41, 0.16)",
-              borderRadius: 12,
-              background: activeTab === tab.id ? "#214639" : "#fffdf7",
-              color: activeTab === tab.id ? "#f7f0df" : "#214639",
-              fontSize: 13,
-              fontWeight: 800,
-              cursor: "pointer",
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-          gap: 10,
-        }}
-      >
-        <label style={{ display: "grid", gap: 6, color: "#496158", fontSize: 13, fontWeight: 800 }}>
-          City
-          <select
-            value={cityFilter}
-            onChange={(event) => onCityChange(event.target.value)}
-            style={filterInputStyle}
-          >
-            <option value="">Any city</option>
-            {cityOptions.map((city) => (
-              <option key={city} value={city}>
-                {city}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label style={{ display: "grid", gap: 6, color: "#496158", fontSize: 13, fontWeight: 800 }}>
-          Date
-          <input
-            type="date"
-            value={dateFilter}
-            onChange={(event) => onDateChange(event.target.value)}
-            style={filterInputStyle}
-          />
-        </label>
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 12,
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            color: "#314c42",
-            fontSize: 14,
-            fontWeight: 800,
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={urgentOnly}
-            onChange={(event) => onUrgentOnlyChange(event.target.checked)}
-            style={{ width: 18, height: 18, accentColor: "#214639" }}
-          />
-          Urgent only
-        </label>
-
-        {hasFilters ? (
-          <button
-            type="button"
-            onClick={onClear}
-            style={{
-              border: 0,
-              background: "transparent",
-              color: "#214639",
-              cursor: "pointer",
-              fontSize: 14,
-              fontWeight: 800,
-              padding: "8px 0",
-            }}
-          >
-            Clear filters
-          </button>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-function Group({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <h2
-        style={{
-          margin: "0 0 10px",
-          fontSize: 13,
-          letterSpacing: "0.18em",
-          textTransform: "uppercase",
-          color: "#496158",
-        }}
-      >
-        {title}
-      </h2>
-      <div style={{ display: "grid", gap: 12 }}>{children}</div>
+    <section style={{ marginBottom: 24 }}>
+      <Eyebrow style={{ marginBottom: 10 }}>{label}</Eyebrow>
+      <div style={{ display: "grid", gap: 10 }}>{children}</div>
     </section>
   );
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        padding: 18,
-        borderRadius: 14,
-        background: "rgba(255, 253, 247, 0.7)",
-        border: "1px dashed rgba(24, 50, 41, 0.18)",
-        color: "#5d6d66",
-        textAlign: "center",
-        fontSize: 14,
-      }}
-    >
+    <div style={{
+      padding: "18px 16px",
+      borderRadius: 14,
+      background: "#fff",
+      border: "0.5px dashed var(--line)",
+      color: "var(--ink-3)",
+      textAlign: "center",
+      fontSize: 14,
+    }}>
       {children}
     </div>
   );
 }
 
 function RequestCard({
-  request,
-  myResponse,
-  eligibility,
-  myUserId,
-  locale,
-  busy,
-  onAccept,
-  onDecline,
+  request, myResponse, eligibility, myUserId, locale, busy, onAccept, onDecline,
 }: {
   request: StaffingRequest;
   myResponse: RequestResponse | null;
@@ -472,486 +357,256 @@ function RequestCard({
   onAccept?: () => void;
   onDecline?: () => void;
 }) {
-  const perspectiveLabel = workerRequestPerspective(request, myResponse, myUserId, locale);
+  const urgent = request.urgency_level >= 3;
   return (
-    <article
-      style={{
-        background: "#fffdf7",
-        borderRadius: 20,
-        padding: 18,
-        boxShadow: "0 8px 18px rgba(24, 50, 41, 0.08)",
-        display: "grid",
-        gap: 12,
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "start" }}>
-        <strong style={{ fontSize: 18, lineHeight: 1.2 }}>{request.title}</strong>
-        {request.coverage_type ? (
-          <Badge tone={request.coverage_type === "emergency" || request.coverage_type === "same_day_urgent" ? "urgent" : "neutral"}>
-            {coverageTypeLabel(request.coverage_type, locale)}
-          </Badge>
-        ) : request.urgency_level >= 3 ? (
-          <Badge tone="urgent">Urgent</Badge>
-        ) : null}
-      </div>
+    <article style={{
+      background: "#fff",
+      borderRadius: 18,
+      padding: "14px 16px",
+      border: `0.5px solid ${urgent ? "#F2C5B0" : "var(--line)"}`,
+      boxShadow: urgent ? "0 8px 24px -16px rgba(220,90,42,.18)" : "none",
+      position: "relative",
+      overflow: "hidden",
+    }}>
+      {urgent && <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--terra)" }} />}
 
-
-      <div style={{ display: "grid", gap: 4, color: "#3d564c", fontSize: 14 }}>
-        <span>📍 {request.location_name ? `${request.location_name}, ${request.city}` : request.city}</span>
-        <span>📅 {request.work_date}</span>
-        <span>
-          🕒 {request.start_time.slice(0, 5)} – {request.end_time.slice(0, 5)}
-        </span>
-        {request.language_requirement ? (
-          <span>🗣 {request.language_requirement.toUpperCase()}</span>
-        ) : null}
-      </div>
-
-      {request.description ? (
-        <p style={{ margin: 0, color: "#3d564c", fontSize: 14, lineHeight: 1.5 }}>
-          {request.description}
-        </p>
-      ) : null}
-
-      {eligibility ? <EligibilityChips eligibility={eligibility} /> : null}
-
-      {perspectiveLabel ? (
-        <div
-          style={{
-            fontSize: 12,
-            fontWeight: 700,
-            letterSpacing: "0.06em",
-            textTransform: "uppercase",
-            color:
-              myResponse?.status === "accepted"
-                ? "#296246"
-                : myResponse?.status === "declined"
-                ? "#8c4d3f"
-                : "#5d6d66",
-          }}
-        >
-          {perspectiveLabel}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {urgent && <Chip variant="urgent" dot>{locale === "fr" ? "Urgent" : "Urgent"}</Chip>}
+          {request.coverage_type && (
+            <Chip variant="default">{coverageLabel(request.coverage_type, locale)}</Chip>
+          )}
         </div>
-      ) : null}
+        {request.language_requirement && (
+          <Mono style={{ fontSize: 10, color: "var(--ink-3)" }}>{request.language_requirement.toUpperCase()}</Mono>
+        )}
+      </div>
 
-      {myResponse?.status === "accepted" ? (
-        <p style={{ margin: 0, color: "#296246", fontSize: 14, fontWeight: 800 }}>
+      <div style={{ fontFamily: "var(--serif)", fontSize: 22, lineHeight: 1.15, marginBottom: 2 }}>
+        {request.title}
+      </div>
+      <div style={{ fontSize: 12, color: "var(--ink-2)", marginBottom: 10 }}>
+        {request.location_name ? `${request.location_name} · ` : ""}{request.city}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 12 }}>
+        <Meta icon={<Calendar size={13} />} label={request.work_date} sub={`${request.start_time.slice(0,5)} → ${request.end_time.slice(0,5)}`} />
+        <Meta icon={<MapPin size={13} />} label={request.city} />
+      </div>
+
+      {eligibility && <EligibilityList eligibility={eligibility} />}
+
+      {myResponse?.status === "accepted" && (
+        <div style={{ padding: "10px 0", fontSize: 13, color: "var(--moss)", fontWeight: 500 }}>
           {request.status === "responses_received"
-            ? locale === "fr"
-              ? "Réponse reçue par le coordonnateur · En attente de confirmation."
-              : "Response received by coordinator · Awaiting confirmation."
-            : locale === "fr"
-            ? "Réponse envoyée · En attente de confirmation du coordonnateur."
-            : "Response sent · Awaiting coordinator confirmation."}
-        </p>
-      ) : myResponse?.status === "declined" && myResponse.decline_reason ? (
-        <p style={{ margin: 0, color: "#8c4d3f", fontSize: 13 }}>
-          Reason: {myResponse.decline_reason}
-        </p>
-      ) : null}
+            ? (locale === "fr" ? "Réponse reçue · En attente de confirmation." : "Response received · Awaiting confirmation.")
+            : (locale === "fr" ? "Réponse envoyée · En attente du coordonnateur." : "Response sent · Awaiting coordinator.")}
+        </div>
+      )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        {onAccept ? (
-          <BigButton tone="primary" disabled={busy} onClick={onAccept}>
-            Accept
-          </BigButton>
-        ) : null}
-        {onDecline ? (
-          <BigButton tone="muted" disabled={busy} onClick={onDecline}>
-            Decline
-          </BigButton>
-        ) : null}
+      {myResponse?.status === "declined" && myResponse.decline_reason && (
+        <div style={{ padding: "8px 0", fontSize: 12, color: "var(--ink-3)" }}>
+          {locale === "fr" ? "Raison : " : "Reason: "}{myResponse.decline_reason}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8 }}>
+        {onAccept && (
+          <button onClick={onAccept} disabled={busy} style={ctaStyle("primary", busy)}>
+            {locale === "fr" ? "Je peux le prendre" : "I can take it"}
+          </button>
+        )}
+        {onDecline && (
+          <button onClick={onDecline} disabled={busy} style={ctaStyle("ghost", busy)}>
+            {locale === "fr" ? "Refuser" : "Decline"}
+          </button>
+        )}
       </div>
     </article>
   );
 }
 
-function FilledRequestCard({
-  request,
-  locale,
-}: {
-  request: StaffingRequest;
-  locale: "en" | "fr";
-}) {
-  const notice =
-    locale === "fr"
-      ? "Ce remplacement a été pourvu. Un·e autre remplaçant·e a été confirmé·e."
-      : "This request has been filled. Another substitute was confirmed.";
+function EligibilityList({ eligibility }: { eligibility: EligibilityResult }) {
   return (
-    <article
-      style={{
-        background: "#f5f5f3",
-        borderRadius: 20,
-        padding: 18,
-        display: "grid",
-        gap: 10,
-        opacity: 0.85,
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "start" }}>
-        <strong style={{ fontSize: 16, color: "#5d6d66", lineHeight: 1.2 }}>{request.title}</strong>
-        <span
-          style={{
-            borderRadius: 999,
-            padding: "4px 10px",
-            background: "#e8e8e5",
-            color: "#5d6d66",
-            fontSize: 11,
-            fontWeight: 800,
-            letterSpacing: "0.06em",
-            textTransform: "uppercase",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {locale === "fr" ? "Pourvu" : "Filled"}
-        </span>
-      </div>
-      <div style={{ display: "grid", gap: 4, color: "#7d8f87", fontSize: 14 }}>
-        <span>📍 {request.location_name ? `${request.location_name}, ${request.city}` : request.city}</span>
-        <span>📅 {request.work_date}</span>
-        <span>🕒 {request.start_time.slice(0, 5)} – {request.end_time.slice(0, 5)}</span>
-      </div>
-      <p
-        style={{
-          margin: 0,
-          fontSize: 13,
-          color: "#5d6d66",
-          fontStyle: "italic",
-          lineHeight: 1.45,
-        }}
-      >
-        {notice}
-      </p>
-    </article>
-  );
-}
-
-function EligibilityChips({ eligibility }: { eligibility: EligibilityResult }) {
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-      {eligibility.reasons.map((reason, index) => (
-        <span
-          key={`${reason.type}-${reason.code || index}`}
-          style={{
-            borderRadius: 999,
-            padding: "6px 10px",
-            background: reason.status === "matched" ? "#e2f1e8" : "#f4d4cc",
-            color: reason.status === "matched" ? "#296246" : "#7a3526",
-            fontSize: 12,
-            fontWeight: 800,
-            lineHeight: 1.1,
-          }}
-        >
-          {reason.label}
-        </span>
+    <div style={{ background: "var(--paper)", borderRadius: 12, padding: "4px 10px", marginBottom: 10 }}>
+      {eligibility.reasons.map((reason, i) => (
+        <div key={`${reason.type}-${i}`} style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "7px 0",
+          borderBottom: i < eligibility.reasons.length - 1 ? "0.5px solid var(--line-soft)" : "none",
+        }}>
+          <div style={{
+            width: 20, height: 20, borderRadius: 99, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+            background: reason.status === "matched" ? "var(--moss-soft)" : "var(--rose-soft)",
+            color: reason.status === "matched" ? "var(--moss)" : "var(--rose)",
+          }}>
+            {reason.status === "matched" ? <Check size={11} strokeWidth={2.5} /> : <X size={11} strokeWidth={2.5} />}
+          </div>
+          <span style={{ fontSize: 12, color: "var(--ink-2)" }}>{reason.label}</span>
+        </div>
       ))}
     </div>
   );
 }
 
-function ConfirmAvailabilityModal({
-  request,
-  busy,
-  onCancel,
-  onConfirm,
-}: {
-  request: StaffingRequest;
-  busy: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
+function FilledCard({ request, locale }: { request: StaffingRequest; locale: "en" | "fr" }) {
+  return (
+    <article style={{
+      background: "var(--paper-2)",
+      borderRadius: 18,
+      padding: "14px 16px",
+      border: "0.5px solid var(--line)",
+      opacity: 0.8,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+        <div style={{ fontFamily: "var(--serif)", fontSize: 18, color: "var(--ink-3)" }}>{request.title}</div>
+        <Chip variant="default" style={{ color: "var(--ink-3)" }}>{locale === "fr" ? "Pourvu" : "Filled"}</Chip>
+      </div>
+      <div style={{ fontSize: 12, color: "var(--ink-3)" }}>{request.city} · {request.work_date}</div>
+      <div style={{ marginTop: 8, fontSize: 13, color: "var(--ink-3)", fontStyle: "italic", lineHeight: 1.5 }}>
+        {locale === "fr"
+          ? "Ce remplacement a été pourvu par un·e autre remplaçant·e."
+          : "This request has been filled by another substitute."}
+      </div>
+    </article>
+  );
+}
+
+function ConfirmModal({ request, busy, locale, onCancel, onConfirm }: {
+  request: StaffingRequest; busy: boolean; locale: "en" | "fr"; onCancel: () => void; onConfirm: () => void;
 }) {
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="confirm-availability-title"
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(24, 50, 41, 0.34)",
-        display: "flex",
-        alignItems: "end",
-        justifyContent: "center",
-        padding: 16,
-        zIndex: 30,
-      }}
-    >
-      <section
-        style={{
-          width: "min(100%, 440px)",
-          background: "#fffdf7",
-          color: "#183229",
-          borderRadius: 20,
-          padding: 20,
-          boxShadow: "0 18px 42px rgba(24, 50, 41, 0.24)",
-          display: "grid",
-          gap: 16,
-        }}
-      >
-        <div>
-          <h2 id="confirm-availability-title" style={{ margin: 0, fontSize: 22 }}>
-            Confirm availability
-          </h2>
-          <p style={{ margin: "8px 0 0", color: "#496158", lineHeight: 1.45 }}>
-            Confirm you are available for this coverage request. Your response will be sent to the
-            coordinator for final confirmation.
-          </p>
-        </div>
-
-        <div
-          style={{
-            borderRadius: 16,
-            background: "#f3eadb",
-            padding: 14,
-            display: "grid",
-            gap: 6,
-            color: "#314c42",
-            fontSize: 14,
-          }}
-        >
-          <strong style={{ color: "#183229", fontSize: 16 }}>{request.title}</strong>
-          <span>{request.city} · {request.work_date}</span>
-          <span>{request.start_time.slice(0, 5)} - {request.end_time.slice(0, 5)}</span>
-        </div>
-
-        <p style={{ margin: 0, color: "#496158", fontSize: 14, fontWeight: 800 }}>
-          This sends your response only. The assignment is confirmed by the coordinator.
+    <div role="dialog" aria-modal="true" style={overlayStyle}>
+      <section style={sheetStyle}>
+        <h2 style={{ fontFamily: "var(--serif)", fontSize: 26, margin: "0 0 6px" }}>
+          {locale === "fr" ? <>Confirmer la <em style={{ fontStyle: "italic" }}>disponibilité</em></> : <>Confirm <em style={{ fontStyle: "italic" }}>availability</em></>}
+        </h2>
+        <p style={{ margin: "0 0 18px", color: "var(--ink-2)", fontSize: 14, lineHeight: 1.5 }}>
+          {locale === "fr"
+            ? "Votre réponse sera envoyée au coordonnateur pour confirmation finale."
+            : "Your response will be sent to the coordinator for final confirmation."}
         </p>
-
+        <div style={{ background: "var(--paper)", borderRadius: 14, padding: "14px 16px", marginBottom: 18 }}>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 18, marginBottom: 4 }}>{request.title}</div>
+          <div style={{ fontSize: 13, color: "var(--ink-2)" }}>{request.city} · {request.work_date}</div>
+          <div style={{ fontSize: 13, color: "var(--ink-2)" }}>{request.start_time.slice(0,5)} – {request.end_time.slice(0,5)}</div>
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <BigButton tone="muted" disabled={busy} onClick={onCancel}>
-            Go back
-          </BigButton>
-          <BigButton tone="primary" disabled={busy} onClick={onConfirm}>
-            Confirm
-          </BigButton>
+          <button onClick={onCancel} disabled={busy} style={ctaStyle("ghost", busy)}>{locale === "fr" ? "Retour" : "Go back"}</button>
+          <button onClick={onConfirm} disabled={busy} style={ctaStyle("terra", busy)}>{locale === "fr" ? "Confirmer" : "Confirm"}</button>
         </div>
       </section>
     </div>
   );
 }
 
-const DECLINE_REASONS = [
-  "Not available",
-  "Too far",
-  "Not interested",
-  "Conflict with another assignment",
-  "Other",
-];
+const DECLINE_REASONS_EN = ["Not available", "Too far", "Not interested", "Conflict with another assignment", "Other"];
+const DECLINE_REASONS_FR = ["Non disponible", "Trop loin", "Pas intéressé·e", "Conflit avec une autre affectation", "Autre"];
 
-function DeclineModal({
-  request,
-  reason,
-  busy,
-  onReasonChange,
-  onCancel,
-  onConfirm,
-}: {
-  request: StaffingRequest;
-  reason: string;
-  busy: boolean;
-  onReasonChange: (reason: string) => void;
-  onCancel: () => void;
-  onConfirm: () => void;
+function DeclineModal({ request, reason, busy, locale, onReasonChange, onCancel, onConfirm }: {
+  request: StaffingRequest; reason: string; busy: boolean; locale: "en" | "fr";
+  onReasonChange: (r: string) => void; onCancel: () => void; onConfirm: () => void;
 }) {
+  const reasons = locale === "fr" ? DECLINE_REASONS_FR : DECLINE_REASONS_EN;
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="decline-title"
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(24, 50, 41, 0.34)",
-        display: "flex",
-        alignItems: "end",
-        justifyContent: "center",
-        padding: 16,
-        zIndex: 30,
-      }}
-    >
-      <section
-        style={{
-          width: "min(100%, 440px)",
-          background: "#fffdf7",
-          color: "#183229",
-          borderRadius: 20,
-          padding: 20,
-          boxShadow: "0 18px 42px rgba(24, 50, 41, 0.24)",
-          display: "grid",
-          gap: 16,
-        }}
-      >
-        <div>
-          <h2 id="decline-title" style={{ margin: 0, fontSize: 22 }}>
-            Decline request
-          </h2>
-          <p style={{ margin: "8px 0 0", color: "#496158", lineHeight: 1.45 }}>
-            {request.title} · {request.city} · {request.work_date}
-          </p>
-        </div>
-
-        <label style={{ display: "grid", gap: 8, fontWeight: 700, color: "#314c42" }}>
-          Reason <span style={{ fontWeight: 400, fontSize: 13, color: "#5d6d66" }}>(optional)</span>
-          <select
-            value={reason}
-            onChange={(e) => onReasonChange(e.target.value)}
-            style={{
-              border: "1px solid rgba(24, 50, 41, 0.16)",
-              borderRadius: 12,
-              background: "#fff",
-              color: "#183229",
-              fontSize: 15,
-              minHeight: 44,
-              padding: "0 12px",
-              font: "inherit",
-            }}
-          >
-            <option value="">No reason provided</option>
-            {DECLINE_REASONS.map((r) => (
-              <option key={r} value={r}>{r}</option>
-            ))}
+    <div role="dialog" aria-modal="true" style={overlayStyle}>
+      <section style={sheetStyle}>
+        <h2 style={{ fontFamily: "var(--serif)", fontSize: 26, margin: "0 0 4px" }}>
+          {locale === "fr" ? <>Refuser la <em style={{ fontStyle: "italic" }}>demande</em></> : <>Decline <em style={{ fontStyle: "italic" }}>request</em></>}
+        </h2>
+        <p style={{ margin: "0 0 18px", color: "var(--ink-2)", fontSize: 14 }}>
+          {request.title} · {request.city} · {request.work_date}
+        </p>
+        <label style={{ display: "grid", gap: 6, marginBottom: 18 }}>
+          <Eyebrow>{locale === "fr" ? "Raison (optionnel)" : "Reason (optional)"}</Eyebrow>
+          <select value={reason} onChange={(e) => onReasonChange(e.target.value)} style={inputStyle}>
+            <option value="">{locale === "fr" ? "Aucune raison" : "No reason provided"}</option>
+            {reasons.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
         </label>
-
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <BigButton tone="muted" disabled={busy} onClick={onCancel}>
-            Go back
-          </BigButton>
-          <BigButton tone="decline" disabled={busy} onClick={onConfirm}>
-            Decline
-          </BigButton>
+          <button onClick={onCancel} disabled={busy} style={ctaStyle("ghost", busy)}>{locale === "fr" ? "Retour" : "Go back"}</button>
+          <button onClick={onConfirm} disabled={busy} style={ctaStyle("danger", busy)}>{locale === "fr" ? "Refuser" : "Decline"}</button>
         </div>
       </section>
     </div>
   );
 }
 
-function BigButton({
-  tone,
-  disabled,
-  onClick,
-  children,
-}: {
-  tone: "primary" | "muted" | "decline";
-  disabled: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  const palette =
-    tone === "primary"
-      ? { bg: "#214639", color: "#f7f0df" }
-      : tone === "decline"
-      ? { bg: "#7a3526", color: "#fffdf7" }
-      : { bg: "#eadfd7", color: "#7a473f" };
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      style={{
-        border: 0,
-        borderRadius: 14,
-        padding: "16px 18px",
-        background: palette.bg,
-        color: palette.color,
-        fontSize: 16,
-        fontWeight: 800,
-        letterSpacing: "0.04em",
-        cursor: disabled ? "wait" : "pointer",
-        opacity: disabled ? 0.6 : 1,
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function coverageTypeLabel(type: string, locale: "en" | "fr"): string {
+function coverageLabel(type: string, locale: "en" | "fr"): string {
   const map: Record<string, { en: string; fr: string }> = {
     same_day_urgent: { en: "Same-day urgent", fr: "Urgent même jour" },
-    planned_absence: { en: "Planned absence", fr: "Absence planifiée" },
-    recurring:       { en: "Recurring",       fr: "Récurrent" },
-    emergency:       { en: "Emergency",       fr: "Urgence" },
+    planned_absence: { en: "Planned absence",  fr: "Absence planifiée" },
+    recurring:       { en: "Recurring",        fr: "Récurrent" },
+    emergency:       { en: "Emergency",        fr: "Urgence" },
   };
   return map[type]?.[locale] ?? type;
 }
 
-function Badge({ tone, children }: { tone: "urgent" | "neutral"; children: React.ReactNode }) {
-  const palette =
-    tone === "urgent"
-      ? { bg: "#f4d4cc", color: "#7a3526" }
-      : { bg: "#e2ebdd", color: "#214639" };
-  return (
-    <span
-      style={{
-        borderRadius: 999,
-        padding: "4px 10px",
-        background: palette?.bg,
-        color: palette?.color,
-        fontSize: 11,
-        fontWeight: 800,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-      }}
-    >
-      {children}
-    </span>
-  );
-}
-
-const filterInputStyle: CSSProperties = {
-  border: "1px solid rgba(24, 50, 41, 0.16)",
-  borderRadius: 12,
-  background: "#fffdf7",
-  color: "#183229",
-  fontSize: 15,
+const inputStyle: CSSProperties = {
+  border: "0.5px solid var(--line)",
+  borderRadius: 10,
+  background: "#fff",
+  color: "var(--ink)",
+  fontSize: 14,
   minHeight: 44,
   padding: "0 12px",
+  fontFamily: "var(--ui)",
+  width: "100%",
 };
 
-function matchesTab(request: StaffingRequest, tab: CoverageTab): boolean {
-  if (tab === "urgent") return isUrgent(request);
-  if (tab === "today") return request.work_date === todayString();
-  if (tab === "week") return isWithinThisWeek(request.work_date);
+function ctaStyle(variant: "primary" | "ghost" | "terra" | "danger", disabled: boolean): CSSProperties {
+  const base: CSSProperties = {
+    border: "none",
+    borderRadius: 12,
+    padding: "12px 16px",
+    fontSize: 14,
+    fontWeight: 500,
+    cursor: disabled ? "wait" : "pointer",
+    opacity: disabled ? 0.6 : 1,
+    fontFamily: "var(--ui)",
+    flex: 1,
+  };
+  if (variant === "primary") return { ...base, background: "var(--ink)", color: "var(--paper)" };
+  if (variant === "terra")   return { ...base, background: "var(--terra)", color: "#fff" };
+  if (variant === "danger")  return { ...base, background: "transparent", color: "var(--rose)", border: "0.5px solid var(--rose-soft)" };
+  return { ...base, background: "transparent", color: "var(--ink)", border: "0.5px solid var(--line)" };
+}
+
+const overlayStyle: CSSProperties = {
+  position: "fixed", inset: 0,
+  background: "rgba(21,20,15,.4)",
+  display: "flex", alignItems: "flex-end", justifyContent: "center",
+  padding: 16, zIndex: 30,
+};
+
+const sheetStyle: CSSProperties = {
+  width: "min(100%, 480px)",
+  background: "#fff",
+  borderRadius: 20,
+  padding: 22,
+  boxShadow: "0 18px 42px rgba(21,20,15,.2)",
+};
+
+function matchesTab(r: StaffingRequest, tab: CoverageTab): boolean {
+  if (tab === "urgent") return r.urgency_level >= 3;
+  if (tab === "today")  return r.work_date === todayStr();
+  if (tab === "week")   return inThisWeek(r.work_date);
   return true;
 }
-
-function matchesCity(request: StaffingRequest, city: string): boolean {
-  if (!city) return true;
-  return request.city === city;
+function matchesCity(r: StaffingRequest, city: string) { return !city || r.city === city; }
+function matchesDate(r: StaffingRequest, date: string) { return !date || r.work_date === date; }
+function isUrgent(r: StaffingRequest) { return r.urgency_level >= 3; }
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
-
-function matchesDate(request: StaffingRequest, date: string): boolean {
-  if (!date) return true;
-  return request.work_date === date;
-}
-
-function isUrgent(request: StaffingRequest): boolean {
-  return request.urgency_level >= 3;
-}
-
-function isWithinThisWeek(dateValue: string): boolean {
-  const target = parseDateOnly(dateValue).getTime();
-  const today = parseDateOnly(todayString());
-  const end = new Date(today);
-  end.setDate(today.getDate() + 6);
+function inThisWeek(dateValue: string): boolean {
+  const [y,m,d] = dateValue.split("-").map(Number);
+  const target = new Date(y, m-1, d).getTime();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const end = new Date(today); end.setDate(today.getDate() + 6);
   return target >= today.getTime() && target <= end.getTime();
-}
-
-function todayString(): string {
-  const today = new Date();
-  return toDateInputValue(today);
-}
-
-function parseDateOnly(dateValue: string): Date {
-  const [year, month, day] = dateValue.split("-").map(Number);
-  return new Date(year, month - 1, day);
-}
-
-function toDateInputValue(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }

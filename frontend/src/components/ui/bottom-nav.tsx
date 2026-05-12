@@ -27,11 +27,16 @@ export function BottomNav({ items }: BottomNavProps) {
         zIndex: 20,
         background: "#fff",
         borderTop: "0.5px solid var(--line)",
-        padding: "10px 24px 26px",
-        display: "flex",
-        justifyContent: "space-around",
+        padding: "10px 0 26px",
       }}
     >
+      <div style={{
+        maxWidth: 560,
+        margin: "0 auto",
+        display: "flex",
+        justifyContent: "space-around",
+        padding: "0 8px",
+      }}>
       {items.map(({ href, label, Icon }) => {
         const active =
           pathname === href || (href !== "/worker" && pathname.startsWith(href));
@@ -62,6 +67,7 @@ export function BottomNav({ items }: BottomNavProps) {
           </Link>
         );
       })}
+      </div>
     </nav>
   );
 }

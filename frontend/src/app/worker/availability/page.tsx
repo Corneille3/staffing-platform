@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { MapPin, X } from "lucide-react";
 import { updateAvailability, updateWorkerPreferences } from "../../../lib/browser-api";
 import { availabilityStatusLabel, pickLocale } from "../../../lib/status-labels";
 import { useWorkerSession } from "../../../lib/worker-session";
+import { Eyebrow } from "../../../components/ui";
 
 export default function WorkerAvailabilityPage() {
   const { worker, refresh } = useWorkerSession();
@@ -17,8 +19,8 @@ export default function WorkerAvailabilityPage() {
   const locale = pickLocale(worker.preferred_language);
 
   const status = worker.profile?.availability_status || "unknown";
-  const statusLabel = availabilityStatusLabel(status, locale);
   const cities: string[] = worker.profile?.supported_cities ?? [];
+  const urgentAlertsOn = worker.profile?.urgent_alert_opt_in ?? false;
 
   async function setStatus(next: "available" | "unavailable") {
     if (!worker) return;
@@ -48,6 +50,19 @@ export default function WorkerAvailabilityPage() {
     }
   }
 
+  async function toggleUrgentAlerts() {
+    if (!worker) return;
+    setBusy(true);
+    try {
+      await updateWorkerPreferences(worker.id, { urgent_alert_opt_in: !urgentAlertsOn });
+      await refresh();
+    } catch {
+      // silent
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function addCity() {
     const trimmed = cityInput.trim();
     if (!trimmed || cities.includes(trimmed)) { setCityInput(""); return; }
@@ -60,105 +75,133 @@ export default function WorkerAvailabilityPage() {
   }
 
   return (
-    <div style={{ display: "grid", gap: 28, paddingTop: 16 }}>
+    <div style={{ display: "grid", gap: 24, paddingTop: 16 }}>
       <header>
-        <h1 style={{ margin: 0, fontSize: 26 }}>Availability</h1>
-        <p style={{ margin: "6px 0 0", color: "#496158" }}>
-          Toggle whether you can be matched to new requests.
-        </p>
+        <Eyebrow style={{ marginBottom: 4 }}>
+          {locale === "fr" ? "Disponibilités" : "Availability"}
+        </Eyebrow>
+        <h1 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 30, lineHeight: 1.05 }}>
+          {locale === "fr"
+            ? <>Quand vous êtes <em style={{ fontStyle: "italic" }}>disponible</em></>
+            : <>When you're <em style={{ fontStyle: "italic" }}>open</em></>}
+        </h1>
       </header>
 
-      <section
-        style={{
-          background: "#fffdf7",
-          borderRadius: 22,
-          padding: 22,
-          boxShadow: "0 8px 18px rgba(24, 50, 41, 0.08)",
-          textAlign: "center",
-          display: "grid",
-          gap: 18,
-        }}
-      >
-        <div>
-          <p
-            style={{
-              margin: 0,
-              fontSize: 12,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              color: "#5d6d66",
-            }}
-          >
-            Current status
-          </p>
-          <p
-            style={{
-              margin: "8px 0 0",
-              fontSize: 30,
-              fontWeight: 800,
-              color: status === "available" ? "#214639" : "#7a473f",
-            }}
-          >
-            {statusLabel}
-          </p>
+      {/* status summary strip */}
+      <div style={{
+        padding: "14px 16px",
+        background: "var(--card)",
+        border: "0.5px solid var(--line)",
+        borderRadius: 16,
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+      }}>
+        <div style={{ flex: 1 }}>
+          <Eyebrow style={{ marginBottom: 4 }}>
+            {locale === "fr" ? "Statut actuel" : "Current status"}
+          </Eyebrow>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 22, lineHeight: 1, marginTop: 4 }}>
+            {availabilityStatusLabel(status, locale)}
+          </div>
+        </div>
+        <div style={{
+          width: 10,
+          height: 10,
+          borderRadius: 99,
+          background: status === "available" ? "var(--moss)" : "var(--ink-4)",
+          flexShrink: 0,
+        }} />
+      </div>
+
+      {/* available / unavailable toggles */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => setStatus("available")}
+          style={{
+            border: status === "available" ? "none" : "0.5px solid var(--line)",
+            borderRadius: 14,
+            padding: "18px",
+            background: status === "available" ? "var(--moss)" : "var(--card)",
+            color: status === "available" ? "#fff" : "var(--ink-2)",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: busy ? "wait" : "pointer",
+            opacity: busy ? 0.6 : 1,
+            minHeight: 44,
+            fontFamily: "inherit",
+          }}
+        >
+          {availabilityStatusLabel("available", locale)}
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => setStatus("unavailable")}
+          style={{
+            border: status === "unavailable" ? "none" : "0.5px solid var(--line)",
+            borderRadius: 14,
+            padding: "18px",
+            background: status === "unavailable" ? "var(--ink)" : "var(--card)",
+            color: status === "unavailable" ? "var(--paper)" : "var(--ink-2)",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: busy ? "wait" : "pointer",
+            opacity: busy ? 0.6 : 1,
+            minHeight: 44,
+            fontFamily: "inherit",
+          }}
+        >
+          {availabilityStatusLabel("unavailable", locale)}
+        </button>
+      </div>
+
+      {error ? (
+        <p style={{ margin: 0, color: "var(--rose)", fontWeight: 600, fontSize: 14 }}>{error}</p>
+      ) : null}
+
+      {/* info note */}
+      <div style={{
+        padding: "12px 16px",
+        borderRadius: 12,
+        background: "var(--card)",
+        border: "0.5px solid var(--line)",
+        color: "var(--ink-2)",
+        fontSize: 13,
+        lineHeight: 1.5,
+      }}>
+        {locale === "fr"
+          ? <>Quand vous êtes <strong>non disponible</strong>, vous ne serez pas mis en correspondance avec de nouvelles demandes. Vous pouvez toujours voir celles qui vous ont déjà été envoyées.</>
+          : <>When <strong>unavailable</strong>, you won't be matched to new requests. You can still see ones already sent to you.</>}
+      </div>
+
+      {/* preferred cities */}
+      <section style={{
+        background: "var(--card)",
+        border: "0.5px solid var(--line)",
+        borderRadius: 18,
+        padding: 18,
+        display: "grid",
+        gap: 16,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <MapPin size={14} style={{ color: "var(--ink-3)" }} />
+          <Eyebrow>{locale === "fr" ? "Villes préférées" : "Preferred cities"}</Eyebrow>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Toggle
-            active={status === "available"}
-            disabled={busy}
-            onClick={() => setStatus("available")}
-            tone="primary"
-          >
-            {availabilityStatusLabel("available", locale)}
-          </Toggle>
-          <Toggle
-            active={status === "unavailable"}
-            disabled={busy}
-            onClick={() => setStatus("unavailable")}
-            tone="muted"
-          >
-            {availabilityStatusLabel("unavailable", locale)}
-          </Toggle>
-        </div>
+        <p style={{ margin: 0, fontSize: 13, color: "var(--ink-2)", lineHeight: 1.45 }}>
+          {locale === "fr"
+            ? "Seules les demandes dans ces villes vous seront proposées."
+            : "Only requests in these cities will be matched to you."}
+        </p>
 
-        {error ? <p style={{ margin: 0, color: "#7a3526", fontWeight: 700 }}>{error}</p> : null}
-      </section>
-
-      <section
-        style={{
-          padding: 16,
-          borderRadius: 14,
-          background: "rgba(255, 253, 247, 0.7)",
-          color: "#3d564c",
-          fontSize: 14,
-          lineHeight: 1.5,
-        }}
-      >
-        When you are <strong>unavailable</strong>, you will not be matched to new requests. You can
-        still see and respond to ones already sent to you.
-      </section>
-
-      <section
-        style={{
-          background: "#fffdf7",
-          borderRadius: 22,
-          padding: 22,
-          boxShadow: "0 8px 18px rgba(24, 50, 41, 0.08)",
-          display: "grid",
-          gap: 18,
-        }}
-      >
-        <div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Preferred cities</h2>
-          <p style={{ margin: "6px 0 0", color: "#496158", fontSize: 14 }}>
-            Only requests in these cities will be matched to you.
-          </p>
-        </div>
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {cities.length === 0 ? (
-            <span style={{ color: "#5d6d66", fontSize: 14 }}>No cities added yet.</span>
+            <span style={{ color: "var(--ink-3)", fontSize: 13 }}>
+              {locale === "fr" ? "Aucune ville ajoutée." : "No cities added yet."}
+            </span>
           ) : (
             cities.map((city) => (
               <span
@@ -168,11 +211,12 @@ export default function WorkerAvailabilityPage() {
                   alignItems: "center",
                   gap: 8,
                   borderRadius: 999,
-                  padding: "8px 14px",
-                  background: "#e2ebdd",
-                  color: "#214639",
-                  fontWeight: 800,
-                  fontSize: 14,
+                  padding: "7px 12px",
+                  background: "var(--moss-soft)",
+                  color: "var(--moss)",
+                  fontWeight: 500,
+                  fontSize: 13,
+                  border: "0.5px solid #C8DCC1",
                 }}
               >
                 {city}
@@ -184,38 +228,40 @@ export default function WorkerAvailabilityPage() {
                   style={{
                     border: 0,
                     background: "none",
-                    color: "#496158",
+                    color: "var(--moss)",
                     cursor: cityBusy ? "wait" : "pointer",
                     padding: 0,
-                    fontSize: 16,
-                    lineHeight: 1,
-                    fontWeight: 800,
+                    display: "flex",
+                    alignItems: "center",
+                    opacity: 0.65,
                   }}
                 >
-                  ×
+                  <X size={12} />
                 </button>
               </span>
             ))
           )}
         </div>
 
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 8 }}>
           <input
             type="text"
             value={cityInput}
-            placeholder="Add a city…"
+            placeholder={locale === "fr" ? "Ajouter une ville…" : "Add a city…"}
             onChange={(e) => setCityInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCity(); } }}
             disabled={cityBusy}
             style={{
               flex: 1,
-              border: "1px solid rgba(24, 50, 41, 0.18)",
-              borderRadius: 12,
-              padding: "12px 14px",
-              fontSize: 15,
+              border: "0.5px solid var(--line)",
+              borderRadius: 10,
+              padding: "11px 14px",
+              fontSize: 14,
               background: "#fff",
-              color: "#183229",
+              color: "var(--ink)",
               font: "inherit",
+              minHeight: 44,
+              outline: "none",
             }}
           />
           <button
@@ -224,63 +270,108 @@ export default function WorkerAvailabilityPage() {
             onClick={addCity}
             style={{
               border: 0,
-              borderRadius: 12,
-              padding: "12px 18px",
-              background: "#214639",
-              color: "#f7f0df",
-              fontWeight: 800,
-              fontSize: 15,
+              borderRadius: 10,
+              padding: "11px 18px",
+              background: "var(--ink)",
+              color: "var(--paper)",
+              fontWeight: 600,
+              fontSize: 14,
               cursor: cityBusy || !cityInput.trim() ? "default" : "pointer",
-              opacity: cityBusy || !cityInput.trim() ? 0.5 : 1,
+              opacity: cityBusy || !cityInput.trim() ? 0.4 : 1,
+              fontFamily: "inherit",
+              minHeight: 44,
             }}
           >
-            Add
+            {locale === "fr" ? "Ajouter" : "Add"}
           </button>
         </div>
 
         {cityError ? (
-          <p style={{ margin: 0, color: "#7a3526", fontWeight: 700, fontSize: 14 }}>{cityError}</p>
+          <p style={{ margin: 0, color: "var(--rose)", fontWeight: 600, fontSize: 13 }}>{cityError}</p>
         ) : null}
+      </section>
+
+      {/* preferences */}
+      <section>
+        <Eyebrow style={{ marginBottom: 10 }}>
+          {locale === "fr" ? "Préférences" : "Preferences"}
+        </Eyebrow>
+        <div style={{
+          background: "var(--card)",
+          border: "0.5px solid var(--line)",
+          borderRadius: 16,
+          overflow: "hidden",
+        }}>
+          <ToggleRow
+            label={locale === "fr" ? "Alertes urgentes" : "Urgent alerts"}
+            sub={locale === "fr"
+              ? "M'avertir pour les demandes du jour même"
+              : "Notify me for same-day requests"}
+            on={urgentAlertsOn}
+            onToggle={toggleUrgentAlerts}
+            disabled={busy}
+            last
+          />
+        </div>
       </section>
     </div>
   );
 }
 
-function Toggle({
-  active,
+function ToggleRow({
+  label,
+  sub,
+  on,
+  onToggle,
   disabled,
-  onClick,
-  tone,
-  children,
+  last,
 }: {
-  active: boolean;
-  disabled: boolean;
-  onClick: () => void;
-  tone: "primary" | "muted";
-  children: React.ReactNode;
+  label: string;
+  sub: string;
+  on: boolean;
+  onToggle: () => void;
+  disabled?: boolean;
+  last?: boolean;
 }) {
-  const palette =
-    tone === "primary"
-      ? { onBg: "#214639", onColor: "#f7f0df", offBg: "#dbe4dd", offColor: "#214639" }
-      : { onBg: "#7a473f", onColor: "#fff7ef", offBg: "#eadfd7", offColor: "#7a473f" };
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      style={{
-        border: 0,
-        borderRadius: 14,
-        padding: "18px 18px",
-        background: active ? palette.onBg : palette.offBg,
-        color: active ? palette.onColor : palette.offColor,
-        fontSize: 16,
-        fontWeight: 800,
-        cursor: disabled ? "wait" : "pointer",
-        opacity: disabled ? 0.6 : 1,
-      }}
-    >
-      {children}
-    </button>
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      padding: "14px 16px",
+      borderBottom: last ? "none" : "0.5px solid var(--line-soft)",
+    }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>{label}</div>
+        <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>{sub}</div>
+      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={disabled}
+        aria-checked={on}
+        style={{
+          width: 38,
+          height: 22,
+          borderRadius: 99,
+          border: "none",
+          cursor: disabled ? "wait" : "pointer",
+          background: on ? "var(--moss)" : "var(--paper-2)",
+          position: "relative",
+          flexShrink: 0,
+        }}
+      >
+        <div style={{
+          position: "absolute",
+          top: 2,
+          left: on ? 18 : 2,
+          width: 18,
+          height: 18,
+          borderRadius: 99,
+          background: "#fff",
+          boxShadow: "0 1px 2px rgba(0,0,0,.15)",
+          transition: "left .15s",
+        }} />
+      </button>
+    </div>
   );
 }
