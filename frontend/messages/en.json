@@ -105,6 +105,10 @@
       "preferences": "Preferences",
       "urgentAlerts": "Urgent alerts",
       "urgentAlertsSub": "Notify me for same-day requests",
+      "notifyFar": "Far-away shifts",
+      "notifyFarSub": "Notify me for requests beyond my usual area",
+      "notifyWeekendOvernight": "Weekend overnights",
+      "notifyWeekendOvernightSub": "Notify me for overnight shifts on weekends",
       "available": "Available",
       "unavailable": "Unavailable"
     },

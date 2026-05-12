@@ -165,6 +165,8 @@ class WorkerService:
         user_id: UUID,
         availability_status: AvailabilityStatus | None = None,
         urgent_alert_opt_in: bool | None = None,
+        notify_far: bool | None = None,
+        notify_weekend_overnight: bool | None = None,
         supported_cities: list[str] | None = None,
     ) -> WorkerProfile | None:
         profile = self.repository.get_profile(user_id)
@@ -178,6 +180,12 @@ class WorkerService:
         if urgent_alert_opt_in is not None:
             profile.urgent_alert_opt_in = urgent_alert_opt_in
             payload['urgent_alert_opt_in'] = urgent_alert_opt_in
+        if notify_far is not None:
+            profile.notify_far = notify_far
+            payload['notify_far'] = notify_far
+        if notify_weekend_overnight is not None:
+            profile.notify_weekend_overnight = notify_weekend_overnight
+            payload['notify_weekend_overnight'] = notify_weekend_overnight
         if supported_cities is not None:
             profile.region_records.clear()
             profile.region_records.extend(

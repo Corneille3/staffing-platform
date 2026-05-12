@@ -157,6 +157,8 @@ export async function updateWorkerPreferences(
   payload: {
     availability_status?: "available" | "unavailable";
     urgent_alert_opt_in?: boolean;
+    notify_far?: boolean;
+    notify_weekend_overnight?: boolean;
     supported_cities?: string[];
   },
 ): Promise<WorkerProfile> {

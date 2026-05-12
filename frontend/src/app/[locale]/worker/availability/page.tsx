@@ -22,6 +22,8 @@ export default function WorkerAvailabilityPage() {
   const status = worker.profile?.availability_status || "unknown";
   const cities: string[] = worker.profile?.supported_cities ?? [];
   const urgentAlertsOn = worker.profile?.urgent_alert_opt_in ?? false;
+  const notifyFarOn = worker.profile?.notify_far ?? false;
+  const notifyWeekendOvernightOn = worker.profile?.notify_weekend_overnight ?? false;
 
   async function setStatus(next: "available" | "unavailable") {
     if (!worker) return;
@@ -56,6 +58,32 @@ export default function WorkerAvailabilityPage() {
     setBusy(true);
     try {
       await updateWorkerPreferences(worker.id, { urgent_alert_opt_in: !urgentAlertsOn });
+      await refresh();
+    } catch {
+      // silent
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleNotifyFar() {
+    if (!worker) return;
+    setBusy(true);
+    try {
+      await updateWorkerPreferences(worker.id, { notify_far: !notifyFarOn });
+      await refresh();
+    } catch {
+      // silent
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleNotifyWeekendOvernight() {
+    if (!worker) return;
+    setBusy(true);
+    try {
+      await updateWorkerPreferences(worker.id, { notify_weekend_overnight: !notifyWeekendOvernightOn });
       await refresh();
     } catch {
       // silent
@@ -297,6 +325,20 @@ export default function WorkerAvailabilityPage() {
             sub={t("urgentAlertsSub")}
             on={urgentAlertsOn}
             onToggle={toggleUrgentAlerts}
+            disabled={busy}
+          />
+          <ToggleRow
+            label={t("notifyFar")}
+            sub={t("notifyFarSub")}
+            on={notifyFarOn}
+            onToggle={toggleNotifyFar}
+            disabled={busy}
+          />
+          <ToggleRow
+            label={t("notifyWeekendOvernight")}
+            sub={t("notifyWeekendOvernightSub")}
+            on={notifyWeekendOvernightOn}
+            onToggle={toggleNotifyWeekendOvernight}
             disabled={busy}
             last
           />

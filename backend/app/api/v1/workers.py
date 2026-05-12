@@ -94,6 +94,8 @@ def update_worker_availability(
         user_id,
         availability_status=payload.availability_status,
         urgent_alert_opt_in=payload.urgent_alert_opt_in,
+        notify_far=payload.notify_far,
+        notify_weekend_overnight=payload.notify_weekend_overnight,
         supported_cities=payload.supported_cities,
     )
     if profile is None:
