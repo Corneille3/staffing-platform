@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Calendar, Mail, MapPin, Phone, User } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { fetchAssignments, fetchRequests } from "../../../../lib/browser-api";
+import { formatWorkDate, locationLabel, roleSectorSubtitle } from "../../../../lib/format";
 import { assignmentStatusLabel } from "../../../../lib/status-labels";
 import { Assignment, StaffingRequest } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
@@ -183,12 +184,13 @@ function HeroCard({
 
       <div>
         <div style={{ fontFamily: "var(--serif)", fontSize: 28, lineHeight: 1.1 }}>
-          {request.title}
+          {request.organization?.name ?? request.title}
         </div>
-        <div style={{ fontSize: 13, color: "rgba(246,244,238,.65)", marginTop: 4 }}>
-          {request.location_name ? `${request.location_name} · ` : ""}
-          {request.city}
-        </div>
+        {roleSectorSubtitle(request, locale) && (
+          <div style={{ fontSize: 13, color: "rgba(246,244,238,.65)", marginTop: 4 }}>
+            {roleSectorSubtitle(request, locale)}
+          </div>
+        )}
       </div>
 
       <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
@@ -203,9 +205,9 @@ function HeroCard({
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, color: "rgba(246,244,238,.65)", fontSize: 13 }}>
         <Calendar size={14} />
-        <span>{request.work_date}</span>
+        <span>{formatWorkDate(request.work_date, locale)}</span>
         <MapPin size={14} style={{ marginLeft: 4 }} />
-        <span>{request.city}</span>
+        <span>{locationLabel(request)}</span>
       </div>
 
       {(request.contact_name || request.contact_phone || request.contact_email) && (
@@ -315,7 +317,7 @@ function UpcomingRow({
         {request.work_date.slice(5)}
       </div>
       <div style={{ flex: 1, lineHeight: 1.25 }}>
-        <div style={{ fontSize: 13, fontWeight: 500 }}>{request.title}</div>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>{request.organization?.name ?? request.title}</div>
         <Mono style={{ fontSize: 11, color: "var(--ink-3)", display: "block", marginTop: 2 }}>
           {request.start_time.slice(0, 5)}–{request.end_time.slice(0, 5)}
         </Mono>
@@ -352,10 +354,10 @@ function PastCard({
       opacity: 0.65,
     }}>
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, fontWeight: 500 }}>{request.title}</div>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>{request.organization?.name ?? request.title}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, color: "var(--ink-3)", fontSize: 12 }}>
           <Calendar size={12} />
-          <span>{request.work_date}</span>
+          <span>{formatWorkDate(request.work_date, locale)}</span>
           <span>·</span>
           <Mono style={{ fontSize: 11 }}>
             {request.start_time.slice(0, 5)}–{request.end_time.slice(0, 5)}

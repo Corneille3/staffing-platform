@@ -4,8 +4,20 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import CoverageType, RequestRole, RequestStatus, RequestType
+from app.models.enums import CoverageType, OrganizationType, RequestRole, RequestStatus, RequestType
 from app.schemas.common import TimestampedSchema
+
+
+class OrganizationSummary(BaseModel):
+    id: UUID
+    name: str
+    type: OrganizationType
+    city: str
+    neighbourhood: str | None = None
+    latitude: Decimal | None = None
+    longitude: Decimal | None = None
+
+    model_config = {'from_attributes': True}
 
 
 class StaffingRequestBase(BaseModel):
@@ -51,3 +63,4 @@ class StaffingRequestRead(StaffingRequestBase, TimestampedSchema):
     assigned_at: datetime | None = None
     cancelled_at: datetime | None = None
     completed_at: datetime | None = None
+    organization: OrganizationSummary | None = None

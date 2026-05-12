@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Calendar, MapPin } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Link } from "../../../i18n/navigation";
 import {
   fetchAssignments,
@@ -10,7 +10,14 @@ import {
   fetchRequests,
   updateWorkerPreferences,
 } from "../../../lib/browser-api";
-import { Assignment, RequestResponse, StaffingRequest } from "../../../lib/types";
+import {
+  distanceFromWorker,
+  formatDistance,
+  formatWorkDate,
+  locationLabel,
+  roleSectorSubtitle,
+} from "../../../lib/format";
+import { Assignment, RequestResponse, StaffingRequest, Worker } from "../../../lib/types";
 import { useWorkerSession } from "../../../lib/worker-session";
 import { Avatar, Chip, Meta, Mono } from "../../../components/ui";
 
@@ -23,6 +30,7 @@ interface InboxItem {
 
 export default function WorkerHome() {
   const { worker, refresh } = useWorkerSession();
+  const locale = useLocale() as "fr" | "en";
   const t = useTranslations("worker.home");
   const tCommon = useTranslations("common");
   const tTime = useTranslations("time");
@@ -198,6 +206,8 @@ export default function WorkerHome() {
             key={request.id}
             request={request}
             status={status}
+            worker={worker}
+            locale={locale}
             t={t}
             tCommon={tCommon}
             tTime={tTime}
@@ -215,18 +225,27 @@ export default function WorkerHome() {
 function RequestCard({
   request,
   status,
+  worker,
+  locale,
   t,
   tCommon,
   tTime,
 }: {
   request: StaffingRequest;
   status: CardStatus;
+  worker: Worker;
+  locale: "fr" | "en";
   t: ReturnType<typeof useTranslations>;
   tCommon: ReturnType<typeof useTranslations>;
   tTime: ReturnType<typeof useTranslations>;
 }) {
   const urgent = request.urgency_level >= 3;
   const timeAgo = formatTimeAgo(request.created_at, tTime);
+  const subtitle = roleSectorSubtitle(request, locale);
+  const distanceKm = distanceFromWorker(request, worker.profile);
+  const distanceLabel = formatDistance(distanceKm);
+  const dateLabel = formatWorkDate(request.work_date, locale);
+  const cityLabel = locationLabel(request);
 
   return (
     <div
@@ -260,22 +279,23 @@ function RequestCard({
 
       {/* Org name */}
       <div style={{ fontFamily: "var(--serif)", fontSize: 22, lineHeight: 1.15, marginBottom: 2 }}>
-        {request.title}
+        {request.organization?.name ?? request.title}
       </div>
-      <div style={{ fontSize: 12, color: "var(--ink-2)", marginBottom: 10 }}>
-        {request.city}
-      </div>
+      {subtitle && (
+        <div style={{ fontSize: 12, color: "var(--ink-2)", marginBottom: 10 }}>{subtitle}</div>
+      )}
 
       {/* Meta grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 12 }}>
         <Meta
           icon={<Calendar size={13} />}
-          label={request.work_date}
+          label={dateLabel}
           sub={`${request.start_time.slice(0, 5)} → ${request.end_time.slice(0, 5)}`}
         />
         <Meta
           icon={<MapPin size={13} />}
-          label={request.city}
+          label={cityLabel}
+          sub={distanceLabel ?? undefined}
         />
       </div>
 

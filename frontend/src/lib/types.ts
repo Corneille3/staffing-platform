@@ -64,8 +64,8 @@ export type WorkerProfile = {
   notify_far: boolean;
   notify_weekend_overnight: boolean;
   travel_radius_km: number | null;
-  home_latitude: number | null;
-  home_longitude: number | null;
+  home_latitude: string | null;
+  home_longitude: string | null;
   supported_cities: string[];
   qualifications: string[];
   certifications: string[];
@@ -82,9 +82,21 @@ export type Worker = {
   profile: WorkerProfile | null;
 };
 
+export type OrganizationSummary = {
+  id: string;
+  name: string;
+  type: string;
+  city: string;
+  neighbourhood: string | null;
+  // Pydantic Decimal serializes as a string over JSON
+  latitude: string | null;
+  longitude: string | null;
+};
+
 export type StaffingRequest = {
   id: string;
   organization_id: string;
+  organization: OrganizationSummary | null;
   created_by_user_id: string;
   request_type: string;
   role: RequestRole | null;
@@ -99,7 +111,7 @@ export type StaffingRequest = {
   urgency_level: number;
   language_requirement: string | null;
   coverage_type: "same_day_urgent" | "planned_absence" | "recurring" | "emergency" | null;
-  hourly_rate: number | null;
+  hourly_rate: string | null;
   contact_name: string | null;
   contact_phone: string | null;
   contact_email: string | null;
@@ -188,7 +200,7 @@ export type Assignment = {
   cancelled_at: string | null;
   completed_at: string | null;
   checked_in_at: string | null;
-  checked_in_latitude: number | null;
-  checked_in_longitude: number | null;
+  checked_in_latitude: string | null;
+  checked_in_longitude: string | null;
   notes: string | null;
 };

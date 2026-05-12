@@ -2,7 +2,7 @@
 
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { Calendar, MapPin, Check, X } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   acceptRequest,
   declineRequest,
@@ -11,7 +11,14 @@ import {
   fetchRequests,
   markRequestViewed,
 } from "../../../../lib/browser-api";
-import { EligibilityResult, RequestResponse, StaffingRequest } from "../../../../lib/types";
+import {
+  distanceFromWorker,
+  formatDistance,
+  formatWorkDate,
+  locationLabel,
+  roleSectorSubtitle,
+} from "../../../../lib/format";
+import { EligibilityResult, RequestResponse, StaffingRequest, Worker } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
 import { Chip, Eyebrow, Meta, Mono } from "../../../../components/ui";
 
@@ -27,6 +34,7 @@ const DECLINE_REASON_KEYS = ["notAvailable", "tooFar", "notInterested", "conflic
 
 export default function WorkerRequestsPage() {
   const { worker } = useWorkerSession();
+  const locale = useLocale() as "fr" | "en";
   const t = useTranslations("worker.requests");
   const tCommon = useTranslations("common");
   const [items, setItems] = useState<RequestWithMyResponse[]>([]);
@@ -238,6 +246,8 @@ export default function WorkerRequestsPage() {
                   request={request}
                   myResponse={myResponse}
                   eligibility={eligibility}
+                  worker={worker}
+                  locale={locale}
                   busy={busy === request.id}
                   t={t}
                   tCommon={tCommon}
@@ -256,6 +266,8 @@ export default function WorkerRequestsPage() {
                   request={request}
                   myResponse={myResponse}
                   eligibility={eligibility}
+                  worker={worker}
+                  locale={locale}
                   busy={busy === request.id}
                   t={t}
                   tCommon={tCommon}
@@ -273,6 +285,8 @@ export default function WorkerRequestsPage() {
                   request={request}
                   myResponse={myResponse}
                   eligibility={eligibility}
+                  worker={worker}
+                  locale={locale}
                   busy={busy === request.id}
                   t={t}
                   tCommon={tCommon}
@@ -285,7 +299,7 @@ export default function WorkerRequestsPage() {
           {filledItems.length > 0 && (
             <Group label={t("filledCount", { n: filledItems.length })}>
               {filledItems.map((request) => (
-                <FilledCard key={request.id} request={request} t={t} tCommon={tCommon} />
+                <FilledCard key={request.id} request={request} locale={locale} t={t} tCommon={tCommon} />
               ))}
             </Group>
           )}
@@ -295,6 +309,7 @@ export default function WorkerRequestsPage() {
       {confirmingRequest && (
         <ConfirmModal
           request={confirmingRequest}
+          locale={locale}
           busy={busy === confirmingRequest.id}
           t={t}
           onCancel={() => setConfirmingRequest(null)}
@@ -304,6 +319,7 @@ export default function WorkerRequestsPage() {
       {decliningRequest && (
         <DeclineModal
           request={decliningRequest}
+          locale={locale}
           reason={declineReason}
           busy={busy === decliningRequest.id}
           t={t}
@@ -342,11 +358,13 @@ function Empty({ children }: { children: React.ReactNode }) {
 }
 
 function RequestCard({
-  request, myResponse, eligibility, busy, t, tCommon, onAccept, onDecline,
+  request, myResponse, eligibility, worker, locale, busy, t, tCommon, onAccept, onDecline,
 }: {
   request: StaffingRequest;
   myResponse: RequestResponse | null;
   eligibility: EligibilityResult | null;
+  worker: Worker;
+  locale: "fr" | "en";
   busy: boolean;
   t: ReturnType<typeof useTranslations>;
   tCommon: ReturnType<typeof useTranslations>;
@@ -354,6 +372,11 @@ function RequestCard({
   onDecline?: () => void;
 }) {
   const urgent = request.urgency_level >= 3;
+  const subtitle = roleSectorSubtitle(request, locale);
+  const distanceKm = distanceFromWorker(request, worker.profile);
+  const distanceLabel = formatDistance(distanceKm);
+  const dateLabel = formatWorkDate(request.work_date, locale);
+  const cityLabel = locationLabel(request);
   return (
     <article style={{
       background: "#fff",
@@ -379,15 +402,15 @@ function RequestCard({
       </div>
 
       <div style={{ fontFamily: "var(--serif)", fontSize: 22, lineHeight: 1.15, marginBottom: 2 }}>
-        {request.title}
+        {request.organization?.name ?? request.title}
       </div>
-      <div style={{ fontSize: 12, color: "var(--ink-2)", marginBottom: 10 }}>
-        {request.location_name ? `${request.location_name} · ` : ""}{request.city}
-      </div>
+      {subtitle && (
+        <div style={{ fontSize: 12, color: "var(--ink-2)", marginBottom: 10 }}>{subtitle}</div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 12 }}>
-        <Meta icon={<Calendar size={13} />} label={request.work_date} sub={`${request.start_time.slice(0,5)} → ${request.end_time.slice(0,5)}`} />
-        <Meta icon={<MapPin size={13} />} label={request.city} />
+        <Meta icon={<Calendar size={13} />} label={dateLabel} sub={`${request.start_time.slice(0,5)} → ${request.end_time.slice(0,5)}`} />
+        <Meta icon={<MapPin size={13} />} label={cityLabel} sub={distanceLabel ?? undefined} />
       </div>
 
       {eligibility && <EligibilityList eligibility={eligibility} />}
@@ -447,10 +470,12 @@ function EligibilityList({ eligibility }: { eligibility: EligibilityResult }) {
 
 function FilledCard({
   request,
+  locale,
   t,
   tCommon,
 }: {
   request: StaffingRequest;
+  locale: "fr" | "en";
   t: ReturnType<typeof useTranslations>;
   tCommon: ReturnType<typeof useTranslations>;
 }) {
@@ -463,10 +488,10 @@ function FilledCard({
       opacity: 0.8,
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-        <div style={{ fontFamily: "var(--serif)", fontSize: 18, color: "var(--ink-3)" }}>{request.title}</div>
+        <div style={{ fontFamily: "var(--serif)", fontSize: 18, color: "var(--ink-3)" }}>{request.organization?.name ?? request.title}</div>
         <Chip variant="default" style={{ color: "var(--ink-3)" }}>{tCommon("filled")}</Chip>
       </div>
-      <div style={{ fontSize: 12, color: "var(--ink-3)" }}>{request.city} · {request.work_date}</div>
+      <div style={{ fontSize: 12, color: "var(--ink-3)" }}>{locationLabel(request)} · {formatWorkDate(request.work_date, locale)}</div>
       <div style={{ marginTop: 8, fontSize: 13, color: "var(--ink-3)", fontStyle: "italic", lineHeight: 1.5 }}>
         {t("filledByOther")}
       </div>
@@ -476,12 +501,14 @@ function FilledCard({
 
 function ConfirmModal({
   request,
+  locale,
   busy,
   t,
   onCancel,
   onConfirm,
 }: {
   request: StaffingRequest;
+  locale: "fr" | "en";
   busy: boolean;
   t: ReturnType<typeof useTranslations>;
   onCancel: () => void;
@@ -497,8 +524,8 @@ function ConfirmModal({
           {t("confirmModalSub")}
         </p>
         <div style={{ background: "var(--paper)", borderRadius: 14, padding: "14px 16px", marginBottom: 18 }}>
-          <div style={{ fontFamily: "var(--serif)", fontSize: 18, marginBottom: 4 }}>{request.title}</div>
-          <div style={{ fontSize: 13, color: "var(--ink-2)" }}>{request.city} · {request.work_date}</div>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 18, marginBottom: 4 }}>{request.organization?.name ?? request.title}</div>
+          <div style={{ fontSize: 13, color: "var(--ink-2)" }}>{locationLabel(request)} · {formatWorkDate(request.work_date, locale)}</div>
           <div style={{ fontSize: 13, color: "var(--ink-2)" }}>{request.start_time.slice(0,5)} – {request.end_time.slice(0,5)}</div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -512,6 +539,7 @@ function ConfirmModal({
 
 function DeclineModal({
   request,
+  locale,
   reason,
   busy,
   t,
@@ -520,6 +548,7 @@ function DeclineModal({
   onConfirm,
 }: {
   request: StaffingRequest;
+  locale: "fr" | "en";
   reason: string;
   busy: boolean;
   t: ReturnType<typeof useTranslations>;
@@ -534,7 +563,11 @@ function DeclineModal({
           {t("declineModal.headlinePre")} <em style={{ fontStyle: "italic" }}>{t("declineModal.headlineAccent")}</em>
         </h2>
         <p style={{ margin: "0 0 18px", color: "var(--ink-2)", fontSize: 14 }}>
-          {t("declineModalSub", { title: request.title, city: request.city, date: request.work_date })}
+          {t("declineModalSub", {
+            title: request.organization?.name ?? request.title,
+            city: locationLabel(request),
+            date: formatWorkDate(request.work_date, locale),
+          })}
         </p>
         <label style={{ display: "grid", gap: 6, marginBottom: 18 }}>
           <Eyebrow>{t("declineModal.reasonLabel")}</Eyebrow>
