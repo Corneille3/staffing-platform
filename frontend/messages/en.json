@@ -55,6 +55,7 @@
       "thatsAll": "That's all for now.",
       "chipNew": "New request",
       "chipSent": "Reply sent",
+      "chipDeclined": "Declined",
       "iCanTakeIt": "I can take it",
       "waitingForConfirmation": "Waiting for confirmation"
     },
@@ -168,6 +169,21 @@
         "recurring": "Recurring",
         "emergency": "Emergency"
       }
+    },
+    "requestDetail": {
+      "back": "Back",
+      "urgentBanner": "Same-day urgent",
+      "whyMatch": "Why you'll match",
+      "duration": "Duration",
+      "distance": "Distance",
+      "location": "Location",
+      "iCanTakeIt": "I can take it",
+      "cant": "Can't",
+      "loading": "Loading…",
+      "notFound": "Request not found.",
+      "filled": "This request has been filled.",
+      "alreadyAccepted": "You've accepted this shift. The coordinator will confirm soon.",
+      "alreadyDeclined": "You declined this shift."
     },
     "profile": {
       "language": "Language",

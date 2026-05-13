@@ -55,6 +55,7 @@
       "thatsAll": "C'est tout pour l'instant.",
       "chipNew": "Nouvelle demande",
       "chipSent": "Réponse envoyée",
+      "chipDeclined": "Décliné",
       "iCanTakeIt": "Je peux le prendre",
       "waitingForConfirmation": "En attente de confirmation"
     },
@@ -168,6 +169,21 @@
         "recurring": "Récurrent",
         "emergency": "Urgence"
       }
+    },
+    "requestDetail": {
+      "back": "Retour",
+      "urgentBanner": "Urgent même jour",
+      "whyMatch": "Pourquoi vous correspondez",
+      "duration": "Durée",
+      "distance": "Distance",
+      "location": "Lieu",
+      "iCanTakeIt": "Je peux le prendre",
+      "cant": "Je ne peux pas",
+      "loading": "Chargement…",
+      "notFound": "Demande introuvable.",
+      "filled": "Cette demande a déjà été pourvue.",
+      "alreadyAccepted": "Vous avez accepté ce quart. Le coordonnateur confirmera bientôt.",
+      "alreadyDeclined": "Vous avez décliné ce quart."
     },
     "profile": {
       "language": "Langue",

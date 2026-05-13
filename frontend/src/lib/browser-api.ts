@@ -85,6 +85,10 @@ export async function fetchRequests(): Promise<StaffingRequest[]> {
   return data.items;
 }
 
+export async function fetchRequest(requestId: string): Promise<StaffingRequest> {
+  return getJson<StaffingRequest>(`/api/v1/requests/${requestId}`);
+}
+
 export async function fetchRequestResponses(requestId: string): Promise<RequestResponse[]> {
   const data = await getJson<{ items: RequestResponse[] }>(
     `/api/v1/requests/${requestId}/responses`,

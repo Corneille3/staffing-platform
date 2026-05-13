@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Calendar, MapPin } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { Link } from "../../../i18n/navigation";
+import { Link, useRouter } from "../../../i18n/navigation";
 import {
   fetchAssignments,
   fetchRequestResponses,
@@ -21,7 +21,7 @@ import { Assignment, RequestResponse, StaffingRequest, Worker } from "../../../l
 import { useWorkerSession } from "../../../lib/worker-session";
 import { Avatar, Chip, Meta, Mono } from "../../../components/ui";
 
-type CardStatus = "new" | "sent" | "filled";
+type CardStatus = "new" | "sent" | "filled" | "declined";
 
 interface InboxItem {
   request: StaffingRequest;
@@ -73,14 +73,16 @@ export default function WorkerHome() {
     let status: CardStatus = "new";
     if (["assigned", "completed", "cancelled", "expired"].includes(req.status)) {
       status = "filled";
+    } else if (myResponse?.status === "declined") {
+      status = "declined";
     } else if (myResponse && ["accepted", "viewed"].includes(myResponse.status)) {
       status = "sent";
     }
     return { request: req, status };
   });
 
-  const activeItems = inboxItems.filter((i) => i.status !== "filled");
-  const historyItems = inboxItems.filter((i) => i.status === "filled");
+  const activeItems = inboxItems.filter((i) => i.status === "new" || i.status === "sent");
+  const historyItems = inboxItems.filter((i) => i.status === "filled" || i.status === "declined");
   const displayed = tab === "active" ? activeItems : historyItems;
 
   const firstName = worker.first_name;
@@ -239,6 +241,7 @@ function RequestCard({
   tCommon: ReturnType<typeof useTranslations>;
   tTime: ReturnType<typeof useTranslations>;
 }) {
+  const router = useRouter();
   const urgent = request.urgency_level >= 3;
   const timeAgo = formatTimeAgo(request.created_at, tTime);
   const subtitle = roleSectorSubtitle(request, locale);
@@ -246,9 +249,20 @@ function RequestCard({
   const distanceLabel = formatDistance(distanceKm);
   const dateLabel = formatWorkDate(request.work_date, locale);
   const cityLabel = locationLabel(request);
+  const detailHref = `/worker/requests/${request.id}`;
+  const openDetail = () => router.push(detailHref);
 
   return (
     <div
+      role="link"
+      tabIndex={0}
+      onClick={openDetail}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openDetail();
+        }
+      }}
       style={{
         background: "#fff",
         borderRadius: 18,
@@ -260,6 +274,7 @@ function RequestCard({
           : "none",
         position: "relative",
         overflow: "hidden",
+        cursor: "pointer",
       }}
     >
       {urgent && (
@@ -270,9 +285,10 @@ function RequestCard({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {urgent && <Chip variant="urgent" dot>{tCommon("urgent")}</Chip>}
-          {status === "new"    && <Chip variant="terra" dot>{t("chipNew")}</Chip>}
-          {status === "sent"   && <Chip variant="sand"  dot>{t("chipSent")}</Chip>}
-          {status === "filled" && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{tCommon("filled")}</Chip>}
+          {status === "new"      && <Chip variant="terra" dot>{t("chipNew")}</Chip>}
+          {status === "sent"     && <Chip variant="sand"  dot>{t("chipSent")}</Chip>}
+          {status === "declined" && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{t("chipDeclined")}</Chip>}
+          {status === "filled"   && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{tCommon("filled")}</Chip>}
         </div>
         <Mono style={{ fontSize: 10, color: "var(--ink-3)" }}>{timeAgo}</Mono>
       </div>
@@ -303,7 +319,8 @@ function RequestCard({
       {status === "new" && (
         <div style={{ display: "flex", gap: 8 }}>
           <Link
-            href={`/worker/requests`}
+            href={detailHref}
+            onClick={(e) => e.stopPropagation()}
             style={{
               flex: 1,
               padding: "11px 0",
@@ -320,7 +337,8 @@ function RequestCard({
             {t("iCanTakeIt")}
           </Link>
           <Link
-            href={`/worker/requests`}
+            href={detailHref}
+            onClick={(e) => e.stopPropagation()}
             style={{
               padding: "11px 14px",
               borderRadius: 12,
