@@ -185,6 +185,22 @@
       "alreadyAccepted": "You've accepted this shift. The coordinator will confirm soon.",
       "alreadyDeclined": "You declined this shift."
     },
+    "requestAccepted": {
+      "back": "Back",
+      "successPre": "You're",
+      "successAccent": "in",
+      "successSub": "Your response is on its way to the coordinator.",
+      "timelineResponseSent": "Response sent",
+      "timelineReviewing": "Coordinator reviewing",
+      "timelineConfirmed": "Confirmed",
+      "timelineShiftStarts": "Shift starts",
+      "withdraw": "Withdraw response",
+      "withdrawing": "Withdrawing…",
+      "loading": "Loading…",
+      "notFound": "Response not found.",
+      "alreadyAssigned": "This shift is confirmed. Withdraw is no longer available.",
+      "withdrawn": "You've withdrawn this response."
+    },
     "profile": {
       "language": "Language",
       "identity": "Identity",

@@ -144,6 +144,15 @@ export async function declineRequest(
   });
 }
 
+export async function withdrawRequest(
+  requestId: string,
+  workerUserId: string,
+): Promise<RequestResponse> {
+  return postJson<RequestResponse>(`/api/v1/requests/${requestId}/responses/withdraw`, {
+    worker_user_id: workerUserId,
+  });
+}
+
 export async function updateAvailability(
   workerId: string,
   status: "available" | "unavailable",

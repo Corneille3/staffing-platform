@@ -99,7 +99,7 @@ export default function WorkerRequestDetailPage() {
     setBusy(true);
     try {
       await acceptRequest(request.id, worker.id);
-      router.push("/worker");
+      router.push(`/worker/requests/${request.id}/accepted`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Accept failed");
       setBusy(false);

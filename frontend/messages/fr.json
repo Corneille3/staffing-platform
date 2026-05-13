@@ -185,6 +185,22 @@
       "alreadyAccepted": "Vous avez accepté ce quart. Le coordonnateur confirmera bientôt.",
       "alreadyDeclined": "Vous avez décliné ce quart."
     },
+    "requestAccepted": {
+      "back": "Retour",
+      "successPre": "Vous êtes",
+      "successAccent": "inscrit·e",
+      "successSub": "Votre réponse est en route vers le coordonnateur.",
+      "timelineResponseSent": "Réponse envoyée",
+      "timelineReviewing": "Le coordonnateur examine",
+      "timelineConfirmed": "Confirmé",
+      "timelineShiftStarts": "Début du quart",
+      "withdraw": "Retirer la réponse",
+      "withdrawing": "Retrait en cours…",
+      "loading": "Chargement…",
+      "notFound": "Réponse introuvable.",
+      "alreadyAssigned": "Ce quart est confirmé. Le retrait n'est plus possible.",
+      "withdrawn": "Vous avez retiré cette réponse."
+    },
     "profile": {
       "language": "Langue",
       "identity": "Identité",
