@@ -12,6 +12,7 @@ git -C /home/corneille3/STAFFIG-PLATFORM log --oneline -10
 Disk state is authoritative — stale VS Code buffers have caused phantom "missing code" reports.
 
 **Last shipped (newest first):**
+- HANDOFF gap closures on `feature/worker-inbox` (2026-05-12, local only): **#16** distance + embedded org payload + friendly dates on worker cards · **#12 + #13** `notify_far` / `notify_weekend_overnight` preference toggles · **#3** dedicated `/worker/requests/[id]` detail page (back, urgent banner, title block, time block with Duration/Distance, location card, "Why you'll match" eligibility, sticky footer CTAs) plus fix for `/worker` home misclassifying declined responses as "new" · **#4 + #18** `/worker/requests/[id]/accepted` page (moss hero, 4-node vertical timeline, withdraw button) and `POST /requests/{id}/responses/withdraw` endpoint with 409 guards. Branch holds 4 unpushed commits past `origin/feature/worker-inbox@95169a6`. See `docs/handoff-gaps.md`.
 - Worker surface redesign (`feature/worker-inbox`): design system (Tailwind v4, Inter Tight / Instrument Serif / JetBrains Mono), new UI primitives (Chip, Button, Card, Avatar, BottomNav, Eyebrow, Mono), all 5 worker pages redesigned per `frontend/New design by Claude Design/HANDOFF.md`.
 - Lifecycle management, multi-tenant onboarding, outbound email via AWS SES. Tenant + user removal UI, orphan cleanup. SES domain `staffig.kouamvision.com` verified (sandbox; production-access request submitted). One-command deploy via `make deploy-backend`.
 - DB-owns-roles architecture live. `/auth/sync` links Clerk identity to DB row; uninvited sign-up → 403 → `/not-invited`. Server-side role guards on `/apf` + `/admin` layouts.
@@ -173,6 +174,13 @@ D1 network overview metrics · D2 substitute pool · D3 activity history
 - [ ] **E2** Worker UI polish pass — after pilot data; don't brief designer before real-user feedback
 - [ ] **E3** Case-study on `kouamvision.com/work/`
 - [ ] **E4** Optional standalone landing at `staffig.kouamvision.com` (app → `app.staffig.*`)
+
+### Carry-over for next session (started 2026-05-12)
+
+- **Feature parity audit (worker + coordinator):** prod lets both worker (decline with reason) and coordinator (cancel with reason, re-notify) act on a request. Endpoints exist on `feature/worker-inbox` too (`POST /requests/{id}/cancel`, `POST /requests/{id}/renotify`); verify the redesigned coordinator surface still exposes both, and that decline-with-reason still surfaces on the new worker detail page (currently no reason picker — direct decline).
+- **Cosmetic from #4:** `/worker/requests/[id]/accepted` shows the moss "You're *in*" hero even when the response is withdrawn — contradicts the "You've withdrawn" notice. Gate the hero on `!withdrawn` (~5 lines).
+- **Pre-existing on main, blocks dev test data:** `frontend/src/components/request-create-form.tsx:37` calls `useAuth()` unconditionally; `ClerkProvider` is only mounted when `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is set, so admin create-request crashes in dev. Wrap in a CLERK_ENABLED check or move token-getting into `lib/browser-api.ts`.
+- **Remaining worker HANDOFF gaps:** #5 (Directions + phone CTAs in `/schedule` hero), #11 (availability 7×4 grid), #14 (check-in card on `/schedule`), #17 (numeric match score on eligibility panel). #15 hourly rate dropped per product call (see memory `feedback-no-hourly-rate-display`).
 
 ### Git workflow
 - Branches: `main` (prod only) ← `develop` (integration) ← `feature/*`
