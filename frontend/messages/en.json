@@ -241,7 +241,19 @@
       "notFound": "Request not found.",
       "filled": "This request has been filled.",
       "alreadyAccepted": "You've accepted this shift. The coordinator will confirm soon.",
-      "alreadyDeclined": "You declined this shift."
+      "alreadyDeclined": "You declined this shift.",
+      "declineTitle": "Can't take this shift?",
+      "declineSub": "Pick a reason so the coordinator knows what's going on. You can add a note if it helps.",
+      "declineReason": {
+        "unavailable": "Not available at that time",
+        "tooFar": "Too far from me",
+        "notQualified": "I don't have the required qualification",
+        "other": "Other"
+      },
+      "declineNotesPlaceholder": "Anything else the coordinator should know? (optional)",
+      "declineConfirm": "Send decline",
+      "decliningProgress": "Sending…",
+      "cancel": "Cancel"
     },
     "requestAccepted": {
       "back": "Back",

@@ -241,7 +241,19 @@
       "notFound": "Demande introuvable.",
       "filled": "Cette demande a déjà été pourvue.",
       "alreadyAccepted": "Vous avez accepté ce quart. Le coordonnateur confirmera bientôt.",
-      "alreadyDeclined": "Vous avez décliné ce quart."
+      "alreadyDeclined": "Vous avez décliné ce quart.",
+      "declineTitle": "Pas en mesure d'accepter?",
+      "declineSub": "Choisissez une raison pour informer la coordonnatrice. Vous pouvez ajouter une note si utile.",
+      "declineReason": {
+        "unavailable": "Pas disponible à ce moment",
+        "tooFar": "Trop loin de chez moi",
+        "notQualified": "Je n'ai pas la qualification requise",
+        "other": "Autre"
+      },
+      "declineNotesPlaceholder": "Autre chose à signaler? (facultatif)",
+      "declineConfirm": "Envoyer le refus",
+      "decliningProgress": "Envoi…",
+      "cancel": "Annuler"
     },
     "requestAccepted": {
       "back": "Retour",

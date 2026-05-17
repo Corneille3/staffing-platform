@@ -28,7 +28,7 @@ class StaffingRequestService:
         self.worker_repository = WorkerRepository(db)
         self.response_repository = ResponseRepository(db)
         self.audit_service = AuditService(db)
-        self.matching_service = MatchingService()
+        self.matching_service = MatchingService(db=db)
         self.dispatcher = NotificationDispatcher(db)
 
     def list(self) -> list[StaffingRequest]:

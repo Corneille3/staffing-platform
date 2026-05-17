@@ -41,6 +41,9 @@ export default function WorkerRequestDetailPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [declineModalOpen, setDeclineModalOpen] = useState(false);
+  const [declineReason, setDeclineReason] = useState<string>("");
+  const [declineNotes, setDeclineNotes] = useState("");
 
   useEffect(() => {
     if (!worker || !requestId) return;
@@ -108,9 +111,11 @@ export default function WorkerRequestDetailPage() {
 
   async function handleDecline() {
     if (!worker || !request) return;
+    const reasonParts = [declineReason, declineNotes.trim()].filter(Boolean);
+    const reason = reasonParts.length > 0 ? reasonParts.join(" — ") : undefined;
     setBusy(true);
     try {
-      await declineRequest(request.id, worker.id);
+      await declineRequest(request.id, worker.id, reason);
       router.push("/worker");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Decline failed");
@@ -306,7 +311,7 @@ export default function WorkerRequestDetailPage() {
         }}>
           <button
             type="button"
-            onClick={handleDecline}
+            onClick={() => setDeclineModalOpen(true)}
             disabled={busy}
             style={{
               border: "0.5px solid var(--line)",
@@ -346,6 +351,166 @@ export default function WorkerRequestDetailPage() {
           </button>
         </div>
       )}
+
+      {declineModalOpen && (
+        <DeclineModal
+          reason={declineReason}
+          notes={declineNotes}
+          busy={busy}
+          onReasonChange={setDeclineReason}
+          onNotesChange={setDeclineNotes}
+          onClose={() => setDeclineModalOpen(false)}
+          onConfirm={() => {
+            setDeclineModalOpen(false);
+            handleDecline();
+          }}
+          t={t}
+        />
+      )}
+    </div>
+  );
+}
+
+const DECLINE_REASON_KEYS = ["unavailable", "tooFar", "notQualified", "other"] as const;
+
+function DeclineModal({
+  reason,
+  notes,
+  busy,
+  onReasonChange,
+  onNotesChange,
+  onClose,
+  onConfirm,
+  t,
+}: {
+  reason: string;
+  notes: string;
+  busy: boolean;
+  onReasonChange: (v: string) => void;
+  onNotesChange: (v: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 100,
+        background: "rgba(21, 20, 15, 0.4)",
+        display: "grid",
+        placeItems: "end center",
+        padding: 12,
+      }}
+      onClick={onClose}
+    >
+      <section
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: 480,
+          background: "var(--paper)",
+          borderRadius: 22,
+          padding: 22,
+          display: "grid",
+          gap: 16,
+          boxShadow: "0 24px 60px rgba(21, 20, 15, 0.25)",
+        }}
+      >
+        <header>
+          <h2 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 22, lineHeight: 1.15 }}>
+            {t("declineTitle")}
+          </h2>
+          <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
+            {t("declineSub")}
+          </p>
+        </header>
+
+        <div style={{ display: "grid", gap: 8 }}>
+          {DECLINE_REASON_KEYS.map((key) => {
+            const label = t(`declineReason.${key}`);
+            const on = reason === label;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => onReasonChange(label)}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "14px 16px", borderRadius: 12,
+                  border: on ? "1px solid var(--terra)" : "0.5px solid var(--line)",
+                  background: on ? "var(--terra-soft)" : "var(--card)",
+                  color: "var(--ink)",
+                  cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 500,
+                  minHeight: 44, textAlign: "left",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        <textarea
+          value={notes}
+          onChange={(e) => onNotesChange(e.target.value)}
+          rows={3}
+          placeholder={t("declineNotesPlaceholder")}
+          style={{
+            borderRadius: 12,
+            border: "0.5px solid var(--line)",
+            padding: "12px 14px",
+            background: "#fff",
+            color: "var(--ink)",
+            font: "inherit",
+            resize: "vertical",
+          }}
+        />
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            style={{
+              border: "0.5px solid var(--line)",
+              background: "transparent",
+              borderRadius: 12,
+              padding: "12px 18px",
+              color: "var(--ink)",
+              fontFamily: "inherit",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: busy ? "wait" : "pointer",
+              minHeight: 44,
+            }}
+          >
+            {t("cancel")}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy || !reason}
+            style={{
+              border: 0,
+              borderRadius: 12,
+              padding: "12px 18px",
+              background: reason && !busy ? "var(--rose)" : "var(--ink-4)",
+              color: "var(--paper)",
+              fontFamily: "inherit",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: reason && !busy ? "pointer" : "not-allowed",
+              minHeight: 44,
+            }}
+          >
+            {busy ? t("decliningProgress") : t("declineConfirm")}
+          </button>
+        </div>
+      </section>
     </div>
   );
 }

@@ -67,7 +67,7 @@ def get_request_eligibility(
     if worker is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Worker not found')
 
-    return MatchingService().eligibility_result(staffing_request, worker)
+    return MatchingService(db=db).eligibility_result(staffing_request, worker)
 
 
 @router.post('', status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)])

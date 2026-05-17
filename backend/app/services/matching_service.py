@@ -1,11 +1,32 @@
+from datetime import date, time, timedelta
 from typing import Literal
+from uuid import UUID
 
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app.models.availability import Availability
+from app.models.enums import SlotPeriod
 from app.models.staffing_request import StaffingRequest
 from app.models.user import User
 from app.schemas.eligibility import EligibilityReason, EligibilityResult
 
 
+def _slot_for_start_time(t: time) -> SlotPeriod:
+    h = t.hour
+    if 5 <= h < 12:
+        return SlotPeriod.MORNING
+    if 12 <= h < 17:
+        return SlotPeriod.AFTERNOON
+    if 17 <= h < 22:
+        return SlotPeriod.EVENING
+    return SlotPeriod.OVERNIGHT
+
+
 class MatchingService:
+    def __init__(self, db: Session | None = None) -> None:
+        self.db = db
+
     def eligible_workers(self, staffing_request: StaffingRequest, workers: list[User]) -> list[User]:
         eligible: list[User] = []
         for worker in workers:
@@ -40,6 +61,14 @@ class MatchingService:
             return EligibilityResult(eligible=False, score=0, reasons=reasons)
 
         if profile.availability_status.value == 'available':
+            grid_check = self._check_grid_for(worker.id, staffing_request.work_date, staffing_request.start_time)
+            if grid_check is False:
+                reasons.append(EligibilityReason(
+                    type='availability',
+                    status='missing',
+                    label='Slot not in weekly grid',
+                ))
+                return EligibilityResult(eligible=False, score=0, reasons=reasons)
             reasons.append(EligibilityReason(type='availability', status='matched', label='Available'))
         else:
             reasons.append(
@@ -98,6 +127,30 @@ class MatchingService:
             score=self._score(reasons),
             reasons=reasons,
         )
+
+    def _check_grid_for(self, worker_user_id: UUID, work_date: date, start_time: time) -> bool | None:
+        """Returns True if the worker's grid has this (date, slot) marked available,
+        False if their grid covers that week but doesn't include this cell as available,
+        and None if they haven't engaged with the grid for that week (fall through)."""
+        if self.db is None:
+            return None
+        week_start = work_date - timedelta(days=work_date.weekday())
+        week_end = week_start + timedelta(days=6)
+        week_count = self.db.scalar(
+            select(func.count(Availability.id))
+            .where(Availability.user_id == worker_user_id)
+            .where(Availability.specific_date.between(week_start, week_end))
+        ) or 0
+        if week_count == 0:
+            return None
+        slot = _slot_for_start_time(start_time)
+        match = self.db.scalar(
+            select(Availability.available)
+            .where(Availability.user_id == worker_user_id)
+            .where(Availability.specific_date == work_date)
+            .where(Availability.slot == slot)
+        )
+        return bool(match)
 
     @staticmethod
     def _score(reasons: list[EligibilityReason]) -> int:
