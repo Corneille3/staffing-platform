@@ -51,9 +51,8 @@ jobs:
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-    defaults:
-      run:
-        working-directory: frontend
+    # Run from repo root — the Vercel project on vercel.com has
+    # Root Directory = "frontend" set, and the CLI honors that.
     steps:
       - uses: actions/checkout@v4
 
