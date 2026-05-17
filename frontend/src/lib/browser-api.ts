@@ -312,6 +312,7 @@ export async function onboardWorker(
     supported_cities: string[];
     qualifications: string[];
     certifications: string[];
+    preferred_language?: string;
   },
 ): Promise<WorkerProfile> {
   return postJson<WorkerProfile>(`/api/v1/workers/${workerId}/onboard`, payload);

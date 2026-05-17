@@ -251,7 +251,10 @@ function RequestCard({
   const distanceLabel = formatDistance(distanceKm);
   const dateLabel = formatWorkDate(request.work_date, locale);
   const cityLabel = locationLabel(request);
-  const detailHref = `/worker/requests/${request.id}`;
+  const detailHref =
+    status === "sent"
+      ? `/worker/requests/${request.id}/accepted`
+      : `/worker/requests/${request.id}`;
   const openDetail = () => router.push(detailHref);
 
   return (

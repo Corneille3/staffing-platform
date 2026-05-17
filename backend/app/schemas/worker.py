@@ -72,3 +72,4 @@ class WorkerOnboardCreate(BaseModel):
     supported_cities: list[str] = Field(default_factory=list)
     qualifications: list[str] = Field(default_factory=list)
     certifications: list[str] = Field(default_factory=list)
+    preferred_language: str | None = None  # fr | en | bilingual

@@ -145,6 +145,12 @@ class WorkerService:
                     id=uuid4(), worker_profile_id=profile.id, certification_code=code.strip(),
                 ))
 
+        if payload.preferred_language:
+            user = self.db.get(User, worker_user_id)
+            if user is not None and payload.preferred_language in {'fr', 'en', 'bilingual'}:
+                user.preferred_language = payload.preferred_language
+                self.db.add(user)
+
         self.audit_service.log(
             action='worker.onboarded',
             entity_type='worker_profile',

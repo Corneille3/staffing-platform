@@ -93,8 +93,25 @@ def seed() -> None:
             role=UserRole.WORKER,
             preferred_language='fr',
         )
+        # Invited but not onboarded — exercises the onboarding flow.
+        worker_three = User(
+            id=uuid4(),
+            clerk_user_id='dev-worker-nora',
+            first_name='Nora',
+            last_name='NewHire',
+            email='nora.worker@example.org',
+            role=UserRole.WORKER,
+        )
+        worker_four = User(
+            id=uuid4(),
+            clerk_user_id='dev-worker-owen',
+            first_name='Owen',
+            last_name='Onboarding',
+            email='owen.worker@example.org',
+            role=UserRole.WORKER,
+        )
 
-        db.add_all([organization, network_admin, org_admin, worker_one, worker_two])
+        db.add_all([organization, network_admin, org_admin, worker_one, worker_two, worker_three, worker_four])
         db.flush()
 
         db.add(TenantMembership(
@@ -106,7 +123,7 @@ def seed() -> None:
         db.add(OrganizationMembership(
             id=uuid4(), user_id=org_admin.id, organization_id=organization.id, role=UserRole.ORG_ADMIN,
         ))
-        for worker in (worker_one, worker_two):
+        for worker in (worker_one, worker_two, worker_three, worker_four):
             db.add(TenantMembership(
                 id=uuid4(), user_id=worker.id, tenant_id=tenant.id, role=UserRole.WORKER,
             ))
