@@ -1,5 +1,7 @@
 name: Frontend CI
 
+# Deploys are handled by Vercel's native GitHub integration (auto preview
+# on PRs, auto prod on main). This workflow only runs CI checks.
 on:
   push:
     paths:
@@ -42,33 +44,3 @@ jobs:
           # Real API calls happen at request time, not during static build.
           API_BASE_URL: http://localhost:8000
           NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
-
-  preview:
-    name: Deploy preview to Vercel
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-    # Run from repo root — the Vercel project on vercel.com has
-    # Root Directory = "frontend" set, and the CLI honors that.
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-
-      - name: Pull Vercel environment
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy preview
-        run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
