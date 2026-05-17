@@ -69,7 +69,13 @@
       "history": "Historique",
       "contact": "Contact",
       "arrival": "À l'arrivée",
-      "addToCalendar": "Ajouter au calendrier"
+      "addToCalendar": "Ajouter au calendrier",
+      "directions": "Itinéraire",
+      "arrivalCheckIn": "À l'arrivée",
+      "checkInHint": "Touchez pour confirmer votre arrivée. La localisation est captée si autorisée.",
+      "checkInCta": "Confirmer arrivée",
+      "checkingIn": "Confirmation…",
+      "checkedIn": "Arrivée confirmée"
     },
     "notifications": {
       "noAlerts": "Aucune alerte",
@@ -111,7 +117,26 @@
       "notifyWeekendOvernight": "Nuits de fin de semaine",
       "notifyWeekendOvernightSub": "M'avertir pour les quarts de nuit en fin de semaine",
       "available": "Disponible",
-      "unavailable": "Indisponible"
+      "unavailable": "Indisponible",
+      "weeklyGrid": "Disponibilités hebdomadaires",
+      "copyLastWeek": "Copier la semaine dernière",
+      "prevWeek": "Semaine précédente",
+      "nextWeek": "Semaine suivante",
+      "dow": {
+        "0": "Lun",
+        "1": "Mar",
+        "2": "Mer",
+        "3": "Jeu",
+        "4": "Ven",
+        "5": "Sam",
+        "6": "Dim"
+      },
+      "slot": {
+        "morning": "Matin",
+        "afternoon": "Après-midi",
+        "evening": "Soir",
+        "overnight": "Nuit"
+      }
     },
     "requests": {
       "eyebrow": "Remplacements disponibles",

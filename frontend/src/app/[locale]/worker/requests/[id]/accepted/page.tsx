@@ -120,7 +120,8 @@ export default function WorkerRequestAcceptedPage() {
         </Link>
       </div>
 
-      {/* Success hero (moss) */}
+      {/* Success hero (moss) — hidden after withdrawal */}
+      {!withdrawn && (
       <section style={{
         background: "var(--moss)",
         color: "var(--paper)",
@@ -162,6 +163,7 @@ export default function WorkerRequestAcceptedPage() {
           <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>{locationLabel(request)}</div>
         </div>
       </section>
+      )}
 
       {/* Timeline */}
       <section style={{

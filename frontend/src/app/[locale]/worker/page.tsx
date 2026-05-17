@@ -68,18 +68,20 @@ export default function WorkerHome() {
   const availabilityStatus = worker.profile?.availability_status || "unavailable";
   const available = availabilityStatus === "available";
 
-  const inboxItems: InboxItem[] = requests.map((req) => {
-    const myResponse = responses.find((r) => r.staffing_request_id === req.id);
-    let status: CardStatus = "new";
-    if (["assigned", "completed", "cancelled", "expired"].includes(req.status)) {
-      status = "filled";
-    } else if (myResponse?.status === "declined") {
-      status = "declined";
-    } else if (myResponse && ["accepted", "viewed"].includes(myResponse.status)) {
-      status = "sent";
-    }
-    return { request: req, status };
-  });
+  const inboxItems: InboxItem[] = requests
+    .filter((req) => responses.some((r) => r.staffing_request_id === req.id))
+    .map((req) => {
+      const myResponse = responses.find((r) => r.staffing_request_id === req.id);
+      let status: CardStatus = "new";
+      if (["assigned", "completed", "cancelled", "expired"].includes(req.status)) {
+        status = "filled";
+      } else if (myResponse?.status === "declined") {
+        status = "declined";
+      } else if (myResponse && ["accepted", "viewed"].includes(myResponse.status)) {
+        status = "sent";
+      }
+      return { request: req, status };
+    });
 
   const activeItems = inboxItems.filter((i) => i.status === "new" || i.status === "sent");
   const historyItems = inboxItems.filter((i) => i.status === "filled" || i.status === "declined");

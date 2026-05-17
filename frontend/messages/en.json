@@ -69,7 +69,13 @@
       "history": "History",
       "contact": "Contact",
       "arrival": "Arrival",
-      "addToCalendar": "Add to calendar"
+      "addToCalendar": "Add to calendar",
+      "directions": "Directions",
+      "arrivalCheckIn": "On arrival",
+      "checkInHint": "Tap to check in when you arrive on site. Location is captured if granted.",
+      "checkInCta": "Check in",
+      "checkingIn": "Checking in…",
+      "checkedIn": "Checked in"
     },
     "notifications": {
       "noAlerts": "No alerts",
@@ -111,7 +117,26 @@
       "notifyWeekendOvernight": "Weekend overnights",
       "notifyWeekendOvernightSub": "Notify me for overnight shifts on weekends",
       "available": "Available",
-      "unavailable": "Unavailable"
+      "unavailable": "Unavailable",
+      "weeklyGrid": "Weekly availability",
+      "copyLastWeek": "Copy last week",
+      "prevWeek": "Previous week",
+      "nextWeek": "Next week",
+      "dow": {
+        "0": "Mon",
+        "1": "Tue",
+        "2": "Wed",
+        "3": "Thu",
+        "4": "Fri",
+        "5": "Sat",
+        "6": "Sun"
+      },
+      "slot": {
+        "morning": "Morning",
+        "afternoon": "Afternoon",
+        "evening": "Evening",
+        "overnight": "Overnight"
+      }
     },
     "requests": {
       "eyebrow": "Available coverage",

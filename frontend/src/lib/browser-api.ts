@@ -2,11 +2,13 @@
 
 import {
   Assignment,
+  AvailabilityGrid,
   Coordinator,
   EligibilityResult,
   NotificationFeedItem,
   Organization,
   RequestResponse,
+  SlotPeriod,
   StaffingRequest,
   Worker,
   WorkerProfile,
@@ -264,6 +266,42 @@ export async function inviteCoordinator(payload: {
   org_ids: string[];
 }): Promise<Coordinator> {
   return postJson<Coordinator>("/api/v1/coordinators/invite", payload);
+}
+
+export async function checkInAssignment(
+  assignmentId: string,
+  coords?: { latitude: number; longitude: number },
+): Promise<Assignment> {
+  return postJson<Assignment>(`/api/v1/assignments/${assignmentId}/check-in`, coords ?? {});
+}
+
+export async function fetchAvailabilityGrid(
+  workerId: string,
+  weekStart: string,
+): Promise<AvailabilityGrid> {
+  const params = new URLSearchParams({ week_start: weekStart });
+  return getJson<AvailabilityGrid>(`/api/v1/workers/${workerId}/availability/grid?${params}`);
+}
+
+export async function saveAvailabilityGrid(
+  workerId: string,
+  weekStart: string,
+  cells: { specific_date: string; slot: SlotPeriod; available: boolean }[],
+): Promise<AvailabilityGrid> {
+  return postJson<AvailabilityGrid>(`/api/v1/workers/${workerId}/availability/grid`, {
+    week_start: weekStart,
+    cells,
+  });
+}
+
+export async function copyPreviousAvailabilityWeek(
+  workerId: string,
+  targetWeekStart: string,
+): Promise<AvailabilityGrid> {
+  return postJson<AvailabilityGrid>(
+    `/api/v1/workers/${workerId}/availability/grid/copy-previous`,
+    { target_week_start: targetWeekStart },
+  );
 }
 
 export async function onboardWorker(

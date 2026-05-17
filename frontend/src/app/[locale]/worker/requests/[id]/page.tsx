@@ -223,7 +223,21 @@ export default function WorkerRequestDetailPage() {
           display: "grid",
           gap: 10,
         }}>
-          <Eyebrow>{t("whyMatch")}</Eyebrow>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+            <Eyebrow>{t("whyMatch")}</Eyebrow>
+            <div style={{
+              display: "inline-flex",
+              alignItems: "baseline",
+              gap: 4,
+              padding: "4px 10px",
+              borderRadius: 999,
+              background: eligibility.score >= 80 ? "var(--moss-soft)" : eligibility.score >= 50 ? "var(--sand-soft)" : "var(--rose-soft)",
+              color: eligibility.score >= 80 ? "var(--moss)" : eligibility.score >= 50 ? "var(--ink-2)" : "var(--rose)",
+            }}>
+              <Mono style={{ fontSize: 14, fontWeight: 700 }}>{eligibility.score}</Mono>
+              <span style={{ fontSize: 11, fontWeight: 600 }}>%</span>
+            </div>
+          </div>
           <div>
             {eligibility.reasons.map((reason, i) => (
               <div

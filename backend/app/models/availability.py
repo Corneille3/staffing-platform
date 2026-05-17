@@ -25,6 +25,7 @@ class Availability(Base):
             name='ck_availabilities_day_of_week_range',
         ),
         UniqueConstraint('user_id', 'day_of_week', 'slot', name='uq_availabilities_recurring'),
+        UniqueConstraint('user_id', 'specific_date', 'slot', name='uq_availabilities_specific'),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True)

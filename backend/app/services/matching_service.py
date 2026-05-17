@@ -27,7 +27,7 @@ class MatchingService:
                     label='Missing: active worker profile',
                 )
             )
-            return EligibilityResult(eligible=False, reasons=reasons)
+            return EligibilityResult(eligible=False, score=0, reasons=reasons)
 
         if profile is None:
             reasons.append(
@@ -37,7 +37,7 @@ class MatchingService:
                     label='Missing: worker profile',
                 )
             )
-            return EligibilityResult(eligible=False, reasons=reasons)
+            return EligibilityResult(eligible=False, score=0, reasons=reasons)
 
         if profile.availability_status.value == 'available':
             reasons.append(EligibilityReason(type='availability', status='matched', label='Available'))
@@ -95,8 +95,16 @@ class MatchingService:
 
         return EligibilityResult(
             eligible=all(reason.status == 'matched' for reason in reasons),
+            score=self._score(reasons),
             reasons=reasons,
         )
+
+    @staticmethod
+    def _score(reasons: list[EligibilityReason]) -> int:
+        if not reasons:
+            return 0
+        matched = sum(1 for r in reasons if r.status == 'matched')
+        return round((matched / len(reasons)) * 100)
 
     @staticmethod
     def _requirement_reasons(

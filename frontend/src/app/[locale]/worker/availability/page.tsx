@@ -1,11 +1,43 @@
 "use client";
 
-import { useState } from "react";
-import { MapPin, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Copy, MapPin, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { updateAvailability, updateWorkerPreferences } from "../../../../lib/browser-api";
+import {
+  copyPreviousAvailabilityWeek,
+  fetchAvailabilityGrid,
+  saveAvailabilityGrid,
+  updateAvailability,
+  updateWorkerPreferences,
+} from "../../../../lib/browser-api";
+import { SlotPeriod } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
-import { Eyebrow } from "../../../../components/ui";
+import { Eyebrow, Mono } from "../../../../components/ui";
+
+const SLOTS: SlotPeriod[] = ["morning", "afternoon", "evening", "overnight"];
+
+function mondayOf(d: Date): Date {
+  const out = new Date(d);
+  const dow = out.getDay(); // 0=Sun
+  const diff = dow === 0 ? -6 : 1 - dow;
+  out.setDate(out.getDate() + diff);
+  out.setHours(0, 0, 0, 0);
+  return out;
+}
+
+function isoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function addDays(d: Date, n: number): Date {
+  const out = new Date(d);
+  out.setDate(out.getDate() + n);
+  return out;
+}
+
+function cellKey(dateIso: string, slot: SlotPeriod): string {
+  return `${dateIso}|${slot}`;
+}
 
 export default function WorkerAvailabilityPage() {
   const { worker, refresh } = useWorkerSession();
@@ -16,6 +48,89 @@ export default function WorkerAvailabilityPage() {
   const [cityInput, setCityInput] = useState("");
   const [cityBusy, setCityBusy] = useState(false);
   const [cityError, setCityError] = useState<string | null>(null);
+
+  const [weekStart, setWeekStart] = useState<Date>(() => mondayOf(new Date()));
+  const [gridCells, setGridCells] = useState<Set<string>>(new Set());
+  const [gridLoading, setGridLoading] = useState(false);
+  const [gridBusy, setGridBusy] = useState(false);
+  const [gridError, setGridError] = useState<string | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const workerId = worker?.id;
+  const weekStartIso = isoDate(weekStart);
+
+  useEffect(() => {
+    if (!workerId) return;
+    let alive = true;
+    setGridLoading(true);
+    setGridError(null);
+    fetchAvailabilityGrid(workerId, weekStartIso)
+      .then((grid) => {
+        if (!alive) return;
+        const next = new Set<string>();
+        for (const cell of grid.cells) {
+          if (cell.available) next.add(cellKey(cell.specific_date, cell.slot));
+        }
+        setGridCells(next);
+      })
+      .catch((err) => {
+        if (!alive) return;
+        setGridError(err instanceof Error ? err.message : "Failed to load grid");
+      })
+      .finally(() => alive && setGridLoading(false));
+    return () => { alive = false; };
+  }, [workerId, weekStartIso]);
+
+  const persistGrid = useCallback(
+    (next: Set<string>) => {
+      if (!workerId) return;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(async () => {
+        setGridBusy(true);
+        setGridError(null);
+        try {
+          const payload = [...next].map((key) => {
+            const [d, s] = key.split("|");
+            return { specific_date: d, slot: s as SlotPeriod, available: true };
+          });
+          await saveAvailabilityGrid(workerId, weekStartIso, payload);
+        } catch (err) {
+          setGridError(err instanceof Error ? err.message : "Save failed");
+        } finally {
+          setGridBusy(false);
+        }
+      }, 500);
+    },
+    [workerId, weekStartIso],
+  );
+
+  function toggleCell(dateIso: string, slot: SlotPeriod) {
+    const key = cellKey(dateIso, slot);
+    setGridCells((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      persistGrid(next);
+      return next;
+    });
+  }
+
+  async function copyLastWeek() {
+    if (!workerId) return;
+    setGridBusy(true);
+    setGridError(null);
+    try {
+      const grid = await copyPreviousAvailabilityWeek(workerId, weekStartIso);
+      const next = new Set<string>();
+      for (const cell of grid.cells) {
+        if (cell.available) next.add(cellKey(cell.specific_date, cell.slot));
+      }
+      setGridCells(next);
+    } catch (err) {
+      setGridError(err instanceof Error ? err.message : "Copy failed");
+    } finally {
+      setGridBusy(false);
+    }
+  }
 
   if (!worker) return null;
 
@@ -186,6 +301,111 @@ export default function WorkerAvailabilityPage() {
       {error ? (
         <p style={{ margin: 0, color: "var(--rose)", fontWeight: 600, fontSize: 14 }}>{error}</p>
       ) : null}
+
+      {/* weekly grid */}
+      <section>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <Eyebrow>{t("weeklyGrid")}</Eyebrow>
+          <button
+            type="button"
+            disabled={gridBusy}
+            onClick={copyLastWeek}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              border: "0.5px solid var(--line)",
+              background: "var(--card)",
+              color: "var(--ink-2)",
+              borderRadius: 999,
+              padding: "6px 12px",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: gridBusy ? "wait" : "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            <Copy size={12} />
+            {t("copyLastWeek")}
+          </button>
+        </div>
+
+        <div style={{ background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: 16, padding: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <button
+              type="button"
+              aria-label={t("prevWeek")}
+              onClick={() => setWeekStart((d) => addDays(d, -7))}
+              style={{ border: "none", background: "none", padding: 6, color: "var(--ink-2)", cursor: "pointer" }}
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <Mono style={{ fontSize: 13, color: "var(--ink-2)" }}>
+              {`${weekStartIso} → ${isoDate(addDays(weekStart, 6))}`}
+            </Mono>
+            <button
+              type="button"
+              aria-label={t("nextWeek")}
+              onClick={() => setWeekStart((d) => addDays(d, 7))}
+              style={{ border: "none", background: "none", padding: 6, color: "var(--ink-2)", cursor: "pointer" }}
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+
+          {gridLoading ? (
+            <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13, textAlign: "center", padding: 16 }}>
+              {tCommon("loading")}
+            </p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "auto repeat(7, 1fr)", gap: 4 }}>
+              <div />
+              {Array.from({ length: 7 }, (_, i) => {
+                const day = addDays(weekStart, i);
+                return (
+                  <div key={i} style={{ textAlign: "center", fontSize: 11, color: "var(--ink-3)" }}>
+                    <div style={{ fontWeight: 600 }}>{t(`dow.${i}`)}</div>
+                    <Mono style={{ fontSize: 11 }}>{String(day.getDate()).padStart(2, "0")}</Mono>
+                  </div>
+                );
+              })}
+
+              {SLOTS.map((slot) => (
+                <div key={slot} style={{ display: "contents" }}>
+                  <div style={{ fontSize: 11, color: "var(--ink-3)", alignSelf: "center", paddingRight: 6, textTransform: "capitalize" }}>
+                    {t(`slot.${slot}`)}
+                  </div>
+                  {Array.from({ length: 7 }, (_, i) => {
+                    const day = addDays(weekStart, i);
+                    const iso = isoDate(day);
+                    const on = gridCells.has(cellKey(iso, slot));
+                    return (
+                      <button
+                        key={`${slot}-${i}`}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => toggleCell(iso, slot)}
+                        style={{
+                          minHeight: 38,
+                          border: on ? "none" : "0.5px solid var(--line)",
+                          borderRadius: 8,
+                          background: on ? "var(--moss)" : "#fff",
+                          cursor: "pointer",
+                          padding: 0,
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {gridError ? (
+            <p style={{ margin: "10px 0 0", color: "var(--rose)", fontSize: 12, fontWeight: 600 }}>{gridError}</p>
+          ) : null}
+        </div>
+      </section>
 
       {/* info note */}
       <div

@@ -58,6 +58,18 @@ export type Availability = {
   created_at: string;
 };
 
+export type AvailabilityCell = {
+  id: string;
+  specific_date: string;
+  slot: SlotPeriod;
+  available: boolean;
+};
+
+export type AvailabilityGrid = {
+  week_start: string;
+  cells: AvailabilityCell[];
+};
+
 export type WorkerProfile = {
   availability_status: string;
   urgent_alert_opt_in: boolean;
@@ -134,6 +146,7 @@ export type EligibilityReason = {
 };
 
 export type EligibilityResult = {
+  score: number;
   eligible: boolean;
   reasons: EligibilityReason[];
 };

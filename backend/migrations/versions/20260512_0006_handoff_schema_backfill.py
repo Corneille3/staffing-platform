@@ -95,9 +95,15 @@ def upgrade() -> None:
         'availabilities',
         ['user_id', 'day_of_week', 'slot'],
     )
+    op.create_unique_constraint(
+        'uq_availabilities_specific',
+        'availabilities',
+        ['user_id', 'specific_date', 'slot'],
+    )
 
 
 def downgrade() -> None:
+    op.drop_constraint('uq_availabilities_specific', 'availabilities', type_='unique')
     op.drop_constraint('uq_availabilities_recurring', 'availabilities', type_='unique')
     op.drop_index('ix_availabilities_user_id', table_name='availabilities')
     op.drop_table('availabilities')

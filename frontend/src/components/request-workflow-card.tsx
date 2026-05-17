@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { useAuth } from "@clerk/nextjs";
 import { availabilityStatusLabel } from "../lib/status-labels";
 import { Assignment, RequestResponse, StaffingRequest, User, Worker } from "../lib/types";
 
 const browserApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+type ClerkLike = { session?: { getToken: () => Promise<string | null> } };
 
 function formatStatus(value: string) {
   return value.replace(/_/g, " ");
@@ -61,7 +62,6 @@ export function RequestWorkflowCard({
   assignment: Assignment | null;
 }) {
   const router = useRouter();
-  const { getToken } = useAuth();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [cancelAssignmentOpen, setCancelAssignmentOpen] = useState(false);
@@ -77,7 +77,10 @@ export function RequestWorkflowCard({
 
   async function post(path: string, payload?: object) {
     setError(null);
-    const token = await getToken();
+    let token: string | null = null;
+    if (CLERK_ENABLED && typeof window !== "undefined") {
+      token = (await (window as unknown as { Clerk?: ClerkLike }).Clerk?.session?.getToken()) ?? null;
+    }
     const response = await fetch(`${browserApiBaseUrl}${path}`, {
       method: "POST",
       headers: {

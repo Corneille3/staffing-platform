@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Calendar, Mail, MapPin, Phone, User } from "lucide-react";
+import { Calendar, CheckCircle2, Mail, MapPin, Navigation, Phone, User } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { fetchAssignments, fetchRequests } from "../../../../lib/browser-api";
+import { checkInAssignment, fetchAssignments, fetchRequests } from "../../../../lib/browser-api";
 import { formatWorkDate, locationLabel, roleSectorSubtitle } from "../../../../lib/format";
 import { assignmentStatusLabel } from "../../../../lib/status-labels";
 import { Assignment, StaffingRequest } from "../../../../lib/types";
@@ -95,6 +95,11 @@ export default function WorkerSchedulePage() {
               request={hero.request}
               locale={locale}
               t={t}
+              onCheckedIn={(updated) => {
+                setItems((prev) =>
+                  prev.map((it) => (it.assignment.id === updated.id ? { ...it, assignment: updated } : it)),
+                );
+              }}
             />
           )}
 
@@ -145,12 +150,17 @@ function HeroCard({
   request,
   locale,
   t,
+  onCheckedIn,
 }: {
   assignment: Assignment;
   request: StaffingRequest;
   locale: "en" | "fr";
   t: ReturnType<typeof useTranslations>;
+  onCheckedIn: (updated: Assignment) => void;
 }) {
+  const today = new Date();
+  const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const showCheckIn = request.work_date === todayIso;
   return (
     <article style={{
       background: "var(--ink)",
@@ -267,31 +277,176 @@ function HeroCard({
         </div>
       )}
 
-      <a
-        href={buildCalendarUrl(request)}
-        target="_blank"
-        rel="noopener noreferrer"
+      {showCheckIn && (
+        <CheckInCard assignment={assignment} t={t} onCheckedIn={onCheckedIn} />
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <a
+          href={buildDirectionsUrl(request)}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            borderRadius: 14,
+            padding: "13px 14px",
+            background: "var(--terra)",
+            color: "var(--paper)",
+            fontWeight: 600,
+            fontSize: 14,
+            textDecoration: "none",
+            minHeight: 44,
+          }}
+        >
+          <Navigation size={15} />
+          {t("directions")}
+        </a>
+        <a
+          href={buildCalendarUrl(request)}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            borderRadius: 14,
+            padding: "13px 14px",
+            background: "rgba(246,244,238,.10)",
+            border: "0.5px solid rgba(246,244,238,.22)",
+            color: "var(--paper)",
+            fontWeight: 600,
+            fontSize: 14,
+            textDecoration: "none",
+            minHeight: 44,
+          }}
+        >
+          <Calendar size={15} />
+          {t("addToCalendar")}
+        </a>
+      </div>
+    </article>
+  );
+}
+
+function CheckInCard({
+  assignment,
+  t,
+  onCheckedIn,
+}: {
+  assignment: Assignment;
+  t: ReturnType<typeof useTranslations>;
+  onCheckedIn: (updated: Assignment) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const checkedInAt = assignment.checked_in_at;
+
+  async function handleCheckIn() {
+    setBusy(true);
+    setError(null);
+    let coords: { latitude: number; longitude: number } | undefined;
+    if (typeof navigator !== "undefined" && navigator.geolocation) {
+      coords = await new Promise<{ latitude: number; longitude: number } | undefined>((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+          () => resolve(undefined),
+          { enableHighAccuracy: false, maximumAge: 60000, timeout: 5000 },
+        );
+      });
+    }
+    try {
+      const updated = await checkInAssignment(assignment.id, coords);
+      onCheckedIn(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Check-in failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (checkedInAt) {
+    return (
+      <div style={{
+        background: "rgba(168,217,184,.12)",
+        border: "0.5px solid rgba(168,217,184,.3)",
+        borderRadius: 14,
+        padding: "14px 16px",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+      }}>
+        <CheckCircle2 size={18} style={{ color: "#A8D9B8", flexShrink: 0 }} />
+        <div style={{ flex: 1 }}>
+          <Eyebrow style={{ color: "rgba(168,217,184,.7)", letterSpacing: ".16em" }}>
+            {t("checkedIn")}
+          </Eyebrow>
+          <div style={{ fontSize: 13, color: "var(--paper)", marginTop: 2 }}>
+            {checkedInAt.slice(11, 16)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      background: "rgba(246,244,238,.08)",
+      border: "0.5px solid rgba(246,244,238,.15)",
+      borderRadius: 14,
+      padding: "14px 16px",
+      display: "grid",
+      gap: 10,
+    }}>
+      <Eyebrow style={{ color: "rgba(246,244,238,.45)", letterSpacing: ".16em" }}>
+        {t("arrivalCheckIn")}
+      </Eyebrow>
+      <p style={{ margin: 0, fontSize: 13, color: "rgba(246,244,238,.78)", lineHeight: 1.5 }}>
+        {t("checkInHint")}
+      </p>
+      {error && (
+        <p style={{ margin: 0, fontSize: 12, color: "#F2B5A8", fontWeight: 600 }}>{error}</p>
+      )}
+      <button
+        type="button"
+        onClick={handleCheckIn}
+        disabled={busy}
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           gap: 8,
-          borderRadius: 14,
-          padding: "13px 18px",
-          background: "rgba(246,244,238,.10)",
-          border: "0.5px solid rgba(246,244,238,.22)",
-          color: "var(--paper)",
+          borderRadius: 12,
+          padding: "12px 16px",
+          background: "var(--moss)",
+          border: "none",
+          color: "#fff",
           fontWeight: 600,
           fontSize: 14,
-          textDecoration: "none",
+          cursor: busy ? "wait" : "pointer",
+          opacity: busy ? 0.6 : 1,
+          fontFamily: "inherit",
           minHeight: 44,
         }}
       >
-        <Calendar size={15} />
-        {t("addToCalendar")}
-      </a>
-    </article>
+        <CheckCircle2 size={15} />
+        {busy ? t("checkingIn") : t("checkInCta")}
+      </button>
+    </div>
   );
+}
+
+function buildDirectionsUrl(request: StaffingRequest): string {
+  const org = request.organization;
+  if (org?.latitude && org?.longitude) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${org.latitude},${org.longitude}`;
+  }
+  const parts = [request.location_name, org?.neighbourhood, request.city].filter(Boolean);
+  const destination = encodeURIComponent(parts.join(", "));
+  return `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
 }
 
 function UpcomingRow({

@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import date, time, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -14,12 +14,14 @@ from app.models.enums import (
     RequestRole,
     RequestStatus,
     RequestType,
+    ResponseStatus,
     SlotPeriod,
     UserRole,
 )
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
 from app.models.request_requirement import RequestRequirement
+from app.models.request_response import RequestResponse
 from app.models.staffing_request import StaffingRequest
 from app.models.tenant import Tenant
 from app.models.tenant_membership import TenantMembership
@@ -98,6 +100,9 @@ def seed() -> None:
         db.add(TenantMembership(
             id=uuid4(), user_id=network_admin.id, tenant_id=tenant.id, role=UserRole.NETWORK_ADMIN,
         ))
+        db.add(TenantMembership(
+            id=uuid4(), user_id=org_admin.id, tenant_id=tenant.id, role=UserRole.ORG_ADMIN,
+        ))
         db.add(OrganizationMembership(
             id=uuid4(), user_id=org_admin.id, organization_id=organization.id, role=UserRole.ORG_ADMIN,
         ))
@@ -147,15 +152,17 @@ def seed() -> None:
 
         db.add_all([worker_one_profile, worker_two_profile])
 
-        # Seed a default weekly availability grid for both workers
-        # (Mon–Fri morning + afternoon)
+        # Seed availability grid for the current week (Mon–Fri morning + afternoon)
+        today = date.today()
+        week_start = today - timedelta(days=today.weekday())
         for worker in (worker_one, worker_two):
-            for dow in range(0, 5):  # Mon=0 through Fri=4
+            for offset in range(0, 5):  # Mon through Fri
+                shift_date = week_start + timedelta(days=offset)
                 for slot in (SlotPeriod.MORNING, SlotPeriod.AFTERNOON):
                     db.add(Availability(
                         id=uuid4(),
                         user_id=worker.id,
-                        day_of_week=dow,
+                        specific_date=shift_date,
                         slot=slot,
                         available=True,
                     ))
@@ -198,6 +205,53 @@ def seed() -> None:
             ),
         ]
         db.add(staffing_request)
+
+        # Request 2 — notified: appears in worker inbox, no response yet
+        tomorrow = date.today() + timedelta(days=1)
+        notified_request = StaffingRequest(
+            id=uuid4(),
+            organization_id=organization.id,
+            created_by_user_id=org_admin.id,
+            request_type=RequestType.URGENT_REPLACEMENT,
+            role=RequestRole.EDUCATOR,
+            status=RequestStatus.NOTIFIED,
+            title='Afternoon educator needed — Toddler room',
+            description='Need coverage for toddler group, afternoon shift.',
+            city='Montréal',
+            location_name='Site B - Toddler room',
+            work_date=tomorrow,
+            start_time=time(hour=13),
+            end_time=time(hour=17),
+            urgency_level=2,
+            language_requirement='fr',
+            coverage_type=CoverageType.SAME_DAY_URGENT,
+            hourly_rate=Decimal('26.00'),
+            contact_name='Marie-Claude Bergeron',
+            contact_phone='514-555-0147',
+            contact_email='mc.bergeron@example.org',
+            arrival_instructions='Enter through the side door on Rue des Érables. Sign in at the front desk and ask for Marie-Claude.',
+        )
+        notified_request.requirements = [
+            RequestRequirement(
+                id=uuid4(),
+                requirement_type=RequestRequirementType.QUALIFICATION,
+                requirement_code='ECE_LEVEL_1',
+                requirement_label='ECE Level 1',
+            ),
+        ]
+        db.add(notified_request)
+        db.flush()
+
+        # Seed response rows for both workers on the notified request
+        # (the notify endpoint creates these in production)
+        for worker in (worker_one, worker_two):
+            db.add(RequestResponse(
+                id=uuid4(),
+                staffing_request_id=notified_request.id,
+                worker_user_id=worker.id,
+                status=ResponseStatus.NOTIFIED,
+            ))
+
         db.commit()
         print('Seeded development data')
     finally:

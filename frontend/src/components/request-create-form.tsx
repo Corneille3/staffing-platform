@@ -3,10 +3,11 @@
 import { useRouter } from "next/navigation";
 import { CSSProperties } from "react";
 import { FormEvent, useState, useTransition } from "react";
-import { useAuth } from "@clerk/nextjs";
 import { Organization } from "../lib/types";
 
 const browserApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+type ClerkLike = { session?: { getToken: () => Promise<string | null> } };
 
 const ORG_TYPE_LABELS: Record<string, string> = {
   childcare: "Childcare",
@@ -34,7 +35,6 @@ export function RequestCreateForm({
   organizations: Organization[];
 }) {
   const router = useRouter();
-  const { getToken } = useAuth();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [organizationId, setOrganizationId] = useState(organizations[0]?.id || "");
@@ -58,7 +58,10 @@ export function RequestCreateForm({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    const token = await getToken();
+    let token: string | null = null;
+    if (CLERK_ENABLED && typeof window !== "undefined") {
+      token = (await (window as unknown as { Clerk?: ClerkLike }).Clerk?.session?.getToken()) ?? null;
+    }
 
     const response = await fetch(`${browserApiBaseUrl}/api/v1/requests`, {
       method: "POST",
