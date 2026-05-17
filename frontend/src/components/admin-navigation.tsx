@@ -5,20 +5,22 @@ import { usePathname } from "next/navigation";
 
 const links = [
   { href: "/admin", label: "Coverage Desk" },
-  { href: "/admin/organizations", label: "Organizations" },
-  { href: "/admin/workers", label: "Substitutes" },
   { href: "/admin/requests", label: "Requests" },
+  { href: "/admin/workers", label: "Substitutes" },
+  { href: "/admin/organizations", label: "Organizations" },
 ];
 
 export function AdminNavigation() {
   const pathname = usePathname();
+  // Strip any [locale] prefix so /en/admin/requests still matches /admin/requests.
+  const strippedPath = pathname.replace(/^\/(?:en|fr)(?=\/|$)/, "") || "/";
 
   return (
-    <nav style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+    <nav style={{ display: "flex", flexWrap: "wrap", gap: 22 }}>
       {links.map((link) => {
         const active =
-          pathname === link.href ||
-          (link.href !== "/admin" && pathname.startsWith(link.href));
+          strippedPath === link.href ||
+          (link.href !== "/admin" && strippedPath.startsWith(link.href));
 
         return (
           <Link
@@ -26,14 +28,12 @@ export function AdminNavigation() {
             href={link.href}
             style={{
               textDecoration: "none",
-              padding: "10px 16px",
-              borderRadius: 999,
-              background: active ? "#183229" : "rgba(24, 50, 41, 0.08)",
-              color: active ? "#f7f0df" : "#183229",
               fontSize: 14,
-              fontWeight: 700,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
+              fontWeight: 500,
+              color: active ? "var(--ink)" : "var(--ink-2)",
+              paddingBottom: 6,
+              borderBottom: active ? "2px solid var(--terra)" : "2px solid transparent",
+              transition: "color .12s",
             }}
           >
             {link.label}

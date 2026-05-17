@@ -17,17 +17,14 @@ export function HeaderSignOutButton() {
       onClick={handleSignOut}
       style={{
         background: "transparent",
-        border: "1px solid currentColor",
+        border: "0.5px solid var(--line)",
         borderRadius: 999,
         padding: "8px 14px",
-        color: "inherit",
+        color: "var(--ink-2)",
         font: "inherit",
         fontSize: 13,
-        fontWeight: 700,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
+        fontWeight: 500,
         cursor: "pointer",
-        opacity: 0.85,
       }}
     >
       Sign out

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Worker } from "../lib/types";
+import { Eyebrow } from "./ui";
 import { WorkerAvailabilityControl } from "./worker-availability-control";
 
 const LANGUAGE_LABELS: Record<string, string> = {
@@ -46,59 +47,64 @@ export function SubstituteDirectory({ workers }: { workers: Worker[] }) {
 
   const hasFilters = availFilter !== "all" || cityFilter || langFilter || qualSearch;
 
-  const inputStyle = {
-    borderRadius: 12,
-    border: "1px solid rgba(24, 50, 41, 0.16)",
-    background: "#fffdf7",
-    color: "#183229",
+  const inputStyle: React.CSSProperties = {
+    borderRadius: 10,
+    border: "0.5px solid var(--line)",
+    background: "#fff",
+    color: "var(--ink)",
     fontSize: 14,
     minHeight: 40,
     padding: "0 12px",
     font: "inherit",
+    outline: "none",
   };
 
   return (
     <div style={{ display: "grid", gap: 20 }}>
-      <div style={{ display: "grid", gap: 12 }}>
+      <div style={{ display: "grid", gap: 14 }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {(["all", "available", "unavailable"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setAvailFilter(v)}
-              style={{
-                border: availFilter === v ? "1px solid #214639" : "1px solid rgba(24, 50, 41, 0.16)",
-                borderRadius: 999,
-                padding: "8px 16px",
-                background: availFilter === v ? "#214639" : "#fffdf7",
-                color: availFilter === v ? "#f7f0df" : "#214639",
-                fontSize: 13,
-                fontWeight: 800,
-                cursor: "pointer",
-              }}
-            >
-              {v === "all" ? "All" : v.charAt(0).toUpperCase() + v.slice(1)}
-            </button>
-          ))}
+          {(["all", "available", "unavailable"] as const).map((v) => {
+            const active = availFilter === v;
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setAvailFilter(v)}
+                style={{
+                  border: active ? "1px solid var(--terra)" : "0.5px solid var(--line)",
+                  borderRadius: 999,
+                  padding: "7px 14px",
+                  background: active ? "var(--terra-soft)" : "var(--card)",
+                  color: active ? "var(--terra)" : "var(--ink-2)",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {v === "all" ? "All" : v.charAt(0).toUpperCase() + v.slice(1)}
+              </button>
+            );
+          })}
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
-          <label style={{ display: "grid", gap: 5, fontSize: 13, fontWeight: 800, color: "#496158" }}>
-            City
+          <label style={{ display: "grid", gap: 6 }}>
+            <Eyebrow>City</Eyebrow>
             <select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} style={inputStyle}>
               <option value="">Any city</option>
               {cityOptions.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </label>
-          <label style={{ display: "grid", gap: 5, fontSize: 13, fontWeight: 800, color: "#496158" }}>
-            Language
+          <label style={{ display: "grid", gap: 6 }}>
+            <Eyebrow>Language</Eyebrow>
             <select value={langFilter} onChange={(e) => setLangFilter(e.target.value)} style={inputStyle}>
               <option value="">Any language</option>
               {langOptions.map((l) => <option key={l} value={l}>{LANGUAGE_LABELS[l] ?? l}</option>)}
             </select>
           </label>
-          <label style={{ display: "grid", gap: 5, fontSize: 13, fontWeight: 800, color: "#496158" }}>
-            Qualification / certification
+          <label style={{ display: "grid", gap: 6 }}>
+            <Eyebrow>Qualification / certification</Eyebrow>
             <input
               value={qualSearch}
               onChange={(e) => setQualSearch(e.target.value)}
@@ -110,25 +116,25 @@ export function SubstituteDirectory({ workers }: { workers: Worker[] }) {
 
         {hasFilters ? (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 13, color: "#496158" }}>
+            <span style={{ fontSize: 13, color: "var(--ink-3)" }}>
               {filtered.length} of {workers.length} substitutes
             </span>
             <button
               type="button"
               onClick={() => { setAvailFilter("all"); setCityFilter(""); setLangFilter(""); setQualSearch(""); }}
-              style={{ border: 0, background: "transparent", color: "#214639", fontWeight: 800, fontSize: 13, cursor: "pointer" }}
+              style={{ border: 0, background: "transparent", color: "var(--terra)", fontWeight: 500, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
             >
               Clear filters
             </button>
           </div>
         ) : (
-          <span style={{ fontSize: 13, color: "#496158" }}>{workers.length} substitutes</span>
+          <span style={{ fontSize: 13, color: "var(--ink-3)" }}>{workers.length} substitutes</span>
         )}
       </div>
 
-      <div style={{ display: "grid", gap: 14 }}>
+      <div style={{ display: "grid", gap: 12 }}>
         {filtered.length === 0 ? (
-          <div style={{ padding: 20, borderRadius: 16, background: "#f5f2eb", color: "#5d6d66", textAlign: "center", fontSize: 14 }}>
+          <div style={{ padding: 20, borderRadius: 14, background: "var(--paper-2)", color: "var(--ink-3)", textAlign: "center", fontSize: 13, border: "0.5px solid var(--line)" }}>
             No substitutes match these filters.
           </div>
         ) : (
@@ -136,20 +142,20 @@ export function SubstituteDirectory({ workers }: { workers: Worker[] }) {
             <article
               key={worker.id}
               style={{
-                borderRadius: 22,
-                padding: 20,
-                background: "#fffdf7",
-                border: "1px solid rgba(24, 50, 41, 0.1)",
+                borderRadius: 14,
+                padding: 18,
+                background: "var(--card)",
+                border: "0.5px solid var(--line)",
                 display: "grid",
                 gap: 12,
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "start" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
                 <div>
-                  <h2 style={{ margin: 0, fontSize: 22 }}>
+                  <h3 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 20, lineHeight: 1.1, fontWeight: 400 }}>
                     {worker.first_name} {worker.last_name}
-                  </h2>
-                  <p style={{ margin: "4px 0 0", color: "#496158", fontSize: 14 }}>{worker.email}</p>
+                  </h3>
+                  <p style={{ margin: "4px 0 0", color: "var(--ink-3)", fontSize: 13 }}>{worker.email}</p>
                 </div>
                 <WorkerAvailabilityControl
                   workerId={worker.id}
@@ -157,7 +163,7 @@ export function SubstituteDirectory({ workers }: { workers: Worker[] }) {
                 />
               </div>
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 <Chip tone="neutral">{LANGUAGE_LABELS[worker.preferred_language] ?? worker.preferred_language}</Chip>
                 {(worker.profile?.supported_cities ?? []).map((city) => (
                   <Chip key={city} tone="city">{city}</Chip>
@@ -165,12 +171,12 @@ export function SubstituteDirectory({ workers }: { workers: Worker[] }) {
               </div>
 
               {(worker.profile?.qualifications?.length ?? 0) > 0 || (worker.profile?.certifications?.length ?? 0) > 0 ? (
-                <div style={{ display: "grid", gap: 4, fontSize: 13, color: "#3d564c" }}>
+                <div style={{ display: "grid", gap: 4, fontSize: 13, color: "var(--ink-2)" }}>
                   {(worker.profile?.qualifications?.length ?? 0) > 0 ? (
-                    <span><strong>Qualifications:</strong> {worker.profile!.qualifications.join(", ")}</span>
+                    <span><strong style={{ color: "var(--ink)" }}>Qualifications:</strong> {worker.profile!.qualifications.join(", ")}</span>
                   ) : null}
                   {(worker.profile?.certifications?.length ?? 0) > 0 ? (
-                    <span><strong>Certifications:</strong> {worker.profile!.certifications.join(", ")}</span>
+                    <span><strong style={{ color: "var(--ink)" }}>Certifications:</strong> {worker.profile!.certifications.join(", ")}</span>
                   ) : null}
                 </div>
               ) : null}
@@ -185,17 +191,20 @@ export function SubstituteDirectory({ workers }: { workers: Worker[] }) {
 function Chip({ tone, children }: { tone: "neutral" | "city"; children: React.ReactNode }) {
   const palette =
     tone === "city"
-      ? { bg: "#e4eadf", color: "#214639" }
-      : { bg: "#efe3b9", color: "#5d4c37" };
+      ? { bg: "var(--moss-soft)", color: "var(--moss)" }
+      : { bg: "var(--sand-soft)", color: "#8C6B14" };
   return (
     <span
       style={{
+        display: "inline-flex",
+        alignItems: "center",
         borderRadius: 999,
         padding: "4px 10px",
         background: palette.bg,
         color: palette.color,
-        fontSize: 12,
-        fontWeight: 800,
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: "0.02em",
       }}
     >
       {children}

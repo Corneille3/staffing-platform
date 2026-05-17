@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft, Check, Circle } from "lucide-react";
 import { PageFrame } from "../../../../../components/page-frame";
 import { Panel } from "../../../../../components/panel";
 import { RequestWorkflowCard } from "../../../../../components/request-workflow-card";
+import { Eyebrow, Mono } from "../../../../../components/ui";
 import {
   getAssignments,
   getOrganizations,
@@ -32,6 +34,57 @@ function responseCounts(responses: RequestResponse[]) {
   );
 }
 
+// 5-step workflow per HANDOFF spec: Created → Notified → Responses → Assign → Confirmed
+type StepState = "done" | "current" | "pending";
+
+function workflowSteps(status: string, hasResponses: boolean, hasAssignment: boolean) {
+  const steps: { label: string; state: StepState }[] = [
+    { label: "Created",  state: "pending" },
+    { label: "Notified", state: "pending" },
+    { label: "Responses", state: "pending" },
+    { label: "Assign",   state: "pending" },
+    { label: "Confirmed", state: "pending" },
+  ];
+  // Always done since the request exists
+  steps[0].state = "done";
+
+  if (status === "draft") {
+    steps[1].state = "current";
+    return steps;
+  }
+  // From notified onwards, step 1 is done
+  steps[1].state = "done";
+
+  if (status === "open" || status === "notified") {
+    steps[2].state = hasResponses ? "current" : "current";
+    return steps;
+  }
+  if (hasResponses) steps[2].state = "done";
+
+  if (status === "responses_received") {
+    steps[3].state = "current";
+    return steps;
+  }
+
+  if (status === "assigned" || hasAssignment) {
+    steps[3].state = "done";
+    steps[4].state = status === "completed" ? "done" : "current";
+    return steps;
+  }
+  if (status === "completed") {
+    steps[2].state = "done";
+    steps[3].state = "done";
+    steps[4].state = "done";
+    return steps;
+  }
+  if (status === "cancelled" || status === "expired") {
+    return steps;
+  }
+  return steps;
+}
+
+const STATUS_ORDER = ["accepted", "viewed", "notified", "declined", "no_response", "withdrawn"];
+
 export default async function RequestDetailPage({
   params,
 }: {
@@ -59,6 +112,10 @@ export default async function RequestDetailPage({
   const assignedWorker = assignment ? formatWorkerName(users, assignment.worker_user_id) : null;
   const counts = responseCounts(responses);
   const viewedCount = responses.filter((r) => r.viewed_at != null).length;
+  const sortedResponses = [...responses].sort((a, b) => {
+    return STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+  });
+  const steps = workflowSteps(request.status, responses.length > 0, assignment != null);
 
   return (
     <PageFrame
@@ -66,18 +123,106 @@ export default async function RequestDetailPage({
       title={request.title}
       description="Inspect one coverage request, its matching context, response board, and assignment state."
     >
-      <div style={{ marginBottom: 18 }}>
+      <div style={{ marginBottom: 22 }}>
         <Link
           href="/admin/requests"
           style={{
-            color: "#183229",
-            fontWeight: 800,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            color: "var(--ink-2)",
+            fontSize: 13,
             textDecoration: "none",
           }}
         >
+          <ArrowLeft size={14} />
           Back to request queue
         </Link>
       </div>
+
+      {/* 5-step horizontal workflow tracker */}
+      <section
+        style={{
+          background: "var(--card)",
+          border: "0.5px solid var(--line)",
+          borderRadius: 18,
+          padding: 22,
+          marginBottom: 22,
+        }}
+      >
+        <Eyebrow style={{ marginBottom: 16 }}>Workflow</Eyebrow>
+        <ol
+          style={{
+            listStyle: "none",
+            margin: 0,
+            padding: 0,
+            display: "grid",
+            gridTemplateColumns: `repeat(${steps.length}, 1fr)`,
+            gap: 0,
+          }}
+        >
+          {steps.map((step, i) => {
+            const isLast = i === steps.length - 1;
+            const colors =
+              step.state === "done"
+                ? { ring: "var(--moss)", fill: "var(--moss)", icon: "#fff", text: "var(--ink)" }
+                : step.state === "current"
+                  ? { ring: "var(--terra)", fill: "var(--terra-soft)", icon: "var(--terra)", text: "var(--ink)" }
+                  : { ring: "var(--line)", fill: "transparent", icon: "var(--ink-4)", text: "var(--ink-3)" };
+            return (
+              <li key={step.label} style={{ position: "relative", textAlign: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                  {/* connector line left */}
+                  {i > 0 && (
+                    <div style={{
+                      position: "absolute",
+                      left: 0,
+                      right: "50%",
+                      top: 11,
+                      height: 1,
+                      background: steps[i - 1].state === "done" ? "var(--moss)" : "var(--line)",
+                    }} />
+                  )}
+                  {/* connector line right */}
+                  {!isLast && (
+                    <div style={{
+                      position: "absolute",
+                      left: "50%",
+                      right: 0,
+                      top: 11,
+                      height: 1,
+                      background: step.state === "done" ? "var(--moss)" : "var(--line)",
+                    }} />
+                  )}
+                  {/* node */}
+                  <div style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 99,
+                    border: `1.5px solid ${colors.ring}`,
+                    background: colors.fill,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: colors.icon,
+                    position: "relative",
+                    zIndex: 1,
+                  }}>
+                    {step.state === "done"
+                      ? <Check size={12} strokeWidth={2.5} />
+                      : step.state === "current"
+                        ? <span style={{ width: 6, height: 6, borderRadius: 99, background: "var(--terra)" }} />
+                        : <Circle size={6} strokeWidth={0} fill="var(--ink-4)" />}
+                  </div>
+                </div>
+                <div style={{ marginTop: 10, fontSize: 12, fontWeight: step.state === "current" ? 600 : 500, color: colors.text }}>
+                  {step.label}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
 
       <section
         style={{
@@ -89,43 +234,43 @@ export default async function RequestDetailPage({
       >
         <div style={{ display: "grid", gap: 22 }}>
           <Panel title="Request brief" subtitle={formatStatus(request.status)}>
-            <div style={{ display: "grid", gap: 12, color: "#314c42" }}>
+            <div style={{ display: "grid", gap: 10, color: "var(--ink-2)", fontSize: 13 }}>
               <p style={{ margin: 0, lineHeight: 1.55 }}>
                 {request.description || "No additional notes have been added."}
               </p>
-              <div style={{ display: "grid", gap: 8 }}>
+              <div style={{ display: "grid", gap: 6 }}>
                 <span>
-                  <strong>Organization:</strong> {organization?.name || "Unknown organization"}
+                  <strong style={{ color: "var(--ink)" }}>Organization:</strong> {organization?.name || "Unknown organization"}
                 </span>
                 <span>
-                  <strong>Location:</strong> {request.location_name || "No room listed"}, {request.city}
+                  <strong style={{ color: "var(--ink)" }}>Location:</strong> {request.location_name || "No room listed"}, {request.city}
                 </span>
                 <span>
-                  <strong>Date:</strong> {request.work_date}
+                  <strong style={{ color: "var(--ink)" }}>Date:</strong> {request.work_date}
                 </span>
                 <span>
-                  <strong>Time:</strong> {request.start_time.slice(0, 5)} - {request.end_time.slice(0, 5)}
+                  <strong style={{ color: "var(--ink)" }}>Time:</strong> <Mono style={{ fontSize: 13 }}>{request.start_time.slice(0, 5)} – {request.end_time.slice(0, 5)}</Mono>
                 </span>
                 <span>
-                  <strong>Language:</strong> {request.language_requirement || "None"}
+                  <strong style={{ color: "var(--ink)" }}>Language:</strong> {request.language_requirement || "None"}
                 </span>
                 <span>
-                  <strong>Urgency:</strong> {request.urgency_level}
+                  <strong style={{ color: "var(--ink)" }}>Urgency:</strong> {request.urgency_level}
                 </span>
               </div>
             </div>
           </Panel>
 
           <Panel title="Requirements">
-            <div style={{ display: "grid", gap: 12, color: "#314c42" }}>
+            <div style={{ display: "grid", gap: 8, color: "var(--ink-2)", fontSize: 13 }}>
               <span>
-                <strong>Qualifications:</strong> {request.required_qualifications.join(", ") || "None"}
+                <strong style={{ color: "var(--ink)" }}>Qualifications:</strong> {request.required_qualifications.join(", ") || "None"}
               </span>
               <span>
-                <strong>Certifications:</strong> {request.required_certifications?.join(", ") || "None"}
+                <strong style={{ color: "var(--ink)" }}>Certifications:</strong> {request.required_certifications?.join(", ") || "None"}
               </span>
               <span>
-                <strong>Request type:</strong> {formatStatus(request.request_type)}
+                <strong style={{ color: "var(--ink)" }}>Request type:</strong> {formatStatus(request.request_type)}
               </span>
             </div>
           </Panel>
@@ -147,18 +292,16 @@ export default async function RequestDetailPage({
                 <div
                   key={stat.label}
                   style={{
-                    borderRadius: 14,
+                    borderRadius: 12,
                     padding: 14,
-                    background: "#fffdf7",
-                    border: "1px solid rgba(24, 50, 41, 0.1)",
+                    background: "var(--paper-2)",
+                    border: "0.5px solid var(--line)",
                   }}
                 >
-                  <div style={{ color: "#5d6d66", fontSize: 13, fontWeight: 800 }}>
-                    {stat.label}
-                  </div>
-                  <strong style={{ display: "block", marginTop: 4, fontSize: 28 }}>
+                  <Eyebrow style={{ marginBottom: 6 }}>{stat.label}</Eyebrow>
+                  <Mono style={{ fontSize: 26, fontWeight: 500, color: "var(--ink)" }}>
                     {stat.value}
-                  </strong>
+                  </Mono>
                 </div>
               ))}
             </div>
@@ -166,22 +309,22 @@ export default async function RequestDetailPage({
 
           <Panel title="Assignment">
             {assignment ? (
-              <div style={{ display: "grid", gap: 8, color: "#314c42" }}>
+              <div style={{ display: "grid", gap: 6, color: "var(--ink-2)", fontSize: 13 }}>
                 <span>
-                  <strong>Substitute:</strong> {assignedWorker}
+                  <strong style={{ color: "var(--ink)" }}>Substitute:</strong> {assignedWorker}
                 </span>
                 <span>
-                  <strong>Status:</strong> {formatStatus(assignment.status)}
+                  <strong style={{ color: "var(--ink)" }}>Status:</strong> {formatStatus(assignment.status)}
                 </span>
                 <span>
-                  <strong>Assigned at:</strong> {assignment.assigned_at.slice(0, 16).replace("T", " ")}
+                  <strong style={{ color: "var(--ink)" }}>Assigned at:</strong> {assignment.assigned_at.slice(0, 16).replace("T", " ")}
                 </span>
                 <span>
-                  <strong>Notes:</strong> {assignment.notes || "None"}
+                  <strong style={{ color: "var(--ink)" }}>Notes:</strong> {assignment.notes || "None"}
                 </span>
               </div>
             ) : (
-              <p style={{ margin: 0, color: "#5d6d66" }}>
+              <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>
                 No assignment has been confirmed for this request yet.
               </p>
             )}
@@ -191,7 +334,7 @@ export default async function RequestDetailPage({
         <Panel title="Workflow actions" subtitle="Live controls">
           <RequestWorkflowCard
             request={request}
-            responses={responses}
+            responses={sortedResponses}
             users={users}
             workers={workers}
             assignment={assignment}

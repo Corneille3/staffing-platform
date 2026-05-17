@@ -51,9 +51,9 @@ export default async function RequestsPage() {
         title="Active requests"
         subtitle={`${active.length} in progress`}
       >
-        <div style={{ display: "grid", gap: 18 }}>
+        <div style={{ display: "grid", gap: 14 }}>
           {active.length === 0 ? (
-            <p style={{ margin: 0, color: "#5d6d66" }}>No active requests right now.</p>
+            <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>No active requests right now.</p>
           ) : (
             active.map((request) => (
               <RequestWorkflowCard
@@ -68,10 +68,10 @@ export default async function RequestsPage() {
           )}
         </div>
         {closedCount > 0 ? (
-          <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid rgba(24, 50, 41, 0.1)" }}>
+          <div style={{ marginTop: 18, paddingTop: 14, borderTop: "0.5px solid var(--line)" }}>
             <Link
               href="/admin/requests/history"
-              style={{ color: "#183229", fontWeight: 800, textDecoration: "none", fontSize: 14 }}
+              style={{ color: "var(--terra)", fontWeight: 500, textDecoration: "none", fontSize: 13 }}
             >
               View coverage history ({closedCount} closed) →
             </Link>

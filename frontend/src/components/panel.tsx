@@ -12,17 +12,30 @@ export function Panel({
   return (
     <article
       style={{
-        borderRadius: 28,
-        background: "rgba(249, 245, 234, 0.9)",
-        padding: 24,
-        boxShadow: "0 18px 36px rgba(24, 50, 41, 0.1)",
+        borderRadius: 18,
+        background: "var(--card)",
+        border: "0.5px solid var(--line)",
+        padding: 22,
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "baseline" }}>
-        <h2 style={{ margin: 0, fontSize: 30 }}>{title}</h2>
-        {subtitle ? <span style={{ fontSize: 14, color: "#4b5f57" }}>{subtitle}</span> : null}
+        <h2
+          style={{
+            margin: 0,
+            fontFamily: "var(--serif)",
+            fontSize: 22,
+            lineHeight: 1.15,
+            fontWeight: 400,
+            color: "var(--ink)",
+          }}
+        >
+          {title}
+        </h2>
+        {subtitle ? (
+          <span style={{ fontSize: 12, color: "var(--ink-3)", letterSpacing: "0.02em" }}>{subtitle}</span>
+        ) : null}
       </div>
-      <div style={{ marginTop: 18 }}>{children}</div>
+      <div style={{ marginTop: 16 }}>{children}</div>
     </article>
   );
 }

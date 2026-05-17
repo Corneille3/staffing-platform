@@ -182,7 +182,15 @@ D1 network overview metrics · D2 substitute pool · D3 activity history
 - **Availability grid wired into matching (2026-05-17):** `MatchingService` now accepts an optional `db: Session`. After the binary availability check passes, it consults the `availabilities` table for the worker. Rule: if the worker has any rows for that week, require an `available=True` row for the request's `(work_date, slot)` (slot derived from `start_time` — morning/afternoon/evening/overnight). If no rows for that week, fall through (worker hasn't engaged with the grid). Eligibility reason "Slot not in weekly grid" surfaces when grid downgrades a match. All 11 lifecycle tests still pass.
 - **Worker HANDOFF gaps closed:** #3, #4, #5, #11, #12, #13, #14, #16, #17, #18 all shipped. #15 (hourly rate display) intentionally dropped (see memory `feedback-no-hourly-rate-display`). Onboarding redesigned to spec (3-step, terra accents, languages section, full i18n). No worker-side HANDOFF gaps remain.
 
-### Next session plan: coordinator + admin redesign
+### Admin/coordinator redesign status (2026-05-17)
+
+Visual port to design tokens **done** across the admin surface — all of `/admin/*` now uses paper background, 0.5px hairlines, Inter Tight + Instrument Serif, terra/moss/sand accents. Components updated: admin layout shell, AdminNavigation, HeaderSignOutButton, PageFrame (no more gradient hero), Panel, StatCard, request-workflow-card.tsx, AssignedWorkerCard, WorkerReviewCard, CancelAssignmentModal, request-create-form.tsx, substitute-directory.tsx, WorkerAvailabilityControl. Pages updated: `/admin`, `/admin/requests`, `/admin/requests/[id]` (with new 5-step horizontal workflow tracker per spec — Created → Notified → Responses → Assign → Confirmed), `/admin/requests/history`, `/admin/workers`, `/admin/organizations`. Workflow card responses are now sorted by status (accepted first, then viewed, notified, declined, no_response, withdrawn).
+
+**Still deferred from the spec — backend-heavy work:**
+- `/admin/requests/new` 3-step create form with autosave + live preview + reach estimate. Needs new endpoints: `POST /admin/requests` (draft), `PATCH /admin/requests/:id` (autosave), and a debounced reach estimate via `GET /substitutes?rankAgainstDraftId=...`. Current `/admin/requests` inline form stays as the create UX until this lands.
+- `/admin/substitutes` ranking-against-request directory: sortable table with match bar (50px progress, moss/terra/ink-3 bands), filter chips, "ranking against REQ-XXXX" header. Current `/admin/workers` card-based directory has the design-token port but not the table+ranking flow. Needs new backend endpoint `GET /substitutes?rank_against_request_id=` returning workers with eligibility scores.
+
+### Next session plan: coordinator + admin redesign (FUTURE work — bigger features)
 
 The admin surface is the last big project on `feature/worker-inbox`. Current state: still on old inline styles (`#fffdf7`, gradients, hardcoded colors), no design tokens. Same shape onboarding was in before today.
 

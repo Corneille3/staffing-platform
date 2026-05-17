@@ -7,10 +7,10 @@ import { Assignment, StaffingRequest, User } from "../../../../../lib/types";
 const CLOSED_STATUSES = new Set(["assigned", "completed", "cancelled", "expired"]);
 
 const STATUS_PALETTE: Record<string, { bg: string; color: string }> = {
-  assigned:  { bg: "#d2ead8", color: "#1a4a2e" },
-  completed: { bg: "#b8dfc3", color: "#1a4a2e" },
-  cancelled: { bg: "#f4d4cc", color: "#7a3526" },
-  expired:   { bg: "#e8e8e4", color: "#5d5d58" },
+  assigned:  { bg: "var(--moss-soft)", color: "var(--moss)" },
+  completed: { bg: "var(--moss-soft)", color: "var(--moss)" },
+  cancelled: { bg: "var(--rose-soft)", color: "var(--rose)" },
+  expired:   { bg: "var(--paper-2)",   color: "var(--ink-3)" },
 };
 
 function timeDiff(from: string, to: string): string {
@@ -81,7 +81,7 @@ export default async function CoverageHistoryPage() {
       <div style={{ marginBottom: 18 }}>
         <Link
           href="/admin/requests"
-          style={{ color: "#183229", fontWeight: 800, textDecoration: "none" }}
+          style={{ color: "var(--ink-2)", fontSize: 13, textDecoration: "none" }}
         >
           ← Back to active requests
         </Link>
@@ -89,9 +89,9 @@ export default async function CoverageHistoryPage() {
 
       <Panel title="Closed requests" subtitle={`${closed.length} records`}>
         {closed.length === 0 ? (
-          <p style={{ margin: 0, color: "#5d6d66" }}>No closed requests yet.</p>
+          <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>No closed requests yet.</p>
         ) : (
-          <div style={{ display: "grid", gap: 14 }}>
+          <div style={{ display: "grid", gap: 12 }}>
             {closed.map((request) => {
               const assignment = assignmentMap.get(request.id);
               const palette = STATUS_PALETTE[request.status] ?? STATUS_PALETTE.expired;
@@ -100,36 +100,39 @@ export default async function CoverageHistoryPage() {
                 <article
                   key={request.id}
                   style={{
-                    borderRadius: 18,
-                    padding: 18,
-                    background: "#fffdf7",
-                    border: "1px solid rgba(24, 50, 41, 0.1)",
+                    borderRadius: 14,
+                    padding: 16,
+                    background: "var(--paper-2)",
+                    border: "0.5px solid var(--line)",
                     display: "grid",
-                    gap: 10,
+                    gap: 8,
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
                     <div>
                       <Link
                         href={`/admin/requests/${request.id}`}
                         style={{ textDecoration: "none", color: "inherit" }}
                       >
-                        <strong style={{ fontSize: 18, lineHeight: 1.2 }}>{request.title}</strong>
+                        <strong style={{ fontFamily: "var(--serif)", fontSize: 17, lineHeight: 1.2, fontWeight: 400 }}>
+                          {request.title}
+                        </strong>
                       </Link>
-                      <p style={{ margin: "4px 0 0", color: "#496158", fontSize: 13 }}>
+                      <p style={{ margin: "4px 0 0", color: "var(--ink-3)", fontSize: 12 }}>
                         {orgMap.get(request.organization_id) ?? "Unknown org"} · {request.city} · {request.work_date}
                       </p>
                     </div>
                     <span
                       style={{
+                        display: "inline-flex",
+                        alignItems: "center",
                         borderRadius: 999,
-                        padding: "4px 12px",
+                        padding: "4px 10px",
                         background: palette.bg,
                         color: palette.color,
                         fontSize: 11,
-                        fontWeight: 800,
-                        letterSpacing: "0.06em",
-                        textTransform: "uppercase",
+                        fontWeight: 600,
+                        letterSpacing: "0.03em",
                         whiteSpace: "nowrap",
                       }}
                     >
@@ -137,7 +140,7 @@ export default async function CoverageHistoryPage() {
                     </span>
                   </div>
 
-                  <div style={{ fontSize: 13, color: "#3d564c" }}>
+                  <div style={{ fontSize: 13, color: "var(--ink-2)" }}>
                     {outcome}
                   </div>
 
@@ -145,9 +148,9 @@ export default async function CoverageHistoryPage() {
                     style={{
                       display: "flex",
                       flexWrap: "wrap",
-                      gap: 16,
+                      gap: 14,
                       fontSize: 12,
-                      color: "#6b8179",
+                      color: "var(--ink-3)",
                     }}
                   >
                     <span>{request.start_time.slice(0, 5)} – {request.end_time.slice(0, 5)}</span>

@@ -18,39 +18,43 @@ export default async function OrganizationsPage() {
     <PageFrame
       eyebrow="Network Directory"
       title="Organizations"
-      description="Each organization operates independently, while Staffig keeps network-level visibility across sites, contacts, and language preferences."
+      description="Each organization operates independently while Staffig keeps network-level visibility across sites, contacts, and language preferences."
     >
       <Panel title="Active organizations" subtitle={`${organizations.length} listed`}>
-        <div style={{ display: "grid", gap: 16 }}>
+        <div style={{ display: "grid", gap: 12 }}>
           {organizations.map((organization) => (
             <article
               key={organization.id}
               style={{
-                borderRadius: 22,
-                padding: 20,
-                background: "#fffdf7",
-                border: "1px solid rgba(24, 50, 41, 0.1)",
+                borderRadius: 14,
+                padding: 18,
+                background: "var(--paper-2)",
+                border: "0.5px solid var(--line)",
                 display: "grid",
                 gap: 10,
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center" }}>
-                <h2 style={{ margin: 0, fontSize: 24 }}>{organization.name}</h2>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }}>
+                <h2 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 20, lineHeight: 1.15, fontWeight: 400 }}>
+                  {organization.name}
+                </h2>
                 <span
                   style={{
+                    display: "inline-flex",
+                    alignItems: "center",
                     borderRadius: 999,
-                    padding: "6px 12px",
-                    background: organization.is_active ? "#d2ead8" : "#ead2d2",
-                    fontSize: 12,
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
+                    padding: "4px 10px",
+                    background: organization.is_active ? "var(--moss-soft)" : "var(--rose-soft)",
+                    color: organization.is_active ? "var(--moss)" : "var(--rose)",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: "0.03em",
                   }}
                 >
                   {organization.is_active ? "active" : "inactive"}
                 </span>
               </div>
-              <div style={{ color: "#3d564c", display: "grid", gap: 6 }}>
+              <div style={{ color: "var(--ink-2)", display: "grid", gap: 4, fontSize: 13 }}>
                 <span>
                   {organization.city}
                   {organization.region ? `, ${organization.region}` : ""}

@@ -104,21 +104,26 @@ export function RequestCreateForm({
   }
 
   const inputStyle: CSSProperties = {
-    borderRadius: 12,
-    border: "1px solid rgba(24, 50, 41, 0.18)",
+    borderRadius: 10,
+    border: "0.5px solid var(--line)",
     padding: "11px 12px",
-    background: "#fffdf7",
-    color: "#183229",
+    background: "#fff",
+    color: "var(--ink)",
     font: "inherit",
+    fontSize: 14,
     minWidth: 0,
+    minHeight: 40,
+    outline: "none",
   };
 
   const labelStyle: CSSProperties = {
     display: "grid",
     gap: 6,
-    color: "#3d564c",
-    fontSize: 14,
-    fontWeight: 700,
+    color: "var(--ink-2)",
+    fontSize: 12,
+    fontWeight: 600,
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
   };
 
   return (
@@ -242,13 +247,13 @@ export function RequestCreateForm({
 
       <div
         style={{
-          borderTop: "1px solid rgba(24, 50, 41, 0.1)",
+          borderTop: "0.5px solid var(--line)",
           paddingTop: 14,
           display: "grid",
-          gap: 6,
+          gap: 10,
         }}
       >
-        <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: "#496158", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+        <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "var(--ink-3)", letterSpacing: "0.12em", textTransform: "uppercase" }}>
           On-site contact
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
@@ -277,7 +282,7 @@ export function RequestCreateForm({
         </label>
       </div>
 
-      {error ? <p style={{ margin: 0, color: "#8c3f32", fontWeight: 700 }}>{error}</p> : null}
+      {error ? <p style={{ margin: 0, color: "var(--rose)", fontSize: 13, fontWeight: 600 }}>{error}</p> : null}
 
       <button
         type="submit"
@@ -285,12 +290,16 @@ export function RequestCreateForm({
         style={{
           border: 0,
           borderRadius: 12,
-          padding: "13px 16px",
-          background: "#183229",
-          color: "#f7f0df",
-          cursor: "pointer",
-          fontWeight: 800,
+          padding: "12px 18px",
+          background: "var(--ink)",
+          color: "var(--paper)",
+          cursor: isPending || !organizationId ? "not-allowed" : "pointer",
+          opacity: isPending || !organizationId ? 0.5 : 1,
+          fontWeight: 500,
+          fontSize: 14,
+          fontFamily: "inherit",
           justifySelf: "start",
+          minHeight: 44,
         }}
       >
         Create request
