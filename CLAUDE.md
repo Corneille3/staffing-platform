@@ -190,31 +190,46 @@ Visual port to design tokens **done** across the admin surface — all of `/admi
 - `/admin/requests/new` 3-step create form with autosave + live preview + reach estimate. Needs new endpoints: `POST /admin/requests` (draft), `PATCH /admin/requests/:id` (autosave), and a debounced reach estimate via `GET /substitutes?rankAgainstDraftId=...`. Current `/admin/requests` inline form stays as the create UX until this lands.
 - `/admin/substitutes` ranking-against-request directory: sortable table with match bar (50px progress, moss/terra/ink-3 bands), filter chips, "ranking against REQ-XXXX" header. Current `/admin/workers` card-based directory has the design-token port but not the table+ranking flow. Needs new backend endpoint `GET /substitutes?rank_against_request_id=` returning workers with eligibility scores.
 
-### Next session plan: coordinator + admin redesign (FUTURE work — bigger features)
+### APF / Network admin redesign plan (added 2026-05-17)
 
-The admin surface is the last big project on `feature/worker-inbox`. Current state: still on old inline styles (`#fffdf7`, gradients, hardcoded colors), no design tokens. Same shape onboarding was in before today.
+**Canonical spec:** `frontend/New design by Claude Design/NETWORK_HANDOFF.md` (400-line build brief from the design team). Pair it with the main `HANDOFF.md` for the visual system.
 
-**Pages in `frontend/src/app/[locale]/admin/` today:** `page.tsx` (dashboard), `requests/page.tsx` (list + inline create form + workflow cards via `request-workflow-card.tsx`), `requests/[id]/page.tsx` (detail), `requests/history/page.tsx`, `organizations/page.tsx`, `workers/page.tsx`.
+**APF in one sentence:** read-only oversight surface for a network admin who watches many affiliated orgs but never dispatches themselves. Three layers of enforcement: role, route, query.
 
-**HANDOFF spec calls for** (see `frontend/New design by Claude Design/HANDOFF.md` §Admin):
-- `/admin/requests/new` — 3-step create form with live preview pane + reach estimate (`GET /api/admin/substitutes?rankAgainstDraftId=...`)
-- `/admin/requests/[id]` — 5-step horizontal workflow tracker (Created → Notified → Responses → Assign → Confirmed), responses list sorted by status, dark "Best match" card + Assign CTA in a right rail, warning callouts
-- `/admin/substitutes` — directory with ranking bar, filter chips, sortable table (Substitute / City / Years / Availability / Languages / Match / Notify), 50px match bar in moss/terra/ink-3
-- Shell: light cream paper bg (`var(--paper)`), sticky header, tables (not cards), top nav not bottom nav
+**What exists today on `feature/worker-inbox`:**
+- Pages: `/apf/page.tsx` (dashboard), `/apf/activity`, `/apf/coordinators(/new)`, `/apf/networks(/new)`, `/apf/organizations(/new)`, `/apf/substitutes`, `/apf/workers/new`
+- Backend: `app/api/v1/networks.py` (network CRUD), tenant-level scoping via `AccessScope.is_network_admin`
+- Combined prod domain at `staffig.kouamvision.com` (the spec wants a separate `apf.` subdomain)
+- All `/apf/*` pages still on **old inline styles** (same as worker + admin were before today's port — gradient backgrounds, hex colors, no design tokens)
 
-**Suggested first slices (in order):**
-1. Port `admin/layout.tsx` to design tokens + sticky header. Cosmetic only, no logic changes. Sets the foundation so every admin page inherits the look.
-2. Redesign `request-workflow-card.tsx` (highest-traffic coordinator interaction) — preserve all existing actions (publish, renotify, cancel-request, cancel-assignment-with-reason, confirm-worker), swap to tokens + new typography.
-3. Build `/admin/requests/[id]` workflow tracker per spec — 5-step horizontal stepper, response sort, best-match right rail.
-4. Build `/admin/substitutes` from scratch — needs new endpoint `GET /substitutes?rank_against_request_id=` returning workers ranked by eligibility score.
-5. New `/admin/requests/new` 3-step form — replaces the inline `RequestCreateForm` in `admin/requests/page.tsx`.
+**Recommended attack order (per NETWORK_HANDOFF §12, adjusted for our codebase):**
+
+1. **Visual port (slice 0 — purely cosmetic).** Bring `/apf/layout.tsx` + every page under `/apf/*` onto design tokens, but use the **dark sidebar variant** (`var(--ink)` background per NETWORK_HANDOFF §6) instead of the light shell admin uses. Terra-outlined "APF" badge. Persistent "APF observes — it doesn't dispatch" footer in the sidebar. ~1-2h, low risk, mirrors what we did for worker + admin.
+2. **Snapshot endpoint.** Build `GET /api/v1/apf/snapshot` returning `{ kpis, statusBreakdown, shortageCities, orgActivity }` in one round-trip (NETWORK_HANDOFF §3.1). Wire it to the dashboard. Memoize 60s per network. Saves N waterfalls of data fetches.
+3. **Activity feed with filter chips.** Re-skin `/apf/activity` with the chip filters (All / Assigned / Cancelled / Escalated / Invitations / Removals) and cursor-paginated rows per NETWORK_HANDOFF §7.2.
+4. **NetworkPool overhaul (`/apf/substitutes`).** Distribution-by-city chart (plain CSS bars), KPI bento, top-contributors table, bulk-invite modal. Requires `GET /api/v1/apf/substitutes` (aggregate across orgs in scope) and `POST /api/v1/apf/substitutes/invite` (one→N orgs).
+5. **Org drill-in.** Port `/apf/organizations/[id]` to show org-level KPIs + recent requests + a "go to activity feed filtered to this org" link.
+6. **Export.** `/api/v1/apf/export` for CSV (Inngest in the spec; we have no Inngest — use a backend background task or SES-emailed CSV link). Lower priority for v1 pilot.
+
+**Schema deltas required by the spec but NOT in our DB today:**
+- `networks` and `network_organizations` (many-to-many of orgs in a network) — spec assumes orgs can belong to >1 network. Our current `Tenant`/`TenantMembership` collapses network and tenant. **Decide whether to merge or extend** before slice 4+.
+- `network_memberships` with roles `apf_admin` / `apf_observer` — currently we have `UserRole.NETWORK_ADMIN` (single role). The `apf_observer` (read-only, no actions) variant doesn't exist.
+- `data_access_log` table for Law 25 — append-only audit log of every APF read of identifiable substitute data. Cheap and important if real worker PII lands.
+- Worker consent toggle at onboarding for APF visibility (Law 25 §10).
+- `substitute_profiles.reliability` numeric column + nightly cron to compute it.
+
+**Things the spec says NOT to build:**
+- A coverage map (Mapbox cost vs. a list).
+- Predictive analytics ("you'll be short 4 educators Tuesday").
+- Direct messaging between APF and substitutes (would short-circuit the coordinator).
+- Cross-network reports (each network sees only its own scope).
 
 **Don't:**
 - Don't fold worker/admin/apf into one layout (per working agreements).
-- Don't introduce a UI library (Tailwind class-heavy / shadcn / Mantine). Stick to inline styles + design system tokens.
-- Don't change backend behavior beyond what the new endpoints require.
+- Don't add a UI library. Inline styles + design tokens only.
+- Don't expose write endpoints beyond `invite` and `remove-org-from-network` — APF is read+invite-only by design.
 
-The pure-frontend slices (1-3, 5) are doable in 1-2 sessions each. #4 is the only one that touches the backend.
+**Verification at the end (§14 acceptance test):** APF admin signs in → dashboard loads in <800ms with real KPIs → drills into a shortage city → bulk-invites 3 substitutes → sees their invitation in the activity feed → triggers export. Attempt to POST to any write endpoint outside the allowed list returns 403.
 
 ### Git workflow
 - Branches: `main` (prod only) ← `develop` (integration) ← `feature/*`
