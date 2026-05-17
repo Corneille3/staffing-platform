@@ -180,7 +180,33 @@ D1 network overview metrics · D2 substitute pool · D3 activity history
 
 - **Feature parity audit closed (2026-05-17):** verified against `main` rather than memory. Only real gap was **worker decline-with-reason** on `/worker/requests/[id]` (now shipped — modal with 4 preset reasons + free-text note). The "coordinator cancel-with-reason" and "worker withdraw-with-reason" carry-over items were **false alarms**: prod's `/requests/{id}/cancel` endpoint is also direct (no reason payload), and `withdraw` did not exist on prod at all (added in our redesign as #18). Coordinator cancel-**assignment**-with-reason already preserved in redesigned `request-workflow-card.tsx` via `CancelAssignmentModal`. Lesson: cross-check `main` before trusting a parity claim.
 - **Availability grid wired into matching (2026-05-17):** `MatchingService` now accepts an optional `db: Session`. After the binary availability check passes, it consults the `availabilities` table for the worker. Rule: if the worker has any rows for that week, require an `available=True` row for the request's `(work_date, slot)` (slot derived from `start_time` — morning/afternoon/evening/overnight). If no rows for that week, fall through (worker hasn't engaged with the grid). Eligibility reason "Slot not in weekly grid" surfaces when grid downgrades a match. All 11 lifecycle tests still pass.
-- **Worker HANDOFF gaps closed:** #3, #4, #5, #11, #12, #13, #14, #16, #17, #18 all shipped. #15 (hourly rate display) intentionally dropped (see memory `feedback-no-hourly-rate-display`). Onboarding redesigned to spec (3-step, terra accents, languages section, full i18n). No worker-side HANDOFF gaps remain. **Next priority: coordinator + admin surface redesign** per `frontend/New design by Claude Design/HANDOFF.md`.
+- **Worker HANDOFF gaps closed:** #3, #4, #5, #11, #12, #13, #14, #16, #17, #18 all shipped. #15 (hourly rate display) intentionally dropped (see memory `feedback-no-hourly-rate-display`). Onboarding redesigned to spec (3-step, terra accents, languages section, full i18n). No worker-side HANDOFF gaps remain.
+
+### Next session plan: coordinator + admin redesign
+
+The admin surface is the last big project on `feature/worker-inbox`. Current state: still on old inline styles (`#fffdf7`, gradients, hardcoded colors), no design tokens. Same shape onboarding was in before today.
+
+**Pages in `frontend/src/app/[locale]/admin/` today:** `page.tsx` (dashboard), `requests/page.tsx` (list + inline create form + workflow cards via `request-workflow-card.tsx`), `requests/[id]/page.tsx` (detail), `requests/history/page.tsx`, `organizations/page.tsx`, `workers/page.tsx`.
+
+**HANDOFF spec calls for** (see `frontend/New design by Claude Design/HANDOFF.md` §Admin):
+- `/admin/requests/new` — 3-step create form with live preview pane + reach estimate (`GET /api/admin/substitutes?rankAgainstDraftId=...`)
+- `/admin/requests/[id]` — 5-step horizontal workflow tracker (Created → Notified → Responses → Assign → Confirmed), responses list sorted by status, dark "Best match" card + Assign CTA in a right rail, warning callouts
+- `/admin/substitutes` — directory with ranking bar, filter chips, sortable table (Substitute / City / Years / Availability / Languages / Match / Notify), 50px match bar in moss/terra/ink-3
+- Shell: light cream paper bg (`var(--paper)`), sticky header, tables (not cards), top nav not bottom nav
+
+**Suggested first slices (in order):**
+1. Port `admin/layout.tsx` to design tokens + sticky header. Cosmetic only, no logic changes. Sets the foundation so every admin page inherits the look.
+2. Redesign `request-workflow-card.tsx` (highest-traffic coordinator interaction) — preserve all existing actions (publish, renotify, cancel-request, cancel-assignment-with-reason, confirm-worker), swap to tokens + new typography.
+3. Build `/admin/requests/[id]` workflow tracker per spec — 5-step horizontal stepper, response sort, best-match right rail.
+4. Build `/admin/substitutes` from scratch — needs new endpoint `GET /substitutes?rank_against_request_id=` returning workers ranked by eligibility score.
+5. New `/admin/requests/new` 3-step form — replaces the inline `RequestCreateForm` in `admin/requests/page.tsx`.
+
+**Don't:**
+- Don't fold worker/admin/apf into one layout (per working agreements).
+- Don't introduce a UI library (Tailwind class-heavy / shadcn / Mantine). Stick to inline styles + design system tokens.
+- Don't change backend behavior beyond what the new endpoints require.
+
+The pure-frontend slices (1-3, 5) are doable in 1-2 sessions each. #4 is the only one that touches the backend.
 
 ### Git workflow
 - Branches: `main` (prod only) ← `develop` (integration) ← `feature/*`
