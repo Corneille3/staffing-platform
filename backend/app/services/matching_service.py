@@ -61,14 +61,15 @@ class MatchingService:
             return EligibilityResult(eligible=False, score=0, reasons=reasons)
 
         if profile.availability_status.value == 'available':
-            grid_check = self._check_grid_for(worker.id, staffing_request.work_date, staffing_request.start_time)
-            if grid_check is False:
-                reasons.append(EligibilityReason(
-                    type='availability',
-                    status='missing',
-                    label='Slot not in weekly grid',
-                ))
-                return EligibilityResult(eligible=False, score=0, reasons=reasons)
+            if self.db is not None:
+                grid_check = self._check_grid_for(worker.id, staffing_request.work_date, staffing_request.start_time)
+                if grid_check is False:
+                    reasons.append(EligibilityReason(
+                        type='availability',
+                        status='missing',
+                        label='Slot not in weekly grid',
+                    ))
+                    return EligibilityResult(eligible=False, score=0, reasons=reasons)
             reasons.append(EligibilityReason(type='availability', status='matched', label='Available'))
         else:
             reasons.append(
