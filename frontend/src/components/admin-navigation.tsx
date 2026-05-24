@@ -19,7 +19,7 @@ const links: NavItem[] = [
   { href: "/admin/activity",      label: "Activity",       Icon: History },
 ];
 
-export function AdminNavigation() {
+export function AdminNavigation({ openCount = 0 }: { openCount?: number }) {
   const pathname = usePathname();
   // Strip any [locale] prefix so /en/admin/requests still matches /admin/requests.
   const strippedPath = pathname.replace(/^\/(?:en|fr)(?=\/|$)/, "") || "/";
@@ -56,6 +56,26 @@ export function AdminNavigation() {
               color={active ? "var(--terra)" : "var(--ink-3)"}
             />
             <span>{label}</span>
+            {href === "/admin/requests" && openCount > 0 && (
+              <span
+                style={{
+                  marginLeft: "auto",
+                  minWidth: 18,
+                  height: 18,
+                  padding: "0 5px",
+                  borderRadius: 999,
+                  background: "var(--terra)",
+                  color: "#fff",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {openCount}
+              </span>
+            )}
           </Link>
         );
       })}
