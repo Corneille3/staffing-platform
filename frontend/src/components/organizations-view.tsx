@@ -105,6 +105,7 @@ export function OrganizationsView({ sites: initial }: { sites: AdminOrganization
                   color: isSel ? "var(--paper)" : "var(--ink)",
                   border: "0.5px solid var(--line)",
                   borderLeft: isSel ? "3px solid var(--terra)" : "0.5px solid var(--line)",
+                  opacity: site.is_active ? 1 : 0.6,
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -127,7 +128,14 @@ export function OrganizationsView({ sites: initial }: { sites: AdminOrganization
                     {siteCode(site.name)}
                   </div>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{site.name}</div>
+                    <div style={{ fontWeight: 600, fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>
+                      {site.name}
+                      {!site.is_active && (
+                        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--ink-3)", border: "0.5px solid var(--line)", borderRadius: 999, padding: "1px 6px" }}>
+                          Inactive
+                        </span>
+                      )}
+                    </div>
                     <div style={{ fontSize: 12, opacity: isSel ? 0.7 : 0.6 }}>
                       {site.city} · {TYPE_LABELS[site.type] ?? site.type}
                     </div>

@@ -133,7 +133,7 @@ export default async function SubstitutesPage({
         </div>
       ) : null}
 
-      <AdminSubstitutesTable rows={items} ranked={ranked} />
+      <AdminSubstitutesTable rows={items} ranked={ranked} requestId={rank_against?.id} />
 
       <p style={{ marginTop: 16, color: "var(--ink-3)", fontSize: 12 }}>
         Ranking factors: language · qualifications · certifications · city match · availability.

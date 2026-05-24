@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Mono } from "./ui";
+import { notifyWorkers } from "../lib/browser-api";
 import type { AdminSubstituteRow } from "../lib/types";
 
 const LANG_LABEL: Record<string, string> = { fr: "FR", en: "EN", bilingual: "Bilingual" };
@@ -11,6 +12,7 @@ type SortKey = "name" | "city" | "availability" | "match";
 interface Props {
   rows: AdminSubstituteRow[];
   ranked: boolean;
+  requestId?: string;
 }
 
 function initials(first: string, last: string): string {
@@ -30,7 +32,24 @@ function availabilityLabel(row: AdminSubstituteRow): string {
   return "—";
 }
 
-export function AdminSubstitutesTable({ rows, ranked }: Props) {
+export function AdminSubstitutesTable({ rows, ranked, requestId }: Props) {
+  const [notified, setNotified] = useState<Record<string, "busy" | "done">>({});
+
+  async function notify(workerId: string) {
+    if (!requestId) return;
+    setNotified((p) => ({ ...p, [workerId]: "busy" }));
+    try {
+      await notifyWorkers(requestId, [workerId]);
+      setNotified((p) => ({ ...p, [workerId]: "done" }));
+    } catch {
+      setNotified((p) => {
+        const n = { ...p };
+        delete n[workerId];
+        return n;
+      });
+    }
+  }
+
   const [sortKey, setSortKey] = useState<SortKey>(ranked ? "match" : "name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(ranked ? "desc" : "asc");
 
@@ -253,23 +272,33 @@ export function AdminSubstitutesTable({ rows, ranked }: Props) {
                 <span style={{ fontSize: 12, color: "var(--ink-3)" }}>—</span>
               )}
 
-              <button
-                type="button"
-                style={{
-                  padding: "6px 12px",
-                  fontSize: 11,
-                  borderRadius: 999,
-                  background: "transparent",
-                  border: "0.5px solid var(--line)",
-                  color: "var(--ink-2)",
-                  cursor: "pointer",
-                  justifySelf: "end",
-                  fontFamily: "var(--ui)",
-                }}
-                aria-label={`Notify ${row.worker.first_name}`}
-              >
-                Notify
-              </button>
+              {(() => {
+                const state = notified[row.worker.id];
+                const disabled = !requestId || state === "busy" || state === "done";
+                return (
+                  <button
+                    type="button"
+                    onClick={() => notify(row.worker.id)}
+                    disabled={disabled}
+                    title={requestId ? "Add to this request's notification batch" : "Open from a request to notify"}
+                    style={{
+                      padding: "6px 12px",
+                      fontSize: 11,
+                      borderRadius: 999,
+                      background: state === "done" ? "var(--moss-soft)" : "transparent",
+                      border: `0.5px solid ${state === "done" ? "#C8DCC1" : "var(--line)"}`,
+                      color: state === "done" ? "var(--moss)" : requestId ? "var(--ink-2)" : "var(--ink-4)",
+                      cursor: disabled ? "default" : "pointer",
+                      opacity: !requestId ? 0.5 : 1,
+                      justifySelf: "end",
+                      fontFamily: "var(--ui)",
+                    }}
+                    aria-label={`Notify ${row.worker.first_name}`}
+                  >
+                    {state === "busy" ? "…" : state === "done" ? "Notified" : "Notify"}
+                  </button>
+                );
+              })()}
             </div>
           );
         })

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import date, datetime, time
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -315,6 +317,65 @@ class StaffingRequestService:
         self.db.refresh(staffing_request)
         self.dispatcher.notify_workers(staffing_request, eligible_workers)
         return staffing_request
+
+    def notify_specific(self, request_id: UUID, worker_user_ids: list[UUID], actor_user_id: UUID) -> int:
+        """Add specific substitutes to a request's notification batch (the
+        directory 'Notify' action). Creates a notified response row for each
+        worker who isn't already an active responder. Returns the count added."""
+        staffing_request = self._get_required(request_id)
+        if staffing_request.status not in {RequestStatus.RESPONSES_RECEIVED, RequestStatus.NOTIFIED, RequestStatus.OPEN}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='Request is not open to new notifications.',
+            )
+        added = 0
+        notified_workers = []
+        for worker_id in worker_user_ids:
+            self.db.add(
+                RequestNotification(
+                    id=uuid4(),
+                    staffing_request_id=staffing_request.id,
+                    worker_user_id=worker_id,
+                    channel=NotificationChannel.IN_APP,
+                    delivery_status='queued',
+                )
+            )
+            existing = self.response_repository.get_for_request_and_worker(staffing_request.id, worker_id)
+            if existing is None:
+                self.db.add(
+                    RequestResponse(
+                        id=uuid4(),
+                        staffing_request_id=staffing_request.id,
+                        worker_user_id=worker_id,
+                        status=ResponseStatus.NOTIFIED,
+                    )
+                )
+                added += 1
+            elif existing.status == ResponseStatus.DECLINED:
+                existing.status = ResponseStatus.NOTIFIED
+                existing.responded_at = None
+                existing.decline_reason = None
+                added += 1
+            worker = self.worker_repository.get(worker_id)
+            if worker:
+                notified_workers.append(worker)
+
+        if staffing_request.status == RequestStatus.OPEN:
+            staffing_request.status = RequestStatus.NOTIFIED
+            self.repository.save(staffing_request)
+
+        self.audit_service.log(
+            action='staffing_request.renotified',
+            entity_type='staffing_request',
+            entity_id=staffing_request.id,
+            actor_user_id=actor_user_id,
+            organization_id=staffing_request.organization_id,
+            payload={'targeted': True, 'new_notifications': added},
+        )
+        self.db.commit()
+        if notified_workers:
+            self.dispatcher.notify_workers(staffing_request, notified_workers)
+        return added
 
     @staticmethod
     def _requirement_code(item: dict | str) -> str:

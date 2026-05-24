@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Eyebrow, Mono } from "../../../../components/ui";
 import { AdminRequestsList } from "../../../../components/admin-requests-list";
+import { AdminRequestFilters } from "../../../../components/admin-request-filters";
 import { getAdminOrganizations, getAdminRequestsIndex } from "../../../../lib/api";
 import type { AdminRequestTab } from "../../../../lib/types";
 
@@ -36,9 +37,11 @@ export default async function RequestsPage({
   const params = await searchParams;
   const tab = normalizeTab(params.tab);
   const siteId = singleString(params.site_id);
+  const urgency = singleString(params.urgency) ?? "all";
+  const language = singleString(params.language) ?? "all";
 
   const [data, sites] = await Promise.all([
-    getAdminRequestsIndex({ tab, siteId }),
+    getAdminRequestsIndex({ tab, siteId, urgency, language }),
     getAdminOrganizations(),
   ]);
   const { items, counts, next_cursor } = data;
@@ -103,23 +106,30 @@ export default async function RequestsPage({
         })}
       </div>
 
-      {/* Site pills */}
-      {sites.length > 1 && (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 22, paddingBottom: 16, borderBottom: "0.5px solid var(--line)" }}>
-          <SitePill href={hrefFor(tab, undefined)} active={!siteId} label="All sites" />
-          {sites.map((s) => (
-            <SitePill key={s.id} href={hrefFor(tab, s.id)} active={siteId === s.id} label={s.name} />
-          ))}
+      {/* Site pills + more filter */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", marginBottom: 22, paddingBottom: 16, borderBottom: "0.5px solid var(--line)" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {sites.length > 1 && (
+            <>
+              <SitePill href={hrefFor(tab, undefined)} active={!siteId} label="All sites" />
+              {sites.map((s) => (
+                <SitePill key={s.id} href={hrefFor(tab, s.id)} active={siteId === s.id} label={s.name} />
+              ))}
+            </>
+          )}
         </div>
-      )}
+        <AdminRequestFilters tab={tab} siteId={siteId} urgency={urgency} language={language} />
+      </div>
 
       <AdminRequestsList
-        key={`${tab}:${siteId ?? ""}`}
+        key={`${tab}:${siteId ?? ""}:${urgency}:${language}`}
         tab={tab}
         initialRows={items}
         initialCursor={next_cursor}
         siteNames={siteNames}
         siteId={siteId}
+        urgency={urgency}
+        language={language}
       />
     </div>
   );

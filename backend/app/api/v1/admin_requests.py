@@ -10,6 +10,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
@@ -25,6 +26,21 @@ from app.services.admin_request_service import AdminRequestService
 from app.services.staffing_request_service import StaffingRequestService
 
 router = APIRouter(dependencies=[Depends(require_admin)])
+
+
+class NotifyWorkersBody(BaseModel):
+    worker_user_ids: list[UUID]
+
+
+@router.post('/{request_id}/notify')
+def notify_workers(
+    request_id: UUID,
+    payload: NotifyWorkersBody,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> dict:
+    added = StaffingRequestService(db).notify_specific(request_id, payload.worker_user_ids, scope.user.id)
+    return {'newly_notified': added}
 
 
 @router.get('', response_model=AdminRequestsResponse)

@@ -26,12 +26,6 @@ function singleString(value: string | string[] | undefined): string | undefined 
   return Array.isArray(value) ? value[0] : value;
 }
 
-function withSite(href: string, siteId: string | undefined): string {
-  if (!siteId) return href;
-  const sep = href.includes("?") ? "&" : "?";
-  return `${href}${sep}site_id=${siteId}`;
-}
-
 function fmtDuration(minutes: number | null): string {
   if (minutes == null) return "—";
   if (minutes < 60) return `${minutes}m`;
@@ -48,8 +42,32 @@ export default async function AdminActivityPage({
   const params = await searchParams;
   const filter = normalizeFilter(params.filter);
   const siteId = singleString(params.site_id);
+  const from = singleString(params.from);
 
-  const { items, next_cursor, counts, kpis } = await getAdminActivity({ filter, siteId });
+  const { items, next_cursor, counts, kpis } = await getAdminActivity({ filter, siteId, from });
+
+  // Date-range presets (set ?from=ISO). "All" clears it.
+  const dayMs = 86400000;
+  const isoDaysAgo = (n: number) => new Date(Date.now() - n * dayMs).toISOString().slice(0, 10);
+  const ranges: { label: string; from?: string }[] = [
+    { label: "All" },
+    { label: "7 days", from: isoDaysAgo(7) },
+    { label: "30 days", from: isoDaysAgo(30) },
+  ];
+  const rangeHref = (rFrom?: string) => {
+    const p = new URLSearchParams();
+    if (filter !== "all") p.set("filter", filter);
+    if (siteId) p.set("site_id", siteId);
+    if (rFrom) p.set("from", rFrom);
+    const qs = p.toString();
+    return `/admin/activity${qs ? `?${qs}` : ""}`;
+  };
+  const exportBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+  const exportParams = new URLSearchParams();
+  if (filter !== "all") exportParams.set("filter", filter);
+  if (siteId) exportParams.set("site_id", siteId);
+  if (from) exportParams.set("from", from);
+  const exportHref = `${exportBase}/api/v1/admin/activity/export${exportParams.toString() ? `?${exportParams}` : ""}`;
   const cancelPct = kpis.posted ? Math.round((100 * kpis.cancelled) / kpis.posted) : 0;
 
   const kpiTiles: { label: string; value: string; sub: string; color?: string }[] = [
@@ -82,6 +100,39 @@ export default async function AdminActivityPage({
         </p>
       </header>
 
+      {/* Date range + export */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6 }}>
+          {ranges.map((r) => {
+            const active = (r.from ?? "") === (from ?? "");
+            return (
+              <Link
+                key={r.label}
+                href={rangeHref(r.from)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  textDecoration: "none",
+                  background: active ? "var(--ink)" : "transparent",
+                  color: active ? "var(--paper)" : "var(--ink-2)",
+                  border: `0.5px solid ${active ? "var(--ink)" : "var(--line)"}`,
+                }}
+              >
+                {r.label}
+              </Link>
+            );
+          })}
+        </div>
+        <a
+          href={exportHref}
+          style={{ padding: "8px 16px", borderRadius: 999, background: "transparent", border: "0.5px solid var(--line)", color: "var(--ink)", fontSize: 13, fontWeight: 500, textDecoration: "none" }}
+        >
+          Export CSV ↓
+        </a>
+      </div>
+
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 22 }}>
         {kpiTiles.map((k) => (
@@ -101,7 +152,14 @@ export default async function AdminActivityPage({
           return (
             <Link
               key={f.key}
-              href={withSite(f.key === "all" ? "/admin/activity" : `/admin/activity?filter=${f.key}`, siteId)}
+              href={(() => {
+                const p = new URLSearchParams();
+                if (f.key !== "all") p.set("filter", f.key);
+                if (siteId) p.set("site_id", siteId);
+                if (from) p.set("from", from);
+                const qs = p.toString();
+                return `/admin/activity${qs ? `?${qs}` : ""}`;
+              })()}
               style={{
                 display: "inline-flex",
                 alignItems: "center",

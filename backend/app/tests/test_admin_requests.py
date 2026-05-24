@@ -27,6 +27,22 @@ def test_admin_requests_index_shape_and_tabs(org_admin_client, seed):
     assert all(r['status'] in {'open', 'notified', 'responses_received'} for r in data['items'])
 
 
+def test_admin_notify_specific_adds_responders(org_admin_client, seed):
+    rid = _publish(org_admin_client, seed)
+    before = org_admin_client.get(f'/api/v1/requests/{rid}/responses').json()['items']
+    before_ids = {r['worker_user_id'] for r in before}
+    # Notify worker_b explicitly (whether or not already notified, endpoint is idempotent-ish).
+    resp = org_admin_client.post(
+        f'/api/v1/admin/requests/{rid}/notify',
+        json={'worker_user_ids': [str(seed.worker_b.id)]},
+    )
+    assert resp.status_code == 200
+    after = org_admin_client.get(f'/api/v1/requests/{rid}/responses').json()['items']
+    after_ids = {r['worker_user_id'] for r in after}
+    assert str(seed.worker_b.id) in after_ids
+    assert after_ids >= before_ids
+
+
 def test_admin_requests_index_top_match_after_accept(org_admin_client, worker_a_client, seed):
     rid = _publish(org_admin_client, seed)
     worker_a_client.post(

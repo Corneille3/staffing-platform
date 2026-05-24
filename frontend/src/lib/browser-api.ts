@@ -180,6 +180,15 @@ export async function renotifyRequest(requestId: string): Promise<StaffingReques
   return postJson<StaffingRequest>(`/api/v1/requests/${requestId}/renotify`, {});
 }
 
+export async function notifyWorkers(
+  requestId: string,
+  workerUserIds: string[],
+): Promise<{ newly_notified: number }> {
+  return postJson<{ newly_notified: number }>(`/api/v1/admin/requests/${requestId}/notify`, {
+    worker_user_ids: workerUserIds,
+  });
+}
+
 export async function rankAdminSubstitutes(
   rankAgainstDraftId: string,
 ): Promise<AdminSubstitutesResponse> {
