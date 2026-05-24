@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -14,6 +14,11 @@ class Organization(Base):
 
     id: Mapped[UUID] = mapped_column(primary_key=True)
     tenant_id: Mapped[UUID] = mapped_column(ForeignKey('tenants.id', ondelete='RESTRICT'))
+    # Self-referential: a "site"/installation rows up to its parent CPE/org.
+    # NULL parent means this row IS a parent (or a standalone org).
+    parent_organization_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey('organizations.id', ondelete='SET NULL')
+    )
     name: Mapped[str] = mapped_column(String(255))
     type: Mapped[OrganizationType] = mapped_column(db_enum(OrganizationType, 'organization_type'))
     city: Mapped[str] = mapped_column(String(100))
@@ -28,10 +33,16 @@ class Organization(Base):
     contact_phone: Mapped[str | None] = mapped_column(String(50))
     preferred_language: Mapped[str] = mapped_column(String(5), default='fr', server_default='fr')
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default='true')
+    # Multi-site descriptors (per ADMIN_ORG_HISTORY_HANDOFF §1) — all optional.
+    capacity: Mapped[int | None] = mapped_column(Integer)
+    enrolled_count: Mapped[int | None] = mapped_column(Integer)
+    hours_label: Mapped[str | None] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     tenant = relationship('Tenant', back_populates='organizations')
+    parent = relationship('Organization', remote_side=[id], back_populates='sites')
+    sites = relationship('Organization', back_populates='parent')
     memberships = relationship('OrganizationMembership', back_populates='organization')
     staffing_requests = relationship('StaffingRequest', back_populates='organization')
     audit_logs = relationship('AuditLog', back_populates='organization')

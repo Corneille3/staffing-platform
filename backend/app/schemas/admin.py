@@ -33,3 +33,60 @@ class RankAgainstBrief(BaseModel):
 class AdminSubstitutesResponse(BaseModel):
     items: list[AdminSubstituteRow]
     rank_against: RankAgainstBrief | None = None
+
+
+# --- /admin/organizations (multi-site coordinator screen, ADMIN_ORG_HISTORY_HANDOFF §2) ---
+
+class AdminOrgMetrics(BaseModel):
+    fill_rate_30d: int
+    requests_30d: int
+    filled_30d: int
+    open_requests: int
+
+
+class AdminOrgCoordinator(BaseModel):
+    id: UUID
+    name: str
+    role: str
+
+
+class AdminOrgRosterToday(BaseModel):
+    on_site: int
+    substitutes_arriving: int
+
+
+class AdminOrganizationSite(BaseModel):
+    id: UUID
+    parent_organization_id: UUID | None = None
+    name: str
+    type: str
+    city: str
+    neighbourhood: str | None = None
+    region: str | None = None
+    address_line1: str | None = None
+    postal_code: str | None = None
+    capacity: int | None = None
+    enrolled_count: int | None = None
+    hours_label: str | None = None
+    preferred_language: str
+    contact_phone: str | None = None
+    contact_email: str | None = None
+    is_active: bool
+    metrics: AdminOrgMetrics
+    coordinators: list[AdminOrgCoordinator] = []
+    roster_today: AdminOrgRosterToday
+
+
+class AdminOrganizationsResponse(BaseModel):
+    items: list[AdminOrganizationSite]
+
+
+class AdminOrganizationUpdate(BaseModel):
+    """Partial edit for a site (the §2.3 edit modal). Only these fields."""
+    name: str | None = None
+    address_line1: str | None = None
+    hours_label: str | None = None
+    contact_phone: str | None = None
+    preferred_language: str | None = None
+    capacity: int | None = None
+    enrolled_count: int | None = None

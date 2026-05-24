@@ -85,6 +85,9 @@ def seed() -> None:
             longitude=Decimal('-73.5810'),
             contact_email='lespetitslutins@example.org',
             contact_phone='514-555-0142',
+            capacity=64,
+            enrolled_count=62,
+            hours_label='Lun–Ven · 07:00 → 18:00',
         )
         organization_two = Organization(
             id=uuid4(),
@@ -98,6 +101,9 @@ def seed() -> None:
             longitude=Decimal('-73.7330'),
             contact_email='lesetoiles@example.org',
             contact_phone='450-555-0190',
+            capacity=48,
+            enrolled_count=44,
+            hours_label='Lun–Ven · 07:00 → 18:00',
         )
         network_admin = User(
             id=uuid4(),

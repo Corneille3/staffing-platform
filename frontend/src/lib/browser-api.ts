@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AdminOrganizationSite,
   AdminSubstitutesResponse,
   ApfActivity,
   ApfActivityFilter,
@@ -123,6 +124,13 @@ export async function patchAdminRequest(
 
 export async function publishAdminRequest(requestId: string): Promise<StaffingRequest> {
   return postJson<StaffingRequest>(`/api/v1/requests/${requestId}/publish`);
+}
+
+export async function patchAdminOrganization(
+  organizationId: string,
+  partial: Record<string, unknown>,
+): Promise<AdminOrganizationSite> {
+  return patchJson<AdminOrganizationSite>(`/api/v1/admin/organizations/${organizationId}`, partial);
 }
 
 export async function rankAdminSubstitutes(

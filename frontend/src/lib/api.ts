@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import {
+  AdminOrganizationSite,
   AdminSubstitutesResponse,
   ApfActivity,
   ApfActivityFilter,
@@ -143,6 +144,11 @@ export async function getDashboardData(): Promise<{
 
 export async function getOrganizations(): Promise<Organization[]> {
   const response = await fetchJson<{ items: Organization[] }>("/api/v1/organizations");
+  return response.items;
+}
+
+export async function getAdminOrganizations(): Promise<AdminOrganizationSite[]> {
+  const response = await fetchJson<{ items: AdminOrganizationSite[] }>("/api/v1/admin/organizations");
   return response.items;
 }
 

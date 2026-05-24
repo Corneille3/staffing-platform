@@ -237,6 +237,46 @@ export type AdminSubstitutesResponse = {
   rank_against: RankAgainstBrief | null;
 };
 
+export type AdminOrgMetrics = {
+  fill_rate_30d: number;
+  requests_30d: number;
+  filled_30d: number;
+  open_requests: number;
+};
+
+export type AdminOrgCoordinator = {
+  id: string;
+  name: string;
+  role: string;
+};
+
+export type AdminOrgRosterToday = {
+  on_site: number;
+  substitutes_arriving: number;
+};
+
+export type AdminOrganizationSite = {
+  id: string;
+  parent_organization_id: string | null;
+  name: string;
+  type: string;
+  city: string;
+  neighbourhood: string | null;
+  region: string | null;
+  address_line1: string | null;
+  postal_code: string | null;
+  capacity: number | null;
+  enrolled_count: number | null;
+  hours_label: string | null;
+  preferred_language: string;
+  contact_phone: string | null;
+  contact_email: string | null;
+  is_active: boolean;
+  metrics: AdminOrgMetrics;
+  coordinators: AdminOrgCoordinator[];
+  roster_today: AdminOrgRosterToday;
+};
+
 export type Organization = {
   id: string;
   name: string;
