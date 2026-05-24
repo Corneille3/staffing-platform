@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { Eyebrow, Mono } from "./ui";
-import { patchAdminOrganization } from "../lib/browser-api";
-import type { AdminOrganizationSite } from "../lib/types";
+import { ActivityRowCard } from "./apf-activity-row";
+import { fetchAdminActivity, patchAdminOrganization } from "../lib/browser-api";
+import type { AdminOrganizationSite, ApfActivityRow } from "../lib/types";
 
 const TYPE_LABELS: Record<string, string> = {
   childcare: "Childcare",
@@ -295,24 +296,52 @@ function SiteDetail({
             Roster today: <strong style={{ color: "var(--ink-2)" }}>{site.roster_today.on_site}</strong> on site ·{" "}
             <strong style={{ color: "var(--ink-2)" }}>{site.roster_today.substitutes_arriving}</strong> arriving
           </div>
+        </div>
+      </div>
+
+      {/* Recent activity preview */}
+      <div
+        style={{
+          background: "var(--card)",
+          border: "0.5px solid var(--line)",
+          borderRadius: "var(--r-md)",
+          padding: 18,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+          <Eyebrow>Recent activity</Eyebrow>
           <button
             onClick={onActivityLog}
-            style={{
-              marginTop: 10,
-              background: "none",
-              border: "none",
-              padding: 0,
-              cursor: "pointer",
-              color: "var(--terra)",
-              fontFamily: "var(--ui)",
-              fontSize: 13,
-              fontWeight: 600,
-            }}
+            style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--terra)", fontFamily: "var(--ui)", fontSize: 13, fontWeight: 600 }}
           >
             Open activity log →
           </button>
         </div>
+        <SiteActivityPreview siteId={site.id} />
       </div>
+    </div>
+  );
+}
+
+function SiteActivityPreview({ siteId }: { siteId: string }) {
+  const [rows, setRows] = useState<ApfActivityRow[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setRows(null);
+    fetchAdminActivity({ siteId, limit: 3 })
+      .then((res) => alive && setRows(res.items.slice(0, 3)))
+      .catch(() => alive && setRows([]));
+    return () => {
+      alive = false;
+    };
+  }, [siteId]);
+
+  if (rows === null) return <p style={{ fontSize: 13, color: "var(--ink-3)" }}>Loading…</p>;
+  if (rows.length === 0) return <p style={{ fontSize: 13, color: "var(--ink-3)" }}>No recent activity at this site.</p>;
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      {rows.map((row) => <ActivityRowCard key={row.id} row={row} />)}
     </div>
   );
 }

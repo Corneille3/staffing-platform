@@ -1,10 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { AdminActivityFilter, ApfActivityRow } from "../lib/types";
 import { fetchAdminActivity } from "../lib/browser-api";
 import { Mono } from "./ui";
 import { ActivityDateHeader, groupByDate } from "./apf-activity-row";
+
+function requestIdFor(row: ApfActivityRow): string | null {
+  if (row.entity_type === "staffing_request" && row.entity_id) return row.entity_id;
+  const p = row.payload?.staffing_request_id;
+  return typeof p === "string" ? p : null;
+}
 
 type Kind = { verb: string; kind: string; tone: string };
 
@@ -172,9 +179,16 @@ export function AdminActivityList({ filter, initialRows, initialCursor, siteId }
         <div key={group.key}>
           <ActivityDateHeader label={group.label} />
           <div style={{ display: "grid", gap: 8 }}>
-            {group.entries.map((row) => (
-              <AdminActivityRow key={row.id} row={row} />
-            ))}
+            {group.entries.map((row) => {
+              const reqId = requestIdFor(row);
+              return reqId ? (
+                <Link key={row.id} href={`/admin/requests/${reqId}`} style={{ textDecoration: "none" }}>
+                  <AdminActivityRow row={row} />
+                </Link>
+              ) : (
+                <AdminActivityRow key={row.id} row={row} />
+              );
+            })}
           </div>
         </div>
       ))}

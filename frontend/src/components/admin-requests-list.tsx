@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { MoreVertical } from "lucide-react";
 import { Mono } from "./ui";
-import { assignWorker, fetchAdminRequestsIndex } from "../lib/browser-api";
+import { assignWorker, cancelRequest, fetchAdminRequestsIndex, renotifyRequest } from "../lib/browser-api";
 import type { AdminRequestSummary, AdminRequestTab } from "../lib/types";
 
 const LANG_LABEL: Record<string, string> = { fr: "FR", en: "EN", bilingual: "Bilingual" };
@@ -107,6 +108,34 @@ export function AdminRequestsList({ tab, initialRows, initialCursor, siteNames, 
     }
   }
 
+  async function handleCancel(row: AdminRequestSummary) {
+    const reason = window.prompt("Cancel this request — reason?", "");
+    if (reason === null) return;
+    setBusyId(row.id);
+    setError(null);
+    try {
+      await cancelRequest(row.id, reason || "Cancelled by coordinator");
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Cancel failed.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleNotifyMore(row: AdminRequestSummary) {
+    setBusyId(row.id);
+    setError(null);
+    try {
+      await renotifyRequest(row.id);
+      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: r.status === "open" ? "notified" : r.status } : r)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Notify failed.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   if (rows.length === 0) {
     return (
       <div style={{ background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: "var(--r-md)", padding: "36px 20px", textAlign: "center" }}>
@@ -128,6 +157,8 @@ export function AdminRequestsList({ tab, initialRows, initialCursor, siteNames, 
           siteName={siteNames[row.organization_id] ?? ""}
           busy={busyId === row.id}
           onAssign={() => handleAssign(row)}
+          onCancel={() => handleCancel(row)}
+          onNotifyMore={() => handleNotifyMore(row)}
         />
       ))}
       {cursor && (
@@ -160,11 +191,15 @@ function RequestRow({
   siteName,
   busy,
   onAssign,
+  onCancel,
+  onNotifyMore,
 }: {
   row: AdminRequestSummary;
   siteName: string;
   busy: boolean;
   onAssign: () => void;
+  onCancel: () => void;
+  onNotifyMore: () => void;
 }) {
   const statusTone = STATUS_TONE[row.status] ?? "var(--ink-3)";
   const canAssign = row.top_match && row.status !== "assigned";
@@ -279,8 +314,83 @@ function RequestRow({
             View
           </Link>
         )}
+        {row.status !== "assigned" && (
+          <OverflowMenu busy={busy} onCancel={onCancel} onNotifyMore={onNotifyMore} />
+        )}
       </div>
     </div>
+  );
+}
+
+function OverflowMenu({ busy, onCancel, onNotifyMore }: { busy: boolean; onCancel: () => void; onNotifyMore: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        disabled={busy}
+        aria-label="More actions"
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: 10,
+          border: "0.5px solid var(--line)",
+          background: "transparent",
+          color: "var(--ink-3)",
+          cursor: busy ? "wait" : "pointer",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <MoreVertical size={16} />
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
+          <div
+            style={{
+              position: "absolute",
+              top: "calc(100% + 4px)",
+              right: 0,
+              zIndex: 21,
+              background: "var(--card)",
+              border: "0.5px solid var(--line)",
+              borderRadius: 10,
+              padding: 4,
+              minWidth: 160,
+              boxShadow: "0 8px 24px rgba(21,20,15,.12)",
+            }}
+          >
+            <MenuItem label="Notify more" onClick={() => { setOpen(false); onNotifyMore(); }} />
+            <MenuItem label="Cancel request" tone="var(--rose)" onClick={() => { setOpen(false); onCancel(); }} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function MenuItem({ label, onClick, tone }: { label: string; onClick: () => void; tone?: string }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: "100%",
+        textAlign: "left",
+        padding: "8px 10px",
+        background: "transparent",
+        border: "none",
+        borderRadius: 8,
+        cursor: "pointer",
+        fontFamily: "var(--ui)",
+        fontSize: 13,
+        fontWeight: 500,
+        color: tone ?? "var(--ink)",
+      }}
+    >
+      {label}
+    </button>
   );
 }
 

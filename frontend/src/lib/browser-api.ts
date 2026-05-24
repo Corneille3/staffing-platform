@@ -161,14 +161,23 @@ export async function assignWorker(
 }
 
 export async function fetchAdminActivity(
-  params: { filter?: AdminActivityFilter; cursor?: string; siteId?: string } = {},
+  params: { filter?: AdminActivityFilter; cursor?: string; siteId?: string; limit?: number } = {},
 ): Promise<AdminActivity> {
   const search = new URLSearchParams();
   if (params.filter && params.filter !== "all") search.set("filter", params.filter);
   if (params.cursor) search.set("cursor", params.cursor);
   if (params.siteId) search.set("site_id", params.siteId);
+  if (params.limit) search.set("limit", String(params.limit));
   const qs = search.toString();
   return getJson<AdminActivity>(`/api/v1/admin/activity${qs ? `?${qs}` : ""}`);
+}
+
+export async function cancelRequest(requestId: string, reason: string): Promise<StaffingRequest> {
+  return postJson<StaffingRequest>(`/api/v1/requests/${requestId}/cancel`, { reason });
+}
+
+export async function renotifyRequest(requestId: string): Promise<StaffingRequest> {
+  return postJson<StaffingRequest>(`/api/v1/requests/${requestId}/renotify`, {});
 }
 
 export async function rankAdminSubstitutes(
