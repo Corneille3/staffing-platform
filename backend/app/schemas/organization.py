@@ -1,3 +1,4 @@
+from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr
@@ -10,7 +11,10 @@ class OrganizationBase(BaseModel):
     name: str
     type: OrganizationType
     city: str
+    neighbourhood: str | None = None
     region: str | None = None
+    latitude: Decimal | None = None
+    longitude: Decimal | None = None
     address_line1: str | None = None
     address_line2: str | None = None
     postal_code: str | None = None

@@ -1,5 +1,7 @@
 name: Frontend CI (main)
 
+# Production deploy is handled by Vercel's native GitHub integration.
+# This workflow only runs CI checks against main.
 on:
   push:
     branches:
@@ -38,23 +40,3 @@ jobs:
         env:
           API_BASE_URL: http://localhost:8000
           NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
-
-  deploy:
-    name: Deploy to Vercel
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    # Requires these GitHub Actions secrets to be set:
-    #   VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
-    # Set them after connecting the repo on vercel.com.
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy to Vercel (production)
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: frontend
-          vercel-args: "--prod"

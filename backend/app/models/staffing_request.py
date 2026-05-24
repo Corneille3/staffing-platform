@@ -1,11 +1,19 @@
 from datetime import date, datetime, time
+from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, Time, func
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text, Time, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.enums import CoverageType, RequestRequirementType, RequestStatus, RequestType, db_enum
+from app.models.enums import (
+    CoverageType,
+    RequestRequirementType,
+    RequestRole,
+    RequestStatus,
+    RequestType,
+    db_enum,
+)
 
 
 class StaffingRequest(Base):
@@ -15,6 +23,8 @@ class StaffingRequest(Base):
     organization_id: Mapped[UUID] = mapped_column(ForeignKey('organizations.id', ondelete='RESTRICT'))
     created_by_user_id: Mapped[UUID] = mapped_column(ForeignKey('users.id', ondelete='RESTRICT'))
     request_type: Mapped[RequestType] = mapped_column(db_enum(RequestType, 'request_type'))
+    role: Mapped[RequestRole | None] = mapped_column(db_enum(RequestRole, 'request_role'))
+    hourly_rate: Mapped[Decimal | None] = mapped_column(Numeric(6, 2))
     status: Mapped[RequestStatus] = mapped_column(
         db_enum(RequestStatus, 'request_status'),
         default=RequestStatus.DRAFT,

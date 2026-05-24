@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -6,6 +7,12 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db_session
 from app.auth.permissions import require_network_admin
 from app.auth.scope import AccessScope, get_access_scope
+from app.schemas.availability import (
+    AvailabilityCellRead,
+    AvailabilityCopyRequest,
+    AvailabilityGridRead,
+    AvailabilityGridWrite,
+)
 from app.schemas.worker import (
     WorkerAvailabilityUpdate,
     WorkerInviteCreate,
@@ -13,6 +20,7 @@ from app.schemas.worker import (
     WorkerProfileRead,
     WorkerRead,
 )
+from app.services.availability_service import AvailabilityService
 from app.services.worker_service import WorkerService
 
 router = APIRouter()
@@ -94,8 +102,63 @@ def update_worker_availability(
         user_id,
         availability_status=payload.availability_status,
         urgent_alert_opt_in=payload.urgent_alert_opt_in,
+        notify_far=payload.notify_far,
+        notify_weekend_overnight=payload.notify_weekend_overnight,
         supported_cities=payload.supported_cities,
     )
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Worker profile not found')
     return WorkerProfileRead.model_validate(profile)
+
+
+def _check_scope_self(scope: AccessScope, user_id: UUID) -> None:
+    if not scope.is_admin and scope.user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='Workers may only manage their own availability.',
+        )
+
+
+@router.get('/{user_id}/availability/grid')
+def get_availability_grid(
+    user_id: UUID,
+    week_start: date,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> AvailabilityGridRead:
+    _check_scope_self(scope, user_id)
+    cells = AvailabilityService(db).get_week(user_id, week_start)
+    return AvailabilityGridRead(
+        week_start=week_start,
+        cells=[AvailabilityCellRead.model_validate(c) for c in cells],
+    )
+
+
+@router.post('/{user_id}/availability/grid')
+def put_availability_grid(
+    user_id: UUID,
+    payload: AvailabilityGridWrite,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> AvailabilityGridRead:
+    _check_scope_self(scope, user_id)
+    cells = AvailabilityService(db).replace_week(user_id, payload.week_start, payload.cells)
+    return AvailabilityGridRead(
+        week_start=payload.week_start,
+        cells=[AvailabilityCellRead.model_validate(c) for c in cells],
+    )
+
+
+@router.post('/{user_id}/availability/grid/copy-previous')
+def copy_previous_availability_week(
+    user_id: UUID,
+    payload: AvailabilityCopyRequest,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> AvailabilityGridRead:
+    _check_scope_self(scope, user_id)
+    cells = AvailabilityService(db).copy_previous_week(user_id, payload.target_week_start)
+    return AvailabilityGridRead(
+        week_start=payload.target_week_start,
+        cells=[AvailabilityCellRead.model_validate(c) for c in cells],
+    )

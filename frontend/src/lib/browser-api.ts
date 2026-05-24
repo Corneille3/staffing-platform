@@ -1,12 +1,25 @@
 "use client";
 
 import {
+  AdminActivity,
+  AdminActivityFilter,
+  AdminOrganizationSite,
+  AdminRequestsResponse,
+  AdminSubstitutesResponse,
+  ApfActivity,
+  ApfActivityFilter,
+  ApfExportJob,
+  ApfExportRequest,
   Assignment,
+  AvailabilityGrid,
+  BulkInviteEntry,
+  BulkInviteResult,
   Coordinator,
   EligibilityResult,
   NotificationFeedItem,
   Organization,
   RequestResponse,
+  SlotPeriod,
   StaffingRequest,
   Worker,
   WorkerProfile,
@@ -71,6 +84,118 @@ async function patchJson<T>(path: string, body: object): Promise<T> {
   return response.json();
 }
 
+export async function fetchApfActivity(
+  params: { filter?: ApfActivityFilter; cursor?: string; limit?: number; orgId?: string } = {},
+): Promise<ApfActivity> {
+  const search = new URLSearchParams();
+  if (params.filter && params.filter !== "all") search.set("filter", params.filter);
+  if (params.cursor) search.set("cursor", params.cursor);
+  if (params.limit) search.set("limit", String(params.limit));
+  if (params.orgId) search.set("org_id", params.orgId);
+  const qs = search.toString();
+  return getJson<ApfActivity>(`/api/v1/apf/activity${qs ? `?${qs}` : ""}`);
+}
+
+export async function bulkInviteSubstitutes(
+  invitees: BulkInviteEntry[],
+): Promise<BulkInviteResult> {
+  return postJson<BulkInviteResult>("/api/v1/apf/substitutes/invite", { invitees });
+}
+
+export async function recomputeReliability(): Promise<{ updated: number }> {
+  return postJson<{ updated: number }>("/api/v1/apf/substitutes/recompute-reliability");
+}
+
+export async function createApfExport(payload: ApfExportRequest): Promise<ApfExportJob> {
+  return postJson<ApfExportJob>("/api/v1/apf/export", payload);
+}
+
+export async function getApfExportJob(jobId: string): Promise<ApfExportJob> {
+  return getJson<ApfExportJob>(`/api/v1/apf/export/${jobId}`);
+}
+
+export async function createAdminRequest(payload: Record<string, unknown>): Promise<StaffingRequest> {
+  return postJson<StaffingRequest>("/api/v1/admin/requests", payload);
+}
+
+export async function patchAdminRequest(
+  requestId: string,
+  partial: Record<string, unknown>,
+): Promise<StaffingRequest> {
+  return patchJson<StaffingRequest>(`/api/v1/admin/requests/${requestId}`, partial);
+}
+
+export async function publishAdminRequest(requestId: string): Promise<StaffingRequest> {
+  return postJson<StaffingRequest>(`/api/v1/requests/${requestId}/publish`);
+}
+
+export async function patchAdminOrganization(
+  organizationId: string,
+  partial: Record<string, unknown>,
+): Promise<AdminOrganizationSite> {
+  return patchJson<AdminOrganizationSite>(`/api/v1/admin/organizations/${organizationId}`, partial);
+}
+
+export async function fetchAdminRequestsIndex(
+  params: { tab?: string; siteId?: string; urgency?: string; language?: string; cursor?: string } = {},
+): Promise<AdminRequestsResponse> {
+  const search = new URLSearchParams();
+  if (params.tab) search.set("tab", params.tab);
+  if (params.siteId) search.set("site_id", params.siteId);
+  if (params.urgency && params.urgency !== "all") search.set("urgency", params.urgency);
+  if (params.language && params.language !== "all") search.set("language", params.language);
+  if (params.cursor) search.set("cursor", params.cursor);
+  const qs = search.toString();
+  return getJson<AdminRequestsResponse>(`/api/v1/admin/requests${qs ? `?${qs}` : ""}`);
+}
+
+export async function assignWorker(
+  staffingRequestId: string,
+  workerUserId: string,
+): Promise<Assignment> {
+  return postJson<Assignment>("/api/v1/assignments", {
+    staffing_request_id: staffingRequestId,
+    worker_user_id: workerUserId,
+    notes: "Assigned from requests index",
+  });
+}
+
+export async function fetchAdminActivity(
+  params: { filter?: AdminActivityFilter; cursor?: string; siteId?: string; limit?: number } = {},
+): Promise<AdminActivity> {
+  const search = new URLSearchParams();
+  if (params.filter && params.filter !== "all") search.set("filter", params.filter);
+  if (params.cursor) search.set("cursor", params.cursor);
+  if (params.siteId) search.set("site_id", params.siteId);
+  if (params.limit) search.set("limit", String(params.limit));
+  const qs = search.toString();
+  return getJson<AdminActivity>(`/api/v1/admin/activity${qs ? `?${qs}` : ""}`);
+}
+
+export async function cancelRequest(requestId: string, reason: string): Promise<StaffingRequest> {
+  return postJson<StaffingRequest>(`/api/v1/requests/${requestId}/cancel`, { reason });
+}
+
+export async function renotifyRequest(requestId: string): Promise<StaffingRequest> {
+  return postJson<StaffingRequest>(`/api/v1/requests/${requestId}/renotify`, {});
+}
+
+export async function notifyWorkers(
+  requestId: string,
+  workerUserIds: string[],
+): Promise<{ newly_notified: number }> {
+  return postJson<{ newly_notified: number }>(`/api/v1/admin/requests/${requestId}/notify`, {
+    worker_user_ids: workerUserIds,
+  });
+}
+
+export async function rankAdminSubstitutes(
+  rankAgainstDraftId: string,
+): Promise<AdminSubstitutesResponse> {
+  const search = new URLSearchParams({ rank_against_draft_id: rankAgainstDraftId });
+  return getJson<AdminSubstitutesResponse>(`/api/v1/admin/substitutes?${search.toString()}`);
+}
+
 export async function fetchWorkers(): Promise<Worker[]> {
   const data = await getJson<{ items: Worker[] }>("/api/v1/workers");
   return data.items;
@@ -83,6 +208,10 @@ export async function fetchWorker(workerId: string): Promise<Worker> {
 export async function fetchRequests(): Promise<StaffingRequest[]> {
   const data = await getJson<{ items: StaffingRequest[] }>("/api/v1/requests");
   return data.items;
+}
+
+export async function fetchRequest(requestId: string): Promise<StaffingRequest> {
+  return getJson<StaffingRequest>(`/api/v1/requests/${requestId}`);
 }
 
 export async function fetchRequestResponses(requestId: string): Promise<RequestResponse[]> {
@@ -140,6 +269,15 @@ export async function declineRequest(
   });
 }
 
+export async function withdrawRequest(
+  requestId: string,
+  workerUserId: string,
+): Promise<RequestResponse> {
+  return postJson<RequestResponse>(`/api/v1/requests/${requestId}/responses/withdraw`, {
+    worker_user_id: workerUserId,
+  });
+}
+
 export async function updateAvailability(
   workerId: string,
   status: "available" | "unavailable",
@@ -157,6 +295,8 @@ export async function updateWorkerPreferences(
   payload: {
     availability_status?: "available" | "unavailable";
     urgent_alert_opt_in?: boolean;
+    notify_far?: boolean;
+    notify_weekend_overnight?: boolean;
     supported_cities?: string[];
   },
 ): Promise<WorkerProfile> {
@@ -251,6 +391,42 @@ export async function inviteCoordinator(payload: {
   return postJson<Coordinator>("/api/v1/coordinators/invite", payload);
 }
 
+export async function checkInAssignment(
+  assignmentId: string,
+  coords?: { latitude: number; longitude: number },
+): Promise<Assignment> {
+  return postJson<Assignment>(`/api/v1/assignments/${assignmentId}/check-in`, coords ?? {});
+}
+
+export async function fetchAvailabilityGrid(
+  workerId: string,
+  weekStart: string,
+): Promise<AvailabilityGrid> {
+  const params = new URLSearchParams({ week_start: weekStart });
+  return getJson<AvailabilityGrid>(`/api/v1/workers/${workerId}/availability/grid?${params}`);
+}
+
+export async function saveAvailabilityGrid(
+  workerId: string,
+  weekStart: string,
+  cells: { specific_date: string; slot: SlotPeriod; available: boolean }[],
+): Promise<AvailabilityGrid> {
+  return postJson<AvailabilityGrid>(`/api/v1/workers/${workerId}/availability/grid`, {
+    week_start: weekStart,
+    cells,
+  });
+}
+
+export async function copyPreviousAvailabilityWeek(
+  workerId: string,
+  targetWeekStart: string,
+): Promise<AvailabilityGrid> {
+  return postJson<AvailabilityGrid>(
+    `/api/v1/workers/${workerId}/availability/grid/copy-previous`,
+    { target_week_start: targetWeekStart },
+  );
+}
+
 export async function onboardWorker(
   workerId: string,
   payload: {
@@ -259,6 +435,7 @@ export async function onboardWorker(
     supported_cities: string[];
     qualifications: string[];
     certifications: string[];
+    preferred_language?: string;
   },
 ): Promise<WorkerProfile> {
   return postJson<WorkerProfile>(`/api/v1/workers/${workerId}/onboard`, payload);

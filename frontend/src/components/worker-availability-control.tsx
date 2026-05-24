@@ -34,19 +34,21 @@ export function WorkerAvailabilityControl({
 
   return (
     <div style={{ display: "grid", gap: 6, justifyItems: "end" }}>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
         <button
           type="button"
           disabled={isPending}
           onClick={() => setNext("available")}
           style={{
-            border: 0,
+            border: status === "available" ? "1px solid var(--moss)" : "0.5px solid var(--line)",
             borderRadius: 999,
-            padding: "10px 14px",
-            background: status === "available" ? "#214639" : "#dbe4dd",
-            color: status === "available" ? "#f7f0df" : "#214639",
-            cursor: "pointer",
-            fontWeight: 700,
+            padding: "6px 12px",
+            background: status === "available" ? "var(--moss)" : "transparent",
+            color: status === "available" ? "#FFFFFF" : "var(--ink-2)",
+            cursor: isPending ? "wait" : "pointer",
+            fontWeight: 500,
+            fontSize: 12,
+            fontFamily: "inherit",
           }}
         >
           Available
@@ -56,19 +58,21 @@ export function WorkerAvailabilityControl({
           disabled={isPending}
           onClick={() => setNext("unavailable")}
           style={{
-            border: 0,
+            border: status === "unavailable" ? "1px solid var(--ink)" : "0.5px solid var(--line)",
             borderRadius: 999,
-            padding: "10px 14px",
-            background: status === "unavailable" ? "#7a473f" : "#eadfd7",
-            color: status === "unavailable" ? "#fff7ef" : "#7a473f",
-            cursor: "pointer",
-            fontWeight: 700,
+            padding: "6px 12px",
+            background: status === "unavailable" ? "var(--ink)" : "transparent",
+            color: status === "unavailable" ? "var(--paper)" : "var(--ink-2)",
+            cursor: isPending ? "wait" : "pointer",
+            fontWeight: 500,
+            fontSize: 12,
+            fontFamily: "inherit",
           }}
         >
           Unavailable
         </button>
       </div>
-      {error ? <span style={{ color: "#8c3f32", fontSize: 13, fontWeight: 700 }}>{error}</span> : null}
+      {error ? <span style={{ color: "var(--rose)", fontSize: 12, fontWeight: 600 }}>{error}</span> : null}
     </div>
   );
 }

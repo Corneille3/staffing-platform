@@ -77,3 +77,37 @@ class ResponseService:
         )
         self.db.commit()
         return saved
+
+    def withdraw(self, request_id: UUID, worker_user_id: UUID) -> RequestResponse:
+        staffing_request = self.request_repository.get(request_id)
+        if staffing_request is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Staffing request not found')
+        if staffing_request.status in {RequestStatus.CANCELLED, RequestStatus.COMPLETED, RequestStatus.ASSIGNED}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='Request is closed; withdraw not allowed',
+            )
+
+        response = self.response_repository.get_for_request_and_worker(request_id, worker_user_id)
+        if response is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Response not found')
+        if response.status != ResponseStatus.ACCEPTED:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='Only accepted responses can be withdrawn',
+            )
+
+        response.status = ResponseStatus.WITHDRAWN
+        response.responded_at = datetime.now(timezone.utc)
+        saved = self.response_repository.save(response)
+
+        self.audit_service.log(
+            action='request_response.withdrawn',
+            entity_type='request_response',
+            entity_id=saved.id,
+            actor_user_id=worker_user_id,
+            organization_id=staffing_request.organization_id,
+            payload={'staffing_request_id': str(request_id)},
+        )
+        self.db.commit()
+        return saved

@@ -1,7 +1,8 @@
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, Text, func
+from sqlalchemy import DateTime, ForeignKey, Numeric, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -24,6 +25,9 @@ class Assignment(Base):
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    checked_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    checked_in_latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+    checked_in_longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
     notes: Mapped[str | None] = mapped_column(Text)
 
     staffing_request = relationship('StaffingRequest', back_populates='assignment')

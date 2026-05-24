@@ -18,7 +18,10 @@ class StaffingRequestRepository:
     def _base_stmt(self):
         return (
             select(StaffingRequest)
-            .options(selectinload(StaffingRequest.requirements))
+            .options(
+                selectinload(StaffingRequest.requirements),
+                selectinload(StaffingRequest.organization),
+            )
             .order_by(StaffingRequest.created_at.desc())
         )
 
@@ -53,7 +56,10 @@ class StaffingRequestRepository:
         stmt = (
             select(StaffingRequest)
             .where(StaffingRequest.id == request_id)
-            .options(selectinload(StaffingRequest.requirements))
+            .options(
+                selectinload(StaffingRequest.requirements),
+                selectinload(StaffingRequest.organization),
+            )
         )
         return self.db.scalar(stmt)
 

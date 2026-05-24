@@ -1,12 +1,23 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import {
+  AdminActivity,
+  AdminActivityFilter,
+  AdminDashboard,
+  AdminOrganizationSite,
+  AdminRequestsResponse,
+  AdminSubstitutesResponse,
+  ApfActivity,
+  ApfActivityFilter,
+  ApfSnapshot,
   Assignment,
   AuditLog,
   Coordinator,
   NetworkOverview,
+  NetworkPool,
   NetworkSummary,
   Organization,
+  OrgSnapshot,
   RequestResponse,
   StaffingRequest,
   User,
@@ -140,6 +151,39 @@ export async function getOrganizations(): Promise<Organization[]> {
   return response.items;
 }
 
+export async function getAdminOrganizations(): Promise<AdminOrganizationSite[]> {
+  const response = await fetchJson<{ items: AdminOrganizationSite[] }>("/api/v1/admin/organizations");
+  return response.items;
+}
+
+export async function getAdminDashboard(): Promise<AdminDashboard> {
+  return fetchJson<AdminDashboard>("/api/v1/admin/dashboard");
+}
+
+export async function getAdminRequestsIndex(
+  params: { tab?: string; siteId?: string; urgency?: string; language?: string } = {},
+): Promise<AdminRequestsResponse> {
+  const search = new URLSearchParams();
+  if (params.tab) search.set("tab", params.tab);
+  if (params.siteId) search.set("site_id", params.siteId);
+  if (params.urgency && params.urgency !== "all") search.set("urgency", params.urgency);
+  if (params.language && params.language !== "all") search.set("language", params.language);
+  const qs = search.toString();
+  return fetchJson<AdminRequestsResponse>(`/api/v1/admin/requests${qs ? `?${qs}` : ""}`);
+}
+
+export async function getAdminActivity(
+  params: { filter?: AdminActivityFilter; siteId?: string; from?: string; to?: string } = {},
+): Promise<AdminActivity> {
+  const search = new URLSearchParams();
+  if (params.filter && params.filter !== "all") search.set("filter", params.filter);
+  if (params.siteId) search.set("site_id", params.siteId);
+  if (params.from) search.set("from", params.from);
+  if (params.to) search.set("to", params.to);
+  const qs = search.toString();
+  return fetchJson<AdminActivity>(`/api/v1/admin/activity${qs ? `?${qs}` : ""}`);
+}
+
 export async function getWorkers(): Promise<Worker[]> {
   const response = await fetchJson<{ items: Worker[] }>("/api/v1/workers");
   return response.items;
@@ -173,6 +217,41 @@ export async function getAssignments(): Promise<Assignment[]> {
 
 export async function getNetworkOverview(): Promise<NetworkOverview> {
   return fetchJson<NetworkOverview>("/api/v1/reports/network-overview");
+}
+
+export async function getApfSnapshot(): Promise<ApfSnapshot> {
+  return fetchJson<ApfSnapshot>("/api/v1/apf/snapshot");
+}
+
+export async function getApfActivity(
+  params: { filter?: ApfActivityFilter; cursor?: string; limit?: number; orgId?: string } = {},
+): Promise<ApfActivity> {
+  const search = new URLSearchParams();
+  if (params.filter && params.filter !== "all") search.set("filter", params.filter);
+  if (params.cursor) search.set("cursor", params.cursor);
+  if (params.limit) search.set("limit", String(params.limit));
+  if (params.orgId) search.set("org_id", params.orgId);
+  const qs = search.toString();
+  return fetchJson<ApfActivity>(`/api/v1/apf/activity${qs ? `?${qs}` : ""}`);
+}
+
+export async function getApfNetworkPool(): Promise<NetworkPool> {
+  return fetchJson<NetworkPool>("/api/v1/apf/substitutes");
+}
+
+export async function getApfOrgSnapshot(orgId: string): Promise<OrgSnapshot> {
+  return fetchJson<OrgSnapshot>(`/api/v1/apf/organizations/${orgId}/snapshot`);
+}
+
+export async function getAdminSubstitutes(
+  params: { rankAgainstRequestId?: string } = {},
+): Promise<AdminSubstitutesResponse> {
+  const search = new URLSearchParams();
+  if (params.rankAgainstRequestId) search.set("rank_against_request_id", params.rankAgainstRequestId);
+  const qs = search.toString();
+  return fetchJson<AdminSubstitutesResponse>(
+    `/api/v1/admin/substitutes${qs ? `?${qs}` : ""}`,
+  );
 }
 
 export async function getAuditLogs(): Promise<AuditLog[]> {

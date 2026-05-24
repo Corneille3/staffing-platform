@@ -16,9 +16,10 @@ interface ChipProps {
   dot?: boolean;
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
 }
 
-export function Chip({ variant = "default", dot = false, children, className }: ChipProps) {
+export function Chip({ variant = "default", dot = false, children, className, style }: ChipProps) {
   return (
     <span
       className={className}
@@ -31,6 +32,7 @@ export function Chip({ variant = "default", dot = false, children, className }: 
         fontSize: 11,
         fontWeight: 500,
         ...variantStyles[variant],
+        ...style,
       }}
     >
       {dot && (

@@ -18,6 +18,7 @@ CREATE TYPE coverage_type AS ENUM ('same_day_urgent', 'planned_absence', 'recurr
 
 CREATE TABLE organizations (
     id UUID PRIMARY KEY,
+    parent_organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
     name VARCHAR(255) NOT NULL,
     type organization_type NOT NULL,
     city VARCHAR(100) NOT NULL,
@@ -29,6 +30,9 @@ CREATE TABLE organizations (
     contact_phone VARCHAR(50),
     preferred_language VARCHAR(5) NOT NULL DEFAULT 'fr',
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    capacity INTEGER,
+    enrolled_count INTEGER,
+    hours_label VARCHAR(120),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -64,6 +68,7 @@ CREATE TABLE worker_profiles (
     urgent_alert_opt_in BOOLEAN NOT NULL DEFAULT TRUE,
     travel_radius_km INTEGER,
     notes TEXT,
+    reliability INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

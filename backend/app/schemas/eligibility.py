@@ -23,4 +23,5 @@ class EligibilityReason(BaseModel):
 
 class EligibilityResult(BaseModel):
     eligible: bool
+    score: int  # 0-100, percentage of checks that matched
     reasons: list[EligibilityReason]

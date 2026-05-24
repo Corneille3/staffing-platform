@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { useAuth } from "@clerk/nextjs";
+import { CheckCircle2 } from "lucide-react";
 import { availabilityStatusLabel } from "../lib/status-labels";
+import { Eyebrow } from "./ui";
 import { Assignment, RequestResponse, StaffingRequest, User, Worker } from "../lib/types";
 
 const browserApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+type ClerkLike = { session?: { getToken: () => Promise<string | null> } };
 
 function formatStatus(value: string) {
   return value.replace(/_/g, " ");
@@ -25,12 +28,12 @@ function workerResponseLabel(status: string): string {
 }
 
 const RESPONSE_PALETTE: Record<string, { bg: string; chip: string; chipColor: string; label: string }> = {
-  notified:    { bg: "#f0ede4", chip: "#e4ddd0", chipColor: "#5d4c37",  label: "Awaiting reply" },
-  viewed:      { bg: "#e8f0ee", chip: "#b8d8d0", chipColor: "#1f4e43",  label: "Viewed — no reply yet" },
-  accepted:    { bg: "#e2f1e8", chip: "#b8dfc3", chipColor: "#1a4a2e",  label: "Accepted" },
-  declined:    { bg: "#f8e8e4", chip: "#f0c8c0", chipColor: "#7a3526",  label: "Declined" },
-  no_response: { bg: "#eeecea", chip: "#dcdad6", chipColor: "#6b6b64",  label: "No response" },
-  withdrawn:   { bg: "#eeecea", chip: "#dcdad6", chipColor: "#6b6b64",  label: "Withdrawn" },
+  notified:    { bg: "var(--paper-2)",  chip: "var(--sand-soft)",  chipColor: "#8C6B14",      label: "Awaiting reply" },
+  viewed:      { bg: "var(--paper-2)",  chip: "var(--sand-soft)",  chipColor: "#8C6B14",      label: "Viewed — no reply yet" },
+  accepted:    { bg: "var(--moss-soft)", chip: "var(--moss)",      chipColor: "#FFFFFF",      label: "Accepted" },
+  declined:    { bg: "var(--rose-soft)", chip: "var(--rose-soft)", chipColor: "var(--rose)",  label: "Declined" },
+  no_response: { bg: "var(--paper-2)",  chip: "var(--line)",       chipColor: "var(--ink-3)", label: "No response" },
+  withdrawn:   { bg: "var(--paper-2)",  chip: "var(--line)",       chipColor: "var(--ink-3)", label: "Withdrawn" },
 };
 
 const COVERAGE_TYPE_LABELS: Record<string, string> = {
@@ -61,7 +64,6 @@ export function RequestWorkflowCard({
   assignment: Assignment | null;
 }) {
   const router = useRouter();
-  const { getToken } = useAuth();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [cancelAssignmentOpen, setCancelAssignmentOpen] = useState(false);
@@ -77,7 +79,10 @@ export function RequestWorkflowCard({
 
   async function post(path: string, payload?: object) {
     setError(null);
-    const token = await getToken();
+    let token: string | null = null;
+    if (CLERK_ENABLED && typeof window !== "undefined") {
+      token = (await (window as unknown as { Clerk?: ClerkLike }).Clerk?.session?.getToken()) ?? null;
+    }
     const response = await fetch(`${browserApiBaseUrl}${path}`, {
       method: "POST",
       headers: {
@@ -101,37 +106,42 @@ export function RequestWorkflowCard({
   return (
     <article
       style={{
-        borderRadius: 22,
-        padding: 20,
-        background: "#fffdf7",
-        border: "1px solid rgba(24, 50, 41, 0.1)",
+        borderRadius: 18,
+        padding: 22,
+        background: "var(--card)",
+        border: "0.5px solid var(--line)",
         display: "grid",
-        gap: 16,
+        gap: 18,
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 24 }}>{request.title}</h2>
-          <p style={{ margin: "8px 0 0", color: "#496158" }}>
-            {request.city} · {request.work_date} · {request.start_time.slice(0, 5)} - {request.end_time.slice(0, 5)}
+          <h2 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 24, lineHeight: 1.1, fontWeight: 400 }}>
+            {request.title}
+          </h2>
+          <p style={{ margin: "8px 0 0", color: "var(--ink-2)", fontSize: 13 }}>
+            {request.city} · {request.work_date} · {request.start_time.slice(0, 5)} – {request.end_time.slice(0, 5)}
           </p>
         </div>
         <span
           style={{
+            display: "inline-flex",
+            alignItems: "center",
             borderRadius: 999,
-            padding: "6px 12px",
-            background: request.status === "assigned" ? "#d2ead8" : "#efe3b9",
-            fontSize: 12,
-            fontWeight: 700,
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
+            padding: "5px 11px",
+            background: request.status === "assigned" ? "var(--moss-soft)" : "var(--sand-soft)",
+            color: request.status === "assigned" ? "var(--moss)" : "#8C6B14",
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: "0.04em",
+            whiteSpace: "nowrap",
           }}
         >
           {formatStatus(request.status)}
         </span>
       </div>
 
-      <div style={{ color: "#3d564c", display: "grid", gap: 6 }}>
+      <div style={{ color: "var(--ink-2)", display: "grid", gap: 6, fontSize: 13, lineHeight: 1.5 }}>
         <span>{request.description || "No additional notes."}</span>
         <span>
           {request.coverage_type ? `${COVERAGE_TYPE_LABELS[request.coverage_type] ?? request.coverage_type} · ` : ""}
@@ -141,22 +151,27 @@ export function RequestWorkflowCard({
         <span>Required certifications: {request.required_certifications?.join(", ") || "none"}</span>
         {assignedWorker ? (
           <span>
-            Assigned to: {assignedWorker.first_name} {assignedWorker.last_name}
+            Assigned to: <strong style={{ color: "var(--ink)" }}>{assignedWorker.first_name} {assignedWorker.last_name}</strong>
             {assignment ? ` · ${formatStatus(assignment.status)}` : ""}
           </span>
         ) : null}
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         <Link
           href={`/admin/requests/${request.id}`}
           style={{
-            borderRadius: 999,
-            padding: "12px 16px",
-            background: "#e4eadf",
-            color: "#183229",
+            display: "inline-flex",
+            alignItems: "center",
+            borderRadius: 12,
+            padding: "10px 16px",
+            background: "var(--card)",
+            border: "0.5px solid var(--line)",
+            color: "var(--ink)",
             textDecoration: "none",
-            fontWeight: 700,
+            fontWeight: 500,
+            fontSize: 13,
+            minHeight: 40,
           }}
         >
           Open detail
@@ -168,12 +183,15 @@ export function RequestWorkflowCard({
             onClick={() => post(`/api/v1/requests/${request.id}/publish`)}
             style={{
               border: 0,
-              borderRadius: 999,
-              padding: "12px 16px",
-              background: "#183229",
-              color: "#f7f0df",
-              cursor: "pointer",
-              fontWeight: 700,
+              borderRadius: 12,
+              padding: "10px 16px",
+              background: "var(--ink)",
+              color: "var(--paper)",
+              cursor: isPending ? "wait" : "pointer",
+              fontWeight: 500,
+              fontSize: 13,
+              fontFamily: "inherit",
+              minHeight: 40,
             }}
           >
             Publish request
@@ -186,12 +204,15 @@ export function RequestWorkflowCard({
             onClick={() => post(`/api/v1/requests/${request.id}/renotify`)}
             style={{
               border: 0,
-              borderRadius: 999,
-              padding: "12px 16px",
-              background: "#3d6b5a",
-              color: "#f7f0df",
-              cursor: "pointer",
-              fontWeight: 700,
+              borderRadius: 12,
+              padding: "10px 16px",
+              background: "var(--moss)",
+              color: "#FFFFFF",
+              cursor: isPending ? "wait" : "pointer",
+              fontWeight: 500,
+              fontSize: 13,
+              fontFamily: "inherit",
+              minHeight: 40,
             }}
           >
             Re-notify workers
@@ -203,13 +224,16 @@ export function RequestWorkflowCard({
             disabled={isPending}
             onClick={() => post(`/api/v1/requests/${request.id}/cancel`)}
             style={{
-              border: 0,
-              borderRadius: 999,
-              padding: "12px 16px",
-              background: "#eadfd7",
-              color: "#7a473f",
-              cursor: "pointer",
-              fontWeight: 700,
+              border: "0.5px solid var(--line)",
+              borderRadius: 12,
+              padding: "10px 16px",
+              background: "transparent",
+              color: "var(--rose)",
+              cursor: isPending ? "wait" : "pointer",
+              fontWeight: 500,
+              fontSize: 13,
+              fontFamily: "inherit",
+              minHeight: 40,
             }}
           >
             Cancel request
@@ -218,7 +242,7 @@ export function RequestWorkflowCard({
       </div>
 
       {error ? (
-        <p style={{ margin: 0, color: "#8c3f32", fontWeight: 700 }}>
+        <p style={{ margin: 0, color: "var(--rose)", fontWeight: 600, fontSize: 13 }}>
           {error}
         </p>
       ) : null}
@@ -233,9 +257,9 @@ export function RequestWorkflowCard({
       ) : null}
 
       <div style={{ display: "grid", gap: 10 }}>
-        <strong style={{ fontSize: 18 }}>Substitute responses</strong>
+        <Eyebrow>Substitute responses</Eyebrow>
         {responses.length === 0 ? (
-          <p style={{ margin: 0, color: "#5d6d66", fontSize: 14 }}>
+          <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>
             No substitutes have been notified yet.
           </p>
         ) : (
@@ -246,20 +270,21 @@ export function RequestWorkflowCard({
               <div
                 key={response.id}
                 style={{
-                  borderRadius: 16,
+                  borderRadius: 14,
                   padding: 14,
                   background: palette.bg,
+                  border: "0.5px solid var(--line)",
                   display: "grid",
                   gap: 8,
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "start" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
                   <div>
-                    <strong style={{ fontSize: 15 }}>
+                    <strong style={{ fontSize: 14, fontWeight: 600 }}>
                       {user ? `${user.first_name} ${user.last_name}` : "Unknown substitute"}
                     </strong>
                     {user ? (
-                      <div style={{ fontSize: 12, color: "#6b8179", marginTop: 2 }}>{user.email}</div>
+                      <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>{user.email}</div>
                     ) : null}
                   </div>
                   <span
@@ -269,9 +294,8 @@ export function RequestWorkflowCard({
                       background: palette.chip,
                       color: palette.chipColor,
                       fontSize: 11,
-                      fontWeight: 800,
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
+                      fontWeight: 600,
+                      letterSpacing: "0.03em",
                       whiteSpace: "nowrap",
                     }}
                   >
@@ -279,12 +303,12 @@ export function RequestWorkflowCard({
                   </span>
                 </div>
                 {response.viewed_at ? (
-                  <div style={{ fontSize: 12, color: "#6b8179" }}>
+                  <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
                     Viewed {response.viewed_at.slice(0, 16).replace("T", " ")}
                   </div>
                 ) : null}
                 {response.decline_reason ? (
-                  <div style={{ fontSize: 13, color: "#7a3526" }}>
+                  <div style={{ fontSize: 13, color: "var(--rose)" }}>
                     Reason: {response.decline_reason}
                   </div>
                 ) : null}
@@ -300,14 +324,16 @@ export function RequestWorkflowCard({
                       }
                       style={{
                         border: 0,
-                        borderRadius: 999,
+                        borderRadius: 10,
                         padding: "8px 14px",
-                        background: "#214639",
-                        color: "#f7f0df",
+                        background: "var(--moss)",
+                        color: "#FFFFFF",
                         cursor: response.status === "accepted" ? "default" : "pointer",
-                        fontWeight: 700,
+                        fontWeight: 500,
                         fontSize: 13,
+                        fontFamily: "inherit",
                         opacity: response.status === "accepted" ? 0.4 : 1,
+                        minHeight: 36,
                       }}
                     >
                       Accept
@@ -321,15 +347,17 @@ export function RequestWorkflowCard({
                         })
                       }
                       style={{
-                        border: 0,
-                        borderRadius: 999,
+                        border: "0.5px solid var(--line)",
+                        borderRadius: 10,
                         padding: "8px 14px",
-                        background: "#eadfd7",
-                        color: "#7a473f",
+                        background: "transparent",
+                        color: "var(--rose)",
                         cursor: response.status === "declined" ? "default" : "pointer",
-                        fontWeight: 700,
+                        fontWeight: 500,
                         fontSize: 13,
+                        fontFamily: "inherit",
                         opacity: response.status === "declined" ? 0.4 : 1,
+                        minHeight: 36,
                       }}
                     >
                       Decline
@@ -344,7 +372,7 @@ export function RequestWorkflowCard({
 
       {request.status !== "assigned" && acceptedResponses.length > 0 && orgAdmin ? (
         <div style={{ display: "grid", gap: 12 }}>
-          <strong style={{ fontSize: 18 }}>Review accepted workers</strong>
+          <Eyebrow>Review accepted workers</Eyebrow>
           {acceptedResponses.map((response) => {
             const worker = workers.find((item) => item.id === response.worker_user_id);
             if (!worker) return null;
@@ -369,11 +397,13 @@ export function RequestWorkflowCard({
       ) : request.status !== "assigned" && responses.length > 0 ? (
         <div
           style={{
-            padding: 16,
-            borderRadius: 18,
-            background: "#f7f1e4",
-            color: "#5d4c37",
-            fontWeight: 700,
+            padding: 14,
+            borderRadius: 12,
+            background: "var(--sand-soft)",
+            color: "#8C6B14",
+            fontSize: 13,
+            fontWeight: 500,
+            border: "0.5px solid #E6D08F",
           }}
         >
           Assignment opens after at least one notified worker accepts.
@@ -422,32 +452,43 @@ function AssignedWorkerCard({
   return (
     <article
       style={{
-        borderRadius: 18,
+        borderRadius: 14,
         padding: 16,
-        background: "#e2ebdd",
+        background: "var(--moss-soft)",
+        border: "0.5px solid #C8DCC1",
         display: "grid",
         gap: 14,
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
         <div>
-          <strong style={{ display: "block", fontSize: 18 }}>
-            Assigned substitute: {worker.first_name} {worker.last_name}
+          <Eyebrow style={{ color: "var(--moss)", marginBottom: 4 }}>Assigned substitute</Eyebrow>
+          <strong style={{ display: "block", fontSize: 16, fontWeight: 600 }}>
+            {worker.first_name} {worker.last_name}
           </strong>
-          <span style={{ display: "block", marginTop: 4, color: "#496158", fontSize: 14 }}>
+          <span style={{ display: "block", marginTop: 2, color: "var(--ink-2)", fontSize: 13 }}>
             {worker.email}
           </span>
         </div>
         <StatusChip label={formatStatus(assignment.status)} tone="good" />
       </div>
 
-      <div style={{ display: "grid", gap: 8, color: "#314c42", fontSize: 14 }}>
-        <span><strong>Availability:</strong> {profile ? availabilityStatusLabel(profile.availability_status) : "no profile"}</span>
-        <span><strong>Language:</strong> {worker.preferred_language}</span>
-        <span><strong>Cities:</strong> {profile?.supported_cities.join(", ") || "none"}</span>
-        <span><strong>Qualifications:</strong> {profile?.qualifications.join(", ") || "none"}</span>
-        <span><strong>Certifications:</strong> {profile?.certifications.join(", ") || "none"}</span>
-        <span><strong>Assigned at:</strong> {assignment.assigned_at.slice(0, 16).replace("T", " ")}</span>
+      <div style={{ display: "grid", gap: 6, color: "var(--ink-2)", fontSize: 13 }}>
+        <span><strong style={{ color: "var(--ink)" }}>Availability:</strong> {profile ? availabilityStatusLabel(profile.availability_status) : "no profile"}</span>
+        <span><strong style={{ color: "var(--ink)" }}>Language:</strong> {worker.preferred_language}</span>
+        <span><strong style={{ color: "var(--ink)" }}>Cities:</strong> {profile?.supported_cities.join(", ") || "none"}</span>
+        <span><strong style={{ color: "var(--ink)" }}>Qualifications:</strong> {profile?.qualifications.join(", ") || "none"}</span>
+        <span><strong style={{ color: "var(--ink)" }}>Certifications:</strong> {profile?.certifications.join(", ") || "none"}</span>
+        <span><strong style={{ color: "var(--ink)" }}>Assigned at:</strong> {assignment.assigned_at.slice(0, 16).replace("T", " ")}</span>
+        {assignment.checked_in_at ? (
+          <span style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--moss)", fontWeight: 600 }}>
+            <CheckCircle2 size={14} strokeWidth={2.5} />
+            Checked in at {assignment.checked_in_at.slice(0, 16).replace("T", " ")}
+            {assignment.checked_in_latitude && assignment.checked_in_longitude ? " · location recorded" : ""}
+          </span>
+        ) : (
+          <span style={{ color: "var(--ink-3)" }}><strong style={{ color: "var(--ink)" }}>Check-in:</strong> not checked in yet</span>
+        )}
       </div>
 
       <button
@@ -455,13 +496,16 @@ function AssignedWorkerCard({
         disabled={disabled}
         onClick={onCancel}
         style={{
-          border: 0,
-          borderRadius: 999,
-          padding: "12px 16px",
-          background: "#eadfd7",
-          color: "#7a473f",
+          border: "0.5px solid var(--line)",
+          borderRadius: 10,
+          padding: "10px 16px",
+          background: "transparent",
+          color: "var(--rose)",
           cursor: disabled ? "wait" : "pointer",
-          fontWeight: 800,
+          fontWeight: 500,
+          fontSize: 13,
+          fontFamily: "inherit",
+          minHeight: 40,
         }}
       >
         Cancel assignment
@@ -497,42 +541,47 @@ function CancelAssignmentModal({
         position: "fixed",
         inset: 0,
         zIndex: 50,
-        background: "rgba(24, 50, 41, 0.35)",
+        background: "rgba(21, 20, 15, 0.4)",
         display: "grid",
         placeItems: "center",
         padding: 18,
       }}
+      onClick={onClose}
     >
       <section
+        onClick={(e) => e.stopPropagation()}
         style={{
           width: "min(100%, 460px)",
-          borderRadius: 22,
-          padding: 20,
-          background: "#fffdf7",
-          boxShadow: "0 18px 40px rgba(24, 50, 41, 0.22)",
+          borderRadius: 18,
+          padding: 22,
+          background: "var(--paper)",
+          boxShadow: "0 24px 60px rgba(21, 20, 15, 0.25)",
           display: "grid",
           gap: 16,
         }}
       >
         <div>
-          <h3 style={{ margin: 0, fontSize: 22 }}>Cancel assignment</h3>
-          <p style={{ margin: "8px 0 0", color: "#496158", lineHeight: 1.45 }}>
+          <h3 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 22, lineHeight: 1.15, fontWeight: 400 }}>
+            Cancel assignment
+          </h3>
+          <p style={{ margin: "8px 0 0", color: "var(--ink-2)", fontSize: 13, lineHeight: 1.5 }}>
             Cancel the confirmed shift for {workerName}. The request will reopen for coordinator review.
           </p>
         </div>
 
-        <label style={{ display: "grid", gap: 8, color: "#314c42", fontWeight: 800 }}>
+        <label style={{ display: "grid", gap: 8, color: "var(--ink)", fontWeight: 500, fontSize: 13 }}>
           Reason
           <select
             value={reason}
             onChange={(event) => onReasonChange(event.target.value)}
             style={{
-              borderRadius: 12,
-              border: "1px solid rgba(24, 50, 41, 0.18)",
-              padding: "12px 14px",
+              borderRadius: 10,
+              border: "0.5px solid var(--line)",
+              padding: "11px 14px",
               background: "#fff",
-              color: "#183229",
+              color: "var(--ink)",
               font: "inherit",
+              fontSize: 14,
             }}
           >
             {ASSIGNMENT_CANCELLATION_REASONS.map((item) => (
@@ -543,7 +592,7 @@ function CancelAssignmentModal({
           </select>
         </label>
 
-        <label style={{ display: "grid", gap: 8, color: "#314c42", fontWeight: 800 }}>
+        <label style={{ display: "grid", gap: 8, color: "var(--ink)", fontWeight: 500, fontSize: 13 }}>
           Notes
           <textarea
             value={notes}
@@ -551,30 +600,34 @@ function CancelAssignmentModal({
             rows={4}
             placeholder="Optional details"
             style={{
-              borderRadius: 12,
-              border: "1px solid rgba(24, 50, 41, 0.18)",
-              padding: "12px 14px",
+              borderRadius: 10,
+              border: "0.5px solid var(--line)",
+              padding: "11px 14px",
               background: "#fff",
-              color: "#183229",
+              color: "var(--ink)",
               font: "inherit",
+              fontSize: 14,
               resize: "vertical",
             }}
           />
         </label>
 
-        <div style={{ display: "flex", justifyContent: "end", gap: 10 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <button
             type="button"
             disabled={disabled}
             onClick={onClose}
             style={{
-              border: 0,
-              borderRadius: 999,
-              padding: "12px 16px",
-              background: "#e4eadf",
-              color: "#183229",
+              border: "0.5px solid var(--line)",
+              borderRadius: 12,
+              padding: "11px 16px",
+              background: "transparent",
+              color: "var(--ink)",
               cursor: disabled ? "wait" : "pointer",
-              fontWeight: 800,
+              fontWeight: 500,
+              fontSize: 13,
+              fontFamily: "inherit",
+              minHeight: 40,
             }}
           >
             Keep assignment
@@ -585,12 +638,15 @@ function CancelAssignmentModal({
             onClick={onConfirm}
             style={{
               border: 0,
-              borderRadius: 999,
-              padding: "12px 16px",
-              background: "#7a3526",
-              color: "#fffdf7",
+              borderRadius: 12,
+              padding: "11px 16px",
+              background: "var(--rose)",
+              color: "var(--paper)",
               cursor: disabled ? "wait" : "pointer",
-              fontWeight: 800,
+              fontWeight: 500,
+              fontSize: 13,
+              fontFamily: "inherit",
+              minHeight: 40,
             }}
           >
             Cancel assignment
@@ -621,19 +677,20 @@ function WorkerReviewCard({
   return (
     <article
       style={{
-        borderRadius: 18,
+        borderRadius: 14,
         padding: 16,
-        background: "#e2ebdd",
+        background: "var(--moss-soft)",
+        border: "0.5px solid #C8DCC1",
         display: "grid",
         gap: 14,
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
         <div>
-          <strong style={{ display: "block", fontSize: 18 }}>
+          <strong style={{ display: "block", fontSize: 16, fontWeight: 600 }}>
             {worker.first_name} {worker.last_name}
           </strong>
-          <span style={{ display: "block", marginTop: 4, color: "#496158", fontSize: 14 }}>
+          <span style={{ display: "block", marginTop: 2, color: "var(--ink-2)", fontSize: 13 }}>
             {worker.email}
           </span>
         </div>
@@ -643,14 +700,14 @@ function WorkerReviewCard({
         />
       </div>
 
-      <div style={{ display: "grid", gap: 8, color: "#314c42", fontSize: 14 }}>
-        <span><strong>Language:</strong> {worker.preferred_language}</span>
-        <span><strong>Cities:</strong> {profile?.supported_cities.join(", ") || "none"}</span>
-        <span><strong>Qualifications:</strong> {profile?.qualifications.join(", ") || "none"}</span>
-        <span><strong>Certifications:</strong> {profile?.certifications.join(", ") || "none"}</span>
+      <div style={{ display: "grid", gap: 6, color: "var(--ink-2)", fontSize: 13 }}>
+        <span><strong style={{ color: "var(--ink)" }}>Language:</strong> {worker.preferred_language}</span>
+        <span><strong style={{ color: "var(--ink)" }}>Cities:</strong> {profile?.supported_cities.join(", ") || "none"}</span>
+        <span><strong style={{ color: "var(--ink)" }}>Qualifications:</strong> {profile?.qualifications.join(", ") || "none"}</span>
+        <span><strong style={{ color: "var(--ink)" }}>Certifications:</strong> {profile?.certifications.join(", ") || "none"}</span>
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         <StatusChip label={cityMatches ? "City match" : `Missing: ${request.city}`} tone={cityMatches ? "good" : "warn"} />
         <StatusChip label={languageMatches ? "Language match" : `Missing: ${request.language_requirement}`} tone={languageMatches ? "good" : "warn"} />
         {missingQualification.length === 0 ? (
@@ -671,12 +728,15 @@ function WorkerReviewCard({
         onClick={onConfirm}
         style={{
           border: 0,
-          borderRadius: 999,
-          padding: "12px 16px",
-          background: "#183229",
-          color: "#f7f0df",
+          borderRadius: 12,
+          padding: "11px 16px",
+          background: "var(--ink)",
+          color: "var(--paper)",
           cursor: disabled ? "wait" : "pointer",
-          fontWeight: 800,
+          fontWeight: 500,
+          fontSize: 14,
+          fontFamily: "inherit",
+          minHeight: 44,
         }}
       >
         Confirm this substitute
@@ -689,13 +749,15 @@ function StatusChip({ label, tone }: { label: string; tone: "good" | "warn" }) {
   return (
     <span
       style={{
+        display: "inline-flex",
+        alignItems: "center",
         borderRadius: 999,
-        padding: "6px 10px",
-        background: tone === "good" ? "#d2ead8" : "#f4d4cc",
-        color: tone === "good" ? "#214639" : "#7a3526",
-        fontSize: 12,
-        fontWeight: 800,
-        textTransform: "capitalize",
+        padding: "4px 10px",
+        background: tone === "good" ? "var(--moss)" : "var(--rose-soft)",
+        color: tone === "good" ? "#FFFFFF" : "var(--rose)",
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: "0.03em",
       }}
     >
       {label}

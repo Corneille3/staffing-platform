@@ -25,3 +25,4 @@ class User(Base):
 
     worker_profile = relationship('WorkerProfile', back_populates='user', uselist=False)
     memberships = relationship('OrganizationMembership', back_populates='user')
+    availabilities = relationship('Availability', back_populates='user', cascade='all, delete-orphan')

@@ -2,7 +2,11 @@
 
 import { useClerk } from "@clerk/nextjs";
 
-export function HeaderSignOutButton() {
+interface Props {
+  tone?: "light" | "dark";
+}
+
+export function HeaderSignOutButton({ tone = "light" }: Props = {}) {
   const { signOut } = useClerk();
 
   async function handleSignOut() {
@@ -11,23 +15,21 @@ export function HeaderSignOutButton() {
     await signOut({ redirectUrl: "/sign-in" });
   }
 
+  const isDark = tone === "dark";
   return (
     <button
       type="button"
       onClick={handleSignOut}
       style={{
         background: "transparent",
-        border: "1px solid currentColor",
+        border: `0.5px solid ${isDark ? "rgba(229, 225, 211, 0.32)" : "var(--line)"}`,
         borderRadius: 999,
         padding: "8px 14px",
-        color: "inherit",
+        color: isDark ? "var(--paper)" : "var(--ink-2)",
         font: "inherit",
         fontSize: 13,
-        fontWeight: 700,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
+        fontWeight: 500,
         cursor: "pointer",
-        opacity: 0.85,
       }}
     >
       Sign out

@@ -2,41 +2,80 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Activity, Briefcase, History, User as UserIcon, Zap } from "lucide-react";
+import type { ComponentType } from "react";
 
-const links = [
-  { href: "/admin", label: "Coverage Desk" },
-  { href: "/admin/organizations", label: "Organizations" },
-  { href: "/admin/workers", label: "Substitutes" },
-  { href: "/admin/requests", label: "Requests" },
+interface NavItem {
+  href: string;
+  label: string;
+  Icon: ComponentType<{ size?: number; strokeWidth?: number; color?: string }>;
+}
+
+const links: NavItem[] = [
+  { href: "/admin",               label: "Coverage Desk",  Icon: Activity },
+  { href: "/admin/requests",      label: "Requests",       Icon: Zap },
+  { href: "/admin/substitutes",   label: "Substitutes",    Icon: UserIcon },
+  { href: "/admin/organizations", label: "Organizations",  Icon: Briefcase },
+  { href: "/admin/activity",      label: "Activity",       Icon: History },
 ];
 
-export function AdminNavigation() {
+export function AdminNavigation({ openCount = 0 }: { openCount?: number }) {
   const pathname = usePathname();
+  // Strip any [locale] prefix so /en/admin/requests still matches /admin/requests.
+  const strippedPath = pathname.replace(/^\/(?:en|fr)(?=\/|$)/, "") || "/";
 
   return (
-    <nav style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-      {links.map((link) => {
+    <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {links.map(({ href, label, Icon }) => {
         const active =
-          pathname === link.href ||
-          (link.href !== "/admin" && pathname.startsWith(link.href));
+          strippedPath === href ||
+          (href !== "/admin" && strippedPath.startsWith(href));
 
         return (
           <Link
-            key={link.href}
-            href={link.href}
+            key={href}
+            href={href}
             style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "8px 10px",
+              borderRadius: 8,
               textDecoration: "none",
-              padding: "10px 16px",
-              borderRadius: 999,
-              background: active ? "#183229" : "rgba(24, 50, 41, 0.08)",
-              color: active ? "#f7f0df" : "#183229",
-              fontSize: 14,
-              fontWeight: 700,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
+              fontSize: 13,
+              fontWeight: active ? 500 : 400,
+              color: active ? "var(--ink)" : "var(--ink-2)",
+              background: active ? "var(--card)" : "transparent",
+              border: active ? "0.5px solid var(--line)" : "0.5px solid transparent",
+              transition: "color .12s, background .12s",
             }}
           >
-            {link.label}
+            <Icon
+              size={15}
+              strokeWidth={1.6}
+              color={active ? "var(--terra)" : "var(--ink-3)"}
+            />
+            <span>{label}</span>
+            {href === "/admin/requests" && openCount > 0 && (
+              <span
+                style={{
+                  marginLeft: "auto",
+                  minWidth: 18,
+                  height: 18,
+                  padding: "0 5px",
+                  borderRadius: 999,
+                  background: "var(--terra)",
+                  color: "#fff",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {openCount}
+              </span>
+            )}
           </Link>
         );
       })}

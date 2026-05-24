@@ -1,6 +1,12 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    admin_activity,
+    admin_dashboard,
+    admin_organizations,
+    admin_requests,
+    admin_substitutes,
+    apf,
     assignments,
     audit_logs,
     auth,
@@ -28,3 +34,9 @@ api_router.include_router(notifications.router, prefix='/notifications', tags=['
 api_router.include_router(reports.router, prefix='/reports', tags=['reports'])
 api_router.include_router(audit_logs.router, prefix='/audit-logs', tags=['audit_logs'])
 api_router.include_router(networks.router, prefix='/networks', tags=['networks'])
+api_router.include_router(apf.router, prefix='/apf', tags=['apf'])
+api_router.include_router(admin_substitutes.router, prefix='/admin/substitutes', tags=['admin'])
+api_router.include_router(admin_requests.router, prefix='/admin/requests', tags=['admin'])
+api_router.include_router(admin_organizations.router, prefix='/admin/organizations', tags=['admin'])
+api_router.include_router(admin_activity.router, prefix='/admin/activity', tags=['admin'])
+api_router.include_router(admin_dashboard.router, prefix='/admin/dashboard', tags=['admin'])
