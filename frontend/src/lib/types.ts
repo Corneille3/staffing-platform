@@ -237,6 +237,55 @@ export type AdminSubstitutesResponse = {
   rank_against: RankAgainstBrief | null;
 };
 
+export type AdminRequestMetrics = {
+  notified: number;
+  viewed: number;
+  accepted: number;
+  declined: number;
+  responses: number;
+};
+
+export type AdminRequestTopMatch = {
+  user_id: string;
+  name: string;
+  match_score: number | null;
+};
+
+export type AdminRequestAssignedWorker = {
+  user_id: string;
+  name: string;
+};
+
+export type AdminRequestSummary = {
+  id: string;
+  public_id: string;
+  urgent: boolean;
+  status: string;
+  role: string | null;
+  title: string;
+  organization_id: string;
+  work_date: string;
+  start_time: string;
+  end_time: string;
+  language_requirement: string | null;
+  required_qualifications: string[];
+  urgency_level: number;
+  created_at: string;
+  metrics: AdminRequestMetrics;
+  top_match: AdminRequestTopMatch | null;
+  assigned_worker: AdminRequestAssignedWorker | null;
+};
+
+export type AdminRequestCounts = { active: number; assigned: number; all: number };
+
+export type AdminRequestsResponse = {
+  items: AdminRequestSummary[];
+  counts: AdminRequestCounts;
+  next_cursor: string | null;
+};
+
+export type AdminRequestTab = "active" | "assigned" | "all";
+
 export type AdminActivityFilter =
   | "all"
   | "posted"

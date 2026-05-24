@@ -1,10 +1,44 @@
-"""Admin /admin/requests draft create + PATCH autosave."""
+"""Admin /admin/requests draft create + PATCH autosave + triage index."""
 from uuid import uuid4
 
 from app.models.enums import OrganizationType
 from app.models.organization import Organization
 from app.models.tenant import Tenant
 from app.tests.conftest import request_payload
+
+
+def _publish(client, seed):
+    rid = client.post('/api/v1/requests', json=request_payload(seed.org.id, seed.org_admin.id)).json()['id']
+    client.post(f'/api/v1/requests/{rid}/publish')
+    return rid
+
+
+def test_admin_requests_index_shape_and_tabs(org_admin_client, seed):
+    _publish(org_admin_client, seed)
+
+    resp = org_admin_client.get('/api/v1/admin/requests?tab=active')
+    assert resp.status_code == 200
+    data = resp.json()
+    assert set(data['counts']) == {'active', 'assigned', 'all'}
+    assert data['counts']['active'] >= 1
+    row = data['items'][0]
+    assert row['public_id'].startswith('REQ-')
+    assert set(row['metrics']) == {'notified', 'viewed', 'accepted', 'declined', 'responses'}
+    assert all(r['status'] in {'open', 'notified', 'responses_received'} for r in data['items'])
+
+
+def test_admin_requests_index_top_match_after_accept(org_admin_client, worker_a_client, seed):
+    rid = _publish(org_admin_client, seed)
+    worker_a_client.post(
+        f'/api/v1/requests/{rid}/responses/accept',
+        json={'worker_user_id': str(seed.worker_a.id)},
+    )
+
+    data = org_admin_client.get('/api/v1/admin/requests?tab=active').json()
+    row = next(r for r in data['items'] if r['id'] == rid)
+    assert row['metrics']['accepted'] == 1
+    assert row['top_match'] is not None
+    assert row['top_match']['user_id'] == str(seed.worker_a.id)
 
 
 def test_admin_create_returns_draft(apf_client, seed):

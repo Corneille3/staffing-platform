@@ -8,7 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from datetime import datetime
+from datetime import datetime, time as time_cls
 from enum import Enum
 
 from app.schemas.apf import ActivityRow
@@ -137,3 +137,56 @@ class AdminActivity(BaseModel):
     next_cursor: datetime | None = None
     counts: AdminActivityCounts
     kpis: AdminActivityKpis
+
+
+# --- /admin/requests index (triage list, ADMIN_ORG_HISTORY_HANDOFF §4) ---
+
+class AdminRequestMetrics(BaseModel):
+    notified: int
+    viewed: int
+    accepted: int
+    declined: int
+    responses: int
+
+
+class AdminRequestTopMatch(BaseModel):
+    user_id: UUID
+    name: str
+    match_score: int | None = None
+
+
+class AdminRequestAssignedWorker(BaseModel):
+    user_id: UUID
+    name: str
+
+
+class AdminRequestSummary(BaseModel):
+    id: UUID
+    public_id: str
+    urgent: bool
+    status: str
+    role: str | None = None
+    title: str
+    organization_id: UUID
+    work_date: date_cls
+    start_time: time_cls
+    end_time: time_cls
+    language_requirement: str | None = None
+    required_qualifications: list[str] = []
+    urgency_level: int
+    created_at: datetime
+    metrics: AdminRequestMetrics
+    top_match: AdminRequestTopMatch | None = None
+    assigned_worker: AdminRequestAssignedWorker | None = None
+
+
+class AdminRequestCounts(BaseModel):
+    active: int
+    assigned: int
+    all: int
+
+
+class AdminRequestsResponse(BaseModel):
+    items: list[AdminRequestSummary]
+    counts: AdminRequestCounts
+    next_cursor: str | None = None

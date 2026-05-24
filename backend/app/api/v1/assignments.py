@@ -30,7 +30,13 @@ def list_assignments(
 
 
 @router.post('', status_code=201, dependencies=[Depends(require_admin)])
-def create_assignment(payload: AssignmentCreate, db: Session = Depends(get_db_session)) -> AssignmentRead:
+def create_assignment(
+    payload: AssignmentCreate,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> AssignmentRead:
+    if payload.assigned_by_user_id is None:
+        payload.assigned_by_user_id = scope.user.id
     assignment = AssignmentService(db).assign(payload)
     return AssignmentRead.model_validate(assignment)
 

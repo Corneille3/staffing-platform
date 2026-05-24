@@ -4,6 +4,7 @@ import {
   AdminActivity,
   AdminActivityFilter,
   AdminOrganizationSite,
+  AdminRequestsResponse,
   AdminSubstitutesResponse,
   ApfActivity,
   ApfActivityFilter,
@@ -152,6 +153,18 @@ export async function getOrganizations(): Promise<Organization[]> {
 export async function getAdminOrganizations(): Promise<AdminOrganizationSite[]> {
   const response = await fetchJson<{ items: AdminOrganizationSite[] }>("/api/v1/admin/organizations");
   return response.items;
+}
+
+export async function getAdminRequestsIndex(
+  params: { tab?: string; siteId?: string; urgency?: string; language?: string } = {},
+): Promise<AdminRequestsResponse> {
+  const search = new URLSearchParams();
+  if (params.tab) search.set("tab", params.tab);
+  if (params.siteId) search.set("site_id", params.siteId);
+  if (params.urgency && params.urgency !== "all") search.set("urgency", params.urgency);
+  if (params.language && params.language !== "all") search.set("language", params.language);
+  const qs = search.toString();
+  return fetchJson<AdminRequestsResponse>(`/api/v1/admin/requests${qs ? `?${qs}` : ""}`);
 }
 
 export async function getAdminActivity(

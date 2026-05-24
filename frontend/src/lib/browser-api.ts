@@ -4,6 +4,7 @@ import {
   AdminActivity,
   AdminActivityFilter,
   AdminOrganizationSite,
+  AdminRequestsResponse,
   AdminSubstitutesResponse,
   ApfActivity,
   ApfActivityFilter,
@@ -133,6 +134,30 @@ export async function patchAdminOrganization(
   partial: Record<string, unknown>,
 ): Promise<AdminOrganizationSite> {
   return patchJson<AdminOrganizationSite>(`/api/v1/admin/organizations/${organizationId}`, partial);
+}
+
+export async function fetchAdminRequestsIndex(
+  params: { tab?: string; siteId?: string; urgency?: string; language?: string; cursor?: string } = {},
+): Promise<AdminRequestsResponse> {
+  const search = new URLSearchParams();
+  if (params.tab) search.set("tab", params.tab);
+  if (params.siteId) search.set("site_id", params.siteId);
+  if (params.urgency && params.urgency !== "all") search.set("urgency", params.urgency);
+  if (params.language && params.language !== "all") search.set("language", params.language);
+  if (params.cursor) search.set("cursor", params.cursor);
+  const qs = search.toString();
+  return getJson<AdminRequestsResponse>(`/api/v1/admin/requests${qs ? `?${qs}` : ""}`);
+}
+
+export async function assignWorker(
+  staffingRequestId: string,
+  workerUserId: string,
+): Promise<Assignment> {
+  return postJson<Assignment>("/api/v1/assignments", {
+    staffing_request_id: staffingRequestId,
+    worker_user_id: workerUserId,
+    notes: "Assigned from requests index",
+  });
 }
 
 export async function fetchAdminActivity(

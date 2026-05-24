@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles } from "lucide-react";
 import { PageFrame } from "../../../../components/page-frame";
 import { AdminSubstitutesTable } from "../../../../components/admin-substitutes-table";
 import { Mono } from "../../../../components/ui";
@@ -33,6 +33,25 @@ export default async function SubstitutesPage({
           : "Browse the substitute pool. Open a request and choose 'Rank substitutes' to score everyone against it."
       }
     >
+      {ranked && rank_against && (
+        <Link
+          href={`/admin/requests/${rank_against.id}`}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            marginBottom: 16,
+            color: "var(--ink-2)",
+            textDecoration: "none",
+            fontSize: 13,
+            fontWeight: 500,
+          }}
+        >
+          <ArrowLeft size={15} strokeWidth={1.8} />
+          Back to request
+        </Link>
+      )}
+
       {ranked && rank_against ? (
         <div
           style={{
