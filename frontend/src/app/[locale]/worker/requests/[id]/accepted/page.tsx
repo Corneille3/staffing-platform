@@ -77,10 +77,13 @@ export default function WorkerRequestAcceptedPage() {
   // Timeline node states
   const nodeResponseSent: TimelineNodeState = "done";
   const nodeReviewing: TimelineNodeState = isAssignedToMe ? "done" : "current";
-  const nodeConfirmed: TimelineNodeState = isAssignedToMe
+  // The coordinator has confirmed the moment we're assigned (assign === confirm
+  // in this system), so "Confirmed" greens immediately. "Shift starts" then
+  // becomes the active node we're waiting on, and greens once the shift begins.
+  const nodeConfirmed: TimelineNodeState = isAssignedToMe ? "done" : "pending";
+  const nodeShiftStarts: TimelineNodeState = isAssignedToMe
     ? (isShiftStarted ? "done" : "current")
     : "pending";
-  const nodeShiftStarts: TimelineNodeState = isAssignedToMe && isShiftStarted ? "current" : "pending";
 
   const subtitle = roleSectorSubtitle(request, locale);
   const dateLabel = formatWorkDate(request.work_date, locale);

@@ -12,10 +12,11 @@ git -C /home/corneille3/STAFFIG-PLATFORM log --oneline -10
 Disk state is authoritative — stale VS Code buffers have caused phantom "missing code" reports.
 
 **Last shipped (newest first):**
+- **APF redesign (slices 1-5) + admin redesign (M1-M4) on `feature/worker-inbox`, uncommitted (2026-05-23):** APF now has dark left sidebar + 5 new endpoints (snapshot, activity feed with chips + cursor pagination, NetworkPool with distribution + bulk-invite, org drill-in, CSV export). Admin now has light left sidebar (M1), /admin/requests/new 3-step stepper with autosave + live preview + reach estimate (M2), /admin/substitutes table with match-bar + ranking-against-request (M3), and right-rail Best-match dark card on /admin/requests/[id] (M4). New schema column: `worker_profiles.reliability` (migration `20260523_0007`). 109/109 backend tests passing.
 - HANDOFF gap closures on `feature/worker-inbox` (2026-05-17, local only): **#5** Directions button (Google Maps deeplink) alongside Add-to-Calendar on `/schedule` hero · **#11** weekly availability 7×4 grid (week-by-week using `specific_date`) — new backend endpoints `GET/POST /workers/{id}/availability/grid` and `POST .../grid/copy-previous`, debounced auto-save; **UI-only**, matching engine does not yet consult the grid (see carry-over) · **#14** check-in card on `/schedule` hero (visible only on shift day) — backend `POST /assignments/{id}/check-in` with optional `latitude`/`longitude`, status guard for active assignments, idempotent · **#17** numeric match score (0-100) on `EligibilityResult` + pill on worker detail "Why you'll match" panel (moss ≥80 / sand ≥50 / rose <50) · **Cosmetic #4** moss "You're *in*" hero hidden on `/accepted` when response is withdrawn · **Regressions fixed**: worker home was showing DRAFT requests in active inbox (now filters to requests with a response row); `useAuth()` was called unconditionally in `request-workflow-card.tsx` + `request-create-form.tsx` crashing the admin surface in dev (now uses the `window.Clerk` pattern from `browser-api.ts`). Seed updated: Olivia (org_admin) now gets a `TenantMembership` so she appears in `users` queries → coordinator's "Review accepted workers" section actually renders.
 - HANDOFF gap closures on `feature/worker-inbox` (2026-05-12, local only): **#16** distance + embedded org payload + friendly dates on worker cards · **#12 + #13** `notify_far` / `notify_weekend_overnight` preference toggles · **#3** dedicated `/worker/requests/[id]` detail page (back, urgent banner, title block, time block with Duration/Distance, location card, "Why you'll match" eligibility, sticky footer CTAs) plus fix for `/worker` home misclassifying declined responses as "new" · **#4 + #18** `/worker/requests/[id]/accepted` page (moss hero, 4-node vertical timeline, withdraw button) and `POST /requests/{id}/responses/withdraw` endpoint with 409 guards.
 - Worker surface redesign (`feature/worker-inbox`): design system (Tailwind v4, Inter Tight / Instrument Serif / JetBrains Mono), new UI primitives (Chip, Button, Card, Avatar, BottomNav, Eyebrow, Mono), all 5 worker pages redesigned per `frontend/New design by Claude Design/HANDOFF.md`.
-- Lifecycle management, multi-tenant onboarding, outbound email via AWS SES. Tenant + user removal UI, orphan cleanup. SES domain `staffig.kouamvision.com` verified (sandbox; production-access request submitted). One-command deploy via `make deploy-backend`.
+- Lifecycle management, multi-tenant onboarding, outbound email via AWS SES. Tenant + user removal UI, orphan cleanup. SES domain `staffig.kouamvision.com` verified + DKIM verified (2026-05-10, ca-central-1); still in sandbox, production-access request submitted. One-command deploy via `make deploy-backend`.
 - DB-owns-roles architecture live. `/auth/sync` links Clerk identity to DB row; uninvited sign-up → 403 → `/not-invited`. Server-side role guards on `/apf` + `/admin` layouts.
 - Production deployment live: EC2 `i-04a60b0aaf80c1528`, RDS, ECR, Vercel at `staffig.kouamvision.com`, backend at `api.kouamvision.com`, Clerk at `clerk.kouamvision.com`.
 - Full A–D roadmap shipped: worker UX core, schema extensions, coordinator surface, APF oversight surface.
@@ -145,7 +146,7 @@ Infrastructure IDs:
 
 ## Known gaps
 
-1. **SES sandbox** — pre-verify test recipients via `aws sesv2 create-email-identity --region ca-central-1 --email-identity <email>` until production access is granted.
+1. **SES sandbox** — domain + DKIM verified (2026-05-10) so outbound mail is DKIM-signed, but the account is still sandboxed. Pre-verify test recipients via `aws sesv2 create-email-identity --region ca-central-1 --email-identity <email>` until production access is granted.
 2. **End-to-end pass pending** — walk full operator chain once SES production access is granted.
 3. **CI secrets unset** — `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `ECR_REPOSITORY_URL`, `EC2_INSTANCE_ID`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`. All backend deploys manual until set.
 4. **SMS (Twilio) not wired in prod** — `SmsNotificationService` is ready, skips when `TWILIO_ACCOUNT_SID` is empty. ~30 min to wire once provider is chosen.
@@ -182,54 +183,56 @@ D1 network overview metrics · D2 substitute pool · D3 activity history
 - **Availability grid wired into matching (2026-05-17):** `MatchingService` now accepts an optional `db: Session`. After the binary availability check passes, it consults the `availabilities` table for the worker. Rule: if the worker has any rows for that week, require an `available=True` row for the request's `(work_date, slot)` (slot derived from `start_time` — morning/afternoon/evening/overnight). If no rows for that week, fall through (worker hasn't engaged with the grid). Eligibility reason "Slot not in weekly grid" surfaces when grid downgrades a match. All 11 lifecycle tests still pass.
 - **Worker HANDOFF gaps closed:** #3, #4, #5, #11, #12, #13, #14, #16, #17, #18 all shipped. #15 (hourly rate display) intentionally dropped (see memory `feedback-no-hourly-rate-display`). Onboarding redesigned to spec (3-step, terra accents, languages section, full i18n). No worker-side HANDOFF gaps remain.
 
-### Admin/coordinator redesign status (2026-05-17)
+### Admin/coordinator + APF redesign status (updated 2026-05-23)
 
-Visual port to design tokens **done** across the admin surface — all of `/admin/*` now uses paper background, 0.5px hairlines, Inter Tight + Instrument Serif, terra/moss/sand accents. Components updated: admin layout shell, AdminNavigation, HeaderSignOutButton, PageFrame (no more gradient hero), Panel, StatCard, request-workflow-card.tsx, AssignedWorkerCard, WorkerReviewCard, CancelAssignmentModal, request-create-form.tsx, substitute-directory.tsx, WorkerAvailabilityControl. Pages updated: `/admin`, `/admin/requests`, `/admin/requests/[id]` (with new 5-step horizontal workflow tracker per spec — Created → Notified → Responses → Assign → Confirmed), `/admin/requests/history`, `/admin/workers`, `/admin/organizations`. Workflow card responses are now sorted by status (accepted first, then viewed, notified, declined, no_response, withdrawn).
+Both surfaces are now spec-complete on `feature/worker-inbox` — pending e2e walkthrough.
 
-**Still deferred from the spec — backend-heavy work:**
-- `/admin/requests/new` 3-step create form with autosave + live preview + reach estimate. Needs new endpoints: `POST /admin/requests` (draft), `PATCH /admin/requests/:id` (autosave), and a debounced reach estimate via `GET /substitutes?rankAgainstDraftId=...`. Current `/admin/requests` inline form stays as the create UX until this lands.
-- `/admin/substitutes` ranking-against-request directory: sortable table with match bar (50px progress, moss/terra/ink-3 bands), filter chips, "ranking against REQ-XXXX" header. Current `/admin/workers` card-based directory has the design-token port but not the table+ranking flow. Needs new backend endpoint `GET /substitutes?rank_against_request_id=` returning workers with eligibility scores.
+**Admin (4 milestones, all done):**
+- **M1** — `/admin/*` shell is a real left sidebar (`--paper` aside, 232px) with logo + muted "Admin" pill + org switcher card + vertical nav (Lucide icons, terra active accent) + pinned "Fill rate" mini-card. Main column has sticky top bar (Operations Console eyebrow + sign-out). `AdminNavigation` is vertical.
+- **M2** — `/admin/requests/new` is a dedicated 3-step stepper page ("Where & when" · "Who you need" · "Notify") with chip pickers for role/qualifications/certifications/language/urgency. Autosaves the draft via `POST /api/v1/admin/requests` (create) + `PATCH /api/v1/admin/requests/{id}` (debounced 400ms). Right rail has a scaled worker-card preview + moss-soft reach-estimate card driven by `GET /admin/substitutes?rank_against_draft_id=`. Publish → redirects to `/admin/requests/{id}`. The old inline form on `/admin/requests` is replaced by a "+ New request" CTA.
+- **M3** — `/admin/workers` route renamed to `/admin/substitutes`. Sortable table replaces the card layout (Substitute / City / Availability / Languages / Match / Notify, sortable headers). Match bar 50px progress with moss ≥90 / terra ≥80 / ink-3 <80 bands. When `?rank_against_request_id=` is set, a dark `--ink` "Ranking by match against" header bar shows REQ-id + title + derived chips + Clear link, and the top scored row is highlighted moss-soft with a terra "Top" pill. Backend: `GET /api/v1/admin/substitutes` reuses `MatchingService.eligibility_result`.
+- **M4** — `/admin/requests/[id]` right rail has the dark `--ink` "Best match" card (terra avatar + serif name + match % + 4 tag chips derived from eligibility reasons + terra Assign CTA). Hidden when assignment exists. Header gets a "Rank substitutes →" pill linking to `/admin/substitutes?rank_against_request_id=...`. Sand-tinted decline-pattern callout when any declined response has a `decline_reason`.
 
-### APF / Network admin redesign plan (added 2026-05-17)
+**APF (5 slices + visual port redo, all done):**
+- **Slice 0 (visual port, redone correctly)** — `/apf/*` now has a real left sidebar on `--ink` (dark variant, 232px) with terra-outlined "APF" badge, network/org indicator card, vertical nav, pinned "APF observes — it doesn't dispatch." footer. Main column is on `--paper`. Pages re-skinned to ink-on-paper. Distinct light/dark variant from admin per `NETWORK_HANDOFF §6`.
+- **Slice 1** — `GET /api/v1/apf/snapshot` (one round-trip: kpis + status_breakdown + shortage_cities + org_activity + recent_closed_requests). 60s in-memory TTL cache per tenant. Dashboard wired to single fetch.
+- **Slice 2** — `GET /api/v1/apf/activity` with chip filters (all/assigned/cancelled/escalated/invitations/removals), cursor pagination on `(created_at desc, id desc)`, tenant-scoped (audit org match OR actor tenant membership OR tenant-level entity). Counts per bucket returned alongside page. Server-side actor + org + request_title joins. `?org_id=` filter for the drill-in link.
+- **Slice 3** — `/apf/substitutes` NetworkPool: editorial headline, distribution-by-city bar chart (moss ≥85 / sand 50-84 / rose <50), KPI bento (total / available now / multi-org % / avg reliability / shortage callout), top contributors table (last 30d). `POST /api/v1/apf/substitutes/invite` for bulk invite (idempotent per email). `POST /api/v1/apf/substitutes/recompute-reliability` for manual reliability refresh. **Schema delta:** `worker_profiles.reliability INTEGER NOT NULL DEFAULT 0` (migration `20260523_0007`).
+- **Slice 4** — `/apf/organizations/[id]` drill-in: org-level KPIs (fill_rate, avg_fill_hours, unfilled, substitutes_in_city) + status breakdown + upcoming-open + recent-closed. "View full activity →" link with org filter applied. Org rows on dashboard + list link to drill-in.
+- **Slice 5** — `POST /api/v1/apf/export` returns 202 + job id. Background CSV generation. `GET /export/{id}` for status, `GET /export/{id}/download` for CSV. SES-emailed link on completion (best-effort). Form at `/apf/export` with date range + org multi-select + status polling. "Export →" button on `/apf/activity`.
 
-**Canonical spec:** `frontend/New design by Claude Design/NETWORK_HANDOFF.md` (400-line build brief from the design team). Pair it with the main `HANDOFF.md` for the visual system.
+**New endpoints (this branch):**
+- `GET /api/v1/apf/snapshot`
+- `GET /api/v1/apf/activity` (filter, cursor, org_id)
+- `GET /api/v1/apf/substitutes`
+- `POST /api/v1/apf/substitutes/invite`
+- `POST /api/v1/apf/substitutes/recompute-reliability`
+- `GET /api/v1/apf/organizations/{id}/snapshot`
+- `POST /api/v1/apf/export` + `GET /export/{id}` + `GET /export/{id}/download`
+- `GET /api/v1/admin/substitutes` (rank_against_request_id / rank_against_draft_id)
+- `POST /api/v1/admin/requests`
+- `PATCH /api/v1/admin/requests/{id}`
 
-**APF in one sentence:** read-only oversight surface for a network admin who watches many affiliated orgs but never dispatches themselves. Three layers of enforcement: role, route, query.
+**Schema deltas (this branch):**
+- `worker_profiles.reliability` (migration `20260523_0007`).
+- No other migrations.
 
-**What exists today on `feature/worker-inbox`:**
-- Pages: `/apf/page.tsx` (dashboard), `/apf/activity`, `/apf/coordinators(/new)`, `/apf/networks(/new)`, `/apf/organizations(/new)`, `/apf/substitutes`, `/apf/workers/new`
-- Backend: `app/api/v1/networks.py` (network CRUD), tenant-level scoping via `AccessScope.is_network_admin`
-- Combined prod domain at `staffig.kouamvision.com` (the spec wants a separate `apf.` subdomain)
-- All `/apf/*` pages still on **old inline styles** (same as worker + admin were before today's port — gradient backgrounds, hex colors, no design tokens)
+**Test count:** 109 backend tests passing (up from 67). New test files: `test_apf_snapshot`, `test_apf_activity`, `test_apf_network_pool`, `test_apf_org_drillin`, `test_apf_export`, `test_admin_substitutes`, `test_admin_requests`.
 
-**Recommended attack order (per NETWORK_HANDOFF §12, adjusted for our codebase):**
+**Honest gaps still open (post-pilot or post-real-data):**
+- Reliability nightly cron not wired — APF admin can hit `POST /apf/substitutes/recompute-reliability` manually until one lands. Formula uses what we have (accepted/declined/completed/cancelled in 90d) as a proxy for the spec's `viewed-within-60min` formula (we don't track viewed_at + notified_at timestamps yet — TODO in `worker_service.py`).
+- Export job registry is process-local — restart drops jobs. Fine for v2 pilot; swap to Redis/Inngest for production scale.
+- `data_access_log` table for Law 25 §10 not built. Add if real worker PII lands on APF.
+- `apf_observer` (read-only) role variant not implemented — only `network_admin`.
+- Multi-network / many-to-many orgs not modeled — current `Tenant`/`TenantMembership` collapses network and tenant. The spec assumes orgs can belong to >1 network. Decide if/when to extend.
 
-1. **Visual port (slice 0 — purely cosmetic).** Bring `/apf/layout.tsx` + every page under `/apf/*` onto design tokens, but use the **dark sidebar variant** (`var(--ink)` background per NETWORK_HANDOFF §6) instead of the light shell admin uses. Terra-outlined "APF" badge. Persistent "APF observes — it doesn't dispatch" footer in the sidebar. ~1-2h, low risk, mirrors what we did for worker + admin.
-2. **Snapshot endpoint.** Build `GET /api/v1/apf/snapshot` returning `{ kpis, statusBreakdown, shortageCities, orgActivity }` in one round-trip (NETWORK_HANDOFF §3.1). Wire it to the dashboard. Memoize 60s per network. Saves N waterfalls of data fetches.
-3. **Activity feed with filter chips.** Re-skin `/apf/activity` with the chip filters (All / Assigned / Cancelled / Escalated / Invitations / Removals) and cursor-paginated rows per NETWORK_HANDOFF §7.2.
-4. **NetworkPool overhaul (`/apf/substitutes`).** Distribution-by-city chart (plain CSS bars), KPI bento, top-contributors table, bulk-invite modal. Requires `GET /api/v1/apf/substitutes` (aggregate across orgs in scope) and `POST /api/v1/apf/substitutes/invite` (one→N orgs).
-5. **Org drill-in.** Port `/apf/organizations/[id]` to show org-level KPIs + recent requests + a "go to activity feed filtered to this org" link.
-6. **Export.** `/api/v1/apf/export` for CSV (Inngest in the spec; we have no Inngest — use a backend background task or SES-emailed CSV link). Lower priority for v1 pilot.
+**APF spec items deliberately NOT built (per spec):**
+- Coverage map (Mapbox cost > list value).
+- Predictive analytics.
+- Direct messaging between APF and substitutes.
+- Cross-network reports.
 
-**Schema deltas required by the spec but NOT in our DB today:**
-- `networks` and `network_organizations` (many-to-many of orgs in a network) — spec assumes orgs can belong to >1 network. Our current `Tenant`/`TenantMembership` collapses network and tenant. **Decide whether to merge or extend** before slice 4+.
-- `network_memberships` with roles `apf_admin` / `apf_observer` — currently we have `UserRole.NETWORK_ADMIN` (single role). The `apf_observer` (read-only, no actions) variant doesn't exist.
-- `data_access_log` table for Law 25 — append-only audit log of every APF read of identifiable substitute data. Cheap and important if real worker PII lands.
-- Worker consent toggle at onboarding for APF visibility (Law 25 §10).
-- `substitute_profiles.reliability` numeric column + nightly cron to compute it.
-
-**Things the spec says NOT to build:**
-- A coverage map (Mapbox cost vs. a list).
-- Predictive analytics ("you'll be short 4 educators Tuesday").
-- Direct messaging between APF and substitutes (would short-circuit the coordinator).
-- Cross-network reports (each network sees only its own scope).
-
-**Don't:**
-- Don't fold worker/admin/apf into one layout (per working agreements).
-- Don't add a UI library. Inline styles + design tokens only.
-- Don't expose write endpoints beyond `invite` and `remove-org-from-network` — APF is read+invite-only by design.
-
-**Verification at the end (§14 acceptance test):** APF admin signs in → dashboard loads in <800ms with real KPIs → drills into a shortage city → bulk-invites 3 substitutes → sees their invitation in the activity feed → triggers export. Attempt to POST to any write endpoint outside the allowed list returns 403.
+**Acceptance test (NETWORK_HANDOFF §14):** APF admin signs in → dashboard loads with real KPIs → drills into a shortage city → bulk-invites 3 substitutes → sees their invitation in the activity feed → triggers export. Attempt to POST to any write endpoint outside the allowed list returns 403. **Status: not yet walked locally.**
 
 ### Git workflow
 - Branches: `main` (prod only) ← `develop` (integration) ← `feature/*`

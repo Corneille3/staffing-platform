@@ -1,12 +1,18 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import {
+  AdminSubstitutesResponse,
+  ApfActivity,
+  ApfActivityFilter,
+  ApfSnapshot,
   Assignment,
   AuditLog,
   Coordinator,
   NetworkOverview,
+  NetworkPool,
   NetworkSummary,
   Organization,
+  OrgSnapshot,
   RequestResponse,
   StaffingRequest,
   User,
@@ -173,6 +179,41 @@ export async function getAssignments(): Promise<Assignment[]> {
 
 export async function getNetworkOverview(): Promise<NetworkOverview> {
   return fetchJson<NetworkOverview>("/api/v1/reports/network-overview");
+}
+
+export async function getApfSnapshot(): Promise<ApfSnapshot> {
+  return fetchJson<ApfSnapshot>("/api/v1/apf/snapshot");
+}
+
+export async function getApfActivity(
+  params: { filter?: ApfActivityFilter; cursor?: string; limit?: number; orgId?: string } = {},
+): Promise<ApfActivity> {
+  const search = new URLSearchParams();
+  if (params.filter && params.filter !== "all") search.set("filter", params.filter);
+  if (params.cursor) search.set("cursor", params.cursor);
+  if (params.limit) search.set("limit", String(params.limit));
+  if (params.orgId) search.set("org_id", params.orgId);
+  const qs = search.toString();
+  return fetchJson<ApfActivity>(`/api/v1/apf/activity${qs ? `?${qs}` : ""}`);
+}
+
+export async function getApfNetworkPool(): Promise<NetworkPool> {
+  return fetchJson<NetworkPool>("/api/v1/apf/substitutes");
+}
+
+export async function getApfOrgSnapshot(orgId: string): Promise<OrgSnapshot> {
+  return fetchJson<OrgSnapshot>(`/api/v1/apf/organizations/${orgId}/snapshot`);
+}
+
+export async function getAdminSubstitutes(
+  params: { rankAgainstRequestId?: string } = {},
+): Promise<AdminSubstitutesResponse> {
+  const search = new URLSearchParams();
+  if (params.rankAgainstRequestId) search.set("rank_against_request_id", params.rankAgainstRequestId);
+  const qs = search.toString();
+  return fetchJson<AdminSubstitutesResponse>(
+    `/api/v1/admin/substitutes${qs ? `?${qs}` : ""}`,
+  );
 }
 
 export async function getAuditLogs(): Promise<AuditLog[]> {

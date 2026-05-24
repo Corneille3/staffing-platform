@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.scope import AccessScope
 from app.core.config import settings
+from app.models.assignment import Assignment
 from app.models.enums import AvailabilityStatus, UserRole
+from app.models.request_response import RequestResponse
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 from app.models.worker_certification import WorkerCertification
@@ -165,6 +168,71 @@ class WorkerService:
         self.db.commit()
         self.db.refresh(profile)
         return profile
+
+    def recompute_reliability_for(self, worker_user_id: UUID) -> int:
+        """Recompute the cached reliability score for a single worker.
+
+        Spec formula (NETWORK_HANDOFF.md §8) is
+        ``(accepted + completed) / notifications_viewed_within_60min``
+        over a 90-day window, but our schema doesn't yet record
+        ``viewed_at``/``notified_at`` per response (TODO: backfill in a
+        later slice). For v2 we use the closest available proxy:
+        decisive responses (accepted+declined+completed+cancelled
+        assignments) — and score as a percentage of accepted/completed.
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+
+        accepted = self.db.scalar(
+            select(func.count()).select_from(RequestResponse).where(
+                RequestResponse.worker_user_id == worker_user_id,
+                RequestResponse.status == 'accepted',
+                RequestResponse.created_at >= cutoff,
+            )
+        ) or 0
+        declined = self.db.scalar(
+            select(func.count()).select_from(RequestResponse).where(
+                RequestResponse.worker_user_id == worker_user_id,
+                RequestResponse.status.in_(['declined', 'withdrawn']),
+                RequestResponse.created_at >= cutoff,
+            )
+        ) or 0
+        completed = self.db.scalar(
+            select(func.count()).select_from(Assignment).where(
+                Assignment.worker_user_id == worker_user_id,
+                Assignment.status == 'completed',
+                Assignment.assigned_at >= cutoff,
+            )
+        ) or 0
+        cancelled = self.db.scalar(
+            select(func.count()).select_from(Assignment).where(
+                Assignment.worker_user_id == worker_user_id,
+                Assignment.status == 'cancelled',
+                Assignment.assigned_at >= cutoff,
+            )
+        ) or 0
+
+        decisive = accepted + declined + completed + cancelled
+        score = 0 if decisive == 0 else round(((accepted + completed) / decisive) * 100)
+        score = max(0, min(100, score))
+
+        profile = self.repository.get_profile(worker_user_id)
+        if profile is not None:
+            profile.reliability = score
+            self.db.add(profile)
+            self.db.commit()
+        return score
+
+    def recompute_reliability_all(self) -> int:
+        """Recompute reliability for every worker profile in the DB.
+
+        Intended for a nightly cron once we have one. Until then, the APF
+        admin can hit ``POST /api/v1/apf/substitutes/recompute-reliability``
+        to refresh manually.
+        """
+        worker_ids = list(self.db.scalars(select(WorkerProfile.user_id)).all())
+        for user_id in worker_ids:
+            self.recompute_reliability_for(user_id)
+        return len(worker_ids)
 
     def update_availability(
         self,

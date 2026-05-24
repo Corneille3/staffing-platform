@@ -77,9 +77,12 @@ export default function WorkerHome() {
         status = "filled";
       } else if (myResponse?.status === "declined") {
         status = "declined";
-      } else if (myResponse && ["accepted", "viewed"].includes(myResponse.status)) {
+      } else if (myResponse?.status === "accepted") {
         status = "sent";
       }
+      // "viewed" means opened but not yet replied — falls through to the
+      // default "new" so it stays in the action bucket ("Awaiting your reply"),
+      // never the "Reply sent" chip which is reserved for an actual accept.
       return { request: req, status };
     });
 
@@ -251,8 +254,14 @@ function RequestCard({
   const distanceLabel = formatDistance(distanceKm);
   const dateLabel = formatWorkDate(request.work_date, locale);
   const cityLabel = locationLabel(request);
+  // Once the coordinator assigns this worker, the request flips to "filled"
+  // status — but the worker still needs their tracking timeline, so keep
+  // routing the assigned-to-me card to the /accepted page (not the generic
+  // detail), the same as while their reply is pending ("sent").
+  const isAssignedToMe =
+    request.status === "assigned" && request.assigned_worker_user_id === worker.id;
   const detailHref =
-    status === "sent"
+    status === "sent" || isAssignedToMe
       ? `/worker/requests/${request.id}/accepted`
       : `/worker/requests/${request.id}`;
   const openDetail = () => router.push(detailHref);

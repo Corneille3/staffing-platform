@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { CheckCircle2 } from "lucide-react";
 import { availabilityStatusLabel } from "../lib/status-labels";
 import { Eyebrow } from "./ui";
 import { Assignment, RequestResponse, StaffingRequest, User, Worker } from "../lib/types";
@@ -479,6 +480,15 @@ function AssignedWorkerCard({
         <span><strong style={{ color: "var(--ink)" }}>Qualifications:</strong> {profile?.qualifications.join(", ") || "none"}</span>
         <span><strong style={{ color: "var(--ink)" }}>Certifications:</strong> {profile?.certifications.join(", ") || "none"}</span>
         <span><strong style={{ color: "var(--ink)" }}>Assigned at:</strong> {assignment.assigned_at.slice(0, 16).replace("T", " ")}</span>
+        {assignment.checked_in_at ? (
+          <span style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--moss)", fontWeight: 600 }}>
+            <CheckCircle2 size={14} strokeWidth={2.5} />
+            Checked in at {assignment.checked_in_at.slice(0, 16).replace("T", " ")}
+            {assignment.checked_in_latitude && assignment.checked_in_longitude ? " · location recorded" : ""}
+          </span>
+        ) : (
+          <span style={{ color: "var(--ink-3)" }}><strong style={{ color: "var(--ink)" }}>Check-in:</strong> not checked in yet</span>
+        )}
       </div>
 
       <button

@@ -2,12 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Activity, Briefcase, User as UserIcon, Zap } from "lucide-react";
+import type { ComponentType } from "react";
 
-const links = [
-  { href: "/admin", label: "Coverage Desk" },
-  { href: "/admin/requests", label: "Requests" },
-  { href: "/admin/workers", label: "Substitutes" },
-  { href: "/admin/organizations", label: "Organizations" },
+interface NavItem {
+  href: string;
+  label: string;
+  Icon: ComponentType<{ size?: number; strokeWidth?: number; color?: string }>;
+}
+
+const links: NavItem[] = [
+  { href: "/admin",               label: "Coverage Desk",  Icon: Activity },
+  { href: "/admin/requests",      label: "Requests",       Icon: Zap },
+  { href: "/admin/substitutes",   label: "Substitutes",    Icon: UserIcon },
+  { href: "/admin/organizations", label: "Organizations",  Icon: Briefcase },
 ];
 
 export function AdminNavigation() {
@@ -16,27 +24,37 @@ export function AdminNavigation() {
   const strippedPath = pathname.replace(/^\/(?:en|fr)(?=\/|$)/, "") || "/";
 
   return (
-    <nav style={{ display: "flex", flexWrap: "wrap", gap: 22 }}>
-      {links.map((link) => {
+    <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {links.map(({ href, label, Icon }) => {
         const active =
-          strippedPath === link.href ||
-          (link.href !== "/admin" && strippedPath.startsWith(link.href));
+          strippedPath === href ||
+          (href !== "/admin" && strippedPath.startsWith(href));
 
         return (
           <Link
-            key={link.href}
-            href={link.href}
+            key={href}
+            href={href}
             style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "8px 10px",
+              borderRadius: 8,
               textDecoration: "none",
-              fontSize: 14,
-              fontWeight: 500,
+              fontSize: 13,
+              fontWeight: active ? 500 : 400,
               color: active ? "var(--ink)" : "var(--ink-2)",
-              paddingBottom: 6,
-              borderBottom: active ? "2px solid var(--terra)" : "2px solid transparent",
-              transition: "color .12s",
+              background: active ? "var(--card)" : "transparent",
+              border: active ? "0.5px solid var(--line)" : "0.5px solid transparent",
+              transition: "color .12s, background .12s",
             }}
           >
-            {link.label}
+            <Icon
+              size={15}
+              strokeWidth={1.6}
+              color={active ? "var(--terra)" : "var(--ink-3)"}
+            />
+            <span>{label}</span>
           </Link>
         );
       })}

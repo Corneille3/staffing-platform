@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Eyebrow, Mono } from "../../../../components/ui";
 import { getNetworks, requireServerSession } from "../../../../lib/api";
 import { OrphanUserCleanup } from "../../../../components/orphan-user-cleanup";
 import { RemoveNetworkButton } from "../../../../components/remove-network-button";
@@ -6,6 +7,11 @@ import { RemoveNetworkButton } from "../../../../components/remove-network-butto
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 const LANG_LABEL: Record<string, string> = { fr: "FR", en: "EN", bilingual: "Bilingual" };
+
+const CARD_STYLE: React.CSSProperties = {
+  background: "var(--card)",
+  border: "0.5px solid var(--line)",
+};
 
 function formatDate(value: string) {
   try {
@@ -28,21 +34,20 @@ export default async function NetworksPage() {
   const networks = await getNetworks();
 
   return (
-    <main style={{ maxWidth: 1280, margin: "0 auto", padding: "40px 20px 80px" }}>
-      <section style={{ marginBottom: 36 }}>
-        <p
+    <>
+      <section style={{ marginBottom: 32 }}>
+        <Eyebrow style={{ marginBottom: 12 }}>Platform Management</Eyebrow>
+        <h1
           style={{
             margin: 0,
-            fontSize: 12,
-            letterSpacing: "0.24em",
-            textTransform: "uppercase",
-            opacity: 0.6,
+            fontFamily: "var(--serif)",
+            fontSize: "clamp(2rem, 4vw, 3.2rem)",
+            lineHeight: 1.05,
+            fontWeight: 400,
+            color: "var(--ink)",
           }}
         >
-          Platform Management
-        </p>
-        <h1 style={{ margin: "10px 0 8px", fontSize: "clamp(2rem, 4vw, 3.4rem)", lineHeight: 1.05 }}>
-          Networks
+          <em style={{ fontStyle: "italic" }}>Networks</em>
         </h1>
         <div
           style={{
@@ -51,9 +56,10 @@ export default async function NetworksPage() {
             justifyContent: "space-between",
             gap: 20,
             flexWrap: "wrap",
+            marginTop: 12,
           }}
         >
-          <p style={{ margin: 0, maxWidth: 640, opacity: 0.72, lineHeight: 1.55 }}>
+          <p style={{ margin: 0, maxWidth: 640, color: "var(--ink-2)", lineHeight: 1.55, fontSize: 15 }}>
             Each business that runs Staffig is a tenant network with its own isolated data
             and its own network admin. Add a network here; the new admin signs in with the
             invited email and runs their tenant from there.
@@ -62,12 +68,12 @@ export default async function NetworksPage() {
             href="/apf/networks/new"
             style={{
               display: "inline-block",
-              padding: "10px 20px",
-              borderRadius: 12,
-              background: "#f7f0df",
-              color: "#183229",
+              padding: "10px 18px",
+              borderRadius: 999,
+              background: "var(--terra)",
+              color: "var(--paper)",
               fontSize: 14,
-              fontWeight: 800,
+              fontWeight: 500,
               textDecoration: "none",
               whiteSpace: "nowrap",
               flexShrink: 0,
@@ -80,10 +86,9 @@ export default async function NetworksPage() {
 
       <div
         style={{
+          ...CARD_STYLE,
           padding: 24,
-          borderRadius: 22,
-          background: "rgba(247,240,223,0.06)",
-          border: "1px solid rgba(247,240,223,0.1)",
+          borderRadius: "var(--r-lg)",
         }}
       >
         <div
@@ -94,8 +99,12 @@ export default async function NetworksPage() {
             marginBottom: 20,
           }}
         >
-          <h2 style={{ margin: 0, fontSize: 18 }}>All networks</h2>
-          <span style={{ fontSize: 13, opacity: 0.55 }}>{networks.length} records</span>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: "var(--ink)" }}>
+            All networks
+          </h2>
+          <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
+            <Mono>{networks.length}</Mono> records
+          </span>
         </div>
 
         <div
@@ -104,10 +113,12 @@ export default async function NetworksPage() {
             gridTemplateColumns: "1.6fr 0.8fr 2fr 0.8fr 0.8fr 0.7fr",
             gap: 12,
             padding: "8px 14px",
-            fontSize: 11,
-            letterSpacing: "0.14em",
+            fontSize: 10,
+            letterSpacing: "0.2em",
             textTransform: "uppercase",
-            opacity: 0.5,
+            color: "var(--ink-3)",
+            fontWeight: 500,
+            borderBottom: "0.5px solid var(--line)",
           }}
         >
           <span>Name</span>
@@ -118,7 +129,7 @@ export default async function NetworksPage() {
           <span></span>
         </div>
 
-        <div style={{ display: "grid", gap: 6 }}>
+        <div style={{ display: "grid" }}>
           {networks.map((network) => (
             <div
               key={network.id}
@@ -127,31 +138,31 @@ export default async function NetworksPage() {
                 gridTemplateColumns: "1.6fr 0.8fr 2fr 0.8fr 0.8fr 0.7fr",
                 gap: 12,
                 padding: "14px",
-                borderRadius: 14,
                 alignItems: "center",
-                background: "rgba(247,240,223,0.03)",
-                border: "1px solid rgba(247,240,223,0.06)",
+                borderBottom: "0.5px solid var(--line-soft)",
               }}
             >
-              <div style={{ fontWeight: 600, fontSize: 14 }}>{network.name}</div>
-              <code style={{ fontSize: 12, opacity: 0.7 }}>{network.slug}</code>
+              <div style={{ fontWeight: 500, fontSize: 14, color: "var(--ink)" }}>{network.name}</div>
+              <code style={{ fontSize: 12, color: "var(--ink-3)", fontFamily: "var(--mono)" }}>
+                {network.slug}
+              </code>
               <div>
                 {network.network_admin ? (
                   <>
-                    <div style={{ fontSize: 13 }}>
+                    <div style={{ fontSize: 13, color: "var(--ink)" }}>
                       {network.network_admin.first_name} {network.network_admin.last_name}
                     </div>
-                    <div style={{ fontSize: 12, opacity: 0.55, marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
                       {network.network_admin.email}
                       {network.network_admin.clerk_user_id ? null : (
-                        <span style={{ marginLeft: 8, opacity: 0.6, fontStyle: "italic" }}>
+                        <span style={{ marginLeft: 8, color: "var(--ink-3)", fontStyle: "italic" }}>
                           · awaiting first sign-in
                         </span>
                       )}
                     </div>
                   </>
                 ) : (
-                  <span style={{ fontSize: 12, opacity: 0.4 }}>No active admin</span>
+                  <span style={{ fontSize: 12, color: "var(--ink-3)" }}>No active admin</span>
                 )}
                 {network.network_admin ? (
                   <span
@@ -160,11 +171,13 @@ export default async function NetworksPage() {
                       marginTop: 4,
                       padding: "2px 7px",
                       borderRadius: 999,
-                      background: "rgba(247,240,223,0.1)",
+                      background: "var(--paper)",
                       fontSize: 11,
-                      fontWeight: 700,
+                      fontWeight: 500,
                       letterSpacing: "0.06em",
                       textTransform: "uppercase",
+                      color: "var(--ink)",
+                      border: "0.5px solid var(--line)",
                     }}
                   >
                     {LANG_LABEL[network.network_admin.preferred_language] ??
@@ -172,20 +185,21 @@ export default async function NetworksPage() {
                   </span>
                 ) : null}
               </div>
-              <div style={{ fontSize: 12, opacity: 0.6 }}>{formatDate(network.created_at)}</div>
+              <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
+                <Mono>{formatDate(network.created_at)}</Mono>
+              </div>
               <span
                 style={{
                   fontSize: 11,
-                  fontWeight: 800,
+                  fontWeight: 500,
                   letterSpacing: "0.06em",
                   textTransform: "uppercase",
                   padding: "3px 10px",
                   borderRadius: 999,
                   width: "fit-content",
-                  background: network.is_active
-                    ? "rgba(164,200,163,0.15)"
-                    : "rgba(214,160,140,0.15)",
-                  color: network.is_active ? "#a4c8a3" : "#d6a08c",
+                  background: "var(--paper)",
+                  color: network.is_active ? "var(--moss)" : "var(--rose)",
+                  border: `0.5px solid ${network.is_active ? "var(--moss)" : "var(--rose)"}`,
                 }}
               >
                 {network.is_active ? "Active" : "Inactive"}
@@ -197,8 +211,7 @@ export default async function NetworksPage() {
                   tenantName={network.name}
                   isActive={network.is_active}
                   isOwnTenant={
-                    actorUserId !== null &&
-                    network.network_admin?.id === actorUserId
+                    actorUserId !== null && network.network_admin?.id === actorUserId
                   }
                 />
               </div>
@@ -206,7 +219,7 @@ export default async function NetworksPage() {
           ))}
 
           {networks.length === 0 && (
-            <p style={{ margin: "12px 0 0", opacity: 0.5 }}>
+            <p style={{ margin: "12px 0 0", color: "var(--ink-3)" }}>
               No networks yet. Add the first one.
             </p>
           )}
@@ -214,6 +227,6 @@ export default async function NetworksPage() {
       </div>
 
       <OrphanUserCleanup />
-    </main>
+    </>
   );
 }

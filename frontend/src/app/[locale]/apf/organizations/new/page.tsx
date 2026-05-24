@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Eyebrow } from "../../../../../components/ui";
 import { createOrganization } from "../../../../../lib/browser-api";
 import { Organization } from "../../../../../lib/types";
 
@@ -15,21 +16,61 @@ const ORG_TYPES = [
 ];
 
 const FIELD: React.CSSProperties = {
-  display: "block", width: "100%", padding: "12px 14px", borderRadius: 10,
-  border: "1px solid rgba(247,240,223,0.18)", background: "rgba(247,240,223,0.07)",
-  color: "#f7f0df", fontSize: 15, outline: "none", boxSizing: "border-box",
+  display: "block",
+  width: "100%",
+  padding: "12px 14px",
+  borderRadius: "var(--r-sm)",
+  border: "0.5px solid var(--line)",
+  background: "var(--card)",
+  color: "var(--ink)",
+  fontSize: 15,
+  outline: "none",
+  boxSizing: "border-box",
+  fontFamily: "var(--ui)",
 };
 
 const LABEL: React.CSSProperties = {
-  display: "block", fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase",
-  opacity: 0.7, marginBottom: 6,
+  display: "block",
+  fontSize: 11,
+  letterSpacing: "0.18em",
+  textTransform: "uppercase",
+  color: "var(--ink-3)",
+  marginBottom: 6,
+  fontWeight: 500,
+};
+
+const PRIMARY_BTN: React.CSSProperties = {
+  padding: "12px 24px",
+  borderRadius: 999,
+  border: 0,
+  background: "var(--terra)",
+  color: "var(--paper)",
+  cursor: "pointer",
+  fontSize: 14,
+  fontWeight: 500,
+};
+
+const SECONDARY_BTN: React.CSSProperties = {
+  padding: "12px 24px",
+  borderRadius: 999,
+  border: "0.5px solid var(--line)",
+  background: "transparent",
+  color: "var(--ink)",
+  cursor: "pointer",
+  fontSize: 14,
+  fontWeight: 500,
 };
 
 export default function NewOrganizationPage() {
   const router = useRouter();
   const [form, setForm] = useState({
-    name: "", type: "childcare", city: "", region: "",
-    contact_email: "", contact_phone: "", preferred_language: "fr",
+    name: "",
+    type: "childcare",
+    city: "",
+    region: "",
+    contact_email: "",
+    contact_phone: "",
+    preferred_language: "fr",
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,64 +104,111 @@ export default function NewOrganizationPage() {
 
   if (created) {
     return (
-      <main style={{ maxWidth: 560, margin: "0 auto", padding: "60px 20px" }}>
-        <div style={{ background: "rgba(164,200,163,0.15)", border: "1px solid rgba(164,200,163,0.4)", borderRadius: 16, padding: "32px 28px" }}>
-          <p style={{ margin: "0 0 6px", fontSize: 12, letterSpacing: "0.18em", textTransform: "uppercase", color: "#a4c8a3" }}>
-            Organization created
-          </p>
-          <h2 style={{ margin: "0 0 8px", fontSize: 26 }}>{created.name}</h2>
-          <p style={{ margin: "0 0 24px", opacity: 0.75 }}>
+      <div style={{ maxWidth: 560, margin: "0 auto", padding: "40px 0" }}>
+        <div
+          style={{
+            background: "var(--moss-soft)",
+            border: "0.5px solid var(--moss)",
+            borderRadius: "var(--r-lg)",
+            padding: "32px 28px",
+          }}
+        >
+          <Eyebrow style={{ color: "var(--moss)", marginBottom: 10 }}>Organization created</Eyebrow>
+          <h2
+            style={{
+              margin: "0 0 8px",
+              fontFamily: "var(--serif)",
+              fontSize: 28,
+              fontWeight: 400,
+              color: "var(--ink)",
+            }}
+          >
+            {created.name}
+          </h2>
+          <p style={{ margin: "0 0 24px", color: "var(--ink-2)" }}>
             {created.city} · {created.type}
           </p>
           <div style={{ display: "flex", gap: 12 }}>
             <button
               type="button"
-              onClick={() => { setCreated(null); setForm({ name: "", type: "childcare", city: "", region: "", contact_email: "", contact_phone: "", preferred_language: "fr" }); }}
-              style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid rgba(247,240,223,0.3)", background: "transparent", color: "#f7f0df", cursor: "pointer", fontSize: 14 }}
+              onClick={() => {
+                setCreated(null);
+                setForm({
+                  name: "",
+                  type: "childcare",
+                  city: "",
+                  region: "",
+                  contact_email: "",
+                  contact_phone: "",
+                  preferred_language: "fr",
+                });
+              }}
+              style={SECONDARY_BTN}
             >
               Add another
             </button>
-            <button
-              type="button"
-              onClick={() => router.push("/apf/organizations")}
-              style={{ padding: "10px 20px", borderRadius: 10, border: 0, background: "#f7f0df", color: "#183229", cursor: "pointer", fontSize: 14, fontWeight: 700 }}
-            >
+            <button type="button" onClick={() => router.push("/apf/organizations")} style={PRIMARY_BTN}>
               Back to organizations
             </button>
           </div>
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main style={{ maxWidth: 560, margin: "0 auto", padding: "60px 20px" }}>
-      <p style={{ margin: "0 0 8px", fontSize: 12, letterSpacing: "0.24em", textTransform: "uppercase", opacity: 0.6 }}>
-        Network Management
-      </p>
-      <h1 style={{ margin: "0 0 6px", fontSize: 32 }}>New organization</h1>
-      <p style={{ margin: "0 0 36px", opacity: 0.72, lineHeight: 1.55 }}>
+    <div style={{ maxWidth: 560, margin: "0 auto", padding: "20px 0" }}>
+      <Eyebrow style={{ marginBottom: 12 }}>Network Management</Eyebrow>
+      <h1
+        style={{
+          margin: 0,
+          fontFamily: "var(--serif)",
+          fontSize: 36,
+          lineHeight: 1.05,
+          fontWeight: 400,
+          color: "var(--ink)",
+        }}
+      >
+        New <em style={{ fontStyle: "italic" }}>organization</em>
+      </h1>
+      <p style={{ margin: "12px 0 36px", color: "var(--ink-2)", lineHeight: 1.55, fontSize: 15 }}>
         Add a member organization to your network. You can assign coordinators to it once it&apos;s created.
       </p>
 
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: 20 }}>
         <div>
           <label style={LABEL}>Organization name</label>
-          <input required style={FIELD} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Garderie Les Étoiles" />
+          <input
+            required
+            style={FIELD}
+            value={form.name}
+            onChange={(e) => set("name", e.target.value)}
+            placeholder="e.g. Garderie Les Étoiles"
+          />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <div>
             <label style={LABEL}>Type</label>
-            <select style={{ ...FIELD, appearance: "none" }} value={form.type} onChange={(e) => set("type", e.target.value)}>
+            <select
+              style={{ ...FIELD, appearance: "none" }}
+              value={form.type}
+              onChange={(e) => set("type", e.target.value)}
+            >
               {ORG_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
               ))}
             </select>
           </div>
           <div>
             <label style={LABEL}>Language</label>
-            <select style={{ ...FIELD, appearance: "none" }} value={form.preferred_language} onChange={(e) => set("preferred_language", e.target.value)}>
+            <select
+              style={{ ...FIELD, appearance: "none" }}
+              value={form.preferred_language}
+              onChange={(e) => set("preferred_language", e.target.value)}
+            >
               <option value="fr">French (FR)</option>
               <option value="en">English (EN)</option>
             </select>
@@ -130,43 +218,61 @@ export default function NewOrganizationPage() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <div>
             <label style={LABEL}>City</label>
-            <input required style={FIELD} value={form.city} onChange={(e) => set("city", e.target.value)} placeholder="Montréal" />
+            <input
+              required
+              style={FIELD}
+              value={form.city}
+              onChange={(e) => set("city", e.target.value)}
+              placeholder="Montréal"
+            />
           </div>
           <div>
             <label style={LABEL}>Region (optional)</label>
-            <input style={FIELD} value={form.region} onChange={(e) => set("region", e.target.value)} placeholder="Île-de-Montréal" />
+            <input
+              style={FIELD}
+              value={form.region}
+              onChange={(e) => set("region", e.target.value)}
+              placeholder="Île-de-Montréal"
+            />
           </div>
         </div>
 
         <div>
           <label style={LABEL}>Contact email (optional)</label>
-          <input type="email" style={FIELD} value={form.contact_email} onChange={(e) => set("contact_email", e.target.value)} />
+          <input
+            type="email"
+            style={FIELD}
+            value={form.contact_email}
+            onChange={(e) => set("contact_email", e.target.value)}
+          />
         </div>
 
         <div>
           <label style={LABEL}>Contact phone (optional)</label>
-          <input type="tel" style={FIELD} value={form.contact_phone} onChange={(e) => set("contact_phone", e.target.value)} placeholder="+1 555 000 0000" />
+          <input
+            type="tel"
+            style={FIELD}
+            value={form.contact_phone}
+            onChange={(e) => set("contact_phone", e.target.value)}
+            placeholder="+1 555 000 0000"
+          />
         </div>
 
-        {error && <p style={{ margin: 0, color: "#ffb1a0", fontSize: 14 }}>{error}</p>}
+        {error && <p style={{ margin: 0, color: "var(--rose)", fontSize: 14 }}>{error}</p>}
 
         <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-          <button
-            type="button"
-            onClick={() => router.push("/apf/organizations")}
-            style={{ padding: "12px 24px", borderRadius: 12, border: "1px solid rgba(247,240,223,0.3)", background: "transparent", color: "#f7f0df", cursor: "pointer", fontSize: 15 }}
-          >
+          <button type="button" onClick={() => router.push("/apf/organizations")} style={SECONDARY_BTN}>
             Cancel
           </button>
           <button
             type="submit"
             disabled={submitting}
-            style={{ flex: 1, padding: "12px 24px", borderRadius: 12, border: 0, background: "#f7f0df", color: "#183229", cursor: submitting ? "not-allowed" : "pointer", fontSize: 15, fontWeight: 800, opacity: submitting ? 0.7 : 1 }}
+            style={{ ...PRIMARY_BTN, flex: 1, opacity: submitting ? 0.6 : 1, cursor: submitting ? "not-allowed" : "pointer" }}
           >
             {submitting ? "Creating…" : "Create organization"}
           </button>
         </div>
       </form>
-    </main>
+    </div>
   );
 }

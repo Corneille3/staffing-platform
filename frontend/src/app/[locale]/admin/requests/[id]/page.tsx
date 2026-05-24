@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Check, Circle } from "lucide-react";
+import { ArrowLeft, Check, Circle, TriangleAlert } from "lucide-react";
+import { BestMatchCard } from "../../../../../components/best-match-card";
 import { PageFrame } from "../../../../../components/page-frame";
 import { Panel } from "../../../../../components/panel";
 import { RequestWorkflowCard } from "../../../../../components/request-workflow-card";
 import { Eyebrow, Mono } from "../../../../../components/ui";
 import {
+  getAdminSubstitutes,
   getAssignments,
   getOrganizations,
   getRequest,
@@ -37,7 +39,12 @@ function responseCounts(responses: RequestResponse[]) {
 // 5-step workflow per HANDOFF spec: Created → Notified → Responses → Assign → Confirmed
 type StepState = "done" | "current" | "pending";
 
-function workflowSteps(status: string, hasResponses: boolean, hasAssignment: boolean) {
+function workflowSteps(
+  status: string,
+  hasResponses: boolean,
+  hasAssignment: boolean,
+  assignmentConfirmed: boolean,
+) {
   const steps: { label: string; state: StepState }[] = [
     { label: "Created",  state: "pending" },
     { label: "Notified", state: "pending" },
@@ -68,7 +75,10 @@ function workflowSteps(status: string, hasResponses: boolean, hasAssignment: boo
 
   if (status === "assigned" || hasAssignment) {
     steps[3].state = "done";
-    steps[4].state = status === "completed" ? "done" : "current";
+    // Assignment is created already CONFIRMED (assign === confirm in this
+    // system), so "Confirmed" greens the moment a worker is assigned — not
+    // only once the shift is completed.
+    steps[4].state = assignmentConfirmed || status === "completed" ? "done" : "current";
     return steps;
   }
   if (status === "completed") {
@@ -99,12 +109,13 @@ export default async function RequestDetailPage({
     notFound();
   }
 
-  const [users, workers, organizations, assignments, responses] = await Promise.all([
+  const [users, workers, organizations, assignments, responses, ranked] = await Promise.all([
     getUsers(),
     getWorkers(),
     getOrganizations(),
     getAssignments(),
     getRequestResponses(id),
+    getAdminSubstitutes({ rankAgainstRequestId: id }).catch(() => ({ items: [], rank_against: null })),
   ]);
 
   const organization = organizations.find((item) => item.id === request.organization_id);
@@ -115,7 +126,52 @@ export default async function RequestDetailPage({
   const sortedResponses = [...responses].sort((a, b) => {
     return STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
   });
-  const steps = workflowSteps(request.status, responses.length > 0, assignment != null);
+  const steps = workflowSteps(
+    request.status,
+    responses.length > 0,
+    assignment != null,
+    assignment?.status === "confirmed" || assignment?.status === "completed",
+  );
+
+  // Best match = highest-score scored row whose response (if any) isn't declined/withdrawn,
+  // and who isn't already the assigned worker. Prefer accepted responders first.
+  const responseByWorker = new Map(responses.map((r) => [r.worker_user_id, r]));
+  const RESPONSE_PRIORITY: Record<string, number> = {
+    accepted: 0,
+    viewed: 1,
+    notified: 2,
+    no_response: 3,
+    declined: 99,
+    withdrawn: 99,
+  };
+  const eligibleScoredRows = ranked.items
+    .filter((row) => row.eligible !== false)
+    .filter((row) => row.worker.id !== assignment?.worker_user_id)
+    .filter((row) => {
+      const resp = responseByWorker.get(row.worker.id);
+      return !resp || (resp.status !== "declined" && resp.status !== "withdrawn");
+    })
+    .sort((a, b) => {
+      const ra = responseByWorker.get(a.worker.id);
+      const rb = responseByWorker.get(b.worker.id);
+      const pa = ra ? RESPONSE_PRIORITY[ra.status] ?? 50 : 50;
+      const pb = rb ? RESPONSE_PRIORITY[rb.status] ?? 50 : 50;
+      if (pa !== pb) return pa - pb;
+      return (b.match_score ?? 0) - (a.match_score ?? 0);
+    });
+  const bestMatch = eligibleScoredRows[0] ?? null;
+
+  // First admin in the response set drives the "assigned_by" id when we assign from the card.
+  const orgAdminUser = users.find((u) => u.role === "org_admin") || users.find((u) => u.role === "network_admin") || null;
+
+  // Decline-with-reason callout — show the most recent declined response with a reason, if any.
+  const declinedWithReason = responses
+    .filter((r) => (r.status === "declined" || r.status === "withdrawn") && r.decline_reason)
+    .sort((a, b) => (b.responded_at ?? "").localeCompare(a.responded_at ?? ""))[0];
+  const declinedWithReasonWorker = declinedWithReason
+    ? users.find((u) => u.id === declinedWithReason.worker_user_id)
+    : null;
+  const declineCount = responses.filter((r) => r.status === "declined" || r.status === "withdrawn").length;
 
   return (
     <PageFrame
@@ -123,7 +179,7 @@ export default async function RequestDetailPage({
       title={request.title}
       description="Inspect one coverage request, its matching context, response board, and assignment state."
     >
-      <div style={{ marginBottom: 22 }}>
+      <div style={{ marginBottom: 22, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Link
           href="/admin/requests"
           style={{
@@ -138,7 +194,53 @@ export default async function RequestDetailPage({
           <ArrowLeft size={14} />
           Back to request queue
         </Link>
+        <Link
+          href={`/admin/substitutes?rank_against_request_id=${request.id}`}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "7px 14px",
+            borderRadius: 999,
+            background: "transparent",
+            border: "0.5px solid var(--line)",
+            color: "var(--ink)",
+            fontSize: 13,
+            fontWeight: 500,
+            textDecoration: "none",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Rank substitutes →
+        </Link>
       </div>
+
+      {declinedWithReason && declinedWithReasonWorker ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 10,
+            padding: "12px 14px",
+            borderRadius: "var(--r-md)",
+            background: "var(--sand-soft)",
+            border: "0.5px solid var(--sand)",
+            color: "#7C5C12",
+            fontSize: 13,
+            lineHeight: 1.45,
+            marginBottom: 22,
+          }}
+        >
+          <TriangleAlert size={18} strokeWidth={1.6} style={{ flexShrink: 0, marginTop: 1 }} />
+          <div>
+            <strong style={{ fontWeight: 600 }}>
+              {declinedWithReasonWorker.first_name} {declinedWithReasonWorker.last_name}
+            </strong>{" "}
+            declined: &ldquo;{declinedWithReason.decline_reason}.&rdquo;
+            {declineCount > 1 ? ` ${declineCount} declines on this request so far.` : ""}
+          </div>
+        </div>
+      ) : null}
 
       {/* 5-step horizontal workflow tracker */}
       <section
@@ -331,15 +433,27 @@ export default async function RequestDetailPage({
           </Panel>
         </div>
 
-        <Panel title="Workflow actions" subtitle="Live controls">
-          <RequestWorkflowCard
-            request={request}
-            responses={sortedResponses}
-            users={users}
-            workers={workers}
-            assignment={assignment}
-          />
-        </Panel>
+        <div style={{ display: "grid", gap: 22 }}>
+          {bestMatch && !assignment && bestMatch.match_score !== null ? (
+            <BestMatchCard
+              worker={bestMatch.worker}
+              matchScore={bestMatch.match_score}
+              reasons={bestMatch.reasons}
+              requestId={request.id}
+              orgAdminUserId={orgAdminUser?.id ?? null}
+            />
+          ) : null}
+
+          <Panel title="Workflow actions" subtitle="Live controls">
+            <RequestWorkflowCard
+              request={request}
+              responses={sortedResponses}
+              users={users}
+              workers={workers}
+              assignment={assignment}
+            />
+          </Panel>
+        </div>
       </section>
     </PageFrame>
   );

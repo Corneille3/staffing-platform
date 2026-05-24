@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { PageFrame } from "../../../../components/page-frame";
 import { Panel } from "../../../../components/panel";
-import { RequestCreateForm } from "../../../../components/request-create-form";
 import { RequestWorkflowCard } from "../../../../components/request-workflow-card";
 import {
   getAssignments,
@@ -41,11 +40,25 @@ export default async function RequestsPage() {
       title="Requests"
       description="Publish requests, collect substitute responses, and confirm assignments without leaving the operations queue."
     >
-      <Panel title="Create request" subtitle="New coverage need">
-        <RequestCreateForm organizations={organizations} />
-      </Panel>
-
-      <div style={{ height: 22 }} />
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 22 }}>
+        <Link
+          href="/admin/requests/new"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "10px 18px",
+            borderRadius: 999,
+            background: "var(--ink)",
+            color: "var(--paper)",
+            fontSize: 14,
+            fontWeight: 500,
+            textDecoration: "none",
+          }}
+        >
+          + New request
+        </Link>
+      </div>
 
       <Panel
         title="Active requests"
@@ -53,7 +66,9 @@ export default async function RequestsPage() {
       >
         <div style={{ display: "grid", gap: 14 }}>
           {active.length === 0 ? (
-            <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>No active requests right now.</p>
+            <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>
+              No active requests yet — <Link href="/admin/requests/new" style={{ color: "var(--terra)", textDecoration: "none" }}>create one →</Link>
+            </p>
           ) : (
             active.map((request) => (
               <RequestWorkflowCard

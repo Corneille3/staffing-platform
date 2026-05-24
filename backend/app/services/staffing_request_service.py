@@ -1,8 +1,28 @@
-from datetime import datetime
+from datetime import date, datetime, time
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+
+
+def _json_safe(value):
+    """Convert a single field value into something `json.dumps` will accept.
+
+    The audit log's `payload` column is JSONB; FastAPI/Pydantic happily round-trips
+    ``date``/``time``/``Decimal``/Enum types through the API layer, but the raw
+    SQLAlchemy insert into JSONB uses ``json.dumps`` which only knows the
+    primitive set. Stringify here so any draft-update field can be audited.
+    """
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (date, datetime, time)):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return str(value)
+    if hasattr(value, 'value'):  # Enum
+        return value.value
+    return str(value)
 
 from app.auth.scope import AccessScope
 from app.models.enums import NotificationChannel, RequestStatus, ResponseStatus
@@ -15,7 +35,7 @@ from app.models.organization import Organization
 from app.repositories.response_repository import ResponseRepository
 from app.repositories.staffing_request_repository import StaffingRequestRepository
 from app.repositories.worker_repository import WorkerRepository
-from app.schemas.staffing_request import StaffingRequestCreate
+from app.schemas.staffing_request import StaffingRequestCreate, StaffingRequestDraftUpdate
 from app.notifications.notification_dispatcher import NotificationDispatcher
 from app.services.audit_service import AuditService
 from app.services.matching_service import MatchingService
@@ -95,6 +115,92 @@ class StaffingRequestService:
         )
         self.db.commit()
         return created
+
+    def update_draft(
+        self,
+        request_id: UUID,
+        payload: StaffingRequestDraftUpdate,
+        scope: AccessScope,
+    ) -> StaffingRequest:
+        """Apply partial updates to a request that is still in draft.
+
+        Only fields explicitly set on the payload are touched. Once a request
+        has moved out of draft (open/notified/etc), this raises 409 — autosave
+        is for the create flow only; published requests are edited through
+        dedicated cancel/renotify endpoints.
+        """
+        staffing_request = self._get_required(request_id)
+        if not self.repository.can_access(staffing_request, scope):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Out of scope.')
+        if staffing_request.status != RequestStatus.DRAFT:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='Only drafts can be autosaved. This request has already moved past draft.',
+            )
+
+        data = payload.model_dump(exclude_unset=True)
+
+        # Scalar fields map 1:1 onto the column names.
+        scalar_fields = {
+            'title', 'description', 'city', 'location_name', 'work_date',
+            'start_time', 'end_time', 'urgency_level', 'language_requirement',
+            'coverage_type', 'role', 'hourly_rate', 'contact_name',
+            'contact_phone', 'contact_email', 'arrival_instructions',
+        }
+        touched = {}
+        for field in scalar_fields:
+            if field in data:
+                setattr(staffing_request, field, data[field])
+                touched[field] = _json_safe(data[field])
+
+        # Requirements: replace wholesale per patched type. Two-phase flush
+        # required because the unique constraint
+        # (staffing_request_id, requirement_type, requirement_code) trips if
+        # SQLAlchemy tries to insert the new rows before deleting the orphans
+        # with the same composite key.
+        patched_quals = 'required_qualifications' in data
+        patched_certs = 'required_certifications' in data
+        if patched_quals or patched_certs:
+            kept = [
+                r for r in staffing_request.requirements
+                if (r.requirement_type == RequestRequirementType.QUALIFICATION and not patched_quals)
+                or (r.requirement_type == RequestRequirementType.CERTIFICATION and not patched_certs)
+            ]
+            staffing_request.requirements = kept
+            self.db.flush()  # Force orphan deletes BEFORE the inserts below.
+
+            if patched_quals:
+                for item in data['required_qualifications']:
+                    staffing_request.requirements.append(RequestRequirement(
+                        id=uuid4(),
+                        requirement_type=RequestRequirementType.QUALIFICATION,
+                        requirement_code=self._requirement_code(item),
+                        requirement_label=self._requirement_label(item),
+                    ))
+                touched['required_qualifications'] = [self._requirement_code(i) for i in data['required_qualifications']]
+            if patched_certs:
+                for item in data['required_certifications']:
+                    staffing_request.requirements.append(RequestRequirement(
+                        id=uuid4(),
+                        requirement_type=RequestRequirementType.CERTIFICATION,
+                        requirement_code=self._requirement_code(item),
+                        requirement_label=self._requirement_label(item),
+                    ))
+                touched['required_certifications'] = [self._requirement_code(i) for i in data['required_certifications']]
+
+        self.db.flush()
+        if touched:
+            self.audit_service.log(
+                action='staffing_request.draft_updated',
+                entity_type='staffing_request',
+                entity_id=staffing_request.id,
+                actor_user_id=scope.user.id,
+                organization_id=staffing_request.organization_id,
+                payload=touched,
+            )
+        self.db.commit()
+        self.db.refresh(staffing_request)
+        return staffing_request
 
     @staticmethod
     def _can_create_for_organization(organization: Organization, scope: AccessScope) -> bool:

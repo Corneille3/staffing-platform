@@ -26,6 +26,9 @@ class WorkerProfile(Base):
     home_latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
     home_longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
     notes: Mapped[str | None] = mapped_column(Text)
+    # Cached 0–100 reliability score (NETWORK_HANDOFF.md §8). Refreshed by a
+    # periodic compute job, not on every page load.
+    reliability: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

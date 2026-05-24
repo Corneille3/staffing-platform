@@ -1,8 +1,15 @@
 "use client";
 
 import {
+  AdminSubstitutesResponse,
+  ApfActivity,
+  ApfActivityFilter,
+  ApfExportJob,
+  ApfExportRequest,
   Assignment,
   AvailabilityGrid,
+  BulkInviteEntry,
+  BulkInviteResult,
   Coordinator,
   EligibilityResult,
   NotificationFeedItem,
@@ -71,6 +78,58 @@ async function patchJson<T>(path: string, body: object): Promise<T> {
     throw new Error(text || `PATCH ${path} failed (${response.status})`);
   }
   return response.json();
+}
+
+export async function fetchApfActivity(
+  params: { filter?: ApfActivityFilter; cursor?: string; limit?: number; orgId?: string } = {},
+): Promise<ApfActivity> {
+  const search = new URLSearchParams();
+  if (params.filter && params.filter !== "all") search.set("filter", params.filter);
+  if (params.cursor) search.set("cursor", params.cursor);
+  if (params.limit) search.set("limit", String(params.limit));
+  if (params.orgId) search.set("org_id", params.orgId);
+  const qs = search.toString();
+  return getJson<ApfActivity>(`/api/v1/apf/activity${qs ? `?${qs}` : ""}`);
+}
+
+export async function bulkInviteSubstitutes(
+  invitees: BulkInviteEntry[],
+): Promise<BulkInviteResult> {
+  return postJson<BulkInviteResult>("/api/v1/apf/substitutes/invite", { invitees });
+}
+
+export async function recomputeReliability(): Promise<{ updated: number }> {
+  return postJson<{ updated: number }>("/api/v1/apf/substitutes/recompute-reliability");
+}
+
+export async function createApfExport(payload: ApfExportRequest): Promise<ApfExportJob> {
+  return postJson<ApfExportJob>("/api/v1/apf/export", payload);
+}
+
+export async function getApfExportJob(jobId: string): Promise<ApfExportJob> {
+  return getJson<ApfExportJob>(`/api/v1/apf/export/${jobId}`);
+}
+
+export async function createAdminRequest(payload: Record<string, unknown>): Promise<StaffingRequest> {
+  return postJson<StaffingRequest>("/api/v1/admin/requests", payload);
+}
+
+export async function patchAdminRequest(
+  requestId: string,
+  partial: Record<string, unknown>,
+): Promise<StaffingRequest> {
+  return patchJson<StaffingRequest>(`/api/v1/admin/requests/${requestId}`, partial);
+}
+
+export async function publishAdminRequest(requestId: string): Promise<StaffingRequest> {
+  return postJson<StaffingRequest>(`/api/v1/requests/${requestId}/publish`);
+}
+
+export async function rankAdminSubstitutes(
+  rankAgainstDraftId: string,
+): Promise<AdminSubstitutesResponse> {
+  const search = new URLSearchParams({ rank_against_draft_id: rankAgainstDraftId });
+  return getJson<AdminSubstitutesResponse>(`/api/v1/admin/substitutes?${search.toString()}`);
 }
 
 export async function fetchWorkers(): Promise<Worker[]> {

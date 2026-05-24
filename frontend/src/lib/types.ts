@@ -23,6 +23,220 @@ export type NetworkOverview = {
   shortage_cities: string[];
 };
 
+export type ApfSnapshotKpis = {
+  total_requests: number;
+  filled_count: number;
+  fill_rate: number;
+  active_substitutes: number;
+  unfilled_count: number;
+  avg_fill_hours: number | null;
+  organizations_count: number;
+};
+
+export type OrgActivityRow = {
+  id: string;
+  name: string;
+  city: string;
+  region: string | null;
+  type: string;
+  total: number;
+  filled: number;
+  open: number;
+};
+
+export type RecentClosedRequestRow = {
+  id: string;
+  title: string;
+  status: string;
+  city: string;
+  work_date: string;
+  organization_id: string;
+  organization_name: string | null;
+};
+
+export type ApfSnapshot = {
+  kpis: ApfSnapshotKpis;
+  status_breakdown: Record<string, number>;
+  shortage_cities: string[];
+  org_activity: OrgActivityRow[];
+  recent_closed_requests: RecentClosedRequestRow[];
+};
+
+export type ApfActivityFilter =
+  | "all"
+  | "assigned"
+  | "cancelled"
+  | "escalated"
+  | "invitations"
+  | "removals";
+
+export type ApfActivityActor = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+};
+
+export type ApfActivityOrganization = {
+  id: string;
+  name: string;
+};
+
+export type ApfActivityRow = {
+  id: string;
+  created_at: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  actor: ApfActivityActor | null;
+  organization: ApfActivityOrganization | null;
+  payload: Record<string, unknown>;
+  request_title: string | null;
+};
+
+export type ApfActivityCounts = {
+  all: number;
+  assigned: number;
+  cancelled: number;
+  escalated: number;
+  invitations: number;
+  removals: number;
+};
+
+export type ApfActivity = {
+  items: ApfActivityRow[];
+  next_cursor: string | null;
+  counts: ApfActivityCounts;
+};
+
+export type NetworkPoolKpis = {
+  total: number;
+  available_now: number;
+  multi_org_pct: number;
+  avg_reliability: number;
+  shortage_cities_count: number;
+};
+
+export type CityDistributionRow = {
+  city: string;
+  total: number;
+  available: number;
+  coverage_pct: number;
+  languages: string[];
+};
+
+export type ContributorRow = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  cities: string[];
+  role: string;
+  org_count: number;
+  shifts_30d: number;
+  languages: string[];
+  reliability: number;
+};
+
+export type NetworkPool = {
+  kpis: NetworkPoolKpis;
+  distribution: CityDistributionRow[];
+  top_contributors: ContributorRow[];
+};
+
+export type BulkInviteEntry = {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone?: string;
+  preferred_language?: string;
+};
+
+export type BulkInviteOutcome = {
+  email: string;
+  status: "invited" | "skipped";
+  reason: string | null;
+  user_id: string | null;
+};
+
+export type BulkInviteResult = {
+  invited_count: number;
+  skipped_count: number;
+  outcomes: BulkInviteOutcome[];
+};
+
+export type OrgSnapshotKpis = {
+  total_requests: number;
+  filled_count: number;
+  fill_rate: number;
+  unfilled_count: number;
+  avg_fill_hours: number | null;
+  active_substitutes_in_city: number;
+};
+
+export type OrgRequestRow = {
+  id: string;
+  title: string;
+  status: string;
+  city: string;
+  work_date: string;
+  created_at: string;
+};
+
+export type OrgSnapshot = {
+  id: string;
+  name: string;
+  type: string;
+  city: string;
+  region: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  preferred_language: string;
+  is_active: boolean;
+  kpis: OrgSnapshotKpis;
+  status_breakdown: Record<string, number>;
+  recent_closed_requests: OrgRequestRow[];
+  upcoming_open_requests: OrgRequestRow[];
+};
+
+export type ApfExportRequest = {
+  date_from: string; // YYYY-MM-DD
+  date_to: string;
+  org_ids?: string[];
+  format?: "csv";
+};
+
+export type ApfExportJob = {
+  id: string;
+  status: "pending" | "ready" | "failed";
+  created_at: string;
+  completed_at: string | null;
+  row_count: number | null;
+  download_url: string | null;
+  error: string | null;
+};
+
+export type AdminSubstituteRow = {
+  worker: Worker;
+  match_score: number | null;
+  eligible: boolean | null;
+  reasons: EligibilityReason[];
+};
+
+export type RankAgainstBrief = {
+  id: string;
+  title: string;
+  city: string;
+  work_date: string;
+  language_requirement: string | null;
+  required_qualifications: string[];
+  required_certifications: string[];
+};
+
+export type AdminSubstitutesResponse = {
+  items: AdminSubstituteRow[];
+  rank_against: RankAgainstBrief | null;
+};
+
 export type Organization = {
   id: string;
   name: string;

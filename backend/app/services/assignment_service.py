@@ -71,6 +71,53 @@ class AssignmentService:
             self.dispatcher.notify_assignment_confirmed(staffing_request, worker)
         return created
 
+    def check_in(
+        self,
+        assignment_id: UUID,
+        latitude,
+        longitude,
+        actor_user_id: UUID,
+        is_admin: bool,
+    ) -> Assignment:
+        assignment = self.assignment_repository.get(assignment_id)
+        if assignment is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Assignment not found')
+        if not is_admin and assignment.worker_user_id != actor_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail='Workers may only check in for their own assignment.',
+            )
+        if assignment.status not in (AssignmentStatus.PENDING_CONFIRMATION, AssignmentStatus.CONFIRMED):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='Check-in is only allowed for active assignments.',
+            )
+        if assignment.checked_in_at is not None:
+            return assignment  # idempotent — first check-in wins
+
+        staffing_request = self.request_repository.get(assignment.staffing_request_id)
+        assignment.checked_in_at = datetime.now(timezone.utc)
+        assignment.checked_in_latitude = latitude
+        assignment.checked_in_longitude = longitude
+        self.db.add(assignment)
+        # Record the check-in in the audit trail so the event survives even if
+        # the assignment is later cancelled (which clears these columns).
+        self.audit_service.log(
+            action='assignment.checked_in',
+            entity_type='assignment',
+            entity_id=assignment.id,
+            actor_user_id=assignment.worker_user_id,
+            organization_id=staffing_request.organization_id if staffing_request else None,
+            payload={
+                'staffing_request_id': str(assignment.staffing_request_id),
+                'worker_user_id': str(assignment.worker_user_id),
+                'checked_in_at': assignment.checked_in_at.isoformat(),
+            },
+        )
+        self.db.commit()
+        self.db.refresh(assignment)
+        return assignment
+
     def cancel(self, assignment_id: UUID, payload: AssignmentCancel, actor_user_id: UUID) -> Assignment:
         assignment = self.assignment_repository.get(assignment_id)
         if assignment is None:
@@ -86,6 +133,12 @@ class AssignmentService:
 
         assignment.status = AssignmentStatus.CANCELLED
         assignment.cancelled_at = datetime.now(timezone.utc)
+        # A cancelled assignment "didn't happen" — clear its check-in so a
+        # request never carries check-in data on more than one assignment row.
+        # The check-in event itself is preserved in audit_logs (see check_in).
+        assignment.checked_in_at = None
+        assignment.checked_in_latitude = None
+        assignment.checked_in_longitude = None
         assignment.notes = self._append_cancellation_note(assignment.notes, payload)
         self.db.add(assignment)
 
@@ -94,9 +147,13 @@ class AssignmentService:
             assignment.worker_user_id,
         )
         if response is not None:
+            # Reset the response to a clean "notified" state — including
+            # viewed_at, so the row isn't left as "notified but previously
+            # viewed", which is semantically inconsistent.
             response.status = ResponseStatus.NOTIFIED
             response.responded_at = None
             response.decline_reason = None
+            response.viewed_at = None
             self.response_repository.save(response)
 
         staffing_request.status = RequestStatus.RESPONSES_RECEIVED
