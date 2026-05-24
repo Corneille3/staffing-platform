@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import {
   AdminActivity,
   AdminActivityFilter,
+  AdminDashboard,
   AdminOrganizationSite,
   AdminRequestsResponse,
   AdminSubstitutesResponse,
@@ -153,6 +154,10 @@ export async function getOrganizations(): Promise<Organization[]> {
 export async function getAdminOrganizations(): Promise<AdminOrganizationSite[]> {
   const response = await fetchJson<{ items: AdminOrganizationSite[] }>("/api/v1/admin/organizations");
   return response.items;
+}
+
+export async function getAdminDashboard(): Promise<AdminDashboard> {
+  return fetchJson<AdminDashboard>("/api/v1/admin/dashboard");
 }
 
 export async function getAdminRequestsIndex(

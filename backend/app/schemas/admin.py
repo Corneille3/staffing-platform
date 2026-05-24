@@ -190,3 +190,40 @@ class AdminRequestsResponse(BaseModel):
     items: list[AdminRequestSummary]
     counts: AdminRequestCounts
     next_cursor: str | None = None
+
+
+# --- /admin/dashboard (Coverage Desk, ADMIN_HANDOFF §3) ---
+
+class AdminDashboardCoordinator(BaseModel):
+    first_name: str
+
+
+class AdminDashboardUrgent(AdminRequestSummary):
+    elapsed: str
+    starts_in: str
+
+
+class AdminDashboardKpis(BaseModel):
+    fill_rate_week: int
+    fill_rate_delta: int
+    avg_time_to_fill_minutes: int | None = None
+    open_count: int
+    substitutes_ready: int
+
+
+class AdminRosterEntry(BaseModel):
+    name: str
+    role: str | None = None
+    starts_at: time_cls
+    ends_at: time_cls
+    status: str
+
+
+class AdminDashboard(BaseModel):
+    coordinator: AdminDashboardCoordinator
+    urgent_now: AdminDashboardUrgent | None = None
+    kpis: AdminDashboardKpis
+    live_requests: list[AdminRequestSummary]
+    activity_today: list[ActivityRow]
+    week_fill_rate: list[int]
+    roster_today: list[AdminRosterEntry]

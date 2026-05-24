@@ -286,6 +286,37 @@ export type AdminRequestsResponse = {
 
 export type AdminRequestTab = "active" | "assigned" | "all";
 
+export type AdminDashboardKpis = {
+  fill_rate_week: number;
+  fill_rate_delta: number;
+  avg_time_to_fill_minutes: number | null;
+  open_count: number;
+  substitutes_ready: number;
+};
+
+export type AdminRosterEntry = {
+  name: string;
+  role: string | null;
+  starts_at: string;
+  ends_at: string;
+  status: "on_site" | "arriving" | "en_route";
+};
+
+export type AdminDashboardUrgent = AdminRequestSummary & {
+  elapsed: string;
+  starts_in: string;
+};
+
+export type AdminDashboard = {
+  coordinator: { first_name: string };
+  urgent_now: AdminDashboardUrgent | null;
+  kpis: AdminDashboardKpis;
+  live_requests: AdminRequestSummary[];
+  activity_today: ApfActivityRow[];
+  week_fill_rate: number[];
+  roster_today: AdminRosterEntry[];
+};
+
 export type AdminActivityFilter =
   | "all"
   | "posted"
