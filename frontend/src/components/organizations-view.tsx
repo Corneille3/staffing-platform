@@ -153,6 +153,7 @@ export function OrganizationsView({ sites: initial }: { sites: AdminOrganization
           site={selected}
           onEdit={() => setEditing(true)}
           onNewRequest={() => router.push(`/admin/requests/new?orgId=${selected.id}`)}
+          onActivityLog={() => router.push(`/admin/activity?site_id=${selected.id}`)}
         />
       )}
 
@@ -188,10 +189,12 @@ function SiteDetail({
   site,
   onEdit,
   onNewRequest,
+  onActivityLog,
 }: {
   site: AdminOrganizationSite;
   onEdit: () => void;
   onNewRequest: () => void;
+  onActivityLog: () => void;
 }) {
   const m = site.metrics;
   return (
@@ -292,6 +295,22 @@ function SiteDetail({
             Roster today: <strong style={{ color: "var(--ink-2)" }}>{site.roster_today.on_site}</strong> on site ·{" "}
             <strong style={{ color: "var(--ink-2)" }}>{site.roster_today.substitutes_arriving}</strong> arriving
           </div>
+          <button
+            onClick={onActivityLog}
+            style={{
+              marginTop: 10,
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              color: "var(--terra)",
+              fontFamily: "var(--ui)",
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            Open activity log →
+          </button>
         </div>
       </div>
     </div>

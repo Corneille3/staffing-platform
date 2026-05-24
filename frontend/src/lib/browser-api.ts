@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  AdminActivity,
+  AdminActivityFilter,
   AdminOrganizationSite,
   AdminSubstitutesResponse,
   ApfActivity,
@@ -131,6 +133,17 @@ export async function patchAdminOrganization(
   partial: Record<string, unknown>,
 ): Promise<AdminOrganizationSite> {
   return patchJson<AdminOrganizationSite>(`/api/v1/admin/organizations/${organizationId}`, partial);
+}
+
+export async function fetchAdminActivity(
+  params: { filter?: AdminActivityFilter; cursor?: string; siteId?: string } = {},
+): Promise<AdminActivity> {
+  const search = new URLSearchParams();
+  if (params.filter && params.filter !== "all") search.set("filter", params.filter);
+  if (params.cursor) search.set("cursor", params.cursor);
+  if (params.siteId) search.set("site_id", params.siteId);
+  const qs = search.toString();
+  return getJson<AdminActivity>(`/api/v1/admin/activity${qs ? `?${qs}` : ""}`);
 }
 
 export async function rankAdminSubstitutes(

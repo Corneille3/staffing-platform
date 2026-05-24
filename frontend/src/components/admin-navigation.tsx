@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Briefcase, User as UserIcon, Zap } from "lucide-react";
+import { Activity, Briefcase, History, User as UserIcon, Zap } from "lucide-react";
 import type { ComponentType } from "react";
 
 interface NavItem {
@@ -16,6 +16,7 @@ const links: NavItem[] = [
   { href: "/admin/requests",      label: "Requests",       Icon: Zap },
   { href: "/admin/substitutes",   label: "Substitutes",    Icon: UserIcon },
   { href: "/admin/organizations", label: "Organizations",  Icon: Briefcase },
+  { href: "/admin/activity",      label: "Activity",       Icon: History },
 ];
 
 export function AdminNavigation() {

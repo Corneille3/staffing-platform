@@ -1,6 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import {
+  AdminActivity,
+  AdminActivityFilter,
   AdminOrganizationSite,
   AdminSubstitutesResponse,
   ApfActivity,
@@ -150,6 +152,18 @@ export async function getOrganizations(): Promise<Organization[]> {
 export async function getAdminOrganizations(): Promise<AdminOrganizationSite[]> {
   const response = await fetchJson<{ items: AdminOrganizationSite[] }>("/api/v1/admin/organizations");
   return response.items;
+}
+
+export async function getAdminActivity(
+  params: { filter?: AdminActivityFilter; siteId?: string; from?: string; to?: string } = {},
+): Promise<AdminActivity> {
+  const search = new URLSearchParams();
+  if (params.filter && params.filter !== "all") search.set("filter", params.filter);
+  if (params.siteId) search.set("site_id", params.siteId);
+  if (params.from) search.set("from", params.from);
+  if (params.to) search.set("to", params.to);
+  const qs = search.toString();
+  return fetchJson<AdminActivity>(`/api/v1/admin/activity${qs ? `?${qs}` : ""}`);
 }
 
 export async function getWorkers(): Promise<Worker[]> {

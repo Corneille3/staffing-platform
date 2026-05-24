@@ -237,6 +237,46 @@ export type AdminSubstitutesResponse = {
   rank_against: RankAgainstBrief | null;
 };
 
+export type AdminActivityFilter =
+  | "all"
+  | "posted"
+  | "accepted"
+  | "declined"
+  | "assigned"
+  | "completed"
+  | "cancelled"
+  | "expired"
+  | "invited";
+
+export type AdminActivityCounts = {
+  all: number;
+  posted: number;
+  accepted: number;
+  declined: number;
+  assigned: number;
+  completed: number;
+  cancelled: number;
+  expired: number;
+  invited: number;
+};
+
+export type AdminActivityKpis = {
+  posted: number;
+  filled: number;
+  cancelled: number;
+  expired: number;
+  fill_rate: number;
+  avg_time_to_fill_minutes: number | null;
+  sites: number;
+};
+
+export type AdminActivity = {
+  items: ApfActivityRow[];
+  next_cursor: string | null;
+  counts: AdminActivityCounts;
+  kpis: AdminActivityKpis;
+};
+
 export type AdminOrgMetrics = {
   fill_rate_30d: number;
   requests_30d: number;

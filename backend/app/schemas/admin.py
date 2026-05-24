@@ -8,6 +8,10 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from datetime import datetime
+from enum import Enum
+
+from app.schemas.apf import ActivityRow
 from app.schemas.eligibility import EligibilityReason
 from app.schemas.worker import WorkerRead
 
@@ -90,3 +94,46 @@ class AdminOrganizationUpdate(BaseModel):
     preferred_language: str | None = None
     capacity: int | None = None
     enrolled_count: int | None = None
+
+
+# --- /admin/activity (coordinator audit timeline, ADMIN_ORG_HISTORY_HANDOFF §3) ---
+
+class AdminActivityFilter(str, Enum):
+    ALL = 'all'
+    POSTED = 'posted'
+    ACCEPTED = 'accepted'
+    DECLINED = 'declined'
+    ASSIGNED = 'assigned'
+    COMPLETED = 'completed'
+    CANCELLED = 'cancelled'
+    EXPIRED = 'expired'
+    INVITED = 'invited'
+
+
+class AdminActivityCounts(BaseModel):
+    all: int
+    posted: int
+    accepted: int
+    declined: int
+    assigned: int
+    completed: int
+    cancelled: int
+    expired: int
+    invited: int
+
+
+class AdminActivityKpis(BaseModel):
+    posted: int
+    filled: int
+    cancelled: int
+    expired: int
+    fill_rate: int
+    avg_time_to_fill_minutes: int | None = None
+    sites: int = 0
+
+
+class AdminActivity(BaseModel):
+    items: list[ActivityRow]
+    next_cursor: datetime | None = None
+    counts: AdminActivityCounts
+    kpis: AdminActivityKpis

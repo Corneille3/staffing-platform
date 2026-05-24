@@ -41,6 +41,26 @@ def _buckets_for(action: str) -> set[str]:
     return _ACTION_FILTER_BUCKETS.get(action, set())
 
 
+# Admin/coordinator activity taxonomy (ADMIN_ORG_HISTORY_HANDOFF §3.4) — a
+# request-lifecycle view, distinct from the APF network buckets above.
+_ADMIN_ACTION_BUCKETS: dict[str, set[str]] = {
+    'staffing_request.published':  {'posted'},
+    'request_response.accepted':   {'accepted'},
+    'request_response.declined':   {'declined'},
+    'assignment.confirmed':        {'assigned'},
+    'staffing_request.completed':  {'completed'},
+    'staffing_request.cancelled':  {'cancelled'},
+    'assignment.cancelled':        {'cancelled'},
+    'worker.invited':              {'invited'},
+    'coordinator.invited':         {'invited'},
+}
+_ADMIN_BUCKETS = ('posted', 'accepted', 'declined', 'assigned', 'completed', 'cancelled', 'expired', 'invited')
+
+
+def _admin_buckets_for(action: str) -> set[str]:
+    return _ADMIN_ACTION_BUCKETS.get(action, set())
+
+
 class ReportingService:
     def __init__(self, db: Session) -> None:
         self.db = db
@@ -448,6 +468,187 @@ class ReportingService:
             'items': items,
             'next_cursor': next_cursor,
             'counts': counts,
+        }
+
+    def _activity_org_ids(self, scope: AccessScope) -> list[UUID]:
+        if scope.org_ids:
+            return list(scope.org_ids)
+        if (scope.is_platform_admin or scope.is_network_admin) and scope.tenant_id:
+            return list(self.db.scalars(self._tenant_org_subq(scope.tenant_id)))
+        return []
+
+    def _resolve_activity_items(self, rows: list) -> list[dict]:
+        """Eager-load actor + organization + request_title for a page of audit
+        rows and shape them into ActivityRow dicts."""
+        actor_ids = {r.actor_user_id for r in rows if r.actor_user_id is not None}
+        org_ids = {r.organization_id for r in rows if r.organization_id is not None}
+        request_ids: set[UUID] = set()
+        for r in rows:
+            if r.entity_type == 'staffing_request' and r.entity_id is not None:
+                request_ids.add(r.entity_id)
+            payload_req = r.payload.get('staffing_request_id') if isinstance(r.payload, dict) else None
+            if payload_req:
+                try:
+                    request_ids.add(UUID(str(payload_req)))
+                except (ValueError, TypeError):
+                    pass
+
+        actors_by_id = {}
+        if actor_ids:
+            for user in self.db.scalars(select(User).where(User.id.in_(actor_ids))).all():
+                actors_by_id[user.id] = {
+                    'id': user.id,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'role': user.role.value if hasattr(user.role, 'value') else str(user.role),
+                }
+        orgs_by_id = {}
+        if org_ids:
+            for org in self.db.scalars(select(Organization).where(Organization.id.in_(org_ids))).all():
+                orgs_by_id[org.id] = {'id': org.id, 'name': org.name}
+        titles_by_id: dict[UUID, str] = {}
+        if request_ids:
+            for sr_id, title in self.db.execute(
+                select(StaffingRequest.id, StaffingRequest.title).where(StaffingRequest.id.in_(request_ids))
+            ).all():
+                titles_by_id[sr_id] = title
+
+        items = []
+        for r in rows:
+            sr_id = None
+            if r.entity_type == 'staffing_request' and r.entity_id is not None:
+                sr_id = r.entity_id
+            elif isinstance(r.payload, dict):
+                payload_req = r.payload.get('staffing_request_id')
+                if payload_req:
+                    try:
+                        sr_id = UUID(str(payload_req))
+                    except (ValueError, TypeError):
+                        sr_id = None
+            items.append({
+                'id': r.id,
+                'created_at': r.created_at,
+                'action': r.action,
+                'entity_type': r.entity_type,
+                'entity_id': r.entity_id,
+                'actor': actors_by_id.get(r.actor_user_id) if r.actor_user_id else None,
+                'organization': orgs_by_id.get(r.organization_id) if r.organization_id else None,
+                'payload': r.payload if isinstance(r.payload, dict) else {},
+                'request_title': titles_by_id.get(sr_id) if sr_id else None,
+            })
+        return items
+
+    def _admin_activity_kpis(
+        self, scope: AccessScope, site_id, since, until,
+    ) -> dict:
+        def _f(stmt):
+            stmt = self._scope_requests(stmt, scope)
+            if site_id is not None:
+                stmt = stmt.where(StaffingRequest.organization_id == site_id)
+            if since is not None:
+                stmt = stmt.where(StaffingRequest.created_at >= since)
+            if until is not None:
+                stmt = stmt.where(StaffingRequest.created_at <= until)
+            return stmt
+
+        # "Posted" = requests that actually left draft (drafts were never posted).
+        posted = self.db.scalar(
+            _f(select(func.count()).select_from(StaffingRequest).where(StaffingRequest.status != RequestStatus.DRAFT))
+        ) or 0
+        filled = self.db.scalar(
+            _f(select(func.count()).select_from(StaffingRequest).where(StaffingRequest.status.in_(_FILLED)))
+        ) or 0
+        cancelled = self.db.scalar(
+            _f(select(func.count()).select_from(StaffingRequest).where(StaffingRequest.status == RequestStatus.CANCELLED))
+        ) or 0
+        expired = self.db.scalar(
+            _f(select(func.count()).select_from(StaffingRequest).where(StaffingRequest.status == RequestStatus.EXPIRED))
+        ) or 0
+        avg_seconds = self.db.scalar(
+            _f(
+                select(func.avg(func.extract('epoch', StaffingRequest.assigned_at - StaffingRequest.created_at)))
+                .select_from(StaffingRequest)
+                .where(StaffingRequest.assigned_at.isnot(None))
+            )
+        )
+        sites = 1 if site_id is not None else len(self._activity_org_ids(scope))
+        return {
+            'posted': posted,
+            'filled': filled,
+            'cancelled': cancelled,
+            'expired': expired,
+            'fill_rate': round(100 * filled / posted) if posted else 0,
+            'avg_time_to_fill_minutes': int(avg_seconds / 60) if avg_seconds else None,
+            'sites': sites,
+        }
+
+    def admin_activity(
+        self,
+        scope: AccessScope,
+        filter_bucket: str = 'all',
+        cursor: datetime | None = None,
+        limit: int = 50,
+        site_id: UUID | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
+    ) -> dict:
+        """Coordinator audit timeline (ADMIN_ORG_HISTORY_HANDOFF §3) — same
+        audit_logs table as APF activity, scoped to the caller's sites
+        (AccessScope.org_ids), with the request-lifecycle bucket taxonomy,
+        a KPI strip, optional site + date-range filters, and cursor paging."""
+        limit = max(1, min(limit, 100))
+
+        if site_id is not None and site_id not in set(self._activity_org_ids(scope)):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail='You do not have access to this site.',
+            )
+
+        def _filtered(stmt):
+            stmt = self._scope_audit_logs(stmt, scope)
+            if site_id is not None:
+                stmt = stmt.where(AuditLog.organization_id == site_id)
+            if since is not None:
+                stmt = stmt.where(AuditLog.created_at >= since)
+            if until is not None:
+                stmt = stmt.where(AuditLog.created_at <= until)
+            return stmt
+
+        # Facet counts (in-context with site/date filters), one scan.
+        action_counts = {
+            row[0]: row[1]
+            for row in self.db.execute(
+                _filtered(select(AuditLog.action, func.count()).group_by(AuditLog.action))
+            ).all()
+        }
+        counts = {'all': sum(action_counts.values())}
+        for bucket in _ADMIN_BUCKETS:
+            counts[bucket] = 0
+        for action, count in action_counts.items():
+            for bucket in _admin_buckets_for(action):
+                counts[bucket] += count
+
+        page_stmt = _filtered(select(AuditLog))
+        if filter_bucket != 'all':
+            allowed = [a for a in _ADMIN_ACTION_BUCKETS if filter_bucket in _ADMIN_ACTION_BUCKETS[a]]
+            page_stmt = page_stmt.where(AuditLog.action.in_(allowed)) if allowed else page_stmt.where(sa.false())
+        if cursor is not None:
+            page_stmt = page_stmt.where(AuditLog.created_at < cursor)
+
+        rows = list(
+            self.db.scalars(
+                page_stmt.order_by(AuditLog.created_at.desc(), AuditLog.id.desc()).limit(limit + 1)
+            ).all()
+        )
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        next_cursor = rows[-1].created_at if has_more and rows else None
+
+        return {
+            'items': self._resolve_activity_items(rows),
+            'next_cursor': next_cursor,
+            'counts': counts,
+            'kpis': self._admin_activity_kpis(scope, site_id, since, until),
         }
 
     def org_snapshot(self, scope: AccessScope, org_id: UUID) -> dict:
