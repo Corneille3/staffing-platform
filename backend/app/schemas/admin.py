@@ -208,6 +208,7 @@ class AdminDashboardKpis(BaseModel):
     fill_rate_delta: int
     avg_time_to_fill_minutes: int | None = None
     open_count: int
+    assigned_count: int = 0
     substitutes_ready: int
 
 

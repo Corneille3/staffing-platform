@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
@@ -19,6 +20,7 @@ from app.models.worker_profile import WorkerProfile
 from app.models.worker_qualification import WorkerQualification
 from app.models.worker_region import WorkerRegion
 from app.notifications.email_service import EmailMessage, EmailNotificationService
+from app.notifications.i18n import localized
 from app.repositories.worker_repository import WorkerRepository
 from app.schemas.worker import WorkerInviteCreate, WorkerOnboardCreate
 from app.services.audit_service import AuditService
@@ -38,20 +40,27 @@ class WorkerService:
 
     def _send_invite_email(self, user: User) -> None:
         portal_url = self._portal_url()
-        subject = '[Staffig] Invitation to join the substitute pool'
-        body = (
+        signup_url = f'{portal_url}/sign-up?email_address={quote(user.email)}'
+        fr = (
             f'Bonjour {user.first_name},\n\n'
-            f'You have been invited to join the Staffig substitute pool.\n\n'
-            f'Sign in or create your Staffig account with this email address:\n'
-            f'{portal_url}/sign-in\n\n'
-            f'After sign-in, you will be prompted to complete your profile.\n'
-            f'\n---\n\n'
+            f'Vous avez été invité(e) à rejoindre le bassin de remplaçant(e)s Staffig.\n\n'
+            f'Créez votre compte Staffig avec cette adresse courriel :\n'
+            f'{signup_url}\n\n'
+            f'Après votre inscription, vous serez invité(e) à compléter votre profil.\n'
+        )
+        en = (
             f'Hello {user.first_name},\n\n'
             f'You have been invited to join the Staffig substitute pool.\n\n'
-            f'Sign in or create your Staffig account with this email address:\n'
-            f'{portal_url}/sign-in\n\n'
-            f'After sign-in, you will be prompted to complete your profile.\n'
+            f'Create your Staffig account with this email address:\n'
+            f'{signup_url}\n\n'
+            f'After you sign up, you will be prompted to complete your profile.\n'
         )
+        subject = localized(
+            user.preferred_language,
+            '[Staffig] Invitation à rejoindre le bassin de remplaçant(e)s',
+            '[Staffig] Invitation to join the substitute pool',
+        )
+        body = localized(user.preferred_language, fr, en)
         self.email.send(EmailMessage(to_email=user.email, subject=subject, body=body))
 
     def list(self) -> list[User]:

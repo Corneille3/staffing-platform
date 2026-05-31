@@ -291,6 +291,7 @@ export type AdminDashboardKpis = {
   fill_rate_delta: number;
   avg_time_to_fill_minutes: number | null;
   open_count: number;
+  assigned_count: number;
   substitutes_ready: number;
 };
 

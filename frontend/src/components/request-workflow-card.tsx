@@ -739,7 +739,7 @@ function WorkerReviewCard({
           minHeight: 44,
         }}
       >
-        Confirm this substitute
+        {disabled ? "Assigning…" : `Assign ${worker.first_name}`}
       </button>
     </article>
   );

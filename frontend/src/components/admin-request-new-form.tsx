@@ -10,46 +10,16 @@ import {
   rankAdminSubstitutes,
 } from "../lib/browser-api";
 import type { Organization } from "../lib/types";
+import {
+  CERTIFICATIONS,
+  COVERAGE_TYPES,
+  LANGUAGES,
+  QUALIFICATIONS,
+  ROLES,
+} from "../lib/request-form-options";
 import { Eyebrow, Mono } from "./ui";
 
 const STEPS = ["Where & when", "Who you need", "Notify"] as const;
-
-const ROLES: { value: string; label: string }[] = [
-  { value: "educator", label: "Educator" },
-  { value: "assistant_educator", label: "Assistant educator" },
-  { value: "psw", label: "PSW" },
-  { value: "nurse", label: "Nurse" },
-  { value: "food_handler", label: "Food handler" },
-  { value: "other", label: "Other" },
-];
-
-const QUALIFICATIONS = [
-  { code: "ECE_LEVEL_1", label: "ECE Level 1" },
-  { code: "AEC_PETITE_ENFANCE", label: "AEC Petite enfance" },
-  { code: "DEC_TEE", label: "DEC TEE" },
-  { code: "PSW", label: "PSW" },
-  { code: "NURSE", label: "Nurse" },
-];
-
-const CERTIFICATIONS = [
-  { code: "FIRST_AID", label: "First Aid" },
-  { code: "FOOD_HANDLER", label: "Food Handler" },
-  { code: "CPR", label: "CPR" },
-];
-
-const LANGUAGES = [
-  { value: "fr", label: "French" },
-  { value: "en", label: "English" },
-  { value: "bilingual", label: "Bilingual" },
-  { value: "", label: "No preference" },
-];
-
-const COVERAGE_TYPES: { value: string; label: string; sub: string }[] = [
-  { value: "same_day_urgent", label: "Same-day urgent", sub: "Notify in 15 min · phone too" },
-  { value: "planned_absence", label: "Planned absence", sub: "Notify over 24 h" },
-  { value: "recurring", label: "Recurring", sub: "Repeats weekly" },
-  { value: "emergency", label: "Emergency", sub: "Page everyone available" },
-];
 
 interface DraftState {
   organization_id: string;

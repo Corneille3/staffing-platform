@@ -113,7 +113,7 @@ export default async function AdminDashboardPage() {
           <PanelHeader title="Live requests" href="/admin/requests" linkLabel="All requests →" />
           <div style={{ display: "grid", gap: 8 }}>
             {live_requests.length === 0 ? (
-              <p style={{ color: "var(--ink-3)", fontSize: 13 }}>Nothing else in the queue.</p>
+              <LiveRequestsEmptyState assignedCount={kpis.assigned_count} />
             ) : (
               live_requests.map((r) => <LiveRow key={r.id} r={r} siteName={siteNames[r.organization_id] ?? ""} />)
             )}
@@ -183,6 +183,44 @@ export default async function AdminDashboardPage() {
           </div>
         </section>
       </div>
+    </div>
+  );
+}
+
+function LiveRequestsEmptyState({ assignedCount }: { assignedCount: number }) {
+  // Distinguish "nothing has happened yet" from "everything's handled" so a new
+  // coordinator and a caught-up one don't see the same blank panel (E2E bug #7).
+  const allHandled = assignedCount > 0;
+  return (
+    <div
+      style={{
+        background: "var(--card)",
+        border: "0.5px dashed var(--line)",
+        borderRadius: "var(--r-md)",
+        padding: "18px 16px",
+        textAlign: "center",
+      }}
+    >
+      <p style={{ margin: 0, fontSize: 13, color: "var(--ink-2)" }}>
+        {allHandled
+          ? "Nothing needs your attention right now."
+          : "No active requests yet."}
+      </p>
+      <Link
+        href={allHandled ? "/admin/requests?tab=assigned" : "/admin/requests/new"}
+        style={{
+          display: "inline-block",
+          marginTop: 8,
+          fontSize: 13,
+          fontWeight: 500,
+          color: "var(--terra)",
+          textDecoration: "none",
+        }}
+      >
+        {allHandled
+          ? `View ${assignedCount} assigned shift${assignedCount === 1 ? "" : "s"} →`
+          : "+ Create a request to start dispatching"}
+      </Link>
     </div>
   );
 }

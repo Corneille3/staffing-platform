@@ -171,12 +171,43 @@ def test_admin_patch_replaces_qualifications_list(apf_client, seed):
     assert set(quals) == {'PSW', 'NURSE'}
 
 
-def test_admin_patch_rejects_after_publish(apf_client, seed):
+def test_admin_patch_allows_edit_after_publish(apf_client, seed):
+    """E2E bug #6: a published-but-pre-assigned request is still editable
+    (coordinator fixing a date/location typo). Editing does not re-notify."""
+    rid = apf_client.post(
+        '/api/v1/admin/requests',
+        json=request_payload(seed.org.id, seed.apf.id),
+    ).json()['id']
+    apf_client.post(f'/api/v1/requests/{rid}/publish')  # -> notified
+
+    patch = apf_client.patch(
+        f'/api/v1/admin/requests/{rid}',
+        json={'work_date': '2026-09-01', 'location_name': 'Toddler room'},
+    )
+    assert patch.status_code == 200, patch.text
+    data = patch.json()
+    assert data['work_date'] == '2026-09-01'
+    assert data['location_name'] == 'Toddler room'
+    # Still notified — editing must not silently flip the lifecycle status.
+    assert data['status'] == 'notified'
+
+
+def test_admin_patch_rejects_after_assignment(apf_client, worker_a_client, seed):
+    """Once a worker is assigned the shift is locked — PATCH returns 409."""
     rid = apf_client.post(
         '/api/v1/admin/requests',
         json=request_payload(seed.org.id, seed.apf.id),
     ).json()['id']
     apf_client.post(f'/api/v1/requests/{rid}/publish')
+    worker_a_client.post(
+        f'/api/v1/requests/{rid}/responses/accept',
+        json={'worker_user_id': str(seed.worker_a.id)},
+    )
+    apf_client.post('/api/v1/assignments', json={
+        'staffing_request_id': rid,
+        'worker_user_id': str(seed.worker_a.id),
+        'assigned_by_user_id': str(seed.apf.id),
+    })
 
     patch = apf_client.patch(
         f'/api/v1/admin/requests/{rid}',

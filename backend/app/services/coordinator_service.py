@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from urllib.parse import quote
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
@@ -15,6 +16,7 @@ from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 from app.schemas.coordinator import CoordinatorInviteCreate
 from app.notifications.email_service import EmailMessage, EmailNotificationService
+from app.notifications.i18n import localized
 from app.services.audit_service import AuditService
 
 
@@ -31,21 +33,30 @@ class CoordinatorService:
 
     def _send_invite_email(self, user: User, orgs: list[Organization]) -> None:
         portal_url = self._portal_url()
+        signup_url = f'{portal_url}/sign-up?email_address={quote(user.email)}'
         org_names = ', '.join(org.name for org in orgs) if orgs else 'your assigned organization(s)'
-        subject = f'[Staffig] Invitation to coordinate {org_names}'
-        body = (
+        org_names_fr = ', '.join(org.name for org in orgs) if orgs else 'votre/vos organisation(s) assignée(s)'
+
+        fr = (
             f'Bonjour {user.first_name},\n\n'
-            f'You have been invited as a coordinator for {org_names}.\n\n'
-            f'Sign in or create your Staffig account with this email address:\n'
-            f'{portal_url}/sign-in\n\n'
-            f'When you sign in, the platform will link your account to your assigned role automatically.\n'
-            f'\n---\n\n'
+            f'Vous avez été invité(e) à coordonner {org_names_fr}.\n\n'
+            f'Créez votre compte Staffig avec cette adresse courriel :\n'
+            f'{signup_url}\n\n'
+            f'Lors de votre inscription, la plateforme reliera automatiquement votre compte à votre rôle.\n'
+        )
+        en = (
             f'Hello {user.first_name},\n\n'
             f'You have been invited as a coordinator for {org_names}.\n\n'
-            f'Sign in or create your Staffig account with this email address:\n'
-            f'{portal_url}/sign-in\n\n'
-            f'When you sign in, the platform will link your account to your assigned role automatically.\n'
+            f'Create your Staffig account with this email address:\n'
+            f'{signup_url}\n\n'
+            f'When you sign up, the platform will link your account to your assigned role automatically.\n'
         )
+        subject = localized(
+            user.preferred_language,
+            f'[Staffig] Invitation à coordonner {org_names_fr}',
+            f'[Staffig] Invitation to coordinate {org_names}',
+        )
+        body = localized(user.preferred_language, fr, en)
         self.email.send(EmailMessage(to_email=user.email, subject=subject, body=body))
 
     def invite(self, payload: CoordinatorInviteCreate, scope: AccessScope) -> tuple[User, list[Organization]]:

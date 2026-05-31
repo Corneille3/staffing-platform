@@ -218,7 +218,12 @@ def test_coordinator_invite_sends_email(apf_client, monkeypatch, seed):
     assert resp.status_code == 201
     assert sent
     assert sent[0].to_email.startswith('casey-')
-    assert 'sign-in' in sent[0].body
+    # #4: invite links point at sign-up (with prefilled email), not sign-in.
+    assert 'sign-up' in sent[0].body
+    assert 'sign-in' not in sent[0].body
+    # #2: an English-preference invitee gets an English-only body.
+    assert 'Hello Casey' in sent[0].body
+    assert 'Bonjour' not in sent[0].body
 
 
 def test_worker_invite_sends_email(apf_client, monkeypatch):
@@ -243,7 +248,12 @@ def test_worker_invite_sends_email(apf_client, monkeypatch):
     assert resp.status_code == 201
     assert sent
     assert sent[0].to_email.startswith('wendy-')
-    assert 'sign-in' in sent[0].body
+    # #4: sign-up link, not sign-in.
+    assert 'sign-up' in sent[0].body
+    assert 'sign-in' not in sent[0].body
+    # #2: a French-preference invitee gets a French-only body.
+    assert 'Bonjour Wendy' in sent[0].body
+    assert 'Hello' not in sent[0].body
 
 
 # ── auth/sync ─────────────────────────────────────────────────────────────────

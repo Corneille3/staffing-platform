@@ -18,7 +18,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True)
     phone: Mapped[str | None] = mapped_column(String(50))
     role: Mapped[UserRole] = mapped_column(db_enum(UserRole, 'user_role'))
-    preferred_language: Mapped[str] = mapped_column(String(5), default='fr', server_default='fr')
+    preferred_language: Mapped[str] = mapped_column(String(20), default='fr', server_default='fr')
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default='true')
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
