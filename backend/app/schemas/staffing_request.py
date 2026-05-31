@@ -88,4 +88,5 @@ class StaffingRequestRead(StaffingRequestBase, TimestampedSchema):
     assigned_at: datetime | None = None
     cancelled_at: datetime | None = None
     completed_at: datetime | None = None
+    content_last_edited_at: datetime | None = None
     organization: OrganizationSummary | None = None

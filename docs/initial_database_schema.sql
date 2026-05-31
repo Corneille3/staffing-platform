@@ -126,6 +126,7 @@ CREATE TABLE staffing_requests (
     assigned_at TIMESTAMPTZ,
     cancelled_at TIMESTAMPTZ,
     completed_at TIMESTAMPTZ,
+    content_last_edited_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -159,6 +160,7 @@ CREATE TABLE request_responses (
     status response_status NOT NULL,
     decline_reason VARCHAR(255),
     viewed_at TIMESTAMPTZ,
+    last_reviewed_at TIMESTAMPTZ,
     responded_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

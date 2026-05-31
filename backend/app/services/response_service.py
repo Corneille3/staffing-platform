@@ -27,14 +27,18 @@ class ResponseService:
         if response is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Response not found')
 
+        now = datetime.now(timezone.utc)
+        # last_reviewed_at bumps on every open so the worker "modified" banner
+        # clears once they look again; viewed_at + the NOTIFIED->VIEWED
+        # transition stay first-view-only.
+        response.last_reviewed_at = now
         if response.status == ResponseStatus.NOTIFIED:
             response.status = ResponseStatus.VIEWED
-            response.viewed_at = datetime.now(timezone.utc)
-            saved = self.response_repository.save(response)
-            self.db.commit()
-            return saved
+            response.viewed_at = now
 
-        return response
+        saved = self.response_repository.save(response)
+        self.db.commit()
+        return saved
 
     def set_status(
         self,

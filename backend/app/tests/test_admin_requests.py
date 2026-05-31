@@ -192,6 +192,31 @@ def test_admin_patch_allows_edit_after_publish(apf_client, seed):
     assert data['status'] == 'notified'
 
 
+def test_edit_after_publish_stamps_content_last_edited_at(apf_client, seed):
+    """The worker "modified" banner signal: a real post-publish content edit
+    sets content_last_edited_at; it's null up to that point."""
+    rid = apf_client.post(
+        '/api/v1/admin/requests',
+        json=request_payload(seed.org.id, seed.apf.id),
+    ).json()['id']
+    apf_client.post(f'/api/v1/requests/{rid}/publish')
+    assert apf_client.get(f'/api/v1/requests/{rid}').json()['content_last_edited_at'] is None
+
+    apf_client.patch(f'/api/v1/admin/requests/{rid}', json={'location_name': 'New room'})
+    assert apf_client.get(f'/api/v1/requests/{rid}').json()['content_last_edited_at'] is not None
+
+
+def test_draft_edit_does_not_stamp_content_last_edited_at(apf_client, seed):
+    """Editing a still-draft request (create-flow autosave) must NOT set the
+    signal — no worker has been notified yet."""
+    rid = apf_client.post(
+        '/api/v1/admin/requests',
+        json=request_payload(seed.org.id, seed.apf.id),
+    ).json()['id']
+    apf_client.patch(f'/api/v1/admin/requests/{rid}', json={'title': 'Draft tweak'})
+    assert apf_client.get(f'/api/v1/requests/{rid}').json()['content_last_edited_at'] is None
+
+
 def test_admin_patch_rejects_after_assignment(apf_client, worker_a_client, seed):
     """Once a worker is assigned the shift is locked — PATCH returns 409."""
     rid = apf_client.post(

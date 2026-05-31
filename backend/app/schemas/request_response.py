@@ -14,6 +14,7 @@ class RequestResponseRead(TimestampedSchema):
     status: ResponseStatus
     decline_reason: str | None = None
     viewed_at: datetime | None = None
+    last_reviewed_at: datetime | None = None
     responded_at: datetime | None = None
 
 

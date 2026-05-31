@@ -57,7 +57,8 @@
       "chipSent": "Réponse envoyée",
       "chipDeclined": "Décliné",
       "iCanTakeIt": "Je peux le prendre",
-      "waitingForConfirmation": "En attente de confirmation"
+      "waitingForConfirmation": "En attente de confirmation",
+      "modifiedBanner": "Modifié — à revoir"
     },
     "schedule": {
       "noShifts": "Aucun quart",
@@ -253,7 +254,8 @@
       "declineNotesPlaceholder": "Autre chose à signaler? (facultatif)",
       "declineConfirm": "Envoyer le refus",
       "decliningProgress": "Envoi…",
-      "cancel": "Annuler"
+      "cancel": "Annuler",
+      "modifiedBanner": "Ce quart a été modifié depuis votre dernière consultation — veuillez revoir les détails ci-dessous."
     },
     "requestAccepted": {
       "back": "Retour",

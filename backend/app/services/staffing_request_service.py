@@ -208,6 +208,10 @@ class StaffingRequestService:
 
         self.db.flush()
         if touched:
+            # Only a real post-publish content edit drives the worker "modified"
+            # banner — not draft autosaves (no one's been notified yet).
+            if not was_draft:
+                staffing_request.content_last_edited_at = datetime.utcnow()
             self.audit_service.log(
                 action='staffing_request.draft_updated' if was_draft else 'staffing_request.updated',
                 entity_type='staffing_request',
