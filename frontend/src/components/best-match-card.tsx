@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Check, Sparkles } from "lucide-react";
+import { errorMessageFromResponse } from "../lib/browser-api";
 import type { EligibilityReason, Worker } from "../lib/types";
 
 const browserApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
@@ -89,8 +90,7 @@ export function BestMatchCard({ worker, matchScore, reasons, requestId, orgAdmin
         }),
       });
       if (!resp.ok) {
-        const text = await resp.text();
-        throw new Error(text || `Assign failed (${resp.status})`);
+        throw new Error(await errorMessageFromResponse(resp, `Assign failed (${resp.status})`));
       }
       startTransition(() => router.refresh());
     } catch (err) {

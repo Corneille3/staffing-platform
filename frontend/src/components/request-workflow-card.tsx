@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { CheckCircle2 } from "lucide-react";
+import { errorMessageFromResponse } from "../lib/browser-api";
 import { availabilityStatusLabel } from "../lib/status-labels";
 import { Eyebrow } from "./ui";
 import { Assignment, RequestResponse, StaffingRequest, User, Worker } from "../lib/types";
@@ -93,8 +94,7 @@ export function RequestWorkflowCard({
     });
 
     if (!response.ok) {
-      const text = await response.text();
-      setError(text || `Action failed with status ${response.status}`);
+      setError(await errorMessageFromResponse(response, `Action failed with status ${response.status}`));
       return;
     }
 

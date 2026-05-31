@@ -37,12 +37,34 @@ async function authHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// Turn a failed Response into a human message. FastAPI returns
+// {"detail": "..."} (or a list of validation errors) — surfacing the raw JSON
+// body in the UI looks broken, so pull out `detail` when present.
+export async function errorMessageFromResponse(response: Response, fallback: string): Promise<string> {
+  const text = await response.text().catch(() => "");
+  if (!text) return fallback;
+  try {
+    const body = JSON.parse(text);
+    const detail = body?.detail;
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+      const msg = detail.map((d) => d?.msg).filter(Boolean).join("; ");
+      if (msg) return msg;
+    }
+  } catch {
+    // Not JSON — fall through to the raw text.
+  }
+  return text || fallback;
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
     cache: "no-store",
     headers: await authHeaders(),
   });
-  if (!response.ok) throw new Error(`GET ${path} failed (${response.status})`);
+  if (!response.ok) {
+    throw new Error(await errorMessageFromResponse(response, `GET ${path} failed (${response.status})`));
+  }
   return response.json();
 }
 
@@ -53,8 +75,7 @@ async function postJson<T>(path: string, body?: object): Promise<T> {
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `POST ${path} failed (${response.status})`);
+    throw new Error(await errorMessageFromResponse(response, `POST ${path} failed (${response.status})`));
   }
   return response.json();
 }
@@ -65,8 +86,7 @@ async function deleteJson<T>(path: string): Promise<T> {
     headers: await authHeaders(),
   });
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `DELETE ${path} failed (${response.status})`);
+    throw new Error(await errorMessageFromResponse(response, `DELETE ${path} failed (${response.status})`));
   }
   return response.json();
 }
@@ -78,8 +98,7 @@ async function patchJson<T>(path: string, body: object): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `PATCH ${path} failed (${response.status})`);
+    throw new Error(await errorMessageFromResponse(response, `PATCH ${path} failed (${response.status})`));
   }
   return response.json();
 }
