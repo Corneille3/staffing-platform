@@ -31,7 +31,7 @@ class Organization(Base):
     postal_code: Mapped[str | None] = mapped_column(String(20))
     contact_email: Mapped[str | None] = mapped_column(String(255))
     contact_phone: Mapped[str | None] = mapped_column(String(50))
-    preferred_language: Mapped[str] = mapped_column(String(5), default='fr', server_default='fr')
+    preferred_language: Mapped[str] = mapped_column(String(20), default='fr', server_default='fr')
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default='true')
     # Multi-site descriptors (per ADMIN_ORG_HISTORY_HANDOFF §1) — all optional.
     capacity: Mapped[int | None] = mapped_column(Integer)

@@ -127,11 +127,18 @@ class AdminDashboardService:
                 )
             ) or 0
 
+        assigned_count = self.db.scalar(
+            self.reporting._scope_requests(
+                select(func.count()).select_from(StaffingRequest), scope,
+            ).where(StaffingRequest.status == RequestStatus.ASSIGNED)
+        ) or 0
+
         return {
             'fill_rate_week': this_week or 0,
             'fill_rate_delta': (this_week - last_week) if (this_week is not None and last_week is not None) else 0,
             'avg_time_to_fill_minutes': int(avg_seconds / 60) if avg_seconds else None,
             'open_count': open_count,
+            'assigned_count': assigned_count,
             'substitutes_ready': subs,
         }
 

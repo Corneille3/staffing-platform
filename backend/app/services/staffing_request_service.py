@@ -118,27 +118,43 @@ class StaffingRequestService:
         self.db.commit()
         return created
 
+    # Statuses whose details a coordinator may still edit. Once a worker is
+    # assigned (or the request is completed/cancelled/expired) the shift is
+    # locked — editing then must go through cancel/recreate so nobody shows up
+    # at a time/place that silently changed under them.
+    EDITABLE_STATUSES = frozenset({
+        RequestStatus.DRAFT,
+        RequestStatus.OPEN,
+        RequestStatus.NOTIFIED,
+        RequestStatus.RESPONSES_RECEIVED,
+    })
+
     def update_draft(
         self,
         request_id: UUID,
         payload: StaffingRequestDraftUpdate,
         scope: AccessScope,
     ) -> StaffingRequest:
-        """Apply partial updates to a request that is still in draft.
+        """Apply partial updates to a request that hasn't been assigned yet.
 
-        Only fields explicitly set on the payload are touched. Once a request
-        has moved out of draft (open/notified/etc), this raises 409 — autosave
-        is for the create flow only; published requests are edited through
-        dedicated cancel/renotify endpoints.
+        Only fields explicitly set on the payload are touched. Drafts use this
+        for create-flow autosave; published-but-pre-assigned requests use it for
+        coordinator edits (E2E bug #6). Editing does NOT re-notify already-
+        notified workers or reset their responses — the caller is warned in the
+        UI to use the re-notify control. Once assigned/closed, this raises 409.
         """
         staffing_request = self._get_required(request_id)
         if not self.repository.can_access(staffing_request, scope):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Out of scope.')
-        if staffing_request.status != RequestStatus.DRAFT:
+        if staffing_request.status not in self.EDITABLE_STATUSES:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail='Only drafts can be autosaved. This request has already moved past draft.',
+                detail=(
+                    'This request can no longer be edited — it has been assigned '
+                    'or closed. Cancel the assignment first to change shift details.'
+                ),
             )
+        was_draft = staffing_request.status == RequestStatus.DRAFT
 
         data = payload.model_dump(exclude_unset=True)
 
@@ -193,7 +209,7 @@ class StaffingRequestService:
         self.db.flush()
         if touched:
             self.audit_service.log(
-                action='staffing_request.draft_updated',
+                action='staffing_request.draft_updated' if was_draft else 'staffing_request.updated',
                 entity_type='staffing_request',
                 entity_id=staffing_request.id,
                 actor_user_id=scope.user.id,

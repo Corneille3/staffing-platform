@@ -28,7 +28,7 @@ CREATE TABLE organizations (
     postal_code VARCHAR(20),
     contact_email VARCHAR(255),
     contact_phone VARCHAR(50),
-    preferred_language VARCHAR(5) NOT NULL DEFAULT 'fr',
+    preferred_language VARCHAR(20) NOT NULL DEFAULT 'fr',
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     capacity INTEGER,
     enrolled_count INTEGER,
@@ -45,7 +45,7 @@ CREATE TABLE users (
     email VARCHAR(255) UNIQUE NOT NULL,
     phone VARCHAR(50),
     role user_role NOT NULL,
-    preferred_language VARCHAR(5) NOT NULL DEFAULT 'fr',
+    preferred_language VARCHAR(20) NOT NULL DEFAULT 'fr',
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

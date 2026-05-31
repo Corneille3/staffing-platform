@@ -8,7 +8,8 @@ def test_dashboard_shape(org_admin_client, seed):
     d = resp.json()
     assert d['coordinator']['first_name'] == seed.org_admin.first_name
     assert set(d['kpis']) == {
-        'fill_rate_week', 'fill_rate_delta', 'avg_time_to_fill_minutes', 'open_count', 'substitutes_ready',
+        'fill_rate_week', 'fill_rate_delta', 'avg_time_to_fill_minutes', 'open_count',
+        'assigned_count', 'substitutes_ready',
     }
     assert isinstance(d['live_requests'], list)
     assert len(d['week_fill_rate']) == 7
