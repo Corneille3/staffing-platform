@@ -142,7 +142,7 @@ export function AdminRequestEditForm({
             Substitutes have already been notified about this shift. Saving here
             <strong style={{ fontWeight: 600 }}> won&rsquo;t re-notify them</strong> — if you change the
             date, time, or location, use <strong style={{ fontWeight: 600 }}>Re-notify</strong> on the
-            request page afterwards so they see the update.
+            request page afterwards so they&rsquo;re alerted to the change.
           </div>
         </div>
       )}

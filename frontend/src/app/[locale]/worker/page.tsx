@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Calendar, MapPin } from "lucide-react";
+import { Calendar, MapPin, RefreshCw } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "../../../i18n/navigation";
 import {
@@ -17,6 +17,7 @@ import {
   locationLabel,
   roleSectorSubtitle,
 } from "../../../lib/format";
+import { modifiedSinceReview } from "../../../lib/request-modified";
 import { Assignment, RequestResponse, StaffingRequest, Worker } from "../../../lib/types";
 import { useWorkerSession } from "../../../lib/worker-session";
 import { Avatar, Chip, Meta, Mono } from "../../../components/ui";
@@ -26,6 +27,7 @@ type CardStatus = "new" | "sent" | "filled" | "declined";
 interface InboxItem {
   request: StaffingRequest;
   status: CardStatus;
+  modified: boolean;
 }
 
 export default function WorkerHome() {
@@ -83,7 +85,9 @@ export default function WorkerHome() {
       // "viewed" means opened but not yet replied — falls through to the
       // default "new" so it stays in the action bucket ("Awaiting your reply"),
       // never the "Reply sent" chip which is reserved for an actual accept.
-      return { request: req, status };
+      const modified =
+        (status === "new" || status === "sent") && modifiedSinceReview(req, myResponse);
+      return { request: req, status, modified };
     });
 
   const activeItems = inboxItems.filter((i) => i.status === "new" || i.status === "sent");
@@ -208,11 +212,12 @@ export default function WorkerHome() {
           {tab === "active" ? t("noActive") : t("noHistory")}
         </div>
       ) : (
-        displayed.map(({ request, status }) => (
+        displayed.map(({ request, status, modified }) => (
           <RequestCard
             key={request.id}
             request={request}
             status={status}
+            modified={modified}
             worker={worker}
             locale={locale}
             t={t}
@@ -232,6 +237,7 @@ export default function WorkerHome() {
 function RequestCard({
   request,
   status,
+  modified,
   worker,
   locale,
   t,
@@ -240,6 +246,7 @@ function RequestCard({
 }: {
   request: StaffingRequest;
   status: CardStatus;
+  modified: boolean;
   worker: Worker;
   locale: "fr" | "en";
   t: ReturnType<typeof useTranslations>;
@@ -293,6 +300,27 @@ function RequestCard({
     >
       {urgent && (
         <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--terra)" }} />
+      )}
+
+      {modified && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            marginBottom: 10,
+            padding: "7px 10px",
+            borderRadius: 10,
+            background: "var(--sand-soft)",
+            border: "0.5px solid var(--sand)",
+            color: "#7C5C12",
+            fontSize: 12,
+            fontWeight: 600,
+          }}
+        >
+          <RefreshCw size={13} strokeWidth={2} />
+          {t("modifiedBanner")}
+        </div>
       )}
 
       {/* Top row: chips + time */}

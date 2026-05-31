@@ -133,6 +133,33 @@ def test_mark_viewed_is_idempotent(apf_client, worker_a_client, seed):
     assert resp.status_code == 200
 
 
+def test_last_reviewed_at_bumps_while_viewed_at_freezes(apf_client, worker_a_client, seed):
+    """Banner-clear mechanism (#6 follow-up): viewed_at freezes on first view,
+    but last_reviewed_at advances each open — so an edit between views leaves
+    last_reviewed_at ahead of viewed_at."""
+    request_id = apf_client.post(
+        '/api/v1/requests', json=request_payload(seed.org.id, seed.apf.id),
+    ).json()['id']
+    apf_client.post(f'/api/v1/requests/{request_id}/publish')
+
+    first = worker_a_client.post(
+        f'/api/v1/requests/{request_id}/responses/view',
+        json={'worker_user_id': str(seed.worker_a.id)},
+    ).json()
+    assert first['viewed_at'] is not None
+    assert first['last_reviewed_at'] is not None
+
+    # Coordinator edits the published request, then the worker opens it again.
+    apf_client.patch(f'/api/v1/admin/requests/{request_id}', json={'location_name': 'Room B'})
+    second = worker_a_client.post(
+        f'/api/v1/requests/{request_id}/responses/view',
+        json={'worker_user_id': str(seed.worker_a.id)},
+    ).json()
+
+    assert second['viewed_at'] == first['viewed_at']            # frozen at first view
+    assert second['last_reviewed_at'] > first['last_reviewed_at']  # advanced on re-open
+
+
 # ── assign ────────────────────────────────────────────────────────────────────
 
 def test_assign_confirmed_worker(apf_client, worker_a_client, seed):

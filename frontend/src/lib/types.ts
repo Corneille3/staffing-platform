@@ -509,6 +509,7 @@ export type StaffingRequest = {
   assigned_at?: string | null;
   cancelled_at?: string | null;
   completed_at?: string | null;
+  content_last_edited_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -542,6 +543,7 @@ export type RequestResponse = {
   status: string;
   decline_reason: string | null;
   viewed_at: string | null;
+  last_reviewed_at: string | null;
   responded_at: string | null;
 };
 

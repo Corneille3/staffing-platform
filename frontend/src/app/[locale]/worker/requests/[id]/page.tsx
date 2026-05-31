@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Calendar, Check, MapPin, X } from "lucide-react";
+import { ArrowLeft, Calendar, Check, MapPin, RefreshCw, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "../../../../../i18n/navigation";
 import {
@@ -20,6 +20,7 @@ import {
   locationLabel,
   roleSectorSubtitle,
 } from "../../../../../lib/format";
+import { modifiedSinceReview } from "../../../../../lib/request-modified";
 import { EligibilityResult, RequestResponse, StaffingRequest } from "../../../../../lib/types";
 import { useWorkerSession } from "../../../../../lib/worker-session";
 import { Chip, Eyebrow, Mono } from "../../../../../components/ui";
@@ -62,7 +63,9 @@ export default function WorkerRequestDetailPage() {
         setEligibility(elig);
         const mine = responses.find((r) => r.worker_user_id === worker.id) ?? null;
         setMyResponse(mine);
-        if (mine && !mine.viewed_at) {
+        // Mark on every open (not just first) so last_reviewed_at advances and
+        // the "modified" banner clears after they've looked at the change.
+        if (mine) {
           markRequestViewed(requestId, worker.id).catch(() => undefined);
         }
       } catch (err) {
@@ -160,6 +163,26 @@ export default function WorkerRequestDetailPage() {
         }}>
           <span style={{ width: 6, height: 6, borderRadius: 99, background: "var(--rose)" }} />
           {t("urgentBanner")}
+        </div>
+      )}
+
+      {/* "Shift details changed since you last looked" — clears on next open. */}
+      {modifiedSinceReview(request, myResponse) && (
+        <div style={{
+          background: "var(--sand-soft)",
+          color: "#7C5C12",
+          border: "0.5px solid var(--sand)",
+          borderRadius: 12,
+          padding: "10px 14px",
+          marginBottom: 14,
+          fontSize: 13,
+          fontWeight: 600,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}>
+          <RefreshCw size={14} strokeWidth={2} />
+          {t("modifiedBanner")}
         </div>
       )}
 

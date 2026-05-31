@@ -57,7 +57,8 @@
       "chipSent": "Reply sent",
       "chipDeclined": "Declined",
       "iCanTakeIt": "I can take it",
-      "waitingForConfirmation": "Waiting for confirmation"
+      "waitingForConfirmation": "Waiting for confirmation",
+      "modifiedBanner": "Updated — please review"
     },
     "schedule": {
       "noShifts": "No shifts",
@@ -253,7 +254,8 @@
       "declineNotesPlaceholder": "Anything else the coordinator should know? (optional)",
       "declineConfirm": "Send decline",
       "decliningProgress": "Sending…",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "modifiedBanner": "This shift was updated since you last viewed it — please review the details below."
     },
     "requestAccepted": {
       "back": "Back",

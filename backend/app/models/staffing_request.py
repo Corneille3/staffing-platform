@@ -48,6 +48,10 @@ class StaffingRequest(Base):
     assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Stamped when a coordinator edits real content on an already-published
+    # request (see StaffingRequestService.update_draft). Drives the worker-side
+    # "task was modified — please review" banner.
+    content_last_edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
