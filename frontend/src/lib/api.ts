@@ -21,6 +21,7 @@ import {
   PlatformTenantsResponse,
   RequestResponse,
   StaffingRequest,
+  TenantProfile,
   User,
   Worker,
 } from "./types";
@@ -223,6 +224,10 @@ export async function getNetworkOverview(): Promise<NetworkOverview> {
 
 export async function getPlatformTenants(): Promise<PlatformTenantsResponse> {
   return fetchJson<PlatformTenantsResponse>("/api/v1/platform/tenants");
+}
+
+export async function getTenantProfile(): Promise<TenantProfile> {
+  return fetchJson<TenantProfile>("/api/v1/tenant/profile");
 }
 
 export async function getApfSnapshot(): Promise<ApfSnapshot> {

@@ -21,6 +21,7 @@ import {
   RequestResponse,
   SlotPeriod,
   StaffingRequest,
+  TenantProfile,
   Worker,
   WorkerProfile,
 } from "./types";
@@ -365,6 +366,19 @@ export async function fetchOrganizationsForTenant(): Promise<Organization[]> {
   return data.items;
 }
 
+// ── Tenant onboarding wizard (MULTITENANCY_HANDOFF §6) ───────────────────────
+export async function fetchTenantProfile(): Promise<TenantProfile> {
+  return getJson<TenantProfile>("/api/v1/tenant/profile");
+}
+
+export async function patchTenantProfile(payload: Record<string, unknown>): Promise<TenantProfile> {
+  return patchJson<TenantProfile>("/api/v1/tenant/profile", payload);
+}
+
+export async function completeTenantOnboarding(): Promise<TenantProfile> {
+  return postJson<TenantProfile>("/api/v1/tenant/onboarding/complete");
+}
+
 export async function createOrganization(payload: {
   name: string;
   type: string;
@@ -373,6 +387,9 @@ export async function createOrganization(payload: {
   contact_email?: string;
   contact_phone?: string;
   preferred_language: string;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  postal_code?: string | null;
 }): Promise<Organization> {
   return postJson<Organization>("/api/v1/organizations", payload);
 }

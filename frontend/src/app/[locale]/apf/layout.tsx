@@ -1,8 +1,9 @@
 import React from "react";
+import { redirect } from "next/navigation";
 import { ApfNavigation } from "../../../components/apf-navigation";
 import { HeaderSignOutButton } from "../../../components/header-sign-out-button";
 import { Eyebrow } from "../../../components/ui";
-import { getOrganizations, requireServerSession } from "../../../lib/api";
+import { getOrganizations, getTenantProfile, requireServerSession } from "../../../lib/api";
 
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -11,6 +12,14 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
   if (CLERK_ENABLED) {
     const session = await requireServerSession(["network_admin", "platform_admin"]);
     isPlatformAdmin = session.role === "platform_admin";
+    // A tenant admin whose workspace hasn't finished onboarding goes to the
+    // setup wizard (MULTITENANCY_HANDOFF §6). Platform admins skip this.
+    if (!isPlatformAdmin) {
+      const tenant = await getTenantProfile().catch(() => null);
+      if (tenant && tenant.status !== "active") {
+        redirect("/welcome");
+      }
+    }
   }
 
   let orgCount: number | null = null;

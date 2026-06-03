@@ -621,3 +621,12 @@ export type PlatformTenantsResponse = {
   kpis: PlatformKpis;
   tenants: PlatformTenantRow[];
 };
+
+export type TenantProfile = {
+  id: string;
+  name: string;
+  slug: string;
+  region: string | null;
+  status: "pending" | "onboarding" | "active" | "suspended" | string;
+  preferred_language: string;
+};
