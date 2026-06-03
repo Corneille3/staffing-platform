@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.clerk import delete_clerk_user
 from app.auth.scope import AccessScope
-from app.models.enums import UserRole
+from app.models.enums import TenantStatus, UserRole
 from app.models.organization_membership import OrganizationMembership
 from app.models.tenant import Tenant
 from app.models.tenant_membership import TenantMembership
@@ -63,6 +63,10 @@ class TenantService:
             id=uuid4(),
             name=payload.name.strip(),
             slug=slug,
+            region=payload.region.strip() if payload.region else None,
+            # Invited tenant starts PENDING — it goes ONBOARDING when the admin
+            # signs up and ACTIVE when they finish the wizard (P2).
+            status=TenantStatus.PENDING,
             is_active=True,
         )
         self.db.add(tenant)

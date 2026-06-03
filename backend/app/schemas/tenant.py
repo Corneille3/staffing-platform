@@ -12,6 +12,7 @@ class TenantNetworkCreate(BaseModel):
 
     name: str = Field(..., min_length=1, max_length=255)
     slug: str = Field(..., min_length=2, max_length=100, pattern=r'^[a-z0-9][a-z0-9-]*[a-z0-9]$')
+    region: str | None = Field(default=None, max_length=100)
     admin_first_name: str = Field(..., min_length=1, max_length=100)
     admin_last_name: str = Field(..., min_length=1, max_length=100)
     admin_email: EmailStr
@@ -37,6 +38,9 @@ class TenantNetworkRead(BaseModel):
     id: UUID
     name: str
     slug: str
+    status: str = 'active'
+    region: str | None = None
     is_active: bool
+    activated_at: datetime | None = None
     created_at: datetime
     network_admin: TenantAdminRead | None = None
