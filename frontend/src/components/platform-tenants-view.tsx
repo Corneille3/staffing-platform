@@ -187,6 +187,7 @@ function InviteTenantModal({ onClose, onCreated }: { onClose: () => void; onCrea
   const [adminFirst, setAdminFirst] = useState("");
   const [adminLast, setAdminLast] = useState("");
   const [region, setRegion] = useState("");
+  const [language, setLanguage] = useState<"fr" | "en" | "bilingual">("fr");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -205,6 +206,7 @@ function InviteTenantModal({ onClose, onCreated }: { onClose: () => void; onCrea
         admin_first_name: adminFirst.trim(),
         admin_last_name: adminLast.trim(),
         admin_email: adminEmail.trim(),
+        admin_preferred_language: language,
       });
       onCreated();
     } catch (err) {
@@ -246,6 +248,33 @@ function InviteTenantModal({ onClose, onCreated }: { onClose: () => void; onCrea
         </ModalField>
         <ModalField label="Region (optional)">
           <input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="Laurentides" style={inputStyle} />
+        </ModalField>
+        <ModalField label="Admin language">
+          <div style={{ display: "flex", gap: 8 }}>
+            {([["fr", "Français"], ["en", "English"], ["bilingual", "Bilingue"]] as const).map(([code, label]) => {
+              const active = language === code;
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setLanguage(code)}
+                  style={{
+                    flex: 1,
+                    padding: "9px 0",
+                    borderRadius: 10,
+                    cursor: "pointer",
+                    fontFamily: "var(--ui)",
+                    fontSize: 13,
+                    background: active ? "var(--ink)" : "#fff",
+                    color: active ? "var(--paper)" : "var(--ink)",
+                    border: `0.5px solid ${active ? "transparent" : "var(--line)"}`,
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </ModalField>
 
         {error ? <p style={{ margin: "4px 0 0", color: "var(--rose)", fontSize: 12 }}>{error}</p> : null}
