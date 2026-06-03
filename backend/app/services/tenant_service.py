@@ -35,7 +35,7 @@ from app.models.tenant import Tenant
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 from app.notifications.email_service import EmailMessage, EmailNotificationService
-from app.notifications.i18n import localized
+from app.notifications.i18n import localized, localized_subject
 from app.schemas.tenant import TenantNetworkCreate
 from app.services.audit_service import AuditService
 from app.services.user_service import REMOVED_EMAIL_MARKER
@@ -72,7 +72,7 @@ class TenantService:
             f'{signup_url}\n\n'
             f'After you sign up, a short wizard will help you configure your network.\n'
         )
-        subject = localized(
+        subject = localized_subject(
             admin.preferred_language,
             f'[Staffig] Invitation à créer votre réseau « {tenant.name} »',
             f'[Staffig] Set up your Staffig network "{tenant.name}"',

@@ -20,7 +20,7 @@ from app.models.worker_profile import WorkerProfile
 from app.models.worker_qualification import WorkerQualification
 from app.models.worker_region import WorkerRegion
 from app.notifications.email_service import EmailMessage, EmailNotificationService
-from app.notifications.i18n import localized
+from app.notifications.i18n import localized, localized_subject
 from app.repositories.worker_repository import WorkerRepository
 from app.schemas.worker import WorkerInviteCreate, WorkerOnboardCreate
 from app.services.audit_service import AuditService
@@ -55,7 +55,7 @@ class WorkerService:
             f'{signup_url}\n\n'
             f'After you sign up, you will be prompted to complete your profile.\n'
         )
-        subject = localized(
+        subject = localized_subject(
             user.preferred_language,
             '[Staffig] Invitation à rejoindre le bassin de remplaçant(e)s',
             '[Staffig] Invitation to join the substitute pool',
