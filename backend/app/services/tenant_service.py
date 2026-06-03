@@ -18,6 +18,8 @@ deleted best-effort). The Tenant row itself is set is_active=False —
 data is preserved for audit but the tenant is no longer operational.
 """
 
+from datetime import datetime, timezone
+from urllib.parse import quote
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
@@ -26,11 +28,14 @@ from sqlalchemy.orm import Session
 
 from app.auth.clerk import delete_clerk_user
 from app.auth.scope import AccessScope
+from app.core.config import settings
 from app.models.enums import TenantStatus, UserRole
 from app.models.organization_membership import OrganizationMembership
 from app.models.tenant import Tenant
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
+from app.notifications.email_service import EmailMessage, EmailNotificationService
+from app.notifications.i18n import localized
 from app.schemas.tenant import TenantNetworkCreate
 from app.services.audit_service import AuditService
 from app.services.user_service import REMOVED_EMAIL_MARKER
@@ -40,6 +45,43 @@ class TenantService:
     def __init__(self, db: Session) -> None:
         self.db = db
         self.audit_service = AuditService(db)
+        self.email = EmailNotificationService()
+
+    def _portal_url(self) -> str:
+        if settings.allowed_origins:
+            return settings.allowed_origins[0].rstrip('/')
+        return 'http://localhost:3000'
+
+    def _send_tenant_invite_email(self, admin: User, tenant: Tenant) -> None:
+        """Email the invited tenant admin a sign-up link. Best-effort — skipped
+        when SMTP isn't configured. Path-based routing for now (see
+        project_multitenancy_decisions): the admin signs up, /auth/sync links
+        them to this tenant, and they land in the onboarding wizard."""
+        signup_url = f'{self._portal_url()}/sign-up?email_address={quote(admin.email)}'
+        fr = (
+            f'Bonjour {admin.first_name},\n\n'
+            f'Vous avez été invité(e) à créer votre réseau « {tenant.name} » sur Staffig.\n\n'
+            f'Créez votre compte avec cette adresse courriel :\n'
+            f'{signup_url}\n\n'
+            f'Après votre inscription, vous configurerez votre réseau en quelques étapes.\n'
+        )
+        en = (
+            f'Hello {admin.first_name},\n\n'
+            f'You have been invited to set up your network "{tenant.name}" on Staffig.\n\n'
+            f'Create your account with this email address:\n'
+            f'{signup_url}\n\n'
+            f'After you sign up, a short wizard will help you configure your network.\n'
+        )
+        subject = localized(
+            admin.preferred_language,
+            f'[Staffig] Invitation à créer votre réseau « {tenant.name} »',
+            f'[Staffig] Set up your Staffig network "{tenant.name}"',
+        )
+        self.email.send(EmailMessage(
+            to_email=admin.email,
+            subject=subject,
+            body=localized(admin.preferred_language, fr, en),
+        ))
 
     def create_network(
         self, payload: TenantNetworkCreate, scope: AccessScope
@@ -109,7 +151,83 @@ class TenantService:
         self.db.commit()
         self.db.refresh(tenant)
         self.db.refresh(admin)
+
+        # Invitation email is best-effort — the tenant + admin already exist.
+        try:
+            self._send_tenant_invite_email(admin, tenant)
+        except Exception:  # pragma: no cover - never block creation on email
+            pass
+
         return tenant, admin
+
+    def _get_tenant_or_404(self, tenant_id: UUID) -> Tenant:
+        tenant = self.db.get(Tenant, tenant_id)
+        if tenant is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Network not found')
+        return tenant
+
+    def suspend(self, tenant_id: UUID, scope: AccessScope) -> Tenant:
+        """Operator pauses an active tenant (non-payment, ToS). Data preserved."""
+        tenant = self._get_tenant_or_404(tenant_id)
+        tenant.status = TenantStatus.SUSPENDED
+        tenant.is_active = False
+        self.audit_service.log(
+            action='tenant.suspended', entity_type='tenant', entity_id=tenant.id,
+            actor_user_id=scope.user.id, payload={'tenant_slug': tenant.slug},
+        )
+        self.db.commit()
+        self.db.refresh(tenant)
+        return tenant
+
+    def reactivate(self, tenant_id: UUID, scope: AccessScope) -> Tenant:
+        tenant = self._get_tenant_or_404(tenant_id)
+        tenant.status = TenantStatus.ACTIVE
+        tenant.is_active = True
+        if tenant.activated_at is None:
+            tenant.activated_at = datetime.now(timezone.utc)
+        self.audit_service.log(
+            action='tenant.reactivated', entity_type='tenant', entity_id=tenant.id,
+            actor_user_id=scope.user.id, payload={'tenant_slug': tenant.slug},
+        )
+        self.db.commit()
+        self.db.refresh(tenant)
+        return tenant
+
+    def resend_invite(self, tenant_id: UUID, scope: AccessScope) -> Tenant:
+        """Re-send the sign-up email to a pending tenant's admin."""
+        tenant = self._get_tenant_or_404(tenant_id)
+        if tenant.status != TenantStatus.PENDING:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='Only a pending invite can be resent.',
+            )
+        admin = self.db.scalar(
+            select(User)
+            .join(TenantMembership, TenantMembership.user_id == User.id)
+            .where(
+                TenantMembership.tenant_id == tenant_id,
+                TenantMembership.role == UserRole.NETWORK_ADMIN,
+                TenantMembership.is_active.is_(True),
+            )
+        )
+        if admin is not None:
+            self._send_tenant_invite_email(admin, tenant)
+        self.audit_service.log(
+            action='tenant.invite_resent', entity_type='tenant', entity_id=tenant.id,
+            actor_user_id=scope.user.id, payload={'tenant_slug': tenant.slug},
+        )
+        return tenant
+
+    def revoke_invite(self, tenant_id: UUID, scope: AccessScope) -> Tenant:
+        """Cancel a pending invite (hard-suspend; the admin never signed up).
+        Reuses the soft-delete cascade but guards on pending status."""
+        tenant = self._get_tenant_or_404(tenant_id)
+        if tenant.status != TenantStatus.PENDING:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='Only a pending invite can be revoked. Suspend an active tenant instead.',
+            )
+        return self.remove_tenant(tenant_id, scope)
 
     def remove_tenant(self, tenant_id: UUID, scope: AccessScope) -> Tenant:
         """Soft-delete a tenant and cascade-deactivate every member.
