@@ -12,14 +12,14 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
   if (CLERK_ENABLED) {
     const session = await requireServerSession(["network_admin", "platform_admin"]);
     isPlatformAdmin = session.role === "platform_admin";
-    // A tenant admin whose workspace hasn't finished onboarding goes to the
-    // setup wizard (MULTITENANCY_HANDOFF §6). Platform admins skip this.
-    if (!isPlatformAdmin) {
-      const tenant = await getTenantProfile().catch(() => null);
-      if (tenant && tenant.status !== "active") {
-        redirect("/welcome");
-      }
-    }
+  }
+
+  // The caller's own tenant — names the workspace in the sidebar. For a
+  // non-platform admin whose tenant hasn't finished onboarding, bounce them
+  // into the setup wizard (MULTITENANCY_HANDOFF §6).
+  const tenant = await getTenantProfile().catch(() => null);
+  if (CLERK_ENABLED && !isPlatformAdmin && tenant && tenant.status !== "active") {
+    redirect("/welcome");
   }
 
   let orgCount: number | null = null;
@@ -29,6 +29,8 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
   } catch {
     orgCount = null;
   }
+
+  const networkName = tenant?.name ?? "Your network";
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--paper)", color: "var(--ink)" }}>
@@ -73,7 +75,7 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
               textTransform: "uppercase",
             }}
           >
-            APF
+            Network
           </span>
         </div>
 
@@ -90,14 +92,15 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
           }}
         >
           <Eyebrow style={{ color: "rgba(246, 244, 238, 0.5)" }}>Network</Eyebrow>
-          <div style={{ fontSize: 13, fontWeight: 500, color: "var(--paper)" }}>Staffig Network</div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: "var(--paper)" }}>{networkName}</div>
           <div style={{ fontSize: 11, color: "rgba(246, 244, 238, 0.5)" }}>
+            {tenant?.slug ? `${tenant.slug} · ` : ""}
             {orgCount != null ? `${orgCount} ${orgCount === 1 ? "organization" : "organizations"}` : "—"}
           </div>
         </div>
 
         <Eyebrow style={{ color: "rgba(246, 244, 238, 0.5)", padding: "0 12px 8px" }}>Workspace</Eyebrow>
-        <ApfNavigation isPlatformAdmin={isPlatformAdmin} />
+        <ApfNavigation />
 
         <div style={{ flex: 1 }} />
 
@@ -112,7 +115,7 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
             color: "rgba(246, 244, 238, 0.65)",
           }}
         >
-          APF observes — it doesn&apos;t dispatch.
+          Your workspace — manage your sites, coordinators, and substitutes.
         </div>
       </aside>
 
@@ -131,7 +134,7 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
             gap: 16,
           }}
         >
-          <Eyebrow>Network Oversight</Eyebrow>
+          <Eyebrow>Your Network</Eyebrow>
           {CLERK_ENABLED ? <HeaderSignOutButton /> : null}
         </div>
         <div style={{ flex: 1, padding: "32px 32px 64px", maxWidth: 1280, width: "100%" }}>
