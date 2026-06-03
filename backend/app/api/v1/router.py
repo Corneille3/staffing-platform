@@ -18,6 +18,7 @@ from app.api.v1 import (
     reports,
     request_responses,
     staffing_requests,
+    tenant,
     users,
     workers,
 )
@@ -36,6 +37,7 @@ api_router.include_router(reports.router, prefix='/reports', tags=['reports'])
 api_router.include_router(audit_logs.router, prefix='/audit-logs', tags=['audit_logs'])
 api_router.include_router(networks.router, prefix='/networks', tags=['networks'])
 api_router.include_router(platform.router, prefix='/platform', tags=['platform'])
+api_router.include_router(tenant.router, prefix='/tenant', tags=['tenant'])
 api_router.include_router(apf.router, prefix='/apf', tags=['apf'])
 api_router.include_router(admin_substitutes.router, prefix='/admin/substitutes', tags=['admin'])
 api_router.include_router(admin_requests.router, prefix='/admin/requests', tags=['admin'])

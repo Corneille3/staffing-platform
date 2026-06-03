@@ -166,6 +166,43 @@ class TenantService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Network not found')
         return tenant
 
+    def _caller_tenant(self, scope: AccessScope) -> Tenant:
+        if scope.tenant_id is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='No tenant in scope.')
+        return self._get_tenant_or_404(scope.tenant_id)
+
+    def get_profile(self, scope: AccessScope) -> Tenant:
+        """The caller's own tenant (onboarding wizard + workspace header)."""
+        return self._caller_tenant(scope)
+
+    def update_profile(self, payload, scope: AccessScope) -> Tenant:
+        tenant = self._caller_tenant(scope)
+        if payload.name is not None:
+            tenant.name = payload.name.strip()
+        if payload.region is not None:
+            tenant.region = payload.region.strip() or None
+        if payload.preferred_language is not None:
+            tenant.preferred_language = payload.preferred_language
+        self.db.commit()
+        self.db.refresh(tenant)
+        return tenant
+
+    def complete_onboarding(self, scope: AccessScope) -> Tenant:
+        """Wizard finish — flip onboarding -> active (idempotent)."""
+        tenant = self._caller_tenant(scope)
+        if tenant.status in (TenantStatus.ONBOARDING, TenantStatus.PENDING):
+            tenant.status = TenantStatus.ACTIVE
+            tenant.is_active = True
+            if tenant.activated_at is None:
+                tenant.activated_at = datetime.now(timezone.utc)
+            self.audit_service.log(
+                action='tenant.onboarding_completed', entity_type='tenant', entity_id=tenant.id,
+                actor_user_id=scope.user.id, payload={'tenant_slug': tenant.slug},
+            )
+            self.db.commit()
+            self.db.refresh(tenant)
+        return tenant
+
     def suspend(self, tenant_id: UUID, scope: AccessScope) -> Tenant:
         """Operator pauses an active tenant (non-payment, ToS). Data preserved."""
         tenant = self._get_tenant_or_404(tenant_id)

@@ -44,3 +44,24 @@ class TenantNetworkRead(BaseModel):
     activated_at: datetime | None = None
     created_at: datetime
     network_admin: TenantAdminRead | None = None
+
+
+class TenantProfileRead(BaseModel):
+    """The caller's own tenant — for the onboarding wizard + workspace header."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    slug: str
+    region: str | None = None
+    status: str
+    preferred_language: str
+
+
+class TenantProfileUpdate(BaseModel):
+    """Wizard step 1 — confirm/edit the network's name, region, language.
+    Slug is not editable here (set at invite; changing it later is a separate
+    concern under path-based routing)."""
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    region: str | None = Field(default=None, max_length=100)
+    preferred_language: str | None = Field(default=None, pattern=r'^(fr|en|bilingual)$')

@@ -22,6 +22,7 @@ class Tenant(Base):
         default=TenantStatus.ACTIVE, server_default='active',
     )
     region: Mapped[str | None] = mapped_column(String(100))
+    preferred_language: Mapped[str] = mapped_column(String(20), default='fr', server_default='fr')
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default='true')
     activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
