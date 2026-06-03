@@ -594,3 +594,30 @@ export type Assignment = {
   checked_in_longitude: string | null;
   notes: string | null;
 };
+
+// ── Platform operator tier (MULTITENANCY_HANDOFF §5) ──────────────────────────
+export type PlatformKpis = {
+  active_tenants: number;
+  total_orgs: number;
+  total_substitutes: number;
+  weighted_fill_rate: number | null;
+};
+
+export type PlatformTenantRow = {
+  id: string;
+  name: string;
+  slug: string;
+  region: string | null;
+  status: "pending" | "onboarding" | "active" | "suspended" | string;
+  org_count: number;
+  substitute_count: number;
+  fill_rate_30d: number | null;
+  admin_name: string | null;
+  admin_email: string | null;
+  since: string | null;
+};
+
+export type PlatformTenantsResponse = {
+  kpis: PlatformKpis;
+  tenants: PlatformTenantRow[];
+};

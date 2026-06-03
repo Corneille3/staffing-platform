@@ -137,6 +137,22 @@ export async function createAdminRequest(payload: Record<string, unknown>): Prom
   return postJson<StaffingRequest>("/api/v1/admin/requests", payload);
 }
 
+// ── Platform operator (MULTITENANCY_HANDOFF §5) ──────────────────────────────
+type PlatformTenantCreated = { id: string; slug: string; status: string };
+
+export async function invitePlatformTenant(
+  payload: Record<string, unknown>,
+): Promise<PlatformTenantCreated> {
+  return postJson<PlatformTenantCreated>("/api/v1/platform/tenants", payload);
+}
+
+export async function platformTenantAction(
+  tenantId: string,
+  action: "suspend" | "reactivate" | "resend" | "revoke",
+): Promise<PlatformTenantCreated> {
+  return postJson<PlatformTenantCreated>(`/api/v1/platform/tenants/${tenantId}/${action}`);
+}
+
 export async function patchAdminRequest(
   requestId: string,
   partial: Record<string, unknown>,
