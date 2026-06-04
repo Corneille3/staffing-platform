@@ -148,7 +148,9 @@ export const ROLE_HOME: Record<Role, string> = {
   worker: "/worker",
   org_admin: "/admin",
   network_admin: "/apf",
-  platform_admin: "/apf",
+  // Platform operator lands on the tier-0 OS surface (MULTITENANCY_HANDOFF §5),
+  // not inside a tenant's /apf workspace.
+  platform_admin: "/platform",
 };
 
 export const ROLE_LABEL: Record<Role, string> = {

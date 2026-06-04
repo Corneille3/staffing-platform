@@ -18,8 +18,10 @@ import {
   NetworkSummary,
   Organization,
   OrgSnapshot,
+  PlatformTenantsResponse,
   RequestResponse,
   StaffingRequest,
+  TenantProfile,
   User,
   Worker,
 } from "./types";
@@ -38,7 +40,8 @@ const ROLE_HOME_BY_ROLE: Record<ServerSession["role"], string> = {
   worker: "/worker",
   org_admin: "/admin",
   network_admin: "/apf",
-  platform_admin: "/apf",
+  // Platform operator's home is the tier-0 OS surface (MULTITENANCY_HANDOFF §5).
+  platform_admin: "/platform",
 };
 
 const apiBaseUrl =
@@ -217,6 +220,14 @@ export async function getAssignments(): Promise<Assignment[]> {
 
 export async function getNetworkOverview(): Promise<NetworkOverview> {
   return fetchJson<NetworkOverview>("/api/v1/reports/network-overview");
+}
+
+export async function getPlatformTenants(): Promise<PlatformTenantsResponse> {
+  return fetchJson<PlatformTenantsResponse>("/api/v1/platform/tenants");
+}
+
+export async function getTenantProfile(): Promise<TenantProfile> {
+  return fetchJson<TenantProfile>("/api/v1/tenant/profile");
 }
 
 export async function getApfSnapshot(): Promise<ApfSnapshot> {

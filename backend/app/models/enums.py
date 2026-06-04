@@ -10,6 +10,14 @@ class UserRole(str, Enum):
     WORKER = 'worker'
 
 
+class TenantStatus(str, Enum):
+    """Tenant lifecycle (MULTITENANCY_HANDOFF §4)."""
+    PENDING = 'pending'        # operator invited; no one has signed up yet
+    ONBOARDING = 'onboarding'  # first admin signed up, running the wizard
+    ACTIVE = 'active'          # workspace live
+    SUSPENDED = 'suspended'    # operator paused; data preserved
+
+
 class OrganizationType(str, Enum):
     CHILDCARE = 'childcare'
     LONG_TERM_CARE = 'long_term_care'

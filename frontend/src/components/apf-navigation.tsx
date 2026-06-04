@@ -3,14 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-interface Props {
-  isPlatformAdmin: boolean;
-}
-
-export function ApfNavigation({ isPlatformAdmin }: Props) {
+export function ApfNavigation() {
   const pathname = usePathname();
   const strippedPath = pathname.replace(/^\/(?:en|fr)(?=\/|$)/, "") || "/";
 
+  // Tenant-admin workspace nav. (Cross-tenant management lives in the platform
+  // OS surface at /platform — no "Networks" link here anymore.)
   const links = [
     { href: "/apf", label: "Overview" },
     { href: "/apf/organizations", label: "Organizations" },
@@ -18,7 +16,6 @@ export function ApfNavigation({ isPlatformAdmin }: Props) {
     { href: "/apf/substitutes", label: "Substitutes" },
     { href: "/apf/activity", label: "Activity" },
     { href: "/apf/export", label: "Export" },
-    ...(isPlatformAdmin ? [{ href: "/apf/networks", label: "Networks" }] : []),
   ];
 
   return (

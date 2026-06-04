@@ -495,6 +495,33 @@ def test_platform_admin_can_create_network(platform_admin_client, db_session):
     assert membership.is_active is True
 
 
+def test_create_network_starts_pending(platform_admin_client, seed, db_session):
+    """P0 lifecycle: an invited tenant starts in `pending` (becomes active only
+    after onboarding), while directly-seeded tenants are `active`."""
+    from sqlalchemy import select
+    from app.models.tenant import Tenant as TenantModel
+
+    suffix = uuid4().hex[:8]
+    resp = platform_admin_client.post('/api/v1/networks', json={
+        'name': f'Pending Net {suffix}',
+        'slug': f'pending-{suffix}',
+        'region': 'Montréal',
+        'admin_first_name': 'Pat',
+        'admin_last_name': 'Owner',
+        'admin_email': f'pat-{suffix}@pending.example',
+        'admin_preferred_language': 'fr',
+    })
+    assert resp.status_code == 201, resp.text
+    assert resp.json()['status'] == 'pending'
+    assert resp.json()['region'] == 'Montréal'
+
+    tenant = db_session.scalar(select(TenantModel).where(TenantModel.slug == f'pending-{suffix}'))
+    assert tenant.status.value == 'pending'
+    assert tenant.activated_at is None
+    # The seed tenant (created directly) is active.
+    assert seed.tenant.status.value == 'active'
+
+
 def test_platform_admin_can_list_networks(platform_admin_client, seed):
     resp = platform_admin_client.get('/api/v1/networks')
     assert resp.status_code == 200

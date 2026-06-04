@@ -6,10 +6,32 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db_session
 from app.auth.clerk import fetch_user_details, primary_email
 from app.auth.current_user import CurrentUserModel, get_current_user
+from app.models.enums import TenantStatus, UserRole
+from app.models.tenant import Tenant
+from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 from app.schemas.user import UserRead
 
 router = APIRouter()
+
+
+def _start_onboarding_if_pending(db: Session, user: User) -> None:
+    """When an invited tenant admin first links their identity, flip their
+    pending tenant to `onboarding` (MULTITENANCY_HANDOFF §4)."""
+    if user.role != UserRole.NETWORK_ADMIN:
+        return
+    membership = db.scalar(
+        select(TenantMembership).where(
+            TenantMembership.user_id == user.id,
+            TenantMembership.role == UserRole.NETWORK_ADMIN,
+            TenantMembership.is_active.is_(True),
+        )
+    )
+    if membership is None:
+        return
+    tenant = db.get(Tenant, membership.tenant_id)
+    if tenant is not None and tenant.status == TenantStatus.PENDING:
+        tenant.status = TenantStatus.ONBOARDING
 
 
 @router.get('/me')
@@ -58,6 +80,7 @@ def sync_current_user(
         )
 
     by_email.clerk_user_id = current_user.sub
+    _start_onboarding_if_pending(db, by_email)
     try:
         db.commit()
     except IntegrityError:
