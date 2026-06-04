@@ -52,5 +52,19 @@ def require_platform_owner(scope: AccessScope = Depends(get_access_scope)) -> Ac
         )
     return scope
 
+
+def require_platform_operator(scope: AccessScope = Depends(get_access_scope)) -> AccessScope:
+    """Tier-0 `owner` or `operator` (PLATFORM_HANDOFF §2.1) — the operator
+    list is visible to both, but not to `support`."""
+    if (
+        scope.user.role.value != ROLE_PLATFORM_ADMIN
+        or scope.platform_operator_role not in ('owner', 'operator')
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='You do not have permission to perform this action.',
+        )
+    return scope
+
 # Backward-compat alias used by audit_logs route.
 require_apf = require_network_admin

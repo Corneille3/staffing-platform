@@ -18,6 +18,8 @@ import {
   EligibilityResult,
   NotificationFeedItem,
   Organization,
+  PlatformOperator,
+  PlatformSettings,
   RequestResponse,
   SlotPeriod,
   StaffingRequest,
@@ -152,6 +154,46 @@ export async function platformTenantAction(
   action: "suspend" | "reactivate" | "resend" | "revoke",
 ): Promise<PlatformTenantCreated> {
   return postJson<PlatformTenantCreated>(`/api/v1/platform/tenants/${tenantId}/${action}`);
+}
+
+// ── Platform Settings (PLATFORM_HANDOFF §2) ──────────────────────────────────
+
+export async function invitePlatformOperator(payload: {
+  email: string;
+  role: string;
+  first_name: string;
+  last_name: string;
+  preferred_language?: string;
+}): Promise<PlatformOperator> {
+  return postJson<PlatformOperator>("/api/v1/platform/operators", payload);
+}
+
+export async function changePlatformOperatorRole(
+  operatorId: string,
+  role: string,
+): Promise<PlatformOperator> {
+  return patchJson<PlatformOperator>(`/api/v1/platform/operators/${operatorId}`, { role });
+}
+
+export async function removePlatformOperator(operatorId: string): Promise<void> {
+  // 204 No Content — don't parse a body.
+  const response = await fetch(`${BASE}/api/v1/platform/operators/${operatorId}`, {
+    method: "DELETE",
+    headers: await authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessageFromResponse(response, `Remove failed (${response.status})`));
+  }
+}
+
+export async function resendPlatformOperatorInvite(operatorId: string): Promise<PlatformOperator> {
+  return postJson<PlatformOperator>(`/api/v1/platform/operators/${operatorId}/resend`);
+}
+
+export async function updatePlatformSettings(
+  partial: Partial<PlatformSettings>,
+): Promise<PlatformSettings> {
+  return patchJson<PlatformSettings>("/api/v1/platform/settings", partial);
 }
 
 export async function patchAdminRequest(
