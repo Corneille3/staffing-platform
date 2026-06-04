@@ -26,6 +26,16 @@ class PlatformOperatorRole(str, Enum):
     SUPPORT = 'support'    # read-only; can request tenant access only
 
 
+class TenantAccessGrantStatus(str, Enum):
+    """Lifecycle of a logged, consented, time-boxed look inside a tenant
+    (PLATFORM_HANDOFF §2.2)."""
+    REQUESTED = 'requested'  # operator asked; waiting on the tenant admin
+    APPROVED = 'approved'    # consent given (transitional; activation sets ACTIVE)
+    ACTIVE = 'active'        # read-only access live until expires_at
+    EXPIRED = 'expired'      # window closed (auto)
+    DENIED = 'denied'        # tenant admin said no
+
+
 class OrganizationType(str, Enum):
     CHILDCARE = 'childcare'
     LONG_TERM_CARE = 'long_term_care'

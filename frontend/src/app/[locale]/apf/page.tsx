@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { TenantAccessRequestsCard } from "../../../components/tenant-access-requests-card";
 import { Eyebrow, Mono } from "../../../components/ui";
-import { getApfSnapshot } from "../../../lib/api";
+import { getApfSnapshot, getTenantAccessGrants } from "../../../lib/api";
 
 const STATUS_ORDER = [
   "draft", "open", "notified", "responses_received",
@@ -44,11 +45,15 @@ const CARD_STYLE: React.CSSProperties = {
 };
 
 export default async function ApfHomePage() {
-  const snapshot = await getApfSnapshot();
+  const [snapshot, accessGrants] = await Promise.all([
+    getApfSnapshot(),
+    getTenantAccessGrants(), // null-safe; renders nothing unless a request is pending/active
+  ]);
   const { kpis, status_breakdown, shortage_cities, org_activity, recent_closed_requests } = snapshot;
 
   return (
     <>
+      {accessGrants && <TenantAccessRequestsCard grants={accessGrants.grants} />}
       <section style={{ marginBottom: 32 }}>
         <Eyebrow style={{ marginBottom: 12 }}>Network Snapshot</Eyebrow>
         <h1

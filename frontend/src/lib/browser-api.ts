@@ -23,6 +23,7 @@ import {
   RequestResponse,
   SlotPeriod,
   StaffingRequest,
+  TenantAccessGrant,
   TenantProfile,
   Worker,
   WorkerProfile,
@@ -194,6 +195,26 @@ export async function updatePlatformSettings(
   partial: Partial<PlatformSettings>,
 ): Promise<PlatformSettings> {
   return patchJson<PlatformSettings>("/api/v1/platform/settings", partial);
+}
+
+// ── Tenant access grants (PLATFORM_HANDOFF §2.2) ─────────────────────────────
+
+export async function requestTenantAccess(
+  tenantId: string,
+  reason: string,
+): Promise<TenantAccessGrant> {
+  return postJson<TenantAccessGrant>(
+    `/api/v1/platform/tenants/${tenantId}/access-request`,
+    { reason },
+  );
+}
+
+export async function approveTenantAccessGrant(grantId: string): Promise<TenantAccessGrant> {
+  return postJson<TenantAccessGrant>(`/api/v1/tenant/access-grants/${grantId}/approve`);
+}
+
+export async function denyTenantAccessGrant(grantId: string): Promise<TenantAccessGrant> {
+  return postJson<TenantAccessGrant>(`/api/v1/tenant/access-grants/${grantId}/deny`);
 }
 
 export async function patchAdminRequest(

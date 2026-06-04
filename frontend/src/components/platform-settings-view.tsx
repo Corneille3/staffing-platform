@@ -14,6 +14,7 @@ import type {
   PlatformOperator,
   PlatformOperatorsResponse,
   PlatformSettings,
+  TenantAccessGrantsResponse,
 } from "../lib/types";
 
 const ROLE_LEGEND: { role: string; title: string; blurb: string; tone: string }[] = [
@@ -51,10 +52,12 @@ function fmtDate(value: string | null): string {
 export function PlatformSettingsView({
   operators,
   settings,
+  grants,
   viewerEmail,
 }: {
   operators: PlatformOperatorsResponse | null;
   settings: PlatformSettings;
+  grants: TenantAccessGrantsResponse | null;
   viewerEmail: string | null;
 }) {
   const router = useRouter();
@@ -125,6 +128,18 @@ export function PlatformSettingsView({
           The operator list is visible to owners and operators only.
         </div>
       )}
+
+      {/* ── §2.2 Tenant access (the privacy exception) ──────────────────── */}
+      <SectionHead
+        title="Tenant access"
+        sub="How an operator may look inside a tenant when support requires it. Logged, consented, time-boxed."
+      />
+      <TenantAccessCard
+        settings={settings}
+        grants={grants}
+        isOwner={isOwner}
+        onSaved={() => router.refresh()}
+      />
 
       {/* ── §2.3 New-tenant defaults ────────────────────────────────────── */}
       <SectionHead
@@ -260,6 +275,135 @@ function OperatorRow({
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── §2.2 tenant access controls ───────────────────────────────────────────────
+
+const GRANT_STATUS_META: Record<string, { label: string; bg: string; c: string }> = {
+  requested: { label: "Awaiting tenant", bg: "var(--sand-soft)", c: "#8C6B14" },
+  active: { label: "Active", bg: "var(--moss-soft)", c: "var(--moss)" },
+  expired: { label: "Expired", bg: "var(--paper-2)", c: "var(--ink-3)" },
+  denied: { label: "Denied", bg: "var(--rose-soft)", c: "var(--rose)" },
+};
+
+function TenantAccessCard({
+  settings,
+  grants,
+  isOwner,
+  onSaved,
+}: {
+  settings: PlatformSettings;
+  grants: TenantAccessGrantsResponse | null;
+  isOwner: boolean;
+  onSaved: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const recent = grants?.grants.slice(0, 5) ?? [];
+
+  async function save(partial: Partial<PlatformSettings>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await updatePlatformSettings(partial);
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ ...card, padding: "22px 24px", marginBottom: 36 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr", gap: "14px 24px", alignItems: "start" }}>
+        <SettingField label="Require tenant approval">
+          <button
+            type="button"
+            disabled={!isOwner || busy}
+            onClick={() => save({ access_requires_approval: !settings.access_requires_approval })}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 10, padding: "9px 14px",
+              borderRadius: 999, cursor: isOwner ? "pointer" : "not-allowed", fontFamily: "var(--ui)",
+              fontSize: 13, border: "0.5px solid var(--line)",
+              background: settings.access_requires_approval ? "var(--moss-soft)" : "#fff",
+              color: settings.access_requires_approval ? "var(--moss)" : "var(--ink-2)",
+              opacity: !isOwner || busy ? 0.6 : 1,
+            }}
+          >
+            <span
+              style={{
+                width: 30, height: 17, borderRadius: 999, position: "relative", flexShrink: 0,
+                background: settings.access_requires_approval ? "var(--moss)" : "var(--line)",
+                transition: "background .15s",
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute", top: 2, width: 13, height: 13, borderRadius: 99, background: "#fff",
+                  left: settings.access_requires_approval ? 15 : 2, transition: "left .15s",
+                }}
+              />
+            </span>
+            {settings.access_requires_approval ? "On — tenant admin approves each request" : "Off — requests activate immediately"}
+          </button>
+        </SettingField>
+        <SettingField label="Access window (hours)">
+          <input
+            type="number"
+            min={1}
+            max={72}
+            defaultValue={settings.access_window_hours}
+            disabled={!isOwner || busy}
+            onBlur={(e) => {
+              const v = Number(e.target.value);
+              if (v && v !== settings.access_window_hours) save({ access_window_hours: v });
+            }}
+            style={inputStyle}
+          />
+        </SettingField>
+        <SettingField label="Active grants">
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <span
+              style={{
+                fontFamily: "var(--serif)", fontSize: 30, lineHeight: 1,
+                color: (grants?.active_count ?? 0) > 0 ? "var(--terra)" : "var(--moss)",
+              }}
+            >
+              {grants ? grants.active_count : "—"}
+            </span>
+            <span style={{ fontSize: 11, color: "var(--ink-3)" }}>
+              {(grants?.active_count ?? 0) > 0 ? "operators inside a tenant" : "should usually be 0"}
+            </span>
+          </div>
+        </SettingField>
+      </div>
+
+      {recent.length > 0 && (
+        <div style={{ marginTop: 18, borderTop: "0.5px solid var(--line)", paddingTop: 14 }}>
+          <div style={{ fontSize: 10, color: "var(--ink-3)", letterSpacing: ".1em", textTransform: "uppercase", fontWeight: 500, marginBottom: 10 }}>
+            Recent requests
+          </div>
+          {recent.map((g) => {
+            const meta = GRANT_STATUS_META[g.status] ?? GRANT_STATUS_META.expired;
+            return (
+              <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", fontSize: 12.5 }}>
+                <span style={{ fontWeight: 500 }}>{g.operator_name}</span>
+                <span style={{ color: "var(--ink-3)" }}>→ {g.tenant_name}</span>
+                <span style={{ color: "var(--ink-3)", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  “{g.reason}”
+                </span>
+                <span style={{ padding: "2px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 500, background: meta.bg, color: meta.c, flexShrink: 0 }}>
+                  {meta.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {error ? <p style={{ margin: "10px 0 0", color: "var(--rose)", fontSize: 12 }}>{error}</p> : null}
     </div>
   );
 }

@@ -95,6 +95,8 @@ class PlatformSettingsRead(BaseModel):
     invite_expiry_days: int
     data_residency: str  # locked
     orphan_retention_days: int
+    access_requires_approval: bool
+    access_window_hours: int
     reserved_slugs: list[str]
 
 
@@ -103,4 +105,46 @@ class PlatformSettingsUpdate(BaseModel):
     trial_length_days: int | None = Field(default=None, ge=0, le=365)
     invite_expiry_days: int | None = Field(default=None, ge=1, le=90)
     orphan_retention_days: int | None = Field(default=None, ge=1, le=3650)
+    access_requires_approval: bool | None = None
+    access_window_hours: int | None = Field(default=None, ge=1, le=72)
     reserved_slugs: list[str] | None = None
+
+
+class TenantAccessRequestCreate(BaseModel):
+    """An operator asks to look inside one tenant (PLATFORM_HANDOFF §2.2)."""
+    reason: str = Field(min_length=5, max_length=500)
+
+
+class TenantAccessGrantRead(BaseModel):
+    id: UUID
+    tenant_id: UUID
+    tenant_name: str
+    operator_user_id: UUID
+    operator_name: str
+    operator_email: str
+    reason: str
+    status: str  # requested | approved | active | expired | denied
+    requested_at: datetime | None = None
+    expires_at: datetime | None = None
+
+    @classmethod
+    def from_row(cls, grant, operator, tenant) -> 'TenantAccessGrantRead':
+        """Build from the (grant, operator User, Tenant) join the service returns."""
+        return cls(
+            id=grant.id,
+            tenant_id=grant.tenant_id,
+            tenant_name=tenant.name,
+            operator_user_id=grant.operator_user_id,
+            operator_name=f'{operator.first_name} {operator.last_name}'.strip(),
+            operator_email=operator.email,
+            reason=grant.reason,
+            status=grant.status.value,
+            requested_at=grant.requested_at,
+            expires_at=grant.expires_at,
+        )
+
+
+class TenantAccessGrantsResponse(BaseModel):
+    grants: list[TenantAccessGrantRead]
+    # Operators currently inside any tenant — should usually be 0.
+    active_count: int

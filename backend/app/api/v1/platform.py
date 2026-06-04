@@ -14,10 +14,12 @@ from app.api.deps import get_db_session
 from app.auth.permissions import (
     require_platform_admin,
     require_platform_operator,
+    require_platform_operator_mfa,
     require_platform_owner,
 )
 from app.auth.scope import AccessScope
 from app.models.platform_operator import PlatformOperator
+from app.models.tenant import Tenant
 from app.models.user import User
 from app.schemas.platform import (
     PlatformOperatorInvite,
@@ -29,11 +31,15 @@ from app.schemas.platform import (
     PlatformTenantCreate,
     PlatformTenantCreated,
     PlatformTenantsResponse,
+    TenantAccessGrantRead,
+    TenantAccessGrantsResponse,
+    TenantAccessRequestCreate,
 )
 from app.schemas.tenant import TenantNetworkCreate
 from app.services.platform_operator_service import PlatformOperatorService
 from app.services.platform_service import PlatformService
 from app.services.platform_settings_service import PlatformSettingsService
+from app.services.tenant_access_service import TenantAccessService
 from app.services.tenant_service import TenantService
 
 router = APIRouter(dependencies=[Depends(require_platform_admin)])
@@ -133,7 +139,7 @@ def list_tenants(db: Session = Depends(get_db_session)) -> PlatformTenantsRespon
 @router.post('/tenants', status_code=status.HTTP_201_CREATED, response_model=PlatformTenantCreated)
 def invite_tenant(
     payload: PlatformTenantCreate,
-    scope: AccessScope = Depends(require_platform_admin),
+    scope: AccessScope = Depends(require_platform_operator_mfa),
     db: Session = Depends(get_db_session),
 ) -> PlatformTenantCreated:
     tenant, _admin = TenantService(db).create_network(
@@ -142,10 +148,36 @@ def invite_tenant(
     return PlatformTenantCreated(id=tenant.id, slug=tenant.slug, status=tenant.status.value)
 
 
+@router.post(
+    '/tenants/{tenant_id}/access-request',
+    status_code=status.HTTP_201_CREATED,
+    response_model=TenantAccessGrantRead,
+)
+def request_tenant_access(
+    tenant_id: UUID,
+    payload: TenantAccessRequestCreate,
+    scope: AccessScope = Depends(require_platform_admin),
+    db: Session = Depends(get_db_session),
+) -> TenantAccessGrantRead:
+    """§2.2 — any operator role may ask (2FA required; checked in the service)."""
+    grant = TenantAccessService(db).request(tenant_id, payload.reason, scope)
+    tenant = db.get(Tenant, tenant_id)
+    return TenantAccessGrantRead.from_row(grant, scope.user, tenant)
+
+
+@router.get('/access-grants', response_model=TenantAccessGrantsResponse)
+def list_access_grants(db: Session = Depends(get_db_session)) -> TenantAccessGrantsResponse:
+    grants, active = TenantAccessService(db).list_for_platform()
+    return TenantAccessGrantsResponse(
+        grants=[TenantAccessGrantRead.from_row(g, u, t) for g, u, t in grants],
+        active_count=active,
+    )
+
+
 @router.post('/tenants/{tenant_id}/suspend', response_model=PlatformTenantCreated)
 def suspend_tenant(
     tenant_id: UUID,
-    scope: AccessScope = Depends(require_platform_admin),
+    scope: AccessScope = Depends(require_platform_operator_mfa),
     db: Session = Depends(get_db_session),
 ) -> PlatformTenantCreated:
     tenant = TenantService(db).suspend(tenant_id, scope)
@@ -155,7 +187,7 @@ def suspend_tenant(
 @router.post('/tenants/{tenant_id}/reactivate', response_model=PlatformTenantCreated)
 def reactivate_tenant(
     tenant_id: UUID,
-    scope: AccessScope = Depends(require_platform_admin),
+    scope: AccessScope = Depends(require_platform_operator_mfa),
     db: Session = Depends(get_db_session),
 ) -> PlatformTenantCreated:
     tenant = TenantService(db).reactivate(tenant_id, scope)
@@ -165,7 +197,7 @@ def reactivate_tenant(
 @router.post('/tenants/{tenant_id}/resend', response_model=PlatformTenantCreated)
 def resend_invite(
     tenant_id: UUID,
-    scope: AccessScope = Depends(require_platform_admin),
+    scope: AccessScope = Depends(require_platform_operator_mfa),
     db: Session = Depends(get_db_session),
 ) -> PlatformTenantCreated:
     tenant = TenantService(db).resend_invite(tenant_id, scope)
@@ -175,7 +207,7 @@ def resend_invite(
 @router.post('/tenants/{tenant_id}/revoke', response_model=PlatformTenantCreated)
 def revoke_invite(
     tenant_id: UUID,
-    scope: AccessScope = Depends(require_platform_admin),
+    scope: AccessScope = Depends(require_platform_operator_mfa),
     db: Session = Depends(get_db_session),
 ) -> PlatformTenantCreated:
     tenant = TenantService(db).revoke_invite(tenant_id, scope)

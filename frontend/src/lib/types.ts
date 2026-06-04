@@ -649,7 +649,28 @@ export type PlatformSettings = {
   invite_expiry_days: number;
   data_residency: string; // locked (Law 25)
   orphan_retention_days: number;
+  access_requires_approval: boolean;
+  access_window_hours: number;
   reserved_slugs: string[];
+};
+
+// ── Tenant access grants (PLATFORM_HANDOFF §2.2) ──────────────────────────────
+export type TenantAccessGrant = {
+  id: string;
+  tenant_id: string;
+  tenant_name: string;
+  operator_user_id: string;
+  operator_name: string;
+  operator_email: string;
+  reason: string;
+  status: "requested" | "approved" | "active" | "expired" | "denied" | string;
+  requested_at: string | null;
+  expires_at: string | null;
+};
+
+export type TenantAccessGrantsResponse = {
+  grants: TenantAccessGrant[];
+  active_count: number;
 };
 
 export type TenantProfile = {

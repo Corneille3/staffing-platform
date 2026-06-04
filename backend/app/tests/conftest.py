@@ -189,6 +189,7 @@ def platform_admin_client(db_session, seed):
     seed.apf.role = UserRole.PLATFORM_ADMIN
     db_session.add(PlatformOperator(
         id=uuid4(), user_id=seed.apf.id, role=PlatformOperatorRole.OWNER,
+        mfa_enabled=True,  # sensitive tier-0 actions require 2FA (PLATFORM_HANDOFF §1)
     ))
     db_session.flush()
     yield _make_test_client(db_session, 'int-apf', 'platform_admin')

@@ -17,7 +17,8 @@ DEFAULT_RESERVED_SLUGS = [
 # Operator-editable keys (data_residency is locked — Law 25).
 EDITABLE_KEYS = {
     'default_language', 'trial_length_days', 'invite_expiry_days',
-    'orphan_retention_days', 'reserved_slugs',
+    'orphan_retention_days', 'access_requires_approval', 'access_window_hours',
+    'reserved_slugs',
 }
 
 

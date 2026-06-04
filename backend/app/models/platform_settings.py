@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -21,5 +21,9 @@ class PlatformSettings(Base):
     # Law 25 — locked, not editable via the API.
     data_residency: Mapped[str] = mapped_column(String(50), default='aws-ca-central-1', server_default='aws-ca-central-1')
     orphan_retention_days: Mapped[int] = mapped_column(Integer, default=30, server_default='30')
+    # Tenant access (§2.2): does each grant need tenant-admin approval, and how
+    # long does an approved session last before auto-revoke.
+    access_requires_approval: Mapped[bool] = mapped_column(Boolean, default=True, server_default='true')
+    access_window_hours: Mapped[int] = mapped_column(Integer, default=4, server_default='4')
     reserved_slugs: Mapped[list] = mapped_column(JSONB, default=list)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
