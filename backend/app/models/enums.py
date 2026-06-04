@@ -18,6 +18,14 @@ class TenantStatus(str, Enum):
     SUSPENDED = 'suspended'    # operator paused; data preserved
 
 
+class PlatformOperatorRole(str, Enum):
+    """Tier-0 operator roles (PLATFORM_HANDOFF §1). Layered on top of
+    UserRole.PLATFORM_ADMIN (which gates access to the /platform surface)."""
+    OWNER = 'owner'        # everything: operators, billing, tenants, access
+    OPERATOR = 'operator'  # invite/suspend tenants + request access; no operator/billing edits
+    SUPPORT = 'support'    # read-only; can request tenant access only
+
+
 class OrganizationType(str, Enum):
     CHILDCARE = 'childcare'
     LONG_TERM_CARE = 'long_term_care'

@@ -23,6 +23,7 @@ from app.core.config import settings
 from app.core.constants import ROLE_NETWORK_ADMIN, ROLE_ORG_ADMIN, ROLE_PLATFORM_ADMIN, ROLE_WORKER
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
+from app.models.platform_operator import PlatformOperator
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 
@@ -32,10 +33,17 @@ class AccessScope:
     user: User
     tenant_id: UUID | None = None
     org_ids: list[UUID] = field(default_factory=list)
+    # Tier-0 operator role (owner/operator/support) when the user is a platform
+    # admin — adds granularity on top of is_platform_admin (PLATFORM_HANDOFF §1).
+    platform_operator_role: str | None = None
 
     @property
     def is_platform_admin(self) -> bool:
         return self.user.role.value == ROLE_PLATFORM_ADMIN
+
+    @property
+    def is_platform_owner(self) -> bool:
+        return self.platform_operator_role == 'owner'
 
     @property
     def is_network_admin(self) -> bool:
@@ -93,7 +101,17 @@ def get_access_scope(
                 TenantMembership.is_active.is_(True),
             )
         )
-        return AccessScope(user=user, tenant_id=membership.tenant_id if membership else None)
+        operator_role = None
+        if role == ROLE_PLATFORM_ADMIN:
+            op_row = db.scalar(
+                select(PlatformOperator).where(PlatformOperator.user_id == user.id)
+            )
+            operator_role = op_row.role.value if op_row else None
+        return AccessScope(
+            user=user,
+            tenant_id=membership.tenant_id if membership else None,
+            platform_operator_role=operator_role,
+        )
 
     if role == ROLE_ORG_ADMIN:
         memberships = db.scalars(

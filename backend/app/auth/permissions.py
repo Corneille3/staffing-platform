@@ -41,5 +41,16 @@ require_network_admin = require_role(ROLE_PLATFORM_ADMIN, ROLE_NETWORK_ADMIN)
 require_admin = require_role(ROLE_PLATFORM_ADMIN, ROLE_NETWORK_ADMIN, ROLE_ORG_ADMIN)
 require_worker = require_role(ROLE_WORKER)
 
+
+def require_platform_owner(scope: AccessScope = Depends(get_access_scope)) -> AccessScope:
+    """Tier-0 `owner` only (PLATFORM_HANDOFF §1) — managing operators + editing
+    plans. Layered on require_platform_admin (the surface gate)."""
+    if scope.user.role.value != ROLE_PLATFORM_ADMIN or not scope.is_platform_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='Only a platform owner can perform this action.',
+        )
+    return scope
+
 # Backward-compat alias used by audit_logs route.
 require_apf = require_network_admin
