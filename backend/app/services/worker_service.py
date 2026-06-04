@@ -20,7 +20,7 @@ from app.models.worker_profile import WorkerProfile
 from app.models.worker_qualification import WorkerQualification
 from app.models.worker_region import WorkerRegion
 from app.notifications.email_service import EmailMessage, EmailNotificationService
-from app.notifications.i18n import localized
+from app.notifications.i18n import localized, localized_subject
 from app.repositories.worker_repository import WorkerRepository
 from app.schemas.worker import WorkerInviteCreate, WorkerOnboardCreate
 from app.services.audit_service import AuditService
@@ -55,7 +55,7 @@ class WorkerService:
             f'{signup_url}\n\n'
             f'After you sign up, you will be prompted to complete your profile.\n'
         )
-        subject = localized(
+        subject = localized_subject(
             user.preferred_language,
             '[Staffig] Invitation à rejoindre le bassin de remplaçant(e)s',
             '[Staffig] Invitation to join the substitute pool',
@@ -80,11 +80,19 @@ class WorkerService:
                 detail='No tenant associated with your account.',
             )
 
+        # GUARD (MULTITENANCY_HANDOFF §2.5): rejecting an existing email also
+        # prevents the one-person-in-two-tenants state. The spec eventually wants
+        # a substitute in two tenants = one users row + two tenant_memberships,
+        # but our worker inbox query isn't yet tenant-scoped (it would MIX both
+        # tenants' requests — see StaffingRequestRepository.list_for_scope). Until
+        # the per-tenant worker routing lands, we keep multi-tenant substitutes
+        # unreachable: you can't reuse an existing identity to add a 2nd tenant.
         existing = self.db.scalar(select(User).where(User.email == payload.email))
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail='A user with that email already exists.',
+                detail='A user with that email already exists. A substitute can '
+                       'belong to only one network for now.',
             )
 
         user = User(

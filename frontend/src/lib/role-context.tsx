@@ -52,7 +52,7 @@ function DevRoleProvider({ children }: { children: ReactNode }) {
 }
 
 function ClerkRoleProvider({ children }: { children: ReactNode }) {
-  const { isLoaded, isSignedIn } = useUser();
+  const { isLoaded, isSignedIn, user } = useUser();
   const { getToken } = useAuth();
   const { signOut } = useClerk();
   const [role, setRoleState] = useState<Role>(DEFAULT_ROLE);
@@ -84,12 +84,14 @@ function ClerkRoleProvider({ children }: { children: ReactNode }) {
 
         if (response.status === 403) {
           // Signed in to Clerk but no DB row exists for this identity.
-          // The DB is the source of truth for who can use the platform;
-          // sign the user out of Clerk and route to /not-invited rather
-          // than letting them land on a role-shell with no data.
+          // Pass the email so the not-invited page can show it to the user.
           window.localStorage.removeItem("apf.workerId");
           window.localStorage.removeItem("apf.devRole");
-          await signOut({ redirectUrl: "/not-invited" });
+          const email = user?.primaryEmailAddress?.emailAddress;
+          const dest = email
+            ? `/not-invited?email=${encodeURIComponent(email)}`
+            : "/not-invited";
+          await signOut({ redirectUrl: dest });
           return;
         }
 
@@ -148,7 +150,9 @@ export const ROLE_HOME: Record<Role, string> = {
   worker: "/worker",
   org_admin: "/admin",
   network_admin: "/apf",
-  platform_admin: "/apf",
+  // Platform operator lands on the tier-0 OS surface (MULTITENANCY_HANDOFF §5),
+  // not inside a tenant's /apf workspace.
+  platform_admin: "/platform",
 };
 
 export const ROLE_LABEL: Record<Role, string> = {

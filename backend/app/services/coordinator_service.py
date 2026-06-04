@@ -16,7 +16,7 @@ from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 from app.schemas.coordinator import CoordinatorInviteCreate
 from app.notifications.email_service import EmailMessage, EmailNotificationService
-from app.notifications.i18n import localized
+from app.notifications.i18n import localized, localized_subject
 from app.services.audit_service import AuditService
 
 
@@ -51,7 +51,7 @@ class CoordinatorService:
             f'{signup_url}\n\n'
             f'When you sign up, the platform will link your account to your assigned role automatically.\n'
         )
-        subject = localized(
+        subject = localized_subject(
             user.preferred_language,
             f'[Staffig] Invitation à coordonner {org_names_fr}',
             f'[Staffig] Invitation to coordinate {org_names}',

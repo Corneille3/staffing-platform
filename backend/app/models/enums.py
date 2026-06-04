@@ -10,6 +10,32 @@ class UserRole(str, Enum):
     WORKER = 'worker'
 
 
+class TenantStatus(str, Enum):
+    """Tenant lifecycle (MULTITENANCY_HANDOFF §4)."""
+    PENDING = 'pending'        # operator invited; no one has signed up yet
+    ONBOARDING = 'onboarding'  # first admin signed up, running the wizard
+    ACTIVE = 'active'          # workspace live
+    SUSPENDED = 'suspended'    # operator paused; data preserved
+
+
+class PlatformOperatorRole(str, Enum):
+    """Tier-0 operator roles (PLATFORM_HANDOFF §1). Layered on top of
+    UserRole.PLATFORM_ADMIN (which gates access to the /platform surface)."""
+    OWNER = 'owner'        # everything: operators, billing, tenants, access
+    OPERATOR = 'operator'  # invite/suspend tenants + request access; no operator/billing edits
+    SUPPORT = 'support'    # read-only; can request tenant access only
+
+
+class TenantAccessGrantStatus(str, Enum):
+    """Lifecycle of a logged, consented, time-boxed look inside a tenant
+    (PLATFORM_HANDOFF §2.2)."""
+    REQUESTED = 'requested'  # operator asked; waiting on the tenant admin
+    APPROVED = 'approved'    # consent given (transitional; activation sets ACTIVE)
+    ACTIVE = 'active'        # read-only access live until expires_at
+    EXPIRED = 'expired'      # window closed (auto)
+    DENIED = 'denied'        # tenant admin said no
+
+
 class OrganizationType(str, Enum):
     CHILDCARE = 'childcare'
     LONG_TERM_CARE = 'long_term_care'

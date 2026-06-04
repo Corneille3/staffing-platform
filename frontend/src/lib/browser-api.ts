@@ -18,9 +18,13 @@ import {
   EligibilityResult,
   NotificationFeedItem,
   Organization,
+  PlatformOperator,
+  PlatformSettings,
   RequestResponse,
   SlotPeriod,
   StaffingRequest,
+  TenantAccessGrant,
+  TenantProfile,
   Worker,
   WorkerProfile,
 } from "./types";
@@ -135,6 +139,82 @@ export async function getApfExportJob(jobId: string): Promise<ApfExportJob> {
 
 export async function createAdminRequest(payload: Record<string, unknown>): Promise<StaffingRequest> {
   return postJson<StaffingRequest>("/api/v1/admin/requests", payload);
+}
+
+// ── Platform operator (MULTITENANCY_HANDOFF §5) ──────────────────────────────
+type PlatformTenantCreated = { id: string; slug: string; status: string };
+
+export async function invitePlatformTenant(
+  payload: Record<string, unknown>,
+): Promise<PlatformTenantCreated> {
+  return postJson<PlatformTenantCreated>("/api/v1/platform/tenants", payload);
+}
+
+export async function platformTenantAction(
+  tenantId: string,
+  action: "suspend" | "reactivate" | "resend" | "revoke",
+): Promise<PlatformTenantCreated> {
+  return postJson<PlatformTenantCreated>(`/api/v1/platform/tenants/${tenantId}/${action}`);
+}
+
+// ── Platform Settings (PLATFORM_HANDOFF §2) ──────────────────────────────────
+
+export async function invitePlatformOperator(payload: {
+  email: string;
+  role: string;
+  first_name: string;
+  last_name: string;
+  preferred_language?: string;
+}): Promise<PlatformOperator> {
+  return postJson<PlatformOperator>("/api/v1/platform/operators", payload);
+}
+
+export async function changePlatformOperatorRole(
+  operatorId: string,
+  role: string,
+): Promise<PlatformOperator> {
+  return patchJson<PlatformOperator>(`/api/v1/platform/operators/${operatorId}`, { role });
+}
+
+export async function removePlatformOperator(operatorId: string): Promise<void> {
+  // 204 No Content — don't parse a body.
+  const response = await fetch(`${BASE}/api/v1/platform/operators/${operatorId}`, {
+    method: "DELETE",
+    headers: await authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessageFromResponse(response, `Remove failed (${response.status})`));
+  }
+}
+
+export async function resendPlatformOperatorInvite(operatorId: string): Promise<PlatformOperator> {
+  return postJson<PlatformOperator>(`/api/v1/platform/operators/${operatorId}/resend`);
+}
+
+export async function updatePlatformSettings(
+  partial: Partial<PlatformSettings>,
+): Promise<PlatformSettings> {
+  return patchJson<PlatformSettings>("/api/v1/platform/settings", partial);
+}
+
+// ── Tenant access grants (PLATFORM_HANDOFF §2.2) ─────────────────────────────
+
+export async function requestTenantAccess(
+  tenantId: string,
+  reason: string,
+): Promise<TenantAccessGrant> {
+  return postJson<TenantAccessGrant>(
+    `/api/v1/platform/tenants/${tenantId}/access-request`,
+    { reason },
+  );
+}
+
+export async function approveTenantAccessGrant(grantId: string): Promise<TenantAccessGrant> {
+  return postJson<TenantAccessGrant>(`/api/v1/tenant/access-grants/${grantId}/approve`);
+}
+
+export async function denyTenantAccessGrant(grantId: string): Promise<TenantAccessGrant> {
+  return postJson<TenantAccessGrant>(`/api/v1/tenant/access-grants/${grantId}/deny`);
 }
 
 export async function patchAdminRequest(
@@ -349,6 +429,19 @@ export async function fetchOrganizationsForTenant(): Promise<Organization[]> {
   return data.items;
 }
 
+// ── Tenant onboarding wizard (MULTITENANCY_HANDOFF §6) ───────────────────────
+export async function fetchTenantProfile(): Promise<TenantProfile> {
+  return getJson<TenantProfile>("/api/v1/tenant/profile");
+}
+
+export async function patchTenantProfile(payload: Record<string, unknown>): Promise<TenantProfile> {
+  return patchJson<TenantProfile>("/api/v1/tenant/profile", payload);
+}
+
+export async function completeTenantOnboarding(): Promise<TenantProfile> {
+  return postJson<TenantProfile>("/api/v1/tenant/onboarding/complete");
+}
+
 export async function createOrganization(payload: {
   name: string;
   type: string;
@@ -357,6 +450,9 @@ export async function createOrganization(payload: {
   contact_email?: string;
   contact_phone?: string;
   preferred_language: string;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  postal_code?: string | null;
 }): Promise<Organization> {
   return postJson<Organization>("/api/v1/organizations", payload);
 }

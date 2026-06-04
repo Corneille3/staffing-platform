@@ -34,7 +34,10 @@ def list_networks(
             id=tenant.id,
             name=tenant.name,
             slug=tenant.slug,
+            status=tenant.status.value,
+            region=tenant.region,
             is_active=tenant.is_active,
+            activated_at=tenant.activated_at,
             created_at=tenant.created_at,
             network_admin=TenantAdminRead.model_validate(admin) if admin else None,
         )
@@ -54,7 +57,10 @@ def create_network(
         id=tenant.id,
         name=tenant.name,
         slug=tenant.slug,
+        status=tenant.status.value,
+        region=tenant.region,
         is_active=tenant.is_active,
+        activated_at=tenant.activated_at,
         created_at=tenant.created_at,
         network_admin=TenantAdminRead.model_validate(admin),
     )
@@ -71,7 +77,10 @@ def remove_network(
         id=tenant.id,
         name=tenant.name,
         slug=tenant.slug,
+        status=tenant.status.value,
+        region=tenant.region,
         is_active=tenant.is_active,
+        activated_at=tenant.activated_at,
         created_at=tenant.created_at,
         network_admin=None,
     )

@@ -19,3 +19,15 @@ def localized(preferred_language: str | None, fr: str, en: str) -> str:
     if lang == 'en':
         return en
     return f'{fr}{SEPARATOR}{en}'
+
+
+def localized_subject(preferred_language: str | None, fr: str, en: str) -> str:
+    """Like ``localized`` but for an email Subject — a single line. Bilingual
+    joins with ' / ' (never the multi-line body SEPARATOR, which would mangle
+    the header)."""
+    lang = (preferred_language or '').strip().lower()
+    if lang == 'fr':
+        return fr
+    if lang == 'en':
+        return en
+    return f'{fr} / {en}'

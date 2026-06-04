@@ -11,9 +11,10 @@ filter the caller's role implies:
 """
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -21,8 +22,11 @@ from app.api.deps import get_db_session
 from app.auth.current_user import CurrentUserModel, get_current_user
 from app.core.config import settings
 from app.core.constants import ROLE_NETWORK_ADMIN, ROLE_ORG_ADMIN, ROLE_PLATFORM_ADMIN, ROLE_WORKER
+from app.models.enums import TenantAccessGrantStatus
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
+from app.models.platform_operator import PlatformOperator
+from app.models.tenant_access_grant import TenantAccessGrant
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 
@@ -32,10 +36,23 @@ class AccessScope:
     user: User
     tenant_id: UUID | None = None
     org_ids: list[UUID] = field(default_factory=list)
+    # Tier-0 operator role (owner/operator/support) when the user is a platform
+    # admin — adds granularity on top of is_platform_admin (PLATFORM_HANDOFF §1).
+    platform_operator_role: str | None = None
+    # Whether the operator has 2FA enabled — sensitive actions require it (§1).
+    platform_operator_mfa: bool = False
+    # True when tenant_id comes from an ACTIVE tenant_access_grant (§2.2)
+    # instead of a membership. Grant-based access is READ-ONLY — enforced
+    # centrally in get_access_scope.
+    grant_access: bool = False
 
     @property
     def is_platform_admin(self) -> bool:
         return self.user.role.value == ROLE_PLATFORM_ADMIN
+
+    @property
+    def is_platform_owner(self) -> bool:
+        return self.platform_operator_role == 'owner'
 
     @property
     def is_network_admin(self) -> bool:
@@ -54,7 +71,30 @@ class AccessScope:
         return not self.is_worker
 
 
+def _active_grant_tenant_id(db: Session, user_id: UUID) -> UUID | None:
+    """The tenant a membership-less operator may currently look inside
+    (PLATFORM_HANDOFF §2.2). Compares expires_at directly — authorization
+    never depends on the lazy expiry sweep having run."""
+    grant = db.scalar(
+        select(TenantAccessGrant)
+        .where(
+            TenantAccessGrant.operator_user_id == user_id,
+            TenantAccessGrant.status == TenantAccessGrantStatus.ACTIVE,
+            TenantAccessGrant.expires_at > datetime.now(timezone.utc),
+        )
+        .order_by(TenantAccessGrant.expires_at.desc())
+    )
+    return grant.tenant_id if grant else None
+
+
+# Paths exempt from the grant-access read-only block: platform endpoints have
+# their own role gates and never return tenant rows; /auth/sync must stay
+# callable so the operator can sign in at all.
+_GRANT_WRITE_EXEMPT_PREFIXES = ('/api/v1/platform', '/api/v1/auth')
+
+
 def get_access_scope(
+    request: Request,
     current_user: CurrentUserModel = Depends(get_current_user),
     db: Session = Depends(get_db_session),
 ) -> AccessScope:
@@ -93,7 +133,36 @@ def get_access_scope(
                 TenantMembership.is_active.is_(True),
             )
         )
-        return AccessScope(user=user, tenant_id=membership.tenant_id if membership else None)
+        operator_role = None
+        operator_mfa = False
+        tenant_id = membership.tenant_id if membership else None
+        grant_access = False
+        if role == ROLE_PLATFORM_ADMIN:
+            op_row = db.scalar(
+                select(PlatformOperator).where(PlatformOperator.user_id == user.id)
+            )
+            operator_role = op_row.role.value if op_row else None
+            operator_mfa = op_row.mfa_enabled if op_row else False
+            # §2.2: a membership-less operator with an ACTIVE grant gets that
+            # tenant in scope, read-only. A real membership always wins.
+            if membership is None and op_row is not None:
+                granted = _active_grant_tenant_id(db, user.id)
+                if granted is not None:
+                    tenant_id = granted
+                    grant_access = True
+        if grant_access and request.method not in ('GET', 'HEAD', 'OPTIONS') \
+                and not request.url.path.startswith(_GRANT_WRITE_EXEMPT_PREFIXES):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail='Granted tenant access is read-only.',
+            )
+        return AccessScope(
+            user=user,
+            tenant_id=tenant_id,
+            platform_operator_role=operator_role,
+            platform_operator_mfa=operator_mfa,
+            grant_access=grant_access,
+        )
 
     if role == ROLE_ORG_ADMIN:
         memberships = db.scalars(

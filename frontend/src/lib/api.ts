@@ -18,8 +18,13 @@ import {
   NetworkSummary,
   Organization,
   OrgSnapshot,
+  PlatformOperatorsResponse,
+  PlatformSettings,
+  PlatformTenantsResponse,
   RequestResponse,
   StaffingRequest,
+  TenantAccessGrantsResponse,
+  TenantProfile,
   User,
   Worker,
 } from "./types";
@@ -38,7 +43,8 @@ const ROLE_HOME_BY_ROLE: Record<ServerSession["role"], string> = {
   worker: "/worker",
   org_admin: "/admin",
   network_admin: "/apf",
-  platform_admin: "/apf",
+  // Platform operator's home is the tier-0 OS surface (MULTITENANCY_HANDOFF §5).
+  platform_admin: "/platform",
 };
 
 const apiBaseUrl =
@@ -217,6 +223,45 @@ export async function getAssignments(): Promise<Assignment[]> {
 
 export async function getNetworkOverview(): Promise<NetworkOverview> {
   return fetchJson<NetworkOverview>("/api/v1/reports/network-overview");
+}
+
+export async function getPlatformTenants(): Promise<PlatformTenantsResponse> {
+  return fetchJson<PlatformTenantsResponse>("/api/v1/platform/tenants");
+}
+
+export async function getPlatformOperators(): Promise<PlatformOperatorsResponse | null> {
+  // 403 for `support` operators (PLATFORM_HANDOFF §2.1) — render without the list.
+  try {
+    return await fetchJson<PlatformOperatorsResponse>("/api/v1/platform/operators");
+  } catch {
+    return null;
+  }
+}
+
+export async function getPlatformSettings(): Promise<PlatformSettings> {
+  return fetchJson<PlatformSettings>("/api/v1/platform/settings");
+}
+
+export async function getPlatformAccessGrants(): Promise<TenantAccessGrantsResponse | null> {
+  try {
+    return await fetchJson<TenantAccessGrantsResponse>("/api/v1/platform/access-grants");
+  } catch {
+    return null;
+  }
+}
+
+export async function getTenantAccessGrants(): Promise<TenantAccessGrantsResponse | null> {
+  // Tenant-admin side (PLATFORM_HANDOFF §2.2). Null-safe: the APF dashboard
+  // must never break because this section can't load.
+  try {
+    return await fetchJson<TenantAccessGrantsResponse>("/api/v1/tenant/access-grants");
+  } catch {
+    return null;
+  }
+}
+
+export async function getTenantProfile(): Promise<TenantProfile> {
+  return fetchJson<TenantProfile>("/api/v1/tenant/profile");
 }
 
 export async function getApfSnapshot(): Promise<ApfSnapshot> {
