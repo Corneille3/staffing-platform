@@ -97,6 +97,22 @@ def test_each_admin_isolated(two_tenants, db_session):
     assert "Shift reseau-qc" not in titles
 
 
+def test_worker_cannot_join_a_second_tenant(two_tenants, db_session):
+    """Defer-and-guard (MULTITENANCY_HANDOFF §2.5): multi-tenant substitutes
+    aren't supported yet (the worker inbox isn't tenant-scoped). The guard is the
+    unique-email rejection — inviting tenant B's admin to re-use an existing
+    identity from tenant A is refused, so the one-person-two-tenants state can't
+    be created. Pins that until per-tenant worker routing lands."""
+    client_b = _make_client(db_session, two_tenants.b.admin.clerk_user_id)
+    # tenant A's admin email already exists; try to invite them as a substitute in B.
+    resp = client_b.post("/api/v1/workers/invite", json={
+        "first_name": "Adm", "last_name": "reseau-qc",
+        "email": two_tenants.a.admin.email, "preferred_language": "fr",
+    })
+    assert resp.status_code == 409
+    assert "one network" in resp.json()["detail"].lower()
+
+
 def test_platform_operator_sees_both_tenant_counts(two_tenants, db_session):
     client_op = _make_client(db_session, two_tenants.op.clerk_user_id)
     data = client_op.get("/api/v1/platform/tenants").json()
