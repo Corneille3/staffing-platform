@@ -35,7 +35,11 @@ def get_profile(
     scope: AccessScope = Depends(require_network_admin),
     db: Session = Depends(get_db_session),
 ) -> TenantProfileRead:
-    return TenantProfileRead.model_validate(TenantService(db).get_profile(scope))
+    profile = TenantProfileRead.model_validate(TenantService(db).get_profile(scope))
+    # Tell the workspace UI whether this is a §2.2 grant visit (read-only
+    # chrome) or the caller's own tenant.
+    profile.via_grant = scope.grant_access
+    return profile
 
 
 @router.patch('/profile', response_model=TenantProfileRead)

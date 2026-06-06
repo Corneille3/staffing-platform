@@ -1,8 +1,10 @@
 import React from "react";
-import { Shield } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight, Shield } from "lucide-react";
 import { HeaderSignOutButton } from "../../../components/header-sign-out-button";
 import { PlatformNav } from "../../../components/platform-nav";
-import { requireServerSession } from "../../../lib/api";
+import { getTenantProfile, requireServerSession } from "../../../lib/api";
+import type { TenantProfile } from "../../../lib/types";
 
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -13,6 +15,11 @@ export default async function PlatformLayout({ children }: { children: React.Rea
   if (CLERK_ENABLED) {
     await requireServerSession(["platform_admin"]);
   }
+
+  // The operator's path into a tenant workspace, when they have one: their
+  // own tenant (membership — e.g. the bootstrap admin) or a §2.2 access
+  // grant (read-only). 404 = membership-less operator with no grant.
+  const workspace: TenantProfile | null = await getTenantProfile().catch(() => null);
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--paper)", color: "var(--ink)" }}>
@@ -96,6 +103,54 @@ export default async function PlatformLayout({ children }: { children: React.Rea
           Operate
         </div>
         <PlatformNav />
+
+        {workspace ? (
+          <>
+            <div
+              style={{
+                fontSize: 9,
+                color: "rgba(246,244,238,.4)",
+                letterSpacing: ".14em",
+                textTransform: "uppercase",
+                padding: "16px 10px 6px",
+              }}
+            >
+              Workspace
+            </div>
+            <Link href="/apf" style={{ textDecoration: "none" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  background: "rgba(255,255,255,.05)",
+                  border: "0.5px solid rgba(255,255,255,.1)",
+                  color: "var(--paper)",
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}>
+                  <div
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: 500,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {workspace.name}
+                  </div>
+                  <div style={{ fontSize: 10, color: "rgba(246,244,238,.5)" }}>
+                    {workspace.via_grant ? "Granted access · read-only" : "Open your workspace"}
+                  </div>
+                </div>
+                <ArrowUpRight size={14} style={{ color: "var(--terra)", flexShrink: 0 }} />
+              </div>
+            </Link>
+          </>
+        ) : null}
 
         <div style={{ flex: 1 }} />
         <div

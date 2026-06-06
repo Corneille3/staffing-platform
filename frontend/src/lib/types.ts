@@ -680,4 +680,7 @@ export type TenantProfile = {
   region: string | null;
   status: "pending" | "onboarding" | "active" | "suspended" | string;
   preferred_language: string;
+  /** True when the caller sees this tenant via an active access grant
+   * (read-only visit) rather than a membership. */
+  via_grant?: boolean;
 };

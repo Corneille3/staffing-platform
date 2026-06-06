@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Eye, Plus, Shield, X } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Eye, Plus, Shield, X } from "lucide-react";
 import { invitePlatformTenant, platformTenantAction, requestTenantAccess } from "../lib/browser-api";
-import type { PlatformTenantRow, PlatformTenantsResponse } from "../lib/types";
+import type { PlatformTenantRow, PlatformTenantsResponse, TenantProfile } from "../lib/types";
 
 const STATUS_META: Record<string, { chip: string; bg: string; c: string }> = {
   active: { chip: "Active", bg: "var(--moss-soft)", c: "var(--moss)" },
@@ -31,7 +32,15 @@ function fillColor(rate: number | null): string {
   return "var(--rose)";
 }
 
-export function PlatformTenantsView({ data }: { data: PlatformTenantsResponse }) {
+export function PlatformTenantsView({
+  data,
+  callerWorkspace,
+}: {
+  data: PlatformTenantsResponse;
+  // The tenant this operator can already open (own membership or active
+  // §2.2 grant) — its row shows "Open workspace" instead of "Request access".
+  callerWorkspace?: TenantProfile | null;
+}) {
   const router = useRouter();
   const [inviteOpen, setInviteOpen] = useState(false);
 
@@ -89,7 +98,13 @@ export function PlatformTenantsView({ data }: { data: PlatformTenantsResponse })
           </div>
         ) : (
           tenants.map((t, i) => (
-            <TenantRow key={t.id} t={t} last={i === tenants.length - 1} onAction={() => router.refresh()} />
+            <TenantRow
+              key={t.id}
+              t={t}
+              last={i === tenants.length - 1}
+              workspace={callerWorkspace?.id === t.id ? callerWorkspace : null}
+              onAction={() => router.refresh()}
+            />
           ))
         )}
       </div>
@@ -103,7 +118,18 @@ export function PlatformTenantsView({ data }: { data: PlatformTenantsResponse })
   );
 }
 
-function TenantRow({ t, last, onAction }: { t: PlatformTenantRow; last: boolean; onAction: () => void }) {
+function TenantRow({
+  t,
+  last,
+  workspace,
+  onAction,
+}: {
+  t: PlatformTenantRow;
+  last: boolean;
+  // Non-null when this row is the caller's own/granted workspace.
+  workspace: TenantProfile | null;
+  onAction: () => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accessOpen, setAccessOpen] = useState(false);
@@ -158,15 +184,29 @@ function TenantRow({ t, last, onAction }: { t: PlatformTenantRow; last: boolean;
         )}
         {t.status === "active" && (
           <>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setAccessOpen(true)}
-              title="Ask the tenant admin for time-boxed read-only access (PLATFORM_HANDOFF §2.2)"
-              style={rowBtn}
-            >
-              <Eye size={12} /> Request access
-            </button>
+            {workspace ? (
+              <Link
+                href="/apf"
+                title={
+                  workspace.via_grant
+                    ? "You hold an active access grant for this workspace (read-only)"
+                    : "This is your own workspace"
+                }
+                style={{ ...rowBtn, textDecoration: "none", borderColor: "var(--terra)", color: "var(--terra-ink)" }}
+              >
+                <ArrowUpRight size={12} /> Open workspace
+              </Link>
+            ) : (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setAccessOpen(true)}
+                title="Ask the tenant admin for time-boxed read-only access (PLATFORM_HANDOFF §2.2)"
+                style={rowBtn}
+              >
+                <Eye size={12} /> Request access
+              </button>
+            )}
             <button type="button" disabled={busy} onClick={() => run("suspend")} style={rowBtn}>Suspend</button>
           </>
         )}

@@ -56,6 +56,10 @@ class TenantProfileRead(BaseModel):
     region: str | None = None
     status: str
     preferred_language: str
+    # True when the caller sees this tenant through an ACTIVE access grant
+    # (PLATFORM_HANDOFF §2.2) rather than a membership — the workspace UI
+    # labels the visit read-only. Set by the route from scope.grant_access.
+    via_grant: bool = False
 
 
 class TenantProfileUpdate(BaseModel):

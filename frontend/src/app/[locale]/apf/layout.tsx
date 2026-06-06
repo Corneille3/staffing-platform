@@ -1,5 +1,7 @@
 import React from "react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ArrowLeft, Eye } from "lucide-react";
 import { ApfNavigation } from "../../../components/apf-navigation";
 import { HeaderSignOutButton } from "../../../components/header-sign-out-button";
 import { Eyebrow } from "../../../components/ui";
@@ -97,12 +99,55 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
             {tenant?.slug ? `${tenant.slug} · ` : ""}
             {orgCount != null ? `${orgCount} ${orgCount === 1 ? "organization" : "organizations"}` : "—"}
           </div>
+          {tenant?.via_grant ? (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                alignSelf: "flex-start",
+                marginTop: 4,
+                padding: "3px 8px",
+                borderRadius: 999,
+                background: "rgba(232, 201, 122, 0.16)",
+                color: "var(--sand)",
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: ".04em",
+              }}
+            >
+              <Eye size={11} /> Read-only · access grant
+            </div>
+          ) : null}
         </div>
 
         <Eyebrow style={{ color: "rgba(246, 244, 238, 0.5)", padding: "0 12px 8px" }}>Workspace</Eyebrow>
         <ApfNavigation />
 
         <div style={{ flex: 1 }} />
+
+        {isPlatformAdmin ? (
+          <Link href="/platform" style={{ textDecoration: "none" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "9px 12px",
+                marginBottom: 8,
+                borderRadius: 10,
+                background: "rgba(246, 244, 238, 0.04)",
+                border: "0.5px solid rgba(246, 244, 238, 0.12)",
+                color: "rgba(246, 244, 238, 0.75)",
+                fontSize: 12,
+                fontWeight: 500,
+              }}
+            >
+              <ArrowLeft size={13} style={{ color: "var(--terra)" }} />
+              Platform console
+            </div>
+          </Link>
+        ) : null}
 
         <div
           style={{
@@ -134,7 +179,7 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
             gap: 16,
           }}
         >
-          <Eyebrow>Your Network</Eyebrow>
+          <Eyebrow>{tenant?.via_grant ? "Support access · read-only" : "Your Network"}</Eyebrow>
           {CLERK_ENABLED ? <HeaderSignOutButton /> : null}
         </div>
         <div style={{ flex: 1, padding: "32px 32px 64px", maxWidth: 1280, width: "100%" }}>
