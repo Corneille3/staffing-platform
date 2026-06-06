@@ -1,19 +1,13 @@
 import React from "react";
-import Link from "next/link";
-import { Activity, Briefcase, Settings, Shield, Sparkles } from "lucide-react";
+import { Shield } from "lucide-react";
 import { HeaderSignOutButton } from "../../../components/header-sign-out-button";
+import { PlatformNav } from "../../../components/platform-nav";
 import { requireServerSession } from "../../../lib/api";
 
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 // Tier-0 operator chrome (MULTITENANCY_HANDOFF §5.1). Distinct from the tenant
 // /apf shell: near-black sidebar + "OS" badge + aggregate-only framing.
-const NAV: { key: string; label: string; href?: string; icon: React.ReactNode }[] = [
-  { key: "overview", label: "Overview", icon: <Activity size={16} /> },
-  { key: "tenants", label: "Tenants", href: "/platform/tenants", icon: <Briefcase size={16} /> },
-  { key: "billing", label: "Billing", icon: <Sparkles size={16} /> },
-  { key: "settings", label: "Settings", icon: <Settings size={16} /> },
-];
 
 export default async function PlatformLayout({ children }: { children: React.ReactNode }) {
   if (CLERK_ENABLED) {
@@ -101,37 +95,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
         >
           Operate
         </div>
-        {NAV.map((item) => {
-          const active = item.key === "tenants";
-          const row = (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "7px 10px",
-                borderRadius: 8,
-                background: active ? "rgba(255,255,255,.08)" : "transparent",
-                color: active ? "var(--paper)" : "rgba(246,244,238,.65)",
-                fontSize: 13,
-                fontWeight: active ? 500 : 400,
-                marginBottom: 2,
-                cursor: item.href ? "pointer" : "default",
-                opacity: item.href ? 1 : 0.55,
-              }}
-            >
-              <span style={{ color: active ? "var(--terra)" : "rgba(246,244,238,.45)" }}>{item.icon}</span>
-              {item.label}
-            </div>
-          );
-          return item.href ? (
-            <Link key={item.key} href={item.href} style={{ textDecoration: "none" }}>
-              {row}
-            </Link>
-          ) : (
-            <div key={item.key}>{row}</div>
-          );
-        })}
+        <PlatformNav />
 
         <div style={{ flex: 1 }} />
         <div

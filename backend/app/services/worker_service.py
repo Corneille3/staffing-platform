@@ -80,11 +80,19 @@ class WorkerService:
                 detail='No tenant associated with your account.',
             )
 
+        # GUARD (MULTITENANCY_HANDOFF §2.5): rejecting an existing email also
+        # prevents the one-person-in-two-tenants state. The spec eventually wants
+        # a substitute in two tenants = one users row + two tenant_memberships,
+        # but our worker inbox query isn't yet tenant-scoped (it would MIX both
+        # tenants' requests — see StaffingRequestRepository.list_for_scope). Until
+        # the per-tenant worker routing lands, we keep multi-tenant substitutes
+        # unreachable: you can't reuse an existing identity to add a 2nd tenant.
         existing = self.db.scalar(select(User).where(User.email == payload.email))
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail='A user with that email already exists.',
+                detail='A user with that email already exists. A substitute can '
+                       'belong to only one network for now.',
             )
 
         user = User(

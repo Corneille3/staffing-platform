@@ -112,7 +112,34 @@ sys.exit(0 if 'delete' in methods else 1)
   ELAPSED=$(( $(date +%s) - START ))
   echo ""
   echo "✓ API up after ${ELAPSED}s, new image (sha-${COMMIT}) confirmed live"
-  exit 0
+
+  # Readiness gate: a live new image does NOT prove migrations applied.
+  # /health/ready returns 200 only when the DB is reachable AND alembic is at
+  # head. Without this, a deploy where migrations silently failed (e.g. RDS
+  # down at boot, 2026-06-03) looks "healthy" but serves a stale schema.
+  echo "==> Verifying readiness (DB reachable + migrations at head)"
+  READY_URL="http://${DIRECT_IP}/health/ready"
+  READY_DEADLINE=$(( $(date +%s) + 120 ))
+  while :; do
+    RESP="$(curl -s -w '\n%{http_code}' --max-time 5 "${READY_URL}" 2>/dev/null || printf '\n000')"
+    CODE="$(printf '%s' "${RESP}" | tail -n1)"
+    BODY="$(printf '%s' "${RESP}" | sed '$d')"
+    if [ "${CODE}" = "200" ]; then
+      echo "    ✓ ready: ${BODY}"
+      exit 0
+    fi
+    if [ "$(date +%s)" -ge "${READY_DEADLINE}" ]; then
+      echo "" >&2
+      echo "✗ New image is live but NOT ready after 2 min (status=${CODE})." >&2
+      echo "  Body: ${BODY}" >&2
+      echo "  Usually means migrations did not apply — e.g. the DB was unreachable" >&2
+      echo "  at boot (RDS stopped). Ensure RDS is 'available', then re-run:" >&2
+      echo "    aws ec2 reboot-instances --region ${REGION} --instance-ids ${INSTANCE_ID}" >&2
+      exit 1
+    fi
+    printf "."
+    sleep 6
+  done
 else
   echo ""
   echo "⚠ API responding but /api/v1/users/{user_id} DELETE not present —" >&2

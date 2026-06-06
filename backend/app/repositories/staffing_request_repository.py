@@ -45,7 +45,15 @@ class StaffingRequestRepository:
                 return []
             stmt = stmt.where(StaffingRequest.organization_id.in_(scope.org_ids))
             return list(self.db.scalars(stmt).all())
-        # Worker: requests they were notified for.
+        # Worker: requests they were notified for. Spans all orgs in the worker's
+        # tenant (correct per MULTITENANCY_HANDOFF §2.5 — a substitute is a
+        # tenant-pool member, not org-restricted).
+        # TODO(§2.5 multi-tenant worker): this filters only by worker_user_id, NOT
+        # by tenant. For a substitute in ONE tenant (all today) that's safe. A
+        # worker in TWO tenants would see both tenants' requests mixed — guarded
+        # for now by the unique-email check in WorkerService.invite (multi-tenant
+        # substitutes are unreachable). When per-tenant worker routing lands,
+        # scope this by the worker's CURRENT tenant (from the /t/{slug} path).
         stmt = stmt.join(
             RequestResponse,
             RequestResponse.staffing_request_id == StaffingRequest.id,

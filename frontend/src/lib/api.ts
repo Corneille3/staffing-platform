@@ -18,9 +18,12 @@ import {
   NetworkSummary,
   Organization,
   OrgSnapshot,
+  PlatformOperatorsResponse,
+  PlatformSettings,
   PlatformTenantsResponse,
   RequestResponse,
   StaffingRequest,
+  TenantAccessGrantsResponse,
   TenantProfile,
   User,
   Worker,
@@ -224,6 +227,37 @@ export async function getNetworkOverview(): Promise<NetworkOverview> {
 
 export async function getPlatformTenants(): Promise<PlatformTenantsResponse> {
   return fetchJson<PlatformTenantsResponse>("/api/v1/platform/tenants");
+}
+
+export async function getPlatformOperators(): Promise<PlatformOperatorsResponse | null> {
+  // 403 for `support` operators (PLATFORM_HANDOFF §2.1) — render without the list.
+  try {
+    return await fetchJson<PlatformOperatorsResponse>("/api/v1/platform/operators");
+  } catch {
+    return null;
+  }
+}
+
+export async function getPlatformSettings(): Promise<PlatformSettings> {
+  return fetchJson<PlatformSettings>("/api/v1/platform/settings");
+}
+
+export async function getPlatformAccessGrants(): Promise<TenantAccessGrantsResponse | null> {
+  try {
+    return await fetchJson<TenantAccessGrantsResponse>("/api/v1/platform/access-grants");
+  } catch {
+    return null;
+  }
+}
+
+export async function getTenantAccessGrants(): Promise<TenantAccessGrantsResponse | null> {
+  // Tenant-admin side (PLATFORM_HANDOFF §2.2). Null-safe: the APF dashboard
+  // must never break because this section can't load.
+  try {
+    return await fetchJson<TenantAccessGrantsResponse>("/api/v1/tenant/access-grants");
+  } catch {
+    return null;
+  }
 }
 
 export async function getTenantProfile(): Promise<TenantProfile> {

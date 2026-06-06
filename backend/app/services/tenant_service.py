@@ -38,6 +38,8 @@ from app.notifications.email_service import EmailMessage, EmailNotificationServi
 from app.notifications.i18n import localized, localized_subject
 from app.schemas.tenant import TenantNetworkCreate
 from app.services.audit_service import AuditService
+from app.services.platform_audit_service import PlatformAuditService
+from app.services.platform_settings_service import reserved_slugs
 from app.services.user_service import REMOVED_EMAIL_MARKER
 
 
@@ -45,6 +47,7 @@ class TenantService:
     def __init__(self, db: Session) -> None:
         self.db = db
         self.audit_service = AuditService(db)
+        self.platform_audit = PlatformAuditService(db)
         self.email = EmailNotificationService()
 
     def _portal_url(self) -> str:
@@ -88,6 +91,12 @@ class TenantService:
     ) -> tuple[Tenant, User]:
         slug = payload.slug.strip().lower()
         admin_email = payload.admin_email.lower()
+
+        if slug in reserved_slugs(self.db):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f'The slug "{slug}" is reserved and cannot be used.',
+            )
 
         if self.db.scalar(select(Tenant).where(Tenant.slug == slug)):
             raise HTTPException(
@@ -146,6 +155,11 @@ class TenantService:
                 'admin_email': admin.email,
                 'admin_user_id': str(admin.id),
             },
+        )
+        self.platform_audit.log(
+            actor_user_id=scope.user.id, action='tenant.invited',
+            target_type='tenant', target_id=str(tenant.id),
+            payload={'slug': tenant.slug, 'name': tenant.name},
         )
 
         self.db.commit()
@@ -212,6 +226,10 @@ class TenantService:
             action='tenant.suspended', entity_type='tenant', entity_id=tenant.id,
             actor_user_id=scope.user.id, payload={'tenant_slug': tenant.slug},
         )
+        self.platform_audit.log(
+            actor_user_id=scope.user.id, action='tenant.suspended',
+            target_type='tenant', target_id=str(tenant.id), payload={'slug': tenant.slug},
+        )
         self.db.commit()
         self.db.refresh(tenant)
         return tenant
@@ -225,6 +243,10 @@ class TenantService:
         self.audit_service.log(
             action='tenant.reactivated', entity_type='tenant', entity_id=tenant.id,
             actor_user_id=scope.user.id, payload={'tenant_slug': tenant.slug},
+        )
+        self.platform_audit.log(
+            actor_user_id=scope.user.id, action='tenant.reactivated',
+            target_type='tenant', target_id=str(tenant.id), payload={'slug': tenant.slug},
         )
         self.db.commit()
         self.db.refresh(tenant)

@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Plus, Shield, X } from "lucide-react";
-import { invitePlatformTenant, platformTenantAction } from "../lib/browser-api";
+import { ArrowRight, Eye, Plus, Shield, X } from "lucide-react";
+import { invitePlatformTenant, platformTenantAction, requestTenantAccess } from "../lib/browser-api";
 import type { PlatformTenantRow, PlatformTenantsResponse } from "../lib/types";
 
 const STATUS_META: Record<string, { chip: string; bg: string; c: string }> = {
@@ -106,6 +106,7 @@ export function PlatformTenantsView({ data }: { data: PlatformTenantsResponse })
 function TenantRow({ t, last, onAction }: { t: PlatformTenantRow; last: boolean; onAction: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [accessOpen, setAccessOpen] = useState(false);
   const s = STATUS_META[t.status] ?? STATUS_META.active;
   const initials = t.name.split(" ").map((p) => p[0]).slice(0, 2).join("");
 
@@ -156,10 +157,114 @@ function TenantRow({ t, last, onAction }: { t: PlatformTenantRow; last: boolean;
           </>
         )}
         {t.status === "active" && (
-          <button type="button" disabled={busy} onClick={() => run("suspend")} style={rowBtn}>Suspend</button>
+          <>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setAccessOpen(true)}
+              title="Ask the tenant admin for time-boxed read-only access (PLATFORM_HANDOFF §2.2)"
+              style={rowBtn}
+            >
+              <Eye size={12} /> Request access
+            </button>
+            <button type="button" disabled={busy} onClick={() => run("suspend")} style={rowBtn}>Suspend</button>
+          </>
         )}
         {t.status === "suspended" && (
           <button type="button" disabled={busy} onClick={() => run("reactivate")} style={rowBtn}>Reactivate</button>
+        )}
+      </div>
+      {accessOpen && (
+        <RequestAccessModal
+          tenant={t}
+          onClose={() => setAccessOpen(false)}
+          onDone={() => {
+            setAccessOpen(false);
+            onAction();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function RequestAccessModal({
+  tenant,
+  onClose,
+  onDone,
+}: {
+  tenant: PlatformTenantRow;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<string | null>(null);
+
+  async function submit() {
+    if (reason.trim().length < 5) {
+      setError("Give the tenant admin a real reason (min 5 characters).");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const grant = await requestTenantAccess(tenant.id, reason.trim());
+      setResult(
+        grant.status === "active"
+          ? "Access granted — read-only, auto-expires."
+          : "Request sent — the tenant admin must approve it.",
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Request failed");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(21,20,15,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 20 }} onClick={onClose}>
+      <div style={{ ...card, width: 440, maxWidth: "100%", padding: "28px 30px", background: "#fff", boxShadow: "0 30px 80px -20px rgba(0,0,0,.4)" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+          <div>
+            <div className="stf-h-eyebrow" style={eyebrow}>Privacy exception</div>
+            <h2 style={{ fontFamily: "var(--serif)", fontSize: 26, lineHeight: 1.05, margin: "4px 0 0" }}>
+              Request access to <em style={{ fontStyle: "italic" }}>{tenant.name}</em>
+            </h2>
+          </div>
+          <button type="button" onClick={onClose} style={{ ...rowBtn, width: 32, height: 32, borderRadius: 99, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            <X size={15} />
+          </button>
+        </div>
+        {result ? (
+          <>
+            <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--moss)", lineHeight: 1.5 }}>{result}</p>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button type="button" onClick={onDone} style={primaryBtn}>Done</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
+              The tenant admin sees your name and this reason. If approved, you get <strong>read-only</strong> access that auto-expires — every step is logged in both audit trails.
+            </p>
+            <ModalField label="Reason">
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="e.g. Investigating support ticket #42 — a request won't publish"
+                rows={3}
+                style={{ ...inputStyle, resize: "vertical", fontFamily: "var(--ui)" }}
+              />
+            </ModalField>
+            {error ? <p style={{ margin: "4px 0 0", color: "var(--rose)", fontSize: 12 }}>{error}</p> : null}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+              <button type="button" onClick={onClose} style={rowBtn}>Cancel</button>
+              <button type="button" onClick={submit} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>
+                <ArrowRight size={14} /> {busy ? "Sending…" : "Send request"}
+              </button>
+            </div>
+          </>
         )}
       </div>
     </div>

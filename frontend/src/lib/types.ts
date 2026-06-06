@@ -622,6 +622,57 @@ export type PlatformTenantsResponse = {
   tenants: PlatformTenantRow[];
 };
 
+// ── Platform Settings (PLATFORM_HANDOFF §2) ───────────────────────────────────
+export type PlatformOperatorRole = "owner" | "operator" | "support";
+
+export type PlatformOperator = {
+  id: string;
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: PlatformOperatorRole | string;
+  mfa_enabled: boolean;
+  status: "pending" | "active" | string;
+  invited_at: string | null;
+  last_active_at: string | null;
+};
+
+export type PlatformOperatorsResponse = {
+  operators: PlatformOperator[];
+  viewer_role: PlatformOperatorRole | string | null;
+};
+
+export type PlatformSettings = {
+  default_language: string;
+  trial_length_days: number;
+  invite_expiry_days: number;
+  data_residency: string; // locked (Law 25)
+  orphan_retention_days: number;
+  access_requires_approval: boolean;
+  access_window_hours: number;
+  reserved_slugs: string[];
+};
+
+// ── Tenant access grants (PLATFORM_HANDOFF §2.2) ──────────────────────────────
+export type TenantAccessGrant = {
+  id: string;
+  tenant_id: string;
+  tenant_name: string;
+  operator_user_id: string;
+  operator_name: string;
+  operator_email: string;
+  reason: string;
+  status: "requested" | "approved" | "active" | "expired" | "denied" | string;
+  requested_at: string | null;
+  expires_at: string | null;
+};
+
+export type TenantAccessGrantsResponse = {
+  grants: TenantAccessGrant[];
+  active_count: number;
+};
+
 export type TenantProfile = {
   id: string;
   name: string;
