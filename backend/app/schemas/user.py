@@ -19,3 +19,10 @@ class UserBase(BaseModel):
 class UserRead(UserBase, TimestampedSchema):
     id: UUID
     clerk_user_id: str | None = None
+
+
+class SyncedUserRead(UserRead):
+    """/auth/sync response — UserRead + the tier-0 operator role so the
+    frontend can hide owner/operator-only controls from `support`.
+    None for everyone who isn't a platform operator."""
+    platform_operator_role: str | None = None

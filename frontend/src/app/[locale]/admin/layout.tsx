@@ -5,7 +5,14 @@ import { AdminOrgSwitcher } from "../../../components/admin-org-switcher";
 import { AdminBreadcrumb } from "../../../components/admin-breadcrumb";
 import { HeaderSignOutButton } from "../../../components/header-sign-out-button";
 import { Eyebrow } from "../../../components/ui";
-import { getNetworkOverview, getOrganizations, requireServerSession } from "../../../lib/api";
+import { WorkspaceSuspendedScreen } from "../../../components/workspace-suspended";
+import {
+  ApiError,
+  getNetworkOverview,
+  getOrganizations,
+  getTenantProfile,
+  requireServerSession,
+} from "../../../lib/api";
 
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -18,11 +25,25 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   // Sidebar data — both calls are tenant-scoped via AccessScope and reused across
   // every /admin route, so a small parallel fetch in the layout is cheaper than
-  // duplicating it on each page.
-  const [overview, organizations] = await Promise.all([
-    getNetworkOverview().catch(() => null),
-    getOrganizations().catch(() => [] as Awaited<ReturnType<typeof getOrganizations>>),
+  // duplicating it on each page. A 403 means the tenant is suspended (the
+  // backend rejects every tenant-scoped call at scope resolution).
+  let suspended = false;
+  const swallow = <T,>(fallback: T) => (err: unknown): T => {
+    if (err instanceof ApiError && err.status === 403) suspended = true;
+    return fallback;
+  };
+  const [overview, organizations, tenantProfile] = await Promise.all([
+    getNetworkOverview().catch(swallow(null)),
+    getOrganizations().catch(swallow([] as Awaited<ReturnType<typeof getOrganizations>>)),
+    // Only used for the grant-visit chip — a platform operator reading this
+    // surface through a §2.2 access grant should see they're in read-only.
+    getTenantProfile().catch(() => null),
   ]);
+
+  if (CLERK_ENABLED && suspended) {
+    return <WorkspaceSuspendedScreen />;
+  }
+  const viaGrant = tenantProfile?.via_grant === true;
 
   // Primary org used for the switcher card. org_admin typically has one; for
   // network/platform admin we show a generic "All organizations" line.
@@ -155,6 +176,24 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         >
           <AdminBreadcrumb />
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            {viaGrant ? (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "3px 9px",
+                  borderRadius: 999,
+                  background: "var(--sand-soft, rgba(232,201,122,.2))",
+                  color: "#8C6B14",
+                  fontSize: 10.5,
+                  fontWeight: 600,
+                  letterSpacing: ".04em",
+                }}
+              >
+                Read-only · access grant
+              </span>
+            ) : null}
             <Search size={17} strokeWidth={1.7} color="var(--ink-3)" aria-label="Search" />
             <Bell size={17} strokeWidth={1.7} color="var(--ink-3)" aria-label="Notifications" />
             {CLERK_ENABLED ? (

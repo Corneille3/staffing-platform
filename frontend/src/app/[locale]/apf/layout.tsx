@@ -1,11 +1,13 @@
 import React from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Eye } from "lucide-react";
+import { ArrowLeft, ClipboardList, Eye } from "lucide-react";
 import { ApfNavigation } from "../../../components/apf-navigation";
 import { HeaderSignOutButton } from "../../../components/header-sign-out-button";
 import { Eyebrow } from "../../../components/ui";
-import { getOrganizations, getTenantProfile, requireServerSession } from "../../../lib/api";
+import { WorkspaceSuspendedScreen } from "../../../components/workspace-suspended";
+import { ApiError, getOrganizations, getTenantProfile, requireServerSession } from "../../../lib/api";
+import type { TenantProfile } from "../../../lib/types";
 
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -16,10 +18,26 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
     isPlatformAdmin = session.role === "platform_admin";
   }
 
-  // The caller's own tenant — names the workspace in the sidebar. For a
-  // non-platform admin whose tenant hasn't finished onboarding, bounce them
-  // into the setup wizard (MULTITENANCY_HANDOFF §6).
-  const tenant = await getTenantProfile().catch(() => null);
+  // The caller's own tenant — names the workspace in the sidebar. A 403 here
+  // means the tenant is suspended (scope rejects every tenant-scoped call).
+  let tenant: TenantProfile | null = null;
+  let suspended = false;
+  try {
+    tenant = await getTenantProfile();
+  } catch (err) {
+    suspended = err instanceof ApiError && err.status === 403;
+  }
+
+  if (CLERK_ENABLED && suspended) {
+    return <WorkspaceSuspendedScreen />;
+  }
+  // A platform operator with no workspace in scope (no membership, no active
+  // grant — including a tenant suspended out of scope): back to the console.
+  if (CLERK_ENABLED && isPlatformAdmin && tenant === null) {
+    redirect("/platform");
+  }
+  // Non-platform admin whose tenant hasn't finished onboarding → the setup
+  // wizard (MULTITENANCY_HANDOFF §6).
   if (CLERK_ENABLED && !isPlatformAdmin && tenant && tenant.status !== "active") {
     redirect("/welcome");
   }
@@ -127,26 +145,56 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
         <div style={{ flex: 1 }} />
 
         {isPlatformAdmin ? (
-          <Link href="/platform" style={{ textDecoration: "none" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "9px 12px",
-                marginBottom: 8,
-                borderRadius: 10,
-                background: "rgba(246, 244, 238, 0.04)",
-                border: "0.5px solid rgba(246, 244, 238, 0.12)",
-                color: "rgba(246, 244, 238, 0.75)",
-                fontSize: 12,
-                fontWeight: 500,
-              }}
-            >
-              <ArrowLeft size={13} style={{ color: "var(--terra)" }} />
-              Platform console
-            </div>
-          </Link>
+          <>
+            {/* Support work happens through the coordinator lens (same
+                tenant data, same read-only enforcement on a grant visit) —
+                the SaaS side fixes app issues, not the tenant admin. */}
+            <Link href="/admin" style={{ textDecoration: "none" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "9px 12px",
+                  marginBottom: 8,
+                  borderRadius: 10,
+                  background: "rgba(246, 244, 238, 0.04)",
+                  border: "0.5px solid rgba(246, 244, 238, 0.12)",
+                  color: "rgba(246, 244, 238, 0.75)",
+                  fontSize: 12,
+                  fontWeight: 500,
+                }}
+              >
+                <ClipboardList size={13} style={{ color: "var(--terra)" }} />
+                Coordinator view
+                {tenant?.via_grant ? (
+                  <span style={{ marginLeft: "auto", fontSize: 9.5, color: "rgba(246,244,238,.45)" }}>
+                    read-only
+                  </span>
+                ) : null}
+              </div>
+            </Link>
+            <Link href="/platform" style={{ textDecoration: "none" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "9px 12px",
+                  marginBottom: 8,
+                  borderRadius: 10,
+                  background: "rgba(246, 244, 238, 0.04)",
+                  border: "0.5px solid rgba(246, 244, 238, 0.12)",
+                  color: "rgba(246, 244, 238, 0.75)",
+                  fontSize: 12,
+                  fontWeight: 500,
+                }}
+              >
+                <ArrowLeft size={13} style={{ color: "var(--terra)" }} />
+                Platform console
+              </div>
+            </Link>
+          </>
         ) : null}
 
         <div
