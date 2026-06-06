@@ -37,7 +37,20 @@ export type ServerSession = {
   last_name: string;
   clerk_user_id: string | null;
   preferred_language: string;
+  /** Tier-0 operator role — null for everyone who isn't a platform operator.
+   * The UI hides owner/operator-only controls from `support`. */
+  platform_operator_role: "owner" | "operator" | "support" | null;
 };
+
+/** Error thrown by fetchJson — carries the HTTP status so layouts can
+ * branch on it (e.g. 403 = workspace suspended). */
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
 
 const ROLE_HOME_BY_ROLE: Record<ServerSession["role"], string> = {
   worker: "/worker",
@@ -72,7 +85,10 @@ async function fetchJson<T>(path: string): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed for ${path} with status ${response.status}`);
+    throw new ApiError(
+      `API request failed for ${path} with status ${response.status}`,
+      response.status,
+    );
   }
 
   return response.json() as Promise<T>;

@@ -145,6 +145,34 @@ def test_operator_without_mfa_cannot_request(db_session, seed):
         assert 'two-factor' in resp.json()['detail'].lower()
 
 
+def test_suspension_cuts_grant_access(db_session, seed):
+    """Suspending a tenant must also cut an operator's ACTIVE grant — the
+    operator keeps /platform but the granted workspace drops out of scope
+    (E2E finding 2026-06-06: suspension used to be cosmetic)."""
+    from app.models.enums import TenantStatus
+
+    ctx = _setup(db_session)
+    with _client_for(db_session, ctx.operator.clerk_user_id) as op_client:
+        grant_id = op_client.post(
+            f'/api/v1/platform/tenants/{ctx.tenant_b.id}/access-request',
+            json={'reason': 'Investigating ticket #99'},
+        ).json()['id']
+    with _client_for(db_session, ctx.admin_b.clerk_user_id, 'network_admin') as tb_client:
+        assert tb_client.post(f'/api/v1/tenant/access-grants/{grant_id}/approve').status_code == 200
+    with _client_for(db_session, ctx.operator.clerk_user_id) as op_client:
+        assert op_client.get('/api/v1/tenant/profile').status_code == 200
+
+        # platform owner suspends the tenant (status flipped directly — the
+        # endpoint itself is covered in test_platform)
+        ctx.tenant_b.status = TenantStatus.SUSPENDED
+        ctx.tenant_b.is_active = False
+        db_session.flush()
+
+        assert op_client.get('/api/v1/tenant/profile').status_code == 404
+        # the platform surface stays usable
+        assert op_client.get('/api/v1/platform/tenants').status_code == 200
+
+
 def test_mfa_gate_relaxed_when_not_enforced(db_session, seed, monkeypatch):
     """PLATFORM_MFA_ENFORCED=false lets a no-MFA operator through the 2FA
     gate (Clerk MFA is a paid feature — pre-client deployments defer it).

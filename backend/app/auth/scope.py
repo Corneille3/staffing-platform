@@ -22,10 +22,11 @@ from app.api.deps import get_db_session
 from app.auth.current_user import CurrentUserModel, get_current_user
 from app.core.config import settings
 from app.core.constants import ROLE_NETWORK_ADMIN, ROLE_ORG_ADMIN, ROLE_PLATFORM_ADMIN, ROLE_WORKER
-from app.models.enums import TenantAccessGrantStatus
+from app.models.enums import TenantAccessGrantStatus, TenantStatus
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
 from app.models.platform_operator import PlatformOperator
+from app.models.tenant import Tenant
 from app.models.tenant_access_grant import TenantAccessGrant
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
@@ -93,6 +94,23 @@ def _active_grant_tenant_id(db: Session, user_id: UUID) -> UUID | None:
 _GRANT_WRITE_EXEMPT_PREFIXES = ('/api/v1/platform', '/api/v1/auth')
 
 
+def _tenant_suspended(db: Session, tenant_id: UUID | None) -> bool:
+    """Suspension must bite at scope resolution — the single choke point every
+    tenant-scoped request passes through. Pending/onboarding are NOT blocked
+    here (the /welcome wizard handles those)."""
+    if tenant_id is None:
+        return False
+    tenant = db.get(Tenant, tenant_id)
+    return tenant is not None and tenant.status == TenantStatus.SUSPENDED
+
+
+def _raise_workspace_suspended() -> None:
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail='This workspace has been suspended. Contact your platform operator.',
+    )
+
+
 def get_access_scope(
     request: Request,
     current_user: CurrentUserModel = Depends(get_current_user),
@@ -150,6 +168,15 @@ def get_access_scope(
                 if granted is not None:
                     tenant_id = granted
                     grant_access = True
+        if _tenant_suspended(db, tenant_id):
+            if role == ROLE_PLATFORM_ADMIN:
+                # The operator must keep /platform alive (to reactivate!), so
+                # drop the tenant from scope instead of rejecting: workspace
+                # data and /tenant/profile 404 until the tenant is reactivated.
+                tenant_id = None
+                grant_access = False
+            else:
+                _raise_workspace_suspended()
         if grant_access and request.method not in ('GET', 'HEAD', 'OPTIONS') \
                 and not request.url.path.startswith(_GRANT_WRITE_EXEMPT_PREFIXES):
             raise HTTPException(
@@ -177,6 +204,8 @@ def get_access_scope(
             org = db.get(Organization, org_ids[0])
             if org:
                 tenant_id = org.tenant_id
+        if _tenant_suspended(db, tenant_id):
+            _raise_workspace_suspended()
         return AccessScope(user=user, tenant_id=tenant_id, org_ids=org_ids)
 
     # WORKER
@@ -186,4 +215,7 @@ def get_access_scope(
             TenantMembership.is_active.is_(True),
         )
     )
-    return AccessScope(user=user, tenant_id=membership.tenant_id if membership else None)
+    tenant_id = membership.tenant_id if membership else None
+    if _tenant_suspended(db, tenant_id):
+        _raise_workspace_suspended()
+    return AccessScope(user=user, tenant_id=tenant_id)

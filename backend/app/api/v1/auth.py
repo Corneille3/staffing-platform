@@ -11,27 +11,40 @@ from app.models.platform_operator import PlatformOperator
 from app.models.tenant import Tenant
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
-from app.schemas.user import UserRead
+from app.schemas.user import SyncedUserRead
 
 router = APIRouter()
 
 
-def _sync_operator_mfa(db: Session, user: User) -> None:
+def _sync_operator_mfa(db: Session, user: User) -> PlatformOperator | None:
     """Mirror Clerk's ``two_factor_enabled`` into platform_operators.mfa_enabled
     (PLATFORM_HANDOFF §1). Clerk owns the MFA factor; the DB column is what the
     permission gates check. Best-effort: in dev (no Clerk secret) the lookup
-    returns {} and the manually-set column value is left alone."""
+    returns {} and the manually-set column value is left alone.
+
+    Returns the operator row (when one exists) so /auth/sync can expose the
+    tier-0 role to the frontend without a second query."""
     if user.role != UserRole.PLATFORM_ADMIN or not user.clerk_user_id:
-        return
+        return None
     operator = db.scalar(
         select(PlatformOperator).where(PlatformOperator.user_id == user.id)
     )
     if operator is None:
-        return
+        return None
     two_fa = fetch_user_details(user.clerk_user_id).get('two_factor_enabled')
     if isinstance(two_fa, bool) and operator.mfa_enabled != two_fa:
         operator.mfa_enabled = two_fa
         db.commit()
+    return operator
+
+
+def _synced_read(user: User, operator: PlatformOperator | None) -> SyncedUserRead:
+    """Sync payload = the DB user + the tier-0 operator role (None for
+    everyone who isn't a platform operator). The UI uses the role to hide
+    owner/operator-only controls from `support`."""
+    payload = SyncedUserRead.model_validate(user)
+    payload.platform_operator_role = operator.role.value if operator else None
+    return payload
 
 
 def _start_onboarding_if_pending(db: Session, user: User) -> None:
@@ -58,11 +71,11 @@ def read_current_user(current_user: CurrentUserModel = Depends(get_current_user)
     return current_user.model_dump()
 
 
-@router.post('/sync', response_model=UserRead)
+@router.post('/sync', response_model=SyncedUserRead)
 def sync_current_user(
     current_user: CurrentUserModel = Depends(get_current_user),
     db: Session = Depends(get_db_session),
-) -> User:
+) -> SyncedUserRead:
     """Resolve the signed-in Clerk user to a row in ``users``.
 
     DB owns roles and memberships; Clerk is the identity layer only.
@@ -77,8 +90,7 @@ def sync_current_user(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail='Account has been deactivated.',
             )
-        _sync_operator_mfa(db, existing)
-        return existing
+        return _synced_read(existing, _sync_operator_mfa(db, existing))
 
     email = current_user.email or primary_email(fetch_user_details(current_user.sub))
     if not email:
@@ -107,11 +119,10 @@ def sync_current_user(
         db.rollback()
         racing = db.scalar(select(User).where(User.clerk_user_id == current_user.sub))
         if racing is not None:
-            return racing
+            return _synced_read(racing, _sync_operator_mfa(db, racing))
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail='Could not link user (concurrent write).',
         )
     db.refresh(by_email)
-    _sync_operator_mfa(db, by_email)
-    return by_email
+    return _synced_read(by_email, _sync_operator_mfa(db, by_email))

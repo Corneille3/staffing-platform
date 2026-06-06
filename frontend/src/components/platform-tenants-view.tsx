@@ -35,14 +35,19 @@ function fillColor(rate: number | null): string {
 export function PlatformTenantsView({
   data,
   callerWorkspace,
+  callerOperatorRole,
 }: {
   data: PlatformTenantsResponse;
   // The tenant this operator can already open (own membership or active
   // §2.2 grant) — its row shows "Open workspace" instead of "Request access".
   callerWorkspace?: TenantProfile | null;
+  // Tier-0 role: `support` sees a read-only table (no invite, no lifecycle
+  // buttons — the backend 403s those anyway). null (dev mode) = full UI.
+  callerOperatorRole?: "owner" | "operator" | "support" | null;
 }) {
   const router = useRouter();
   const [inviteOpen, setInviteOpen] = useState(false);
+  const readOnlyOperator = callerOperatorRole === "support";
 
   const { kpis, tenants } = data;
   const counts = tenants.reduce(
@@ -74,9 +79,11 @@ export function PlatformTenantsView({
           </p>
           {summary ? <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-3)" }}>{summary}</div> : null}
         </div>
-        <button type="button" onClick={() => setInviteOpen(true)} style={primaryBtn}>
-          <Plus size={15} /> Invite a network
-        </button>
+        {!readOnlyOperator && (
+          <button type="button" onClick={() => setInviteOpen(true)} style={primaryBtn}>
+            <Plus size={15} /> Invite a network
+          </button>
+        )}
       </div>
 
       {/* Aggregate KPIs — privacy-safe (counts only) */}
@@ -103,6 +110,7 @@ export function PlatformTenantsView({
               t={t}
               last={i === tenants.length - 1}
               workspace={callerWorkspace?.id === t.id ? callerWorkspace : null}
+              readOnlyOperator={readOnlyOperator}
               onAction={() => router.refresh()}
             />
           ))
@@ -122,12 +130,15 @@ function TenantRow({
   t,
   last,
   workspace,
+  readOnlyOperator,
   onAction,
 }: {
   t: PlatformTenantRow;
   last: boolean;
   // Non-null when this row is the caller's own/granted workspace.
   workspace: TenantProfile | null;
+  // `support` — hide lifecycle buttons (Suspend/Reactivate/Resend/Revoke).
+  readOnlyOperator: boolean;
   onAction: () => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -176,7 +187,7 @@ function TenantRow({
       </div>
       <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
         {error ? <span style={{ fontSize: 10, color: "var(--rose)" }}>{error}</span> : null}
-        {t.status === "pending" && (
+        {t.status === "pending" && !readOnlyOperator && (
           <>
             <button type="button" disabled={busy} onClick={() => run("resend")} style={rowBtn}>Resend</button>
             <button type="button" disabled={busy} onClick={() => run("revoke")} style={rowBtn}>Revoke</button>
@@ -207,10 +218,12 @@ function TenantRow({
                 <Eye size={12} /> Request access
               </button>
             )}
-            <button type="button" disabled={busy} onClick={() => run("suspend")} style={rowBtn}>Suspend</button>
+            {!readOnlyOperator && (
+              <button type="button" disabled={busy} onClick={() => run("suspend")} style={rowBtn}>Suspend</button>
+            )}
           </>
         )}
-        {t.status === "suspended" && (
+        {t.status === "suspended" && !readOnlyOperator && (
           <button type="button" disabled={busy} onClick={() => run("reactivate")} style={rowBtn}>Reactivate</button>
         )}
       </div>

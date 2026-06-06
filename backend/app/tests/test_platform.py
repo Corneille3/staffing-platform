@@ -62,3 +62,44 @@ def test_platform_endpoints_forbidden_for_network_admin(apf_client):
         'name': 'X', 'slug': 'x-net', 'admin_first_name': 'A',
         'admin_last_name': 'B', 'admin_email': 'a@b.example',
     }).status_code == 403
+
+
+# ── suspension must actually bite (E2E finding 2026-06-06) ────────────────────
+# Suspend used to be cosmetic: scope resolution never checked tenant status,
+# so a suspended tenant's users (and grant visitors) kept full access.
+
+def _suspend_in_db(db_session, tenant) -> None:
+    from app.models.enums import TenantStatus
+    tenant.status = TenantStatus.SUSPENDED
+    tenant.is_active = False
+    db_session.flush()
+
+
+def test_suspension_locks_out_network_admin(apf_client, seed, db_session):
+    assert apf_client.get('/api/v1/tenant/profile').status_code == 200
+    _suspend_in_db(db_session, seed.tenant)
+    locked = apf_client.get('/api/v1/tenant/profile')
+    assert locked.status_code == 403
+    assert 'suspended' in locked.json()['detail'].lower()
+
+
+def test_suspension_locks_out_worker(worker_a_client, seed, db_session):
+    assert worker_a_client.get('/api/v1/assignments').status_code == 200
+    _suspend_in_db(db_session, seed.tenant)
+    locked = worker_a_client.get('/api/v1/assignments')
+    assert locked.status_code == 403
+    assert 'suspended' in locked.json()['detail'].lower()
+
+
+def test_suspending_own_tenant_keeps_platform_console_alive(platform_admin_client, seed):
+    """The operator must keep /platform (to reactivate!) — their own suspended
+    tenant just drops out of scope (profile 404 → workspace nav disappears)."""
+    tid = str(seed.tenant.id)
+    assert platform_admin_client.get('/api/v1/tenant/profile').status_code == 200
+
+    assert platform_admin_client.post(f'/api/v1/platform/tenants/{tid}/suspend').status_code == 200
+    assert platform_admin_client.get('/api/v1/platform/tenants').status_code == 200
+    assert platform_admin_client.get('/api/v1/tenant/profile').status_code == 404
+
+    assert platform_admin_client.post(f'/api/v1/platform/tenants/{tid}/reactivate').status_code == 200
+    assert platform_admin_client.get('/api/v1/tenant/profile').status_code == 200
