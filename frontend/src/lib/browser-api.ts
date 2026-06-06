@@ -209,6 +209,12 @@ export async function requestTenantAccess(
   );
 }
 
+/** Operator ends their own current visit early (single-visit invariant —
+ * no id needed, at most one grant is active). */
+export async function releaseTenantAccessGrant(): Promise<TenantAccessGrant> {
+  return postJson<TenantAccessGrant>(`/api/v1/platform/access-grants/release`);
+}
+
 export async function approveTenantAccessGrant(grantId: string): Promise<TenantAccessGrant> {
   return postJson<TenantAccessGrant>(`/api/v1/tenant/access-grants/${grantId}/approve`);
 }

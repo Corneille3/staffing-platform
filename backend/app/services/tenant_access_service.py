@@ -97,6 +97,7 @@ class TenantAccessService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail='You already have a pending or active request for this tenant.',
             )
+        self._guard_single_active_visit(scope.user.id)
 
         platform_settings = PlatformSettingsService(self.db).get()
         grant = TenantAccessGrant(
@@ -134,6 +135,63 @@ class TenantAccessService:
                 self._notify_tenant_admin(tenant, scope.user, grant.reason)
             except Exception:  # pragma: no cover - never block the request on email
                 pass
+        return grant
+
+    def _guard_single_active_visit(self, operator_user_id: UUID, *, as_operator: bool = True) -> None:
+        """One visit at a time (§2.2 — the scope model resolves a single
+        granted tenant). A second ACTIVE grant would be silently unreachable,
+        so refuse to create one; the operator ends the current visit first."""
+        row = self.db.execute(
+            select(TenantAccessGrant, Tenant)
+            .join(Tenant, Tenant.id == TenantAccessGrant.tenant_id)
+            .where(
+                TenantAccessGrant.operator_user_id == operator_user_id,
+                TenantAccessGrant.status == TenantAccessGrantStatus.ACTIVE,
+            )
+        ).first()
+        if row is not None:
+            _, tenant = row
+            detail = (
+                f'You already hold an active grant for "{tenant.name}". '
+                'End that visit before starting another.'
+                if as_operator
+                else f'This operator is currently visiting "{tenant.name}" — '
+                     'that visit must end before this one can start.'
+            )
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+
+    def release_current(self, scope: AccessScope) -> TenantAccessGrant:
+        """Operator voluntarily ends their own active visit early — flips the
+        grant to EXPIRED now instead of waiting out the window. Both audit
+        trails record it (same shape as the lazy expiry, but attributed)."""
+        self.expire_stale()
+        grant = self.db.scalar(
+            select(TenantAccessGrant)
+            .where(
+                TenantAccessGrant.operator_user_id == scope.user.id,
+                TenantAccessGrant.status == TenantAccessGrantStatus.ACTIVE,
+            )
+            .order_by(TenantAccessGrant.expires_at.desc())
+        )
+        if grant is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail='No active grant to end.',
+            )
+        grant.status = TenantAccessGrantStatus.EXPIRED
+        grant.expires_at = _utcnow()
+
+        self.audit_service.log(
+            action='platform_access.released', entity_type='tenant', entity_id=grant.tenant_id,
+            actor_user_id=scope.user.id, payload={'grant_id': str(grant.id)},
+        )
+        self.platform_audit.log(
+            actor_user_id=scope.user.id, action='access.released',
+            target_type='grant', target_id=str(grant.id),
+            payload={'tenant_id': str(grant.tenant_id)},
+        )
+        self.db.commit()
+        self.db.refresh(grant)
         return grant
 
     def list_for_platform(self) -> tuple[list[tuple[TenantAccessGrant, User, Tenant]], int]:
@@ -192,6 +250,8 @@ class TenantAccessService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail='Only a pending request can be approved.',
             )
+        self.expire_stale()
+        self._guard_single_active_visit(grant.operator_user_id, as_operator=False)
         window_hours = PlatformSettingsService(self.db).get().access_window_hours
         grant.status = TenantAccessGrantStatus.ACTIVE
         grant.approved_by_user_id = scope.user.id

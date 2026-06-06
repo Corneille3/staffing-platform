@@ -173,6 +173,98 @@ def test_suspension_cuts_grant_access(db_session, seed):
         assert op_client.get('/api/v1/platform/tenants').status_code == 200
 
 
+def _second_target_tenant(db_session) -> SimpleNamespace:
+    """One more tenant (+ its admin) for cross-tenant grant cases."""
+    tenant_c = Tenant(id=uuid4(), name='Second Target Network', slug=f'grant-c-{uuid4().hex[:8]}')
+    admin_c = User(
+        id=uuid4(), clerk_user_id=f'int-tc-admin-{uuid4().hex[:6]}', first_name='Téa', last_name='Cee',
+        email=f'tc-admin-{uuid4().hex[:6]}@inttest.example', role=UserRole.NETWORK_ADMIN,
+        preferred_language='en',
+    )
+    db_session.add_all([tenant_c, admin_c])
+    db_session.flush()
+    db_session.add(TenantMembership(
+        id=uuid4(), user_id=admin_c.id, tenant_id=tenant_c.id, role=UserRole.NETWORK_ADMIN,
+    ))
+    db_session.flush()
+    return SimpleNamespace(tenant_c=tenant_c, admin_c=admin_c)
+
+
+def _approved_grant(db_session, ctx) -> str:
+    """Request + approve a grant for ctx.operator on ctx.tenant_b; returns id."""
+    with _client_for(db_session, ctx.operator.clerk_user_id) as op_client:
+        grant_id = op_client.post(
+            f'/api/v1/platform/tenants/{ctx.tenant_b.id}/access-request',
+            json={'reason': 'Visit one — ticket #1'},
+        ).json()['id']
+    with _client_for(db_session, ctx.admin_b.clerk_user_id, 'network_admin') as tb_client:
+        assert tb_client.post(f'/api/v1/tenant/access-grants/{grant_id}/approve').status_code == 200
+    return grant_id
+
+
+def test_one_active_visit_at_a_time(db_session, seed):
+    """E2E finding 2026-06-06: two active grants accumulated and the scope
+    silently resolved only the latest — the other was Active-but-unreachable.
+    Now: a second request 409s while a visit is in progress."""
+    ctx = _setup(db_session)
+    extra = _second_target_tenant(db_session)
+    _approved_grant(db_session, ctx)
+
+    with _client_for(db_session, ctx.operator.clerk_user_id) as op_client:
+        second = op_client.post(
+            f'/api/v1/platform/tenants/{extra.tenant_c.id}/access-request',
+            json={'reason': 'Second visit attempt — ticket #2'},
+        )
+        assert second.status_code == 409
+        assert ctx.tenant_b.name in second.json()['detail']
+
+
+def test_approve_blocked_while_operator_visits_elsewhere(db_session, seed):
+    """The invariant holds on the approve path too: a pending request for
+    tenant C can't flip ACTIVE while the operator is inside tenant B."""
+    ctx = _setup(db_session)
+    extra = _second_target_tenant(db_session)
+
+    # pending request on C first, then the B visit goes active
+    with _client_for(db_session, ctx.operator.clerk_user_id) as op_client:
+        pending_id = op_client.post(
+            f'/api/v1/platform/tenants/{extra.tenant_c.id}/access-request',
+            json={'reason': 'Queued request for tenant C'},
+        ).json()['id']
+    _approved_grant(db_session, ctx)
+
+    with _client_for(db_session, extra.admin_c.clerk_user_id, 'network_admin') as tc_client:
+        resp = tc_client.post(f'/api/v1/tenant/access-grants/{pending_id}/approve')
+        assert resp.status_code == 409
+        assert 'visiting' in resp.json()['detail'].lower()
+
+
+def test_release_ends_visit_and_frees_the_operator(db_session, seed):
+    """End-visit: the operator gives the grant up early, loses access
+    immediately, and can request a new visit right away."""
+    ctx = _setup(db_session)
+    extra = _second_target_tenant(db_session)
+    _approved_grant(db_session, ctx)
+
+    with _client_for(db_session, ctx.operator.clerk_user_id) as op_client:
+        assert op_client.get('/api/v1/tenant/profile').status_code == 200
+
+        released = op_client.post('/api/v1/platform/access-grants/release')
+        assert released.status_code == 200, released.text
+        assert released.json()['status'] == 'expired'
+
+        # access gone at once; nothing left to release
+        assert op_client.get('/api/v1/tenant/profile').status_code == 404
+        assert op_client.post('/api/v1/platform/access-grants/release').status_code == 404
+
+        # and the operator is free to start the next visit
+        again = op_client.post(
+            f'/api/v1/platform/tenants/{extra.tenant_c.id}/access-request',
+            json={'reason': 'Next visit — ticket #3'},
+        )
+        assert again.status_code == 201
+
+
 def test_mfa_gate_relaxed_when_not_enforced(db_session, seed, monkeypatch):
     """PLATFORM_MFA_ENFORCED=false lets a no-MFA operator through the 2FA
     gate (Clerk MFA is a paid feature — pre-client deployments defer it).
