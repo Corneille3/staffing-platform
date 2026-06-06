@@ -11,8 +11,12 @@ const isPublicRoute = createRouteMatcher([
   "/:locale/sign-in(.*)",
   "/:locale/sign-up(.*)",
   "/:locale/not-invited",
-  // Unprefixed variant: post-sign-out redirects land here before the intl
-  // middleware adds the locale prefix — must pass auth.protect() too.
+  // Unprefixed variants: post-sign-out redirects and the SignIn/SignUp
+  // cross-links target these before the intl middleware adds the locale
+  // prefix — they must pass auth.protect() too, or the bounce to the
+  // Clerk sign-in URL silently swallows the navigation.
+  "/sign-in(.*)",
+  "/sign-up(.*)",
   "/not-invited",
 ]);
 
