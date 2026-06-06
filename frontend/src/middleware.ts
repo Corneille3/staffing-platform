@@ -11,6 +11,9 @@ const isPublicRoute = createRouteMatcher([
   "/:locale/sign-in(.*)",
   "/:locale/sign-up(.*)",
   "/:locale/not-invited",
+  // Unprefixed variant: post-sign-out redirects land here before the intl
+  // middleware adds the locale prefix — must pass auth.protect() too.
+  "/not-invited",
 ]);
 
 export default CLERK_ENABLED
