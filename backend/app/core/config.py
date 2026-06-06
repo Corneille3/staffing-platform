@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     dev_auth_bypass: bool = True
     allowed_origins: list[str] | str = 'http://localhost:3000'
     log_level: str = 'INFO'
+    # Tier-0 2FA gate (PLATFORM_HANDOFF §1). Clerk MFA is a paid (Pro)
+    # feature on production instances — set false to relax the gate until
+    # the Clerk plan supports TOTP enrollment. Role gates still apply.
+    platform_mfa_enforced: bool = True
 
     smtp_host: str = ''
     smtp_port: int = 1025

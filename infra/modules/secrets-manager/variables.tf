@@ -44,4 +44,10 @@ variable "apf_bootstrap_last_name" {
   default = "Admin"
 }
 
+variable "platform_mfa_enforced" {
+  type        = bool
+  default     = true
+  description = "Tier-0 2FA gate (PLATFORM_HANDOFF §1). Set false while the Clerk plan has no MFA (paid feature)."
+}
+
 variable "tags" { type = map(string) }

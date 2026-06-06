@@ -16,6 +16,7 @@ from fastapi import Depends, HTTPException, status
 
 from app.auth.current_user import get_current_user
 from app.auth.scope import AccessScope, get_access_scope
+from app.core.config import settings
 from app.core.constants import ROLE_NETWORK_ADMIN, ROLE_ORG_ADMIN, ROLE_PLATFORM_ADMIN, ROLE_WORKER
 
 
@@ -44,7 +45,13 @@ require_worker = require_role(ROLE_WORKER)
 
 def _require_operator_mfa(scope: AccessScope) -> None:
     """2FA is mandatory before any sensitive tier-0 action (PLATFORM_HANDOFF §1).
-    The flag mirrors Clerk's two_factor_enabled (synced on /auth/sync)."""
+    The flag mirrors Clerk's two_factor_enabled (synced on /auth/sync).
+
+    ``PLATFORM_MFA_ENFORCED=false`` relaxes the gate — Clerk MFA is a paid
+    feature on production instances, so pre-client deployments can defer it.
+    Role gates (owner/operator/support) are unaffected."""
+    if not settings.platform_mfa_enforced:
+        return
     if not scope.platform_operator_mfa:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

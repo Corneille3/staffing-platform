@@ -138,6 +138,21 @@ def test_operator_without_mfa_cannot_request(db_session, seed):
         assert 'two-factor' in resp.json()['detail'].lower()
 
 
+def test_mfa_gate_relaxed_when_not_enforced(db_session, seed, monkeypatch):
+    """PLATFORM_MFA_ENFORCED=false lets a no-MFA operator through the 2FA
+    gate (Clerk MFA is a paid feature — pre-client deployments defer it).
+    Role gates are untouched."""
+    from app.core.config import settings as app_settings
+    monkeypatch.setattr(app_settings, 'platform_mfa_enforced', False)
+    ctx = _setup(db_session, mfa=False)
+    with _client_for(db_session, ctx.operator.clerk_user_id) as op_client:
+        resp = op_client.post(
+            f'/api/v1/platform/tenants/{ctx.tenant_b.id}/access-request',
+            json={'reason': 'MFA gate relaxed — should pass'},
+        )
+        assert resp.status_code == 201
+
+
 def test_cannot_request_own_tenant(platform_admin_client, seed):
     """The seeded platform admin is a member of the seed tenant — pointless grant."""
     resp = platform_admin_client.post(

@@ -95,6 +95,8 @@ module "secrets" {
   apf_bootstrap_first_name = var.apf_bootstrap_first_name
   apf_bootstrap_last_name  = var.apf_bootstrap_last_name
 
+  platform_mfa_enforced = var.platform_mfa_enforced
+
   tags = local.tags
 }
 
