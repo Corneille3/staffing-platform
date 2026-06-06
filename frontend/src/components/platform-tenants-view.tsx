@@ -4,7 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, ArrowUpRight, Eye, Plus, Shield, X } from "lucide-react";
-import { invitePlatformTenant, platformTenantAction, requestTenantAccess } from "../lib/browser-api";
+import {
+  invitePlatformTenant,
+  platformTenantAction,
+  releaseTenantAccessGrant,
+  requestTenantAccess,
+} from "../lib/browser-api";
 import type { PlatformTenantRow, PlatformTenantsResponse, TenantProfile } from "../lib/types";
 
 const STATUS_META: Record<string, { chip: string; bg: string; c: string }> = {
@@ -196,17 +201,41 @@ function TenantRow({
         {t.status === "active" && (
           <>
             {workspace ? (
-              <Link
-                href="/apf"
-                title={
-                  workspace.via_grant
-                    ? "You hold an active access grant for this workspace (read-only)"
-                    : "This is your own workspace"
-                }
-                style={{ ...rowBtn, textDecoration: "none", borderColor: "var(--terra)", color: "var(--terra-ink)" }}
-              >
-                <ArrowUpRight size={12} /> Open workspace
-              </Link>
+              <>
+                <Link
+                  href="/apf"
+                  title={
+                    workspace.via_grant
+                      ? "You hold an active access grant for this workspace (read-only)"
+                      : "This is your own workspace"
+                  }
+                  style={{ ...rowBtn, textDecoration: "none", borderColor: "var(--terra)", color: "var(--terra-ink)" }}
+                >
+                  <ArrowUpRight size={12} /> Open workspace
+                </Link>
+                {workspace.via_grant ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    title="Give up your access grant now instead of waiting for it to expire"
+                    onClick={async () => {
+                      setBusy(true);
+                      setError(null);
+                      try {
+                        await releaseTenantAccessGrant();
+                        onAction();
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Action failed");
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                    style={rowBtn}
+                  >
+                    <X size={12} /> End visit
+                  </button>
+                ) : null}
+              </>
             ) : (
               <button
                 type="button"

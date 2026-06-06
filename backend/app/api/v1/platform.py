@@ -174,6 +174,17 @@ def list_access_grants(db: Session = Depends(get_db_session)) -> TenantAccessGra
     )
 
 
+@router.post('/access-grants/release', response_model=TenantAccessGrantRead)
+def release_access_grant(
+    scope: AccessScope = Depends(require_platform_admin),
+    db: Session = Depends(get_db_session),
+) -> TenantAccessGrantRead:
+    """§2.2 — the operator ends their own current visit early. No id needed:
+    the single-visit invariant means there is at most one active grant."""
+    grant = TenantAccessService(db).release_current(scope)
+    return TenantAccessGrantRead.from_row(grant, scope.user, db.get(Tenant, grant.tenant_id))
+
+
 @router.post('/tenants/{tenant_id}/suspend', response_model=PlatformTenantCreated)
 def suspend_tenant(
     tenant_id: UUID,

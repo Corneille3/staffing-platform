@@ -75,13 +75,16 @@ class AccessScope:
 def _active_grant_tenant_id(db: Session, user_id: UUID) -> UUID | None:
     """The tenant a membership-less operator may currently look inside
     (PLATFORM_HANDOFF §2.2). Compares expires_at directly — authorization
-    never depends on the lazy expiry sweep having run."""
+    never depends on the lazy expiry sweep having run. Grants on suspended
+    tenants don't count (and don't shadow a grant on a live one)."""
     grant = db.scalar(
         select(TenantAccessGrant)
+        .join(Tenant, Tenant.id == TenantAccessGrant.tenant_id)
         .where(
             TenantAccessGrant.operator_user_id == user_id,
             TenantAccessGrant.status == TenantAccessGrantStatus.ACTIVE,
             TenantAccessGrant.expires_at > datetime.now(timezone.utc),
+            Tenant.status != TenantStatus.SUSPENDED,
         )
         .order_by(TenantAccessGrant.expires_at.desc())
     )
