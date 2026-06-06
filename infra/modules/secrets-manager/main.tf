@@ -33,5 +33,9 @@ resource "aws_secretsmanager_secret_version" "app_env" {
     APF_BOOTSTRAP_EMAIL      = var.apf_bootstrap_email
     APF_BOOTSTRAP_FIRST_NAME = var.apf_bootstrap_first_name
     APF_BOOTSTRAP_LAST_NAME  = var.apf_bootstrap_last_name
+
+    # Tier-0 2FA gate (PLATFORM_HANDOFF §1). False until the Clerk plan
+    # supports MFA enrollment (paid feature on production instances).
+    PLATFORM_MFA_ENFORCED = tostring(var.platform_mfa_enforced)
   })
 }

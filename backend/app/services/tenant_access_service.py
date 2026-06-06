@@ -55,7 +55,9 @@ class TenantAccessService:
                 detail='Only a platform operator can request tenant access.',
             )
         # §1: no 2FA → no access elevation, for every operator role.
-        if not operator.mfa_enabled:
+        # (PLATFORM_MFA_ENFORCED=false relaxes this — Clerk MFA is a paid
+        # feature on production instances; see auth/permissions.py.)
+        if settings.platform_mfa_enforced and not operator.mfa_enabled:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail='Enable two-factor authentication before requesting tenant access.',

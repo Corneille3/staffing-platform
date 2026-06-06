@@ -94,11 +94,18 @@ def test_request_approve_readonly_then_block_writes(db_session, seed):
         assert approved.json()['status'] == 'active'
         assert approved.json()['expires_at'] is not None
 
+        # membership access — the admin's own workspace, not a grant visit
+        own_profile = tb_client.get('/api/v1/tenant/profile')
+        assert own_profile.status_code == 200
+        assert own_profile.json()['via_grant'] is False
+
     # 3. the operator now reads the tenant — and only reads
     with _client_for(db_session, ctx.operator.clerk_user_id) as op_client:
         profile = op_client.get('/api/v1/tenant/profile')
         assert profile.status_code == 200
         assert profile.json()['name'] == ctx.tenant_b.name
+        # flagged as a grant visit so the workspace UI shows read-only chrome
+        assert profile.json()['via_grant'] is True
 
         # writes are blocked centrally — read-only grant
         assert op_client.patch(
@@ -136,6 +143,21 @@ def test_operator_without_mfa_cannot_request(db_session, seed):
         )
         assert resp.status_code == 403
         assert 'two-factor' in resp.json()['detail'].lower()
+
+
+def test_mfa_gate_relaxed_when_not_enforced(db_session, seed, monkeypatch):
+    """PLATFORM_MFA_ENFORCED=false lets a no-MFA operator through the 2FA
+    gate (Clerk MFA is a paid feature — pre-client deployments defer it).
+    Role gates are untouched."""
+    from app.core.config import settings as app_settings
+    monkeypatch.setattr(app_settings, 'platform_mfa_enforced', False)
+    ctx = _setup(db_session, mfa=False)
+    with _client_for(db_session, ctx.operator.clerk_user_id) as op_client:
+        resp = op_client.post(
+            f'/api/v1/platform/tenants/{ctx.tenant_b.id}/access-request',
+            json={'reason': 'MFA gate relaxed — should pass'},
+        )
+        assert resp.status_code == 201
 
 
 def test_cannot_request_own_tenant(platform_admin_client, seed):

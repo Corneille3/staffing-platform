@@ -47,3 +47,10 @@ variable "apf_bootstrap_last_name" {
   type    = string
   default = "Admin"
 }
+
+# Tier-0 2FA gate (PLATFORM_HANDOFF §1). False until the Clerk plan
+# supports MFA enrollment (paid feature on production instances).
+variable "platform_mfa_enforced" {
+  type    = bool
+  default = true
+}

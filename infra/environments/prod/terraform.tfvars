@@ -23,6 +23,10 @@ allowed_origins         = "https://staffig.kouamvision.com"
 
 ses_domain_name          = "staffig.kouamvision.com"                                                     
 ses_mail_from_address    = "noreply@staffig.kouamvision.com"
-apf_bootstrap_email      = "josycorneille3@gmail.com"                                                    
+apf_bootstrap_email      = "josycorneille3@gmail.com"
 apf_bootstrap_first_name = "Josy"
-apf_bootstrap_last_name  = "Corneille" 
+apf_bootstrap_last_name  = "Corneille"
+
+# Clerk MFA is a paid (Pro) feature — gate stays off until a real client
+# justifies the upgrade. Flip to true after enabling TOTP + enrolling.
+platform_mfa_enforced = false
