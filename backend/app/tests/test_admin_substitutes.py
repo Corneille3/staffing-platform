@@ -43,6 +43,33 @@ def test_list_admin_substitutes_ranked_against_request(apf_client, seed):
     assert eligible_count == 2
 
 
+def test_ranked_rows_flag_preference_optouts(apf_client, worker_a_client, seed):
+    """would_notify diverges from eligible when the worker has muted the
+    broadcast — feeds the 'N eligible, M will be notified' reach card."""
+    worker_a_client.patch(
+        f'/api/v1/workers/{seed.worker_a.id}/availability',
+        json={'urgent_alert_opt_in': False},
+    )
+    rid = apf_client.post(
+        '/api/v1/requests',
+        json=request_payload(seed.org.id, seed.apf.id, urgency_level=3),
+    ).json()['id']
+
+    resp = apf_client.get(f'/api/v1/admin/substitutes?rank_against_request_id={rid}')
+    assert resp.status_code == 200
+    rows = {r['worker']['id']: r for r in resp.json()['items']}
+
+    # Worker A is still eligible (eligibility ignores preferences) but muted.
+    assert rows[str(seed.worker_a.id)]['eligible'] is True
+    assert rows[str(seed.worker_a.id)]['would_notify'] is False
+    assert rows[str(seed.worker_b.id)]['would_notify'] is True
+
+
+def test_unranked_rows_leave_would_notify_null(apf_client, seed):
+    resp = apf_client.get('/api/v1/admin/substitutes')
+    assert all(r['would_notify'] is None for r in resp.json()['items'])
+
+
 def test_list_admin_substitutes_404_for_unknown_request(apf_client):
     resp = apf_client.get(f'/api/v1/admin/substitutes?rank_against_request_id={uuid4()}')
     assert resp.status_code == 404

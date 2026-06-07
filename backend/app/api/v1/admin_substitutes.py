@@ -72,6 +72,7 @@ def list_admin_substitutes(
             'worker': _worker_to_read(worker),
             'match_score': result.score,
             'eligible': result.eligible,
+            'would_notify': result.eligible and matcher.wants_notification(staffing_request, worker),
             'reasons': result.reasons,
         })
     scored.sort(key=lambda r: r['match_score'] or 0, reverse=True)
