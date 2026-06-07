@@ -245,11 +245,17 @@ class StaffingRequestService:
 
         workers = self._workers_for_request(staffing_request)
         eligible_workers = self.matching_service.eligible_workers(staffing_request, workers)
+        # Notification preferences (urgent / weekend-overnight opt-outs) trim the
+        # broadcast batch — eligibility and ranking are unaffected.
+        recipients = [
+            worker for worker in eligible_workers
+            if self.matching_service.wants_notification(staffing_request, worker)
+        ]
 
         staffing_request.status = RequestStatus.NOTIFIED
         self.repository.save(staffing_request)
 
-        for worker in eligible_workers:
+        for worker in recipients:
             self.db.add(
                 RequestNotification(
                     id=uuid4(),
@@ -276,11 +282,15 @@ class StaffingRequestService:
             entity_id=staffing_request.id,
             actor_user_id=staffing_request.created_by_user_id,
             organization_id=staffing_request.organization_id,
-            payload={'eligible_worker_count': len(eligible_workers)},
+            payload={
+                'eligible_worker_count': len(eligible_workers),
+                'notified_worker_count': len(recipients),
+                'preference_opt_out_count': len(eligible_workers) - len(recipients),
+            },
         )
         self.db.commit()
         self.db.refresh(staffing_request)
-        self.dispatcher.notify_workers(staffing_request, eligible_workers)
+        self.dispatcher.notify_workers(staffing_request, recipients)
         return staffing_request
 
     def renotify(self, request_id: UUID, actor_user_id: UUID) -> StaffingRequest:
@@ -293,12 +303,17 @@ class StaffingRequestService:
 
         workers = self._workers_for_request(staffing_request)
         eligible_workers = self.matching_service.eligible_workers(staffing_request, workers)
+        # Same preference gate as publish — see wants_notification.
+        recipients = [
+            worker for worker in eligible_workers
+            if self.matching_service.wants_notification(staffing_request, worker)
+        ]
 
         staffing_request.status = RequestStatus.NOTIFIED
         self.repository.save(staffing_request)
 
         new_notifications = 0
-        for worker in eligible_workers:
+        for worker in recipients:
             self.db.add(
                 RequestNotification(
                     id=uuid4(),
@@ -331,11 +346,16 @@ class StaffingRequestService:
             entity_id=staffing_request.id,
             actor_user_id=actor_user_id,
             organization_id=staffing_request.organization_id,
-            payload={'eligible_worker_count': len(eligible_workers), 'new_notifications': new_notifications},
+            payload={
+                'eligible_worker_count': len(eligible_workers),
+                'notified_worker_count': len(recipients),
+                'preference_opt_out_count': len(eligible_workers) - len(recipients),
+                'new_notifications': new_notifications,
+            },
         )
         self.db.commit()
         self.db.refresh(staffing_request)
-        self.dispatcher.notify_workers(staffing_request, eligible_workers)
+        self.dispatcher.notify_workers(staffing_request, recipients)
         return staffing_request
 
     def notify_specific(self, request_id: UUID, worker_user_ids: list[UUID], actor_user_id: UUID) -> int:
