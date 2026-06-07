@@ -18,6 +18,7 @@ import {
   EligibilityResult,
   NotificationFeedItem,
   Organization,
+  OrphanScanResult,
   PlatformOperator,
   PlatformSettings,
   RequestResponse,
@@ -213,6 +214,16 @@ export async function requestTenantAccess(
  * no id needed, at most one grant is active). */
 export async function releaseTenantAccessGrant(): Promise<TenantAccessGrant> {
   return postJson<TenantAccessGrant>(`/api/v1/platform/access-grants/release`);
+}
+
+// ── Housekeeping orphan scan ──────────────────────────────────────────────────
+export async function scanOrphans(): Promise<OrphanScanResult> {
+  return getJson<OrphanScanResult>("/api/v1/platform/housekeeping/orphans");
+}
+
+/** Remove one scanned orphan; the backend returns a fresh scan. */
+export async function removeOrphan(kind: "clerk" | "db", id: string): Promise<OrphanScanResult> {
+  return postJson<OrphanScanResult>("/api/v1/platform/housekeeping/orphans/remove", { kind, id });
 }
 
 export async function approveTenantAccessGrant(grantId: string): Promise<TenantAccessGrant> {

@@ -7,7 +7,7 @@ delegate to TenantService.
 """
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
@@ -22,6 +22,8 @@ from app.models.platform_operator import PlatformOperator
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.schemas.platform import (
+    OrphanRemovePayload,
+    OrphanScanResponse,
     PlatformOperatorInvite,
     PlatformOperatorRead,
     PlatformOperatorRoleUpdate,
@@ -36,6 +38,7 @@ from app.schemas.platform import (
     TenantAccessRequestCreate,
 )
 from app.schemas.tenant import TenantNetworkCreate
+from app.services.housekeeping_service import HousekeepingService
 from app.services.platform_operator_service import PlatformOperatorService
 from app.services.platform_service import PlatformService
 from app.services.platform_settings_service import PlatformSettingsService
@@ -223,3 +226,37 @@ def revoke_invite(
 ) -> PlatformTenantCreated:
     tenant = TenantService(db).revoke_invite(tenant_id, scope)
     return PlatformTenantCreated(id=tenant.id, slug=tenant.slug, status=tenant.status.value)
+
+@router.get('/housekeeping/orphans', response_model=OrphanScanResponse)
+def scan_orphans(
+    scope: AccessScope = Depends(require_platform_operator),
+    db: Session = Depends(get_db_session),
+) -> OrphanScanResponse:
+    """Housekeeping scan — diff Clerk accounts against DB users and surface
+    both orphan species. Read-only, but exposes emails platform-wide, so it
+    follows the operator-list visibility policy (owner/operator, not support)."""
+    return HousekeepingService(db).scan()
+
+
+@router.post('/housekeeping/orphans/remove', response_model=OrphanScanResponse)
+def remove_orphan(
+    payload: OrphanRemovePayload,
+    scope: AccessScope = Depends(require_platform_operator_mfa),
+    db: Session = Depends(get_db_session),
+) -> OrphanScanResponse:
+    """One-click cleanup for a scanned orphan. Destructive → same gate as
+    tenant lifecycle mutations. Returns a fresh scan so the UI list stays
+    honest without a second round-trip."""
+    service = HousekeepingService(db)
+    if payload.kind == 'clerk':
+        service.remove_clerk_orphan(payload.id, scope)
+    else:
+        try:
+            user_id = UUID(payload.id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail='A db-kind orphan id must be a user UUID.',
+            )
+        service.remove_db_orphan(user_id, scope)
+    return service.scan()

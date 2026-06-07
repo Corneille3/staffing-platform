@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Lock, Plus, Shield, ShieldCheck, ShieldOff, X } from "lucide-react";
-import { OrphanUserCleanup } from "./orphan-user-cleanup";
+import { HousekeepingCard } from "./housekeeping-card";
 import { SaveFlash, useSaveFlash } from "./ui";
 import {
   changePlatformOperatorRole,
@@ -160,9 +160,9 @@ export function PlatformSettingsView({
       {/* ── Housekeeping ────────────────────────────────────────────────── */}
       <SectionHead
         title="Housekeeping"
-        sub="Accounts whose email is stuck in the database but no longer reachable through normal management flows."
+        sub="Orphan accounts — stuck in Clerk without a database row, or in the database without a reachable listing."
       />
-      <OrphanUserCleanup />
+      <HousekeepingCard canScan={operators != null} />
 
       <div style={{ marginTop: 28, fontSize: 12, color: "var(--ink-3)", display: "flex", alignItems: "center", gap: 6 }}>
         <Shield size={13} /> Every change on this page is written to the platform audit trail.

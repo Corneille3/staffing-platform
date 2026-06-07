@@ -675,6 +675,27 @@ export type TenantAccessGrantsResponse = {
   active_count: number;
 };
 
+// ── Housekeeping orphan scan ──────────────────────────────────────────────────
+export type OrphanAccount = {
+  /** "clerk" → id is the Clerk user id (no DB row). "db" → id is users.id. */
+  kind: "clerk" | "db";
+  id: string;
+  email: string | null;
+  name: string | null;
+  role: string | null; // db kind only
+  created_at: string | null;
+  last_sign_in_at: string | null; // clerk kind only
+  clerk_linked: boolean | null; // db kind only
+};
+
+export type OrphanScanResult = {
+  clerk_only: OrphanAccount[];
+  db_only: OrphanAccount[];
+  /** False when the Clerk Backend API is unreachable — clerk_only is then unknown, not empty. */
+  clerk_available: boolean;
+  scanned_at: string;
+};
+
 export type TenantProfile = {
   id: string;
   name: string;
