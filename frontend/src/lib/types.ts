@@ -219,6 +219,8 @@ export type AdminSubstituteRow = {
   worker: Worker;
   match_score: number | null;
   eligible: boolean | null;
+  /** Eligible AND passes the notification-preference gate — would receive the publish broadcast. */
+  would_notify: boolean | null;
   reasons: EligibilityReason[];
 };
 

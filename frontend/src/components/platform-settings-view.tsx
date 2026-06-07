@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Lock, Plus, Shield, ShieldCheck, ShieldOff, X } from "lucide-react";
 import { OrphanUserCleanup } from "./orphan-user-cleanup";
+import { SaveFlash, useSaveFlash } from "./ui";
 import {
   changePlatformOperatorRole,
   invitePlatformOperator,
@@ -197,8 +198,15 @@ function OperatorRow({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingRole, setPendingRole] = useState<string | null>(null);
+  const roleFlash = useSaveFlash();
   const initials = `${op.first_name[0] ?? ""}${op.last_name[0] ?? ""}`;
   const pending = op.status === "pending";
+
+  // Drop the optimistic value once the refreshed server data catches up.
+  useEffect(() => {
+    if (pendingRole !== null && pendingRole === op.role) setPendingRole(null);
+  }, [pendingRole, op.role]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -207,6 +215,24 @@ function OperatorRow({
       await fn();
       onChanged();
     } catch (err) {
+      setError(err instanceof Error ? err.message : "Action failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function changeRole(role: string) {
+    setPendingRole(role);
+    roleFlash.start();
+    setBusy(true);
+    setError(null);
+    try {
+      await changePlatformOperatorRole(op.id, role);
+      roleFlash.succeed();
+      onChanged();
+    } catch (err) {
+      setPendingRole(null);
+      roleFlash.fail();
       setError(err instanceof Error ? err.message : "Action failed");
     } finally {
       setBusy(false);
@@ -235,16 +261,19 @@ function OperatorRow({
       </div>
       <div>
         {isOwner ? (
-          <select
-            value={op.role}
-            disabled={busy}
-            onChange={(e) => run(() => changePlatformOperatorRole(op.id, e.target.value))}
-            style={{ ...inputStyle, width: "auto", padding: "6px 10px", fontSize: 12 }}
-          >
-            <option value="owner">Owner</option>
-            <option value="operator">Operator</option>
-            <option value="support">Support</option>
-          </select>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <select
+              value={pendingRole ?? op.role}
+              disabled={busy}
+              onChange={(e) => changeRole(e.target.value)}
+              style={{ ...inputStyle, width: "auto", padding: "6px 10px", fontSize: 12 }}
+            >
+              <option value="owner">Owner</option>
+              <option value="operator">Operator</option>
+              <option value="support">Support</option>
+            </select>
+            <SaveFlash state={roleFlash.state} style={{ fontSize: 10.5 }} />
+          </div>
         ) : (
           <span style={{ fontSize: 13, textTransform: "capitalize" }}>{op.role}</span>
         )}
@@ -309,56 +338,77 @@ function TenantAccessCard({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingApproval, setPendingApproval] = useState<boolean | null>(null);
+  const approvalFlash = useSaveFlash();
+  const windowFlash = useSaveFlash();
   const recent = grants?.grants.slice(0, 5) ?? [];
+  const approvalOn = pendingApproval ?? settings.access_requires_approval;
 
-  async function save(partial: Partial<PlatformSettings>) {
+  // Drop the optimistic value once the refreshed server data catches up.
+  useEffect(() => {
+    if (pendingApproval !== null && pendingApproval === settings.access_requires_approval) setPendingApproval(null);
+  }, [pendingApproval, settings.access_requires_approval]);
+
+  async function save(partial: Partial<PlatformSettings>, flash: ReturnType<typeof useSaveFlash>): Promise<boolean> {
     setBusy(true);
     setError(null);
+    flash.start();
     try {
       await updatePlatformSettings(partial);
+      flash.succeed();
       onSaved();
+      return true;
     } catch (err) {
+      flash.fail();
       setError(err instanceof Error ? err.message : "Save failed");
+      return false;
     } finally {
       setBusy(false);
     }
   }
 
+  async function toggleApproval() {
+    const next = !approvalOn;
+    setPendingApproval(next);
+    const ok = await save({ access_requires_approval: next }, approvalFlash);
+    if (!ok) setPendingApproval(null);
+  }
+
   return (
     <div style={{ ...card, padding: "22px 24px", marginBottom: 36 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr", gap: "14px 24px", alignItems: "start" }}>
-        <SettingField label="Require tenant approval">
+        <SettingField label="Require tenant approval" flash={<SaveFlash state={approvalFlash.state} />}>
           <button
             type="button"
             disabled={!isOwner || busy}
-            onClick={() => save({ access_requires_approval: !settings.access_requires_approval })}
+            onClick={toggleApproval}
             style={{
               display: "inline-flex", alignItems: "center", gap: 10, padding: "9px 14px",
               borderRadius: 999, cursor: isOwner ? "pointer" : "not-allowed", fontFamily: "var(--ui)",
               fontSize: 13, border: "0.5px solid var(--line)",
-              background: settings.access_requires_approval ? "var(--moss-soft)" : "#fff",
-              color: settings.access_requires_approval ? "var(--moss)" : "var(--ink-2)",
+              background: approvalOn ? "var(--moss-soft)" : "#fff",
+              color: approvalOn ? "var(--moss)" : "var(--ink-2)",
               opacity: !isOwner || busy ? 0.6 : 1,
             }}
           >
             <span
               style={{
                 width: 30, height: 17, borderRadius: 999, position: "relative", flexShrink: 0,
-                background: settings.access_requires_approval ? "var(--moss)" : "var(--line)",
+                background: approvalOn ? "var(--moss)" : "var(--line)",
                 transition: "background .15s",
               }}
             >
               <span
                 style={{
                   position: "absolute", top: 2, width: 13, height: 13, borderRadius: 99, background: "#fff",
-                  left: settings.access_requires_approval ? 15 : 2, transition: "left .15s",
+                  left: approvalOn ? 15 : 2, transition: "left .15s",
                 }}
               />
             </span>
-            {settings.access_requires_approval ? "On — tenant admin approves each request" : "Off — requests activate immediately"}
+            {approvalOn ? "On — tenant admin approves each request" : "Off — requests activate immediately"}
           </button>
         </SettingField>
-        <SettingField label="Access window (hours)">
+        <SettingField label="Access window (hours)" flash={<SaveFlash state={windowFlash.state} />}>
           <input
             type="number"
             min={1}
@@ -367,7 +417,7 @@ function TenantAccessCard({
             disabled={!isOwner || busy}
             onBlur={(e) => {
               const v = Number(e.target.value);
-              if (v && v !== settings.access_window_hours) save({ access_window_hours: v });
+              if (v && v !== settings.access_window_hours) save({ access_window_hours: v }, windowFlash);
             }}
             style={inputStyle}
           />
@@ -523,15 +573,19 @@ function ReservedSlugsCard({
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const flash = useSaveFlash();
 
   async function persist(next: string[]) {
     setBusy(true);
     setError(null);
+    flash.start();
     try {
       const updated = await updatePlatformSettings({ reserved_slugs: next });
       setSlugs(updated.reserved_slugs);
+      flash.succeed();
       onSaved();
     } catch (err) {
+      flash.fail();
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setBusy(false);
@@ -569,7 +623,7 @@ function ReservedSlugsCard({
         ))}
       </div>
       {isOwner && (
-        <div style={{ display: "flex", gap: 10, maxWidth: 420 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, maxWidth: 480 }}>
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -582,6 +636,7 @@ function ReservedSlugsCard({
           <button type="button" onClick={add} disabled={busy || !draft.trim()} style={{ ...primaryBtn, opacity: busy || !draft.trim() ? 0.45 : 1 }}>
             <Plus size={14} /> Add
           </button>
+          <SaveFlash state={flash.state} />
         </div>
       )}
       {error ? <p style={{ margin: "10px 0 0", color: "var(--rose)", fontSize: 12 }}>{error}</p> : null}
@@ -705,10 +760,13 @@ function SectionHead({ title, sub, action }: { title: string; sub: string; actio
   );
 }
 
-function SettingField({ label, children }: { label: string; children: React.ReactNode }) {
+function SettingField({ label, flash, children }: { label: string; flash?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: 11, color: "var(--ink-3)", letterSpacing: ".08em", textTransform: "uppercase", fontWeight: 500, marginBottom: 7 }}>{label}</div>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 7 }}>
+        <span style={{ fontSize: 11, color: "var(--ink-3)", letterSpacing: ".08em", textTransform: "uppercase", fontWeight: 500 }}>{label}</span>
+        {flash}
+      </div>
       {children}
     </div>
   );

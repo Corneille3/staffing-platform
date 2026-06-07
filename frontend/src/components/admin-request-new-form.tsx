@@ -81,6 +81,7 @@ export function AdminRequestNewForm({ organizations }: { organizations: Organiza
   const [draftId, setDraftId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [eligibleCount, setEligibleCount] = useState<number | null>(null);
+  const [notifyCount, setNotifyCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
 
@@ -206,11 +207,13 @@ export function AdminRequestNewForm({ organizations }: { organizations: Organiza
     reachTimerRef.current = window.setTimeout(() => {
       rankAdminSubstitutes(draftId)
         .then((resp) => {
-          const count = resp.items.filter((row) => row.eligible).length;
-          setEligibleCount(count);
+          const eligible = resp.items.filter((row) => row.eligible);
+          setEligibleCount(eligible.length);
+          setNotifyCount(eligible.filter((row) => row.would_notify).length);
         })
         .catch(() => {
           setEligibleCount(null);
+          setNotifyCount(null);
         });
     }, 700);
     return () => {
@@ -334,6 +337,7 @@ export function AdminRequestNewForm({ organizations }: { organizations: Organiza
         <PreviewSidebar
           draft={draft}
           eligibleCount={eligibleCount}
+          notifyCount={notifyCount}
           orgName={currentOrg?.name ?? "Organization"}
           ready={draftId !== null}
         />
@@ -703,14 +707,18 @@ function StepNotify({
 function PreviewSidebar({
   draft,
   eligibleCount,
+  notifyCount,
   orgName,
   ready,
 }: {
   draft: DraftState;
   eligibleCount: number | null;
+  notifyCount: number | null;
   orgName: string;
   ready: boolean;
 }) {
+  const optedOut =
+    eligibleCount !== null && notifyCount !== null ? eligibleCount - notifyCount : 0;
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <Eyebrow style={{ marginBottom: 0 }}>Preview · what workers will see</Eyebrow>
@@ -828,11 +836,38 @@ function PreviewSidebar({
             eligible substitutes
           </span>
         </div>
+        {ready && notifyCount !== null && eligibleCount !== null ? (
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 4 }}>
+            <span style={{ fontFamily: "var(--mono)", fontSize: 14, color: "var(--moss)" }}>
+              {notifyCount}
+            </span>
+            <span style={{ fontSize: 12, color: "var(--moss)" }}>
+              will be notified on publish
+            </span>
+          </div>
+        ) : null}
         <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--moss)", lineHeight: 1.5, opacity: 0.85 }}>
           {ready
             ? "match language, qualifications, city, and weekly availability."
             : "complete step 1 and continue — the estimate appears once the draft is saved."}
         </p>
+        {optedOut > 0 ? (
+          <p
+            style={{
+              margin: "8px 0 0",
+              padding: "7px 10px",
+              background: "var(--sand-soft)",
+              border: "0.5px solid var(--sand)",
+              borderRadius: 8,
+              fontSize: 11,
+              color: "var(--terra-ink)",
+              lineHeight: 1.5,
+            }}
+          >
+            {optedOut} {optedOut === 1 ? "has" : "have"} muted urgent or weekend-overnight alerts for this
+            slot — you can still notify them directly from the substitutes list.
+          </p>
+        ) : null}
       </div>
     </div>
   );

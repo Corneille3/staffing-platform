@@ -12,7 +12,7 @@ import {
 } from "../../../../lib/browser-api";
 import { SlotPeriod } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
-import { Eyebrow, Mono } from "../../../../components/ui";
+import { Eyebrow, Mono, SaveFlash, useSaveFlash } from "../../../../components/ui";
 
 const SLOTS: SlotPeriod[] = ["morning", "afternoon", "evening", "overnight"];
 
@@ -54,6 +54,10 @@ export default function WorkerAvailabilityPage() {
   const [gridLoading, setGridLoading] = useState(false);
   const [gridBusy, setGridBusy] = useState(false);
   const [gridError, setGridError] = useState<string | null>(null);
+  const gridFlash = useSaveFlash();
+  const prefFlash = useSaveFlash();
+  const cityFlash = useSaveFlash();
+  const [prefError, setPrefError] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const workerId = worker?.id;
   const weekStartIso = isoDate(weekStart);
@@ -87,20 +91,23 @@ export default function WorkerAvailabilityPage() {
       saveTimer.current = setTimeout(async () => {
         setGridBusy(true);
         setGridError(null);
+        gridFlash.start();
         try {
           const payload = [...next].map((key) => {
             const [d, s] = key.split("|");
             return { specific_date: d, slot: s as SlotPeriod, available: true };
           });
           await saveAvailabilityGrid(workerId, weekStartIso, payload);
+          gridFlash.succeed();
         } catch (err) {
+          gridFlash.fail();
           setGridError(err instanceof Error ? err.message : "Save failed");
         } finally {
           setGridBusy(false);
         }
       }, 500);
     },
-    [workerId, weekStartIso],
+    [workerId, weekStartIso, gridFlash.start, gridFlash.succeed, gridFlash.fail],
   );
 
   function toggleCell(dateIso: string, slot: SlotPeriod) {
@@ -118,6 +125,7 @@ export default function WorkerAvailabilityPage() {
     if (!workerId) return;
     setGridBusy(true);
     setGridError(null);
+    gridFlash.start();
     try {
       const grid = await copyPreviousAvailabilityWeek(workerId, weekStartIso);
       const next = new Set<string>();
@@ -125,7 +133,9 @@ export default function WorkerAvailabilityPage() {
         if (cell.available) next.add(cellKey(cell.specific_date, cell.slot));
       }
       setGridCells(next);
+      gridFlash.succeed();
     } catch (err) {
+      gridFlash.fail();
       setGridError(err instanceof Error ? err.message : "Copy failed");
     } finally {
       setGridBusy(false);
@@ -158,50 +168,35 @@ export default function WorkerAvailabilityPage() {
     if (!worker) return;
     setCityBusy(true);
     setCityError(null);
+    cityFlash.start();
     try {
       await updateWorkerPreferences(worker.id, { supported_cities: next });
       await refresh();
+      cityFlash.succeed();
     } catch (err) {
+      cityFlash.fail();
       setCityError(err instanceof Error ? err.message : "Update failed");
     } finally {
       setCityBusy(false);
     }
   }
 
-  async function toggleUrgentAlerts() {
+  async function savePreference(partial: {
+    urgent_alert_opt_in?: boolean;
+    notify_far?: boolean;
+    notify_weekend_overnight?: boolean;
+  }) {
     if (!worker) return;
     setBusy(true);
+    setPrefError(null);
+    prefFlash.start();
     try {
-      await updateWorkerPreferences(worker.id, { urgent_alert_opt_in: !urgentAlertsOn });
+      await updateWorkerPreferences(worker.id, partial);
       await refresh();
-    } catch {
-      // silent
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function toggleNotifyFar() {
-    if (!worker) return;
-    setBusy(true);
-    try {
-      await updateWorkerPreferences(worker.id, { notify_far: !notifyFarOn });
-      await refresh();
-    } catch {
-      // silent
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function toggleNotifyWeekendOvernight() {
-    if (!worker) return;
-    setBusy(true);
-    try {
-      await updateWorkerPreferences(worker.id, { notify_weekend_overnight: !notifyWeekendOvernightOn });
-      await refresh();
-    } catch {
-      // silent
+      prefFlash.succeed();
+    } catch (err) {
+      prefFlash.fail();
+      setPrefError(err instanceof Error ? err.message : "Update failed");
     } finally {
       setBusy(false);
     }
@@ -305,7 +300,10 @@ export default function WorkerAvailabilityPage() {
       {/* weekly grid */}
       <section>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <Eyebrow>{t("weeklyGrid")}</Eyebrow>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+            <Eyebrow>{t("weeklyGrid")}</Eyebrow>
+            <SaveFlash state={gridFlash.state} savingLabel={tCommon("saving")} savedLabel={tCommon("saved")} />
+          </div>
           <button
             type="button"
             disabled={gridBusy}
@@ -433,6 +431,7 @@ export default function WorkerAvailabilityPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <MapPin size={14} style={{ color: "var(--ink-3)" }} />
           <Eyebrow>{t("preferredCities")}</Eyebrow>
+          <SaveFlash state={cityFlash.state} savingLabel={tCommon("saving")} savedLabel={tCommon("saved")} />
         </div>
 
         <p style={{ margin: 0, fontSize: 13, color: "var(--ink-2)", lineHeight: 1.45 }}>
@@ -533,7 +532,10 @@ export default function WorkerAvailabilityPage() {
 
       {/* preferences */}
       <section>
-        <Eyebrow style={{ marginBottom: 10 }}>{t("preferences")}</Eyebrow>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 10 }}>
+          <Eyebrow>{t("preferences")}</Eyebrow>
+          <SaveFlash state={prefFlash.state} savingLabel={tCommon("saving")} savedLabel={tCommon("saved")} />
+        </div>
         <div style={{
           background: "var(--card)",
           border: "0.5px solid var(--line)",
@@ -544,25 +546,28 @@ export default function WorkerAvailabilityPage() {
             label={t("urgentAlerts")}
             sub={t("urgentAlertsSub")}
             on={urgentAlertsOn}
-            onToggle={toggleUrgentAlerts}
+            onToggle={() => savePreference({ urgent_alert_opt_in: !urgentAlertsOn })}
             disabled={busy}
           />
           <ToggleRow
             label={t("notifyFar")}
             sub={t("notifyFarSub")}
             on={notifyFarOn}
-            onToggle={toggleNotifyFar}
+            onToggle={() => savePreference({ notify_far: !notifyFarOn })}
             disabled={busy}
           />
           <ToggleRow
             label={t("notifyWeekendOvernight")}
             sub={t("notifyWeekendOvernightSub")}
             on={notifyWeekendOvernightOn}
-            onToggle={toggleNotifyWeekendOvernight}
+            onToggle={() => savePreference({ notify_weekend_overnight: !notifyWeekendOvernightOn })}
             disabled={busy}
             last
           />
         </div>
+        {prefError ? (
+          <p style={{ margin: "10px 0 0", color: "var(--rose)", fontWeight: 600, fontSize: 13 }}>{prefError}</p>
+        ) : null}
       </section>
     </div>
   );
