@@ -1,6 +1,17 @@
 import { SignUp } from "@clerk/nextjs";
+import { getTranslations } from "next-intl/server";
+import { EdgeLanguageToggle } from "../../../../components/ui";
 
-export default function SignUpPage() {
+const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+export default async function SignUpPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations("edge.signUp");
+
   return (
     <div
       style={{
@@ -50,7 +61,7 @@ export default function SignUpPage() {
             marginBottom: 10,
           }}
         >
-          You were invited
+          {t("eyebrow")}
         </div>
         <h1
           style={{
@@ -60,7 +71,9 @@ export default function SignUpPage() {
             margin: "0 0 8px",
           }}
         >
-          Create your <em style={{ fontStyle: "italic" }}>account</em>
+          {t.rich("title", {
+            em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em>,
+          })}
         </h1>
         <p
           style={{
@@ -70,24 +83,31 @@ export default function SignUpPage() {
             lineHeight: 1.5,
           }}
         >
-          Use the same email address your coordinator invited you with — it
-          links your account automatically.
+          {t("blurb")}
         </p>
-        <SignUp signInUrl="/sign-in" />
+        {/* Locale-prefixed path + cross-link: keeps Clerk's multi-step
+            routing inside the current locale (no middleware redirect hop).
+            Dev (no Clerk key): the widget would crash outside ClerkProvider,
+            so render a placeholder — keeps the page verifiable locally. */}
+        {CLERK_ENABLED ? (
+          <SignUp path={`/${locale}/sign-up`} signInUrl={`/${locale}/sign-in`} />
+        ) : (
+          <div
+            style={{
+              padding: "22px 24px",
+              border: "0.5px dashed var(--line)",
+              borderRadius: 14,
+              fontSize: 12.5,
+              color: "var(--ink-3)",
+            }}
+          >
+            Clerk is not configured — the sign-up form renders here in
+            production. Use the dev role-switcher instead.
+          </div>
+        )}
       </div>
 
-      {/* Language toggle */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 32,
-          left: 28,
-          fontSize: 11,
-          color: "var(--ink-3)",
-        }}
-      >
-        EN · <span style={{ textDecoration: "underline", cursor: "pointer" }}>FR</span>
-      </div>
+      <EdgeLanguageToggle />
 
       {/* Decorative circles */}
       <svg
