@@ -6,5 +6,6 @@ export { Avatar } from "./avatar";
 export { BottomNav } from "./bottom-nav";
 export { Meta } from "./meta";
 export { LanguageSwitcher } from "./language-switcher";
+export { EdgeLanguageToggle } from "./edge-language-toggle";
 export { SaveFlash, useSaveFlash } from "./save-flash";
 export type { SaveFlashState } from "./save-flash";

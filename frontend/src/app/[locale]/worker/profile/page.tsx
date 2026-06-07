@@ -2,7 +2,7 @@
 
 import { useClerk } from "@clerk/nextjs";
 import { LogOut, MapPin } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useWorkerSession } from "../../../../lib/worker-session";
 import { Avatar, Eyebrow, LanguageSwitcher } from "../../../../components/ui";
 
@@ -103,11 +103,12 @@ export default function WorkerProfilePage() {
 
 function ClerkSignOutButton({ label }: { label: string }) {
   const { signOut } = useClerk();
+  const locale = useLocale();
 
   async function handleSignOut() {
     window.localStorage.removeItem("apf.workerId");
     window.localStorage.removeItem("apf.devRole");
-    await signOut({ redirectUrl: "/sign-in" });
+    await signOut({ redirectUrl: `/${locale}/sign-in` });
   }
 
   return (

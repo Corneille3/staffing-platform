@@ -1,5 +1,7 @@
-import Link from "next/link";
 import { TriangleAlert } from "lucide-react";
+import { getTranslations } from "next-intl/server";
+import { Link } from "../../../i18n/navigation";
+import { EdgeLanguageToggle } from "../../../components/ui";
 
 export default async function NotInvitedPage({
   searchParams,
@@ -7,6 +9,7 @@ export default async function NotInvitedPage({
   searchParams: Promise<{ email?: string }>;
 }) {
   const { email } = await searchParams;
+  const t = await getTranslations("edge.notInvited");
 
   return (
     <div
@@ -67,7 +70,7 @@ export default async function NotInvitedPage({
             marginBottom: 8,
           }}
         >
-          Hold on —
+          {t("eyebrow")}
         </div>
 
         <h1
@@ -79,8 +82,9 @@ export default async function NotInvitedPage({
             color: "var(--ink)",
           }}
         >
-          You haven&apos;t been{" "}
-          <em style={{ fontStyle: "italic" }}>invited yet</em>.
+          {t.rich("title", {
+            em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em>,
+          })}
         </h1>
 
         <p
@@ -91,19 +95,15 @@ export default async function NotInvitedPage({
             lineHeight: 1.55,
           }}
         >
-          Staffig is invite-only — coordinators add substitutes one at a time
-          so the right people get the right shifts.{" "}
-          {email ? (
-            <>
-              You signed in as{" "}
-              <strong style={{ fontWeight: 500, color: "var(--ink)" }}>
-                {email}
-              </strong>
-              , but we don&apos;t have a record of that address.
-            </>
-          ) : (
-            <>We don&apos;t have a record of the address you signed in with.</>
-          )}
+          {t("blurb")}{" "}
+          {email
+            ? t.rich("signedInAs", {
+                email,
+                strong: (chunks) => (
+                  <strong style={{ fontWeight: 500, color: "var(--ink)" }}>{chunks}</strong>
+                ),
+              })
+            : t("noRecord")}
         </p>
 
         {/* Two ways forward */}
@@ -126,7 +126,7 @@ export default async function NotInvitedPage({
               marginBottom: 10,
             }}
           >
-            Two ways forward
+            {t("twoWays")}
           </div>
           <div
             style={{
@@ -148,11 +148,8 @@ export default async function NotInvitedPage({
               1
             </div>
             <div style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
-              <strong style={{ color: "var(--ink)", fontWeight: 500 }}>
-                Sign in with a different account.
-              </strong>{" "}
-              If your coordinator invited you, they used a specific email —
-              check it.
+              <strong style={{ color: "var(--ink)", fontWeight: 500 }}>{t("way1Title")}</strong>{" "}
+              {t("way1Body")}
             </div>
           </div>
           <div style={{ display: "flex", gap: 14, padding: "10px 0" }}>
@@ -168,11 +165,8 @@ export default async function NotInvitedPage({
               2
             </div>
             <div style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
-              <strong style={{ color: "var(--ink)", fontWeight: 500 }}>
-                Ask your organization to invite you.
-              </strong>{" "}
-              Send them this address and they&apos;ll add you from their
-              Staffig account.
+              <strong style={{ color: "var(--ink)", fontWeight: 500 }}>{t("way2Title")}</strong>{" "}
+              {t("way2Body")}
             </div>
           </div>
         </div>
@@ -192,9 +186,11 @@ export default async function NotInvitedPage({
             fontFamily: "var(--ui)",
           }}
         >
-          Try a different account
+          {t("cta")}
         </Link>
       </div>
+
+      <EdgeLanguageToggle />
 
       {/* Decorative circles */}
       <svg

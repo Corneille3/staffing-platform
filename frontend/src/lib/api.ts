@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import { getLocale } from "next-intl/server";
 import { redirect } from "next/navigation";
 import {
   AdminActivity,
@@ -121,7 +122,9 @@ export async function requireServerSession(
   const session = await auth();
   const token = await session.getToken();
   if (!token) {
-    redirect("/sign-in");
+    // Locale-prefixed: keeps the caller's language without the extra
+    // middleware redirect hop the unprefixed route would take.
+    redirect(`/${await getLocale()}/sign-in`);
   }
 
   const response = await fetch(`${apiBaseUrl}/api/v1/auth/sync`, {
@@ -131,7 +134,7 @@ export async function requireServerSession(
   });
 
   if (response.status === 403) {
-    redirect("/not-invited");
+    redirect(`/${await getLocale()}/not-invited`);
   }
   if (!response.ok) {
     throw new Error(`auth/sync failed with status ${response.status}`);
