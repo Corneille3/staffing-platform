@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth, useUser } from "@clerk/nextjs";
-import { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import { createContext, ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { fetchWorkers } from "./browser-api";
 import { Worker } from "./types";
 
@@ -38,13 +38,19 @@ function useSharedState(enabled: boolean): SharedState {
   const [override, setOverride] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasLoadedRef = useRef(false);
 
   async function load() {
-    setLoading(true);
+    // Only gate the UI on the initial load. Later refreshes (e.g. after a
+    // preference save) update silently — flipping `loading` here would make
+    // the worker layout swap the page for its loading screen mid-interaction,
+    // unmounting the page (and any transient UI state like save flashes).
+    if (!hasLoadedRef.current) setLoading(true);
     try {
       const list = await fetchWorkers();
       setWorkers(list);
       setError(null);
+      hasLoadedRef.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load workers");
     } finally {

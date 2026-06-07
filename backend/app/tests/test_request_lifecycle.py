@@ -3,6 +3,8 @@
 Covers: create → publish → accept/decline → assign → cancel → renotify.
 Each test is isolated by the savepoint rollback in the db_session fixture.
 """
+from datetime import date, timedelta
+
 import pytest
 
 from app.tests.conftest import request_payload
@@ -58,6 +60,125 @@ def test_publish_excludes_unavailable_worker(apf_client, worker_a_client, seed):
     # Only worker B should be notified
     assert len(responses) == 1
     assert responses[0]['worker_user_id'] == str(seed.worker_b.id)
+
+
+# ── notification preferences (HANDOFF #12/#13 broadcast gate) ─────────────────
+
+def test_publish_skips_urgent_optout_worker(apf_client, worker_a_client, seed):
+    """urgent_alert_opt_in=False suppresses broadcast for urgency_level >= 3."""
+    worker_a_client.patch(
+        f'/api/v1/workers/{seed.worker_a.id}/availability',
+        json={'urgent_alert_opt_in': False},
+    )
+
+    request_id = apf_client.post(
+        '/api/v1/requests',
+        json=request_payload(seed.org.id, seed.apf.id, urgency_level=3),
+    ).json()['id']
+    apf_client.post(f'/api/v1/requests/{request_id}/publish')
+
+    responses = apf_client.get(f'/api/v1/requests/{request_id}/responses').json()['items']
+    assert len(responses) == 1
+    assert responses[0]['worker_user_id'] == str(seed.worker_b.id)
+
+
+def test_publish_same_day_counts_as_urgent(apf_client, worker_a_client, seed):
+    """A same-day work date triggers the urgent gate even at low urgency_level."""
+    worker_a_client.patch(
+        f'/api/v1/workers/{seed.worker_a.id}/availability',
+        json={'urgent_alert_opt_in': False},
+    )
+
+    request_id = apf_client.post(
+        '/api/v1/requests',
+        json=request_payload(
+            seed.org.id, seed.apf.id,
+            work_date=date.today().isoformat(), urgency_level=1,
+        ),
+    ).json()['id']
+    apf_client.post(f'/api/v1/requests/{request_id}/publish')
+
+    responses = apf_client.get(f'/api/v1/requests/{request_id}/responses').json()['items']
+    assert len(responses) == 1
+    assert responses[0]['worker_user_id'] == str(seed.worker_b.id)
+
+
+def test_publish_weekend_overnight_requires_opt_in(apf_client, worker_a_client, seed):
+    """notify_weekend_overnight defaults off — only opted-in workers get the
+    broadcast for an overnight slot on a weekend."""
+    worker_a_client.patch(
+        f'/api/v1/workers/{seed.worker_a.id}/availability',
+        json={'notify_weekend_overnight': True},
+    )
+    today = date.today()
+    next_saturday = today + timedelta(days=(5 - today.weekday()) % 7 or 7)
+
+    request_id = apf_client.post(
+        '/api/v1/requests',
+        json=request_payload(
+            seed.org.id, seed.apf.id,
+            work_date=next_saturday.isoformat(),
+            start_time='22:30', end_time='23:45',
+        ),
+    ).json()['id']
+    apf_client.post(f'/api/v1/requests/{request_id}/publish')
+
+    # Worker A opted in; worker B keeps the default False and is skipped.
+    responses = apf_client.get(f'/api/v1/requests/{request_id}/responses').json()['items']
+    assert len(responses) == 1
+    assert responses[0]['worker_user_id'] == str(seed.worker_a.id)
+
+
+def test_notify_specific_bypasses_preference_gate(apf_client, worker_a_client, seed):
+    """A coordinator deliberately picking one substitute outranks the
+    broadcast opt-out."""
+    worker_a_client.patch(
+        f'/api/v1/workers/{seed.worker_a.id}/availability',
+        json={'urgent_alert_opt_in': False},
+    )
+
+    request_id = apf_client.post(
+        '/api/v1/requests',
+        json=request_payload(seed.org.id, seed.apf.id, urgency_level=3),
+    ).json()['id']
+    apf_client.post(f'/api/v1/requests/{request_id}/publish')
+
+    resp = apf_client.post(
+        f'/api/v1/admin/requests/{request_id}/notify',
+        json={'worker_user_ids': [str(seed.worker_a.id)]},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()['newly_notified'] == 1
+    responses = apf_client.get(f'/api/v1/requests/{request_id}/responses').json()['items']
+    worker_ids = {r['worker_user_id'] for r in responses}
+    assert str(seed.worker_a.id) in worker_ids
+
+
+def test_renotify_applies_preference_gate(apf_client, worker_a_client, seed):
+    """A worker who opts out after the first broadcast is excluded from renotify
+    (their existing response row is untouched, but no new notification fires)."""
+    request_id = apf_client.post(
+        '/api/v1/requests',
+        json=request_payload(seed.org.id, seed.apf.id, urgency_level=3),
+    ).json()['id']
+    apf_client.post(f'/api/v1/requests/{request_id}/publish')
+
+    # Both notified on first publish
+    responses = apf_client.get(f'/api/v1/requests/{request_id}/responses').json()['items']
+    assert len(responses) == 2
+
+    # Worker A opts out of urgent alerts, then the coordinator renotifies
+    worker_a_client.patch(
+        f'/api/v1/workers/{seed.worker_a.id}/availability',
+        json={'urgent_alert_opt_in': False},
+    )
+    resp = apf_client.post(f'/api/v1/requests/{request_id}/renotify')
+    assert resp.status_code == 200
+
+    # No duplicate rows; worker A's original response row survives
+    responses = apf_client.get(f'/api/v1/requests/{request_id}/responses').json()['items']
+    assert len(responses) == 2
 
 
 # ── accept / decline ──────────────────────────────────────────────────────────

@@ -4,6 +4,8 @@
     "add": "Add",
     "cancel": "Cancel",
     "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
     "remove": "Remove",
     "signOut": "Sign out",
     "on": "On",

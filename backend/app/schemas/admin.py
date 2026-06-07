@@ -21,6 +21,9 @@ class AdminSubstituteRow(BaseModel):
     worker: WorkerRead
     match_score: int | None = None
     eligible: bool | None = None
+    # Eligible AND passes the notification-preference gate (urgent /
+    # weekend-overnight opt-outs) — i.e. would receive the publish broadcast.
+    would_notify: bool | None = None
     reasons: list[EligibilityReason] = []
 
 

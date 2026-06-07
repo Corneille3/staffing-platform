@@ -36,6 +36,30 @@ class MatchingService:
 
         return eligible
 
+    def wants_notification(self, staffing_request: StaffingRequest, worker: User) -> bool:
+        """Notification-preference gate (HANDOFF #12/#13 toggles).
+
+        Applies to the broadcast paths only (publish / renotify) — never to
+        eligibility or ranking, so reach estimates and best-match stay intact,
+        and notify_specific bypasses it (a coordinator deliberately picking
+        one substitute outranks a broadcast preference).
+        """
+        profile = worker.worker_profile
+        if profile is None:
+            return True
+        if not profile.urgent_alert_opt_in:
+            # "Urgent alerts — notify me for same-day requests": the system's
+            # urgent flag (urgency_level >= 3, see notifications.py) or a
+            # literal same-day work date.
+            if staffing_request.urgency_level >= 3 or staffing_request.work_date <= date.today():
+                return False
+        if not profile.notify_weekend_overnight:
+            # "Weekend overnights — notify me for overnight shifts on weekends".
+            is_weekend = staffing_request.work_date.weekday() >= 5
+            if is_weekend and _slot_for_start_time(staffing_request.start_time) == SlotPeriod.OVERNIGHT:
+                return False
+        return True
+
     def eligibility_result(self, staffing_request: StaffingRequest, worker: User) -> EligibilityResult:
         reasons: list[EligibilityReason] = []
         profile = worker.worker_profile

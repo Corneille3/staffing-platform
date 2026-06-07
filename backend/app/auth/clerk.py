@@ -133,6 +133,38 @@ def fetch_user_details(user_id: str) -> dict:
         return {}
 
 
+def list_clerk_users() -> list[dict] | None:
+    """List every Clerk user via the Backend API (paginated).
+
+    Returns ``None`` when the secret key is unset (dev mode) or a request
+    fails — callers must distinguish "Clerk unavailable" from "no users",
+    otherwise an outage would make every account look like an orphan.
+    Page cap keeps the scan bounded; far beyond current platform scale.
+    """
+    if not settings.clerk_secret_key:
+        return None
+    users: list[dict] = []
+    page_size = 100
+    for page in range(20):
+        try:
+            response = httpx.get(
+                'https://api.clerk.com/v1/users',
+                params={'limit': page_size, 'offset': page * page_size},
+                headers={'Authorization': f'Bearer {settings.clerk_secret_key}'},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            batch = response.json()
+        except (httpx.HTTPError, ValueError):
+            return None
+        if not isinstance(batch, list):
+            return None
+        users.extend(batch)
+        if len(batch) < page_size:
+            break
+    return users
+
+
 def delete_clerk_user(user_id: str) -> bool:
     """Delete a Clerk user via the Backend API.
 

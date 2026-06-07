@@ -4,6 +4,7 @@ These responses carry ONLY aggregate counts + tenant/admin identity — never
 worker names, request titles, or shift details. The privacy boundary (§5.2).
 """
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -148,3 +149,33 @@ class TenantAccessGrantsResponse(BaseModel):
     grants: list[TenantAccessGrantRead]
     # Operators currently inside any tenant — should usually be 0.
     active_count: int
+
+
+class OrphanRead(BaseModel):
+    """One orphan account found by the housekeeping scan.
+
+    ``kind='clerk'`` → ``id`` is the Clerk user id (no DB row exists).
+    ``kind='db'`` → ``id`` is the users.id UUID (no Clerk requirement).
+    """
+    kind: Literal['clerk', 'db']
+    id: str
+    email: str | None = None
+    name: str | None = None
+    role: str | None = None  # db kind only
+    created_at: datetime | None = None
+    last_sign_in_at: datetime | None = None  # clerk kind only
+    clerk_linked: bool | None = None  # db kind only
+
+
+class OrphanScanResponse(BaseModel):
+    clerk_only: list[OrphanRead]
+    db_only: list[OrphanRead]
+    # False when the Clerk Backend API is unreachable or unconfigured —
+    # the clerk_only list is then unknown, not empty.
+    clerk_available: bool
+    scanned_at: datetime
+
+
+class OrphanRemovePayload(BaseModel):
+    kind: Literal['clerk', 'db']
+    id: str = Field(min_length=1, max_length=255)
