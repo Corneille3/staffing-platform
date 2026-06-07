@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import React from "react";
 import { Inter_Tight, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { frFR } from "@clerk/localizations";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { notFound } from "next/navigation";
 import { RoleProvider } from "../../lib/role-context";
@@ -64,7 +65,14 @@ export default async function LocaleLayout({
     >
       <body>
         <NextIntlClientProvider>
-          {CLERK_ENABLED ? <ClerkProvider>{inner}</ClerkProvider> : inner}
+          {CLERK_ENABLED ? (
+            // French Clerk widget under /fr — English is Clerk's default.
+            <ClerkProvider localization={locale === "fr" ? frFR : undefined}>
+              {inner}
+            </ClerkProvider>
+          ) : (
+            inner
+          )}
         </NextIntlClientProvider>
       </body>
     </html>

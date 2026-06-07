@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth, useClerk, useUser } from "@clerk/nextjs";
+import { useLocale } from "next-intl";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
 export type Role = "worker" | "org_admin" | "network_admin" | "platform_admin";
@@ -55,6 +56,7 @@ function ClerkRoleProvider({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn, user } = useUser();
   const { getToken } = useAuth();
   const { signOut } = useClerk();
+  const locale = useLocale();
   const [role, setRoleState] = useState<Role>(DEFAULT_ROLE);
   const [ready, setReady] = useState(false);
 
@@ -88,9 +90,11 @@ function ClerkRoleProvider({ children }: { children: ReactNode }) {
           window.localStorage.removeItem("apf.workerId");
           window.localStorage.removeItem("apf.devRole");
           const email = user?.primaryEmailAddress?.emailAddress;
+          // Locale-prefixed so the user keeps their language through the
+          // sign-out bounce (the unprefixed route works but redirects).
           const dest = email
-            ? `/not-invited?email=${encodeURIComponent(email)}`
-            : "/not-invited";
+            ? `/${locale}/not-invited?email=${encodeURIComponent(email)}`
+            : `/${locale}/not-invited`;
           await signOut({ redirectUrl: dest });
           return;
         }
@@ -115,7 +119,7 @@ function ClerkRoleProvider({ children }: { children: ReactNode }) {
     return () => {
       alive = false;
     };
-  }, [getToken, isLoaded, isSignedIn, signOut]);
+  }, [getToken, isLoaded, isSignedIn, signOut, locale]);
 
   function setRole(next: Role) {
     if (!DEV_ROLE_OVERRIDE_ENABLED) return;
