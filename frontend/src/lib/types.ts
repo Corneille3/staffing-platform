@@ -700,6 +700,42 @@ export type OrphanScanResult = {
   scanned_at: string;
 };
 
+// ── Self-serve replacement — coordinator surface ──────────────────────────────
+export type ReplacementFeedItem = {
+  request_id: string;
+  giver_name: string;
+  title: string;
+  work_date: string;
+  start_time: string;
+  end_time: string;
+  role: string | null;
+  reason: string | null;
+  status: "searching" | "filled" | "cancelled" | "unfilled";
+  claimer_name: string | null;
+  released_at: string;
+  time_to_fill_minutes: number | null;
+};
+
+export type ReplacementKpis = {
+  released_this_week: number;
+  filled: number;
+  avg_time_to_fill_minutes: number | null;
+  unfilled: number;
+};
+
+export type ReplacementFeed = {
+  kpis: ReplacementKpis;
+  items: ReplacementFeedItem[];
+};
+
+export type ReplacementPolicy = {
+  organization_id: string;
+  organization_name: string;
+  policy: "auto" | "approval";
+  allowed_roles: string[];
+  min_release_lead_minutes: number;
+};
+
 export type TenantProfile = {
   id: string;
   name: string;

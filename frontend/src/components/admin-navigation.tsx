@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Briefcase, History, User as UserIcon, Zap } from "lucide-react";
+import { Activity, Briefcase, History, Repeat, User as UserIcon, Zap } from "lucide-react";
 import type { ComponentType } from "react";
 
 interface NavItem {
@@ -15,6 +15,7 @@ const links: NavItem[] = [
   { href: "/admin",               label: "Coverage Desk",  Icon: Activity },
   { href: "/admin/requests",      label: "Requests",       Icon: Zap },
   { href: "/admin/substitutes",   label: "Substitutes",    Icon: UserIcon },
+  { href: "/admin/replacements",  label: "Replacements",   Icon: Repeat },
   { href: "/admin/organizations", label: "Organizations",  Icon: Briefcase },
   { href: "/admin/activity",      label: "Activity",       Icon: History },
 ];

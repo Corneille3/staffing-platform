@@ -20,6 +20,7 @@ import {
   Organization,
   OrphanScanResult,
   PlatformOperator,
+  ReplacementPolicy,
   PlatformSettings,
   RequestResponse,
   SlotPeriod,
@@ -428,6 +429,21 @@ export async function fetchReplacementStatus(requestId: string): Promise<Replace
   return getJson<ReplacementStatus>(`/api/v1/requests/${requestId}/replacement-status`);
 }
 
+// Per-org self-serve policy (§5) — coordinator settings.
+export async function fetchReplacementPolicy(organizationId: string): Promise<ReplacementPolicy> {
+  return getJson<ReplacementPolicy>(`/api/v1/admin/replacements/policy?organization_id=${organizationId}`);
+}
+
+export async function updateReplacementPolicy(
+  organizationId: string,
+  partial: { policy?: "auto" | "approval"; allowed_roles?: string[]; min_release_lead_minutes?: number },
+): Promise<ReplacementPolicy> {
+  return patchJson<ReplacementPolicy>(
+    `/api/v1/admin/replacements/policy?organization_id=${organizationId}`,
+    partial,
+  );
+}
+
 export async function updateAvailability(
   workerId: string,
   status: "available" | "unavailable",
@@ -459,6 +475,7 @@ export async function inviteWorker(payload: {
   email: string;
   phone?: string;
   preferred_language?: string;
+  employment_type?: "permanent" | "contractor";
 }): Promise<Worker> {
   return postJson<Worker>("/api/v1/workers/invite", payload);
 }
