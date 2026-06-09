@@ -8,6 +8,7 @@ import { Link, useRouter } from "../../../../../../i18n/navigation";
 import {
   fetchRequest,
   fetchRequestResponses,
+  releaseShift,
   withdrawRequest,
 } from "../../../../../../lib/browser-api";
 import { formatWorkDate, locationLabel, roleSectorSubtitle } from "../../../../../../lib/format";
@@ -30,6 +31,10 @@ export default function WorkerRequestAcceptedPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Self-serve replacement (§2): the release sheet + the result once broadcast.
+  const [releaseSheet, setReleaseSheet] = useState(false);
+  const [releaseReason, setReleaseReason] = useState<"sick" | "family" | "personal" | "other">("sick");
+  const [released, setReleased] = useState(false);
 
   useEffect(() => {
     if (!worker || !requestId) return;
@@ -101,6 +106,24 @@ export default function WorkerRequestAcceptedPage() {
       setBusy(false);
     }
   }
+
+  async function handleRelease() {
+    if (!request) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await releaseShift(request.id, releaseReason);
+      setReleased(true);
+      setReleaseSheet(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Release failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // You can release a held shift that hasn't started yet (§2).
+  const canRelease = isAssignedToMe && !isShiftStarted && !isClosed && !released;
 
   return (
     <div style={{ paddingBottom: 32 }}>
@@ -197,6 +220,104 @@ export default function WorkerRequestAcceptedPage() {
 
       {error && (
         <p style={{ margin: "8px 0 0", color: "var(--rose)", fontWeight: 600, fontSize: 13 }}>{error}</p>
+      )}
+
+      {/* Self-serve replacement — broadcast confirmation (§7: still yours until claimed) */}
+      {released && (
+        <Notice tone="moss">{t("released")}</Notice>
+      )}
+
+      {/* Self-serve replacement — trigger + confirm sheet (§2) */}
+      {canRelease && !releaseSheet && (
+        <button
+          type="button"
+          onClick={() => setReleaseSheet(true)}
+          style={{
+            width: "100%",
+            marginTop: 8,
+            border: "0.5px solid var(--terra)",
+            borderRadius: 14,
+            padding: "14px 18px",
+            background: "transparent",
+            color: "var(--terra)",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            minHeight: 44,
+          }}
+        >
+          {t("releaseCta")}
+        </button>
+      )}
+
+      {canRelease && releaseSheet && (
+        <section style={{
+          marginTop: 8,
+          background: "var(--card)",
+          border: "0.5px solid var(--line)",
+          borderRadius: 18,
+          padding: 18,
+        }}>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 18, marginBottom: 4 }}>
+            {t("releaseSheetTitle")}
+          </div>
+          <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
+            {t("releaseSheetSub")}
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+            {(["sick", "family", "personal", "other"] as const).map((r) => {
+              const active = releaseReason === r;
+              return (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setReleaseReason(r)}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 99,
+                    border: `0.5px solid ${active ? "transparent" : "var(--line)"}`,
+                    background: active ? "var(--ink)" : "#fff",
+                    color: active ? "var(--paper)" : "var(--ink)",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    minHeight: 40,
+                  }}
+                >
+                  {t(`reason_${r}`)}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              type="button"
+              onClick={() => setReleaseSheet(false)}
+              disabled={busy}
+              style={{
+                flex: 1, minHeight: 44, borderRadius: 14, border: "0.5px solid var(--line)",
+                background: "transparent", color: "var(--ink-2)", fontSize: 14, fontWeight: 600,
+                cursor: busy ? "wait" : "pointer", fontFamily: "inherit",
+              }}
+            >
+              {t("releaseCancel")}
+            </button>
+            <button
+              type="button"
+              onClick={handleRelease}
+              disabled={busy}
+              style={{
+                flex: 1, minHeight: 44, borderRadius: 14, border: "none",
+                background: "var(--terra)", color: "#fff", fontSize: 14, fontWeight: 600,
+                cursor: busy ? "wait" : "pointer", opacity: busy ? 0.6 : 1, fontFamily: "inherit",
+              }}
+            >
+              {busy ? t("releaseBusy") : t("releaseConfirm")}
+            </button>
+          </div>
+        </section>
       )}
 
       {/* Withdraw */}

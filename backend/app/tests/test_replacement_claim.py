@@ -29,7 +29,23 @@ from app.models.staffing_request import StaffingRequest
 from app.models.tenant import Tenant
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
+from app.auth.scope import AccessScope
+from app.models.enums import ReplacementPolicy
 from app.services.replacement_service import ReplacementService
+
+
+def _worker_scope(seed, worker) -> AccessScope:
+    return AccessScope(user=worker, tenant_id=seed.tenant.id)
+
+
+def _assigned_shift(session, seed, worker):
+    """An assigned coordinator request + the worker's confirmed assignment."""
+    original = _make_request(
+        session, seed.org.id, seed.org_admin.id,
+        origin=RequestOrigin.COORDINATOR, status=RequestStatus.ASSIGNED,
+    )
+    assignment = _confirmed_assignment(session, original.id, worker.id)
+    return original, assignment
 
 
 def _make_request(session, org_id, creator_id, *, origin, status, replaces=None) -> StaffingRequest:
@@ -124,6 +140,75 @@ def test_coordinator_request_is_not_claimable(db_session, seed):
     with pytest.raises(HTTPException) as exc:
         ReplacementService(db_session).claim(coord_req.id, seed.worker_b.id, seed.tenant.id)
     assert exc.value.status_code == 409  # origin not in self-serve set
+
+
+# ── release (worker creates the replacement request) ────────────────────────────
+
+def test_release_creates_open_replacement(db_session, seed):
+    original, assignment = _assigned_shift(db_session, seed, seed.worker_a)
+
+    replacement = ReplacementService(db_session).release(
+        original.id, _worker_scope(seed, seed.worker_a), reason='sick',
+    )
+
+    assert replacement.origin == RequestOrigin.WORKER_REPLACEMENT
+    assert replacement.status == RequestStatus.OPEN  # seed org policy defaults to auto
+    assert replacement.auto_assign is True
+    assert replacement.replaces_assignment_id == assignment.id
+    assert replacement.release_reason == 'sick'
+    assert replacement.work_date == original.work_date  # shift details copied
+    # The giver still holds the shift until someone claims it (§7).
+    db_session.refresh(assignment)
+    assert assignment.status == AssignmentStatus.CONFIRMED
+
+
+def test_release_requires_held_shift(db_session, seed):
+    # worker_b doesn't hold this shift → no confirmed assignment → 409.
+    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
+    with pytest.raises(HTTPException) as exc:
+        ReplacementService(db_session).release(
+            original.id, _worker_scope(seed, seed.worker_b), reason=None,
+        )
+    assert exc.value.status_code == 409
+
+
+def test_release_rejects_unknown_reason(db_session, seed):
+    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
+    with pytest.raises(HTTPException) as exc:
+        ReplacementService(db_session).release(
+            original.id, _worker_scope(seed, seed.worker_a), reason='vacation',
+        )
+    assert exc.value.status_code == 422
+
+
+def test_release_role_not_allowed(db_session, seed):
+    seed.org.replacement_allowed_roles = ['psw']  # educator no longer allowed
+    db_session.flush()
+    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
+    with pytest.raises(HTTPException) as exc:
+        ReplacementService(db_session).release(
+            original.id, _worker_scope(seed, seed.worker_a), reason=None,
+        )
+    assert exc.value.status_code == 403
+
+
+def test_release_twice_is_409(db_session, seed):
+    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
+    svc = ReplacementService(db_session)
+    svc.release(original.id, _worker_scope(seed, seed.worker_a), reason=None)
+    with pytest.raises(HTTPException) as exc:
+        svc.release(original.id, _worker_scope(seed, seed.worker_a), reason=None)
+    assert exc.value.status_code == 409
+
+
+def test_release_approval_policy_yields_pending(db_session, seed):
+    seed.org.replacement_policy = ReplacementPolicy.APPROVAL
+    db_session.flush()
+    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
+    replacement = ReplacementService(db_session).release(
+        original.id, _worker_scope(seed, seed.worker_a), reason=None,
+    )
+    assert replacement.status == RequestStatus.PENDING_APPROVAL
 
 
 # ── concurrency (§9 — independent connections, real race) ───────────────────────

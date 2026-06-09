@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
@@ -9,9 +10,30 @@ from app.models.enums import ResponseStatus
 from app.repositories.response_repository import ResponseRepository
 from app.repositories.staffing_request_repository import StaffingRequestRepository
 from app.schemas.request_response import RequestResponseAction, RequestResponseRead
+from app.schemas.staffing_request import StaffingRequestRead
+from app.services.replacement_service import ReplacementService
 from app.services.response_service import ResponseService
 
+
+class RequestRelease(BaseModel):
+    reason: str | None = None  # sick | family | personal | other
+
+
 router = APIRouter()
+
+
+@router.post('/{request_id}/release')
+def release_shift(
+    request_id: UUID,
+    payload: RequestRelease,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> StaffingRequestRead:
+    """Self-serve: the worker holding this shift releases it to the eligible
+    pool (SELF_SERVE_REPLACEMENT §2). Returns the new worker_replacement
+    request the pool will claim."""
+    replacement = ReplacementService(db).release(request_id, scope, payload.reason)
+    return StaffingRequestRead.model_validate(replacement)
 
 
 @router.get('/{request_id}/responses')

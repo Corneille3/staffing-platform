@@ -394,6 +394,15 @@ export async function withdrawRequest(
   });
 }
 
+/** Self-serve replacement (§2): release a held shift to the pool. Returns the
+ * new worker_replacement request the pool will claim. */
+export async function releaseShift(
+  requestId: string,
+  reason: "sick" | "family" | "personal" | "other" | null,
+): Promise<StaffingRequest> {
+  return postJson<StaffingRequest>(`/api/v1/requests/${requestId}/release`, { reason });
+}
+
 export async function updateAvailability(
   workerId: string,
   status: "available" | "unavailable",
