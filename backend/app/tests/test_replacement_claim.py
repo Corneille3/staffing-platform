@@ -30,12 +30,21 @@ from app.models.tenant import Tenant
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 from app.auth.scope import AccessScope
-from app.models.enums import ReplacementPolicy
+from app.models.enums import EmploymentType, ReplacementPolicy
+from app.schemas.replacement import ReplacementPolicyUpdate
+from app.schemas.worker import WorkerInviteCreate
+from app.services.replacement_admin_service import ReplacementAdminService
 from app.services.replacement_service import ReplacementService
+from app.services.worker_service import WorkerService
 
 
 def _worker_scope(seed, worker) -> AccessScope:
     return AccessScope(user=worker, tenant_id=seed.tenant.id)
+
+
+def _admin_scope(seed) -> AccessScope:
+    # seed.apf is a network_admin → sees every org in the tenant.
+    return AccessScope(user=seed.apf, tenant_id=seed.tenant.id)
 
 
 def _assigned_shift(session, seed, worker):
@@ -290,6 +299,75 @@ def test_replacement_status_tally(db_session, seed):
     after = svc.replacement_status(replacement.id, _worker_scope(seed, seed.org_admin))
     assert after['filled'] is True
     assert after['claimed_by_name'] == f'{seed.worker_b.first_name} {seed.worker_b.last_name}'
+
+
+# ── coordinator feed + policy + employment type ─────────────────────────────────
+
+def test_coordinator_feed_and_kpis(db_session, seed):
+    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
+    repl = ReplacementService(db_session).release(
+        original.id, _worker_scope(seed, seed.worker_a), reason='sick',
+    )
+    admin = ReplacementAdminService(db_session)
+    feed = admin.coordinator_feed(_admin_scope(seed))
+    assert any(i.request_id == repl.id and i.status == 'searching' for i in feed.items)
+    assert feed.kpis.released_this_week >= 1
+
+    ReplacementService(db_session).claim(repl.id, seed.worker_b.id, seed.tenant.id)
+    after = admin.coordinator_feed(_admin_scope(seed))
+    item = next(i for i in after.items if i.request_id == repl.id)
+    assert item.status == 'filled'
+    assert item.claimer_name == f'{seed.worker_b.first_name} {seed.worker_b.last_name}'
+    assert item.time_to_fill_minutes is not None
+
+
+def test_coordinator_feed_status_filter(db_session, seed):
+    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
+    repl = ReplacementService(db_session).release(
+        original.id, _worker_scope(seed, seed.worker_a), reason=None,
+    )
+    admin = ReplacementAdminService(db_session)
+    live = admin.coordinator_feed(_admin_scope(seed), status_filter='live')
+    assert any(i.request_id == repl.id for i in live.items)
+    history = admin.coordinator_feed(_admin_scope(seed), status_filter='history')
+    assert all(i.request_id != repl.id for i in history.items)  # still searching → not history
+
+
+def test_policy_get_and_set(db_session, seed):
+    admin = ReplacementAdminService(db_session)
+    pol = admin.get_policy(seed.org.id, _admin_scope(seed))
+    assert pol.policy == ReplacementPolicy.AUTO
+    assert pol.min_release_lead_minutes == 0
+
+    updated = admin.set_policy(
+        seed.org.id,
+        ReplacementPolicyUpdate(policy=ReplacementPolicy.APPROVAL, min_release_lead_minutes=120),
+        _admin_scope(seed),
+    )
+    assert updated.policy == ReplacementPolicy.APPROVAL
+    assert updated.min_release_lead_minutes == 120
+
+
+def test_policy_out_of_scope_403(db_session, seed):
+    admin = ReplacementAdminService(db_session)
+    with pytest.raises(HTTPException) as exc:
+        admin.get_policy(uuid4(), _admin_scope(seed))  # unknown org → not in scope
+    assert exc.value.status_code == 403
+
+
+def test_worker_invite_sets_employment_type(db_session, seed):
+    user = WorkerService(db_session).invite(
+        WorkerInviteCreate(
+            first_name='Perm', last_name='Staff',
+            email=f'perm-{uuid4().hex[:8]}@inttest.example',
+            employment_type=EmploymentType.PERMANENT,
+        ),
+        _admin_scope(seed),
+    )
+    membership = db_session.scalar(select(TenantMembership).where(
+        TenantMembership.user_id == user.id,
+    ))
+    assert membership.employment_type == EmploymentType.PERMANENT
 
 
 # ── concurrency (§9 — independent connections, real race) ───────────────────────
