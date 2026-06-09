@@ -298,6 +298,54 @@ class ReplacementService:
         self._dispatch(replacement, managed)
         return replacement
 
+    def my_absence_reports(self, scope: AccessScope) -> list[dict]:
+        """The worker's own reported absences + live status — so the report
+        page is a hub they can return to, not a fire-and-forget form."""
+        now = datetime.now(timezone.utc)
+        reqs = list(self.db.scalars(
+            select(StaffingRequest)
+            .where(
+                StaffingRequest.created_by_user_id == scope.user.id,
+                StaffingRequest.origin == RequestOrigin.STAFF_ABSENCE,
+            )
+            .order_by(StaffingRequest.created_at.desc())
+            .limit(25)
+        ))
+        items: list[dict] = []
+        for r in reqs:
+            responses = list(self.db.scalars(select(RequestResponse).where(
+                RequestResponse.staffing_request_id == r.id,
+            )))
+            shift_started = datetime.combine(
+                r.work_date, r.start_time, tzinfo=timezone.utc) <= now
+            if r.status in (RequestStatus.ASSIGNED, RequestStatus.COMPLETED):
+                st = 'filled'
+            elif r.status == RequestStatus.CANCELLED:
+                st = 'cancelled'
+            elif r.status == RequestStatus.EXPIRED:
+                st = 'unfilled'
+            else:  # open / notified / responses_received
+                st = 'unfilled' if shift_started else 'searching'
+            claimed_by_name = None
+            if st == 'filled' and r.assigned_worker_user_id:
+                claimer = self.db.get(User, r.assigned_worker_user_id)
+                if claimer:
+                    claimed_by_name = f'{claimer.first_name} {claimer.last_name}'.strip()
+            items.append({
+                'request_id': r.id,
+                'title': r.title,
+                'role': r.role.value if r.role else None,
+                'work_date': r.work_date,
+                'start_time': r.start_time,
+                'end_time': r.end_time,
+                'reason': r.release_reason,
+                'status': st,
+                'claimed_by_name': claimed_by_name,
+                'alerted': len(responses),
+                'viewed': sum(1 for resp in responses if resp.viewed_at is not None),
+            })
+        return items
+
     def absence_options(self, scope: AccessScope) -> list[dict]:
         """The sites a worker can report an absence at (their tenant's orgs) +
         each site's self-serve-allowed roles, for the AbsenceReport form."""

@@ -479,6 +479,20 @@ export type AbsenceSite = {
   allowed_roles: string[];
 };
 
+export type MyAbsenceItem = {
+  request_id: string;
+  title: string;
+  role: string | null;
+  work_date: string;
+  start_time: string;
+  end_time: string;
+  reason: string | null;
+  status: "searching" | "filled" | "unfilled" | "cancelled";
+  claimed_by_name: string | null;
+  alerted: number;
+  viewed: number;
+};
+
 export type OrganizationSummary = {
   id: string;
   name: string;

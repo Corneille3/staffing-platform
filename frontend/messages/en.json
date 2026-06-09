@@ -339,7 +339,13 @@
       "viewed": "viewed",
       "cancel": "Cancel this report",
       "filled": "{name} is covering it — thank you for the notice.",
-      "someone": "Someone"
+      "someone": "Someone",
+      "yourReports": "Your reported absences",
+      "reportAnother": "Report an absence",
+      "st_searching": "Searching",
+      "st_filled": "Covered by {name}",
+      "st_unfilled": "Not covered",
+      "st_cancelled": "Cancelled"
     }
   },
   "edge": {
