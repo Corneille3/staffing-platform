@@ -2,12 +2,13 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text, Time, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, Time, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.enums import (
     CoverageType,
+    RequestOrigin,
     RequestRequirementType,
     RequestRole,
     RequestStatus,
@@ -44,6 +45,21 @@ class StaffingRequest(Base):
     contact_phone: Mapped[str | None] = mapped_column(String(50))
     contact_email: Mapped[str | None] = mapped_column(String(255))
     arrival_instructions: Mapped[str | None] = mapped_column(Text)
+    # Self-serve replacement (SELF_SERVE_REPLACEMENT §1). origin defaults to
+    # coordinator so every existing request is unchanged; auto_assign short-
+    # circuits the coordinator confirm (the claim IS the assignment).
+    origin: Mapped[RequestOrigin] = mapped_column(
+        db_enum(RequestOrigin, 'request_origin'),
+        default=RequestOrigin.COORDINATOR,
+        server_default=RequestOrigin.COORDINATOR.value,
+    )
+    auto_assign: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false')
+    # The assignment being released (worker_replacement only); NULL for a
+    # staff_absence report, which has no StaffiG assignment to release.
+    replaces_assignment_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey('assignments.id', ondelete='SET NULL')
+    )
+    release_reason: Mapped[str | None] = mapped_column(String(20))  # sick|family|personal|other
     assigned_worker_user_id: Mapped[UUID | None] = mapped_column(ForeignKey('users.id', ondelete='SET NULL'))
     assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -58,7 +74,12 @@ class StaffingRequest(Base):
     organization = relationship('Organization', back_populates='staffing_requests')
     notifications = relationship('RequestNotification', back_populates='staffing_request')
     responses = relationship('RequestResponse', back_populates='staffing_request')
-    assignment = relationship('Assignment', back_populates='staffing_request', uselist=False)
+    # foreign_keys pinned to the original FK: replaces_assignment_id added a
+    # second staffing_requests<->assignments path that SQLAlchemy can't auto-resolve.
+    assignment = relationship(
+        'Assignment', back_populates='staffing_request', uselist=False,
+        foreign_keys='Assignment.staffing_request_id',
+    )
     requirements = relationship('RequestRequirement', back_populates='staffing_request', cascade='all, delete-orphan')
 
     @property

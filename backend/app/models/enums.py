@@ -83,6 +83,17 @@ class RequestStatus(str, Enum):
     COMPLETED = 'completed'
     CANCELLED = 'cancelled'
     EXPIRED = 'expired'
+    # Self-serve replacement, approval mode: a released shift waits for the
+    # coordinator to approve before it broadcasts (SELF_SERVE_REPLACEMENT §5).
+    PENDING_APPROVAL = 'pending_approval'
+
+
+class RequestOrigin(str, Enum):
+    """How a request was created (SELF_SERVE_REPLACEMENT §1). Default keeps
+    every existing coordinator-created request unchanged."""
+    COORDINATOR = 'coordinator'
+    WORKER_REPLACEMENT = 'worker_replacement'  # contractor released a held shift
+    STAFF_ABSENCE = 'staff_absence'            # permanent staff reported an absence
 
 
 class ResponseStatus(str, Enum):
@@ -99,6 +110,23 @@ class AssignmentStatus(str, Enum):
     CONFIRMED = 'confirmed'
     CANCELLED = 'cancelled'
     COMPLETED = 'completed'
+    # The holder gave the shift up via self-serve replacement and someone else
+    # claimed it. Distinct from CANCELLED (coordinator-initiated) for audit.
+    RELEASED = 'released'
+
+
+class EmploymentType(str, Enum):
+    """A worker's relationship to a tenant, set by the tenant admin at invite
+    (SELF_SERVE_REPLACEMENT §1). On-call folds into contractor. Drives which
+    self-serve trigger the worker sees (report vs release)."""
+    PERMANENT = 'permanent'
+    CONTRACTOR = 'contractor'
+
+
+class ReplacementPolicy(str, Enum):
+    """Per-org self-serve policy (SELF_SERVE_REPLACEMENT §5)."""
+    AUTO = 'auto'          # released shift broadcasts instantly, first-claim wins
+    APPROVAL = 'approval'  # coordinator approves before it broadcasts
 
 
 class AvailabilityStatus(str, Enum):

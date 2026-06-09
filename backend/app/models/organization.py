@@ -2,11 +2,16 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, func, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.enums import OrganizationType, db_enum
+from app.models.enums import OrganizationType, ReplacementPolicy, db_enum
+
+# Default roles allowed to release/report a shift for self-serve replacement
+# (SELF_SERVE_REPLACEMENT §5) — the care-giving roles, editable per org.
+DEFAULT_REPLACEMENT_ROLES = ['educator', 'assistant_educator', 'psw', 'nurse']
 
 
 class Organization(Base):
@@ -37,6 +42,21 @@ class Organization(Base):
     capacity: Mapped[int | None] = mapped_column(Integer)
     enrolled_count: Mapped[int | None] = mapped_column(Integer)
     hours_label: Mapped[str | None] = mapped_column(String(120))
+    # Self-serve replacement policy (SELF_SERVE_REPLACEMENT §5). Default auto =
+    # released shifts broadcast instantly; approval keeps a coordinator gate.
+    replacement_policy: Mapped[ReplacementPolicy] = mapped_column(
+        db_enum(ReplacementPolicy, 'replacement_policy'),
+        default=ReplacementPolicy.AUTO,
+        server_default=ReplacementPolicy.AUTO.value,
+    )
+    replacement_allowed_roles: Mapped[list[str]] = mapped_column(
+        JSONB,
+        default=lambda: list(DEFAULT_REPLACEMENT_ROLES),
+        server_default=text("""'["educator","assistant_educator","psw","nurse"]'::jsonb"""),
+    )
+    # A shift can only be released this many minutes before it starts (0 = up to
+    # start time, which a same-day sick release needs).
+    min_release_lead_minutes: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
