@@ -211,6 +211,87 @@ def test_release_approval_policy_yields_pending(db_session, seed):
     assert replacement.status == RequestStatus.PENDING_APPROVAL
 
 
+# ── broadcast + claim endpoint + cancel + status ────────────────────────────────
+
+def test_release_broadcasts_to_eligible_pool_excluding_giver(db_session, seed):
+    from app.models.request_response import RequestResponse
+    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
+    replacement = ReplacementService(db_session).release(
+        original.id, _worker_scope(seed, seed.worker_a), reason='sick',
+    )
+    notified = set(db_session.scalars(select(RequestResponse.worker_user_id).where(
+        RequestResponse.staffing_request_id == replacement.id,
+    )))
+    assert seed.worker_b.id in notified       # eligible pool alerted
+    assert seed.worker_a.id not in notified    # never alert the giver
+
+
+def test_claim_endpoint_assigns_eligible_worker(db_session, seed, worker_b_client):
+    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
+    replacement = ReplacementService(db_session).release(
+        original.id, _worker_scope(seed, seed.worker_a), reason='sick',
+    )
+    resp = worker_b_client.post(f'/api/v1/requests/{replacement.id}/claim')
+    assert resp.status_code == 200, resp.text
+    assert resp.json()['worker_user_id'] == str(seed.worker_b.id)
+    db_session.refresh(replacement)
+    assert replacement.status == RequestStatus.ASSIGNED
+
+
+def test_claim_endpoint_second_worker_409(db_session, seed, worker_a_client, worker_b_client):
+    # worker_a is the giver; have an unrelated giver so both a & b can claim.
+    original, _ = _assigned_shift(db_session, seed, seed.org_admin)  # org_admin holds it
+    replacement = ReplacementService(db_session).release(
+        original.id, _worker_scope(seed, seed.org_admin), reason=None,
+    )
+    first = worker_b_client.post(f'/api/v1/requests/{replacement.id}/claim')
+    assert first.status_code == 200, first.text
+    second = worker_a_client.post(f'/api/v1/requests/{replacement.id}/claim')
+    assert second.status_code == 409
+    assert second.json()['detail'] == 'already_filled'
+
+
+def test_cancel_release_by_giver(db_session, seed):
+    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
+    svc = ReplacementService(db_session)
+    replacement = svc.release(original.id, _worker_scope(seed, seed.worker_a), reason=None)
+    cancelled = svc.cancel_release(replacement.id, _worker_scope(seed, seed.worker_a))
+    assert cancelled.status == RequestStatus.CANCELLED
+
+
+def test_cancel_release_by_non_giver_403(db_session, seed):
+    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
+    svc = ReplacementService(db_session)
+    replacement = svc.release(original.id, _worker_scope(seed, seed.worker_a), reason=None)
+    with pytest.raises(HTTPException) as exc:
+        svc.cancel_release(replacement.id, _worker_scope(seed, seed.worker_b))
+    assert exc.value.status_code == 403
+
+
+def test_cancel_release_after_claim_409(db_session, seed):
+    original, _ = _assigned_shift(db_session, seed, seed.org_admin)
+    svc = ReplacementService(db_session)
+    replacement = svc.release(original.id, _worker_scope(seed, seed.org_admin), reason=None)
+    svc.claim(replacement.id, seed.worker_b.id, seed.tenant.id)
+    with pytest.raises(HTTPException) as exc:
+        svc.cancel_release(replacement.id, _worker_scope(seed, seed.org_admin))
+    assert exc.value.status_code == 409
+
+
+def test_replacement_status_tally(db_session, seed):
+    original, _ = _assigned_shift(db_session, seed, seed.org_admin)
+    svc = ReplacementService(db_session)
+    replacement = svc.release(original.id, _worker_scope(seed, seed.org_admin), reason=None)
+    before = svc.replacement_status(replacement.id, _worker_scope(seed, seed.org_admin))
+    assert before['alerted'] >= 1
+    assert before['filled'] is False
+
+    svc.claim(replacement.id, seed.worker_b.id, seed.tenant.id)
+    after = svc.replacement_status(replacement.id, _worker_scope(seed, seed.org_admin))
+    assert after['filled'] is True
+    assert after['claimed_by_name'] == f'{seed.worker_b.first_name} {seed.worker_b.last_name}'
+
+
 # ── concurrency (§9 — independent connections, real race) ───────────────────────
 
 def test_fifty_simultaneous_claims_yield_exactly_one_winner(db_engine):

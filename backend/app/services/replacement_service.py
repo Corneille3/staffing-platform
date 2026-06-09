@@ -20,13 +20,22 @@ from app.auth.scope import AccessScope
 from app.models.assignment import Assignment
 from app.models.enums import (
     AssignmentStatus,
+    NotificationChannel,
     RequestOrigin,
     RequestStatus,
     ReplacementPolicy,
+    ResponseStatus,
 )
 from app.models.organization import Organization
+from app.models.request_notification import RequestNotification
+from app.models.request_requirement import RequestRequirement
+from app.models.request_response import RequestResponse
 from app.models.staffing_request import StaffingRequest
+from app.models.user import User
+from app.notifications.notification_dispatcher import NotificationDispatcher
+from app.repositories.worker_repository import WorkerRepository
 from app.services.audit_service import AuditService
+from app.services.matching_service import MatchingService
 
 # Only worker-originated, auto-assign requests are claimable this way.
 SELF_SERVE_ORIGINS = (RequestOrigin.WORKER_REPLACEMENT, RequestOrigin.STAFF_ABSENCE)
@@ -38,6 +47,59 @@ class ReplacementService:
     def __init__(self, db: Session) -> None:
         self.db = db
         self.audit_service = AuditService(db)
+        self.matching_service = MatchingService(db=db)
+        self.worker_repository = WorkerRepository(db)
+        self.dispatcher = NotificationDispatcher(db)
+
+    def broadcast(self, request: StaffingRequest) -> int:
+        """Notify the eligible pool about an open replacement (§4). Mirrors the
+        coordinator publish recipient logic, but leaves status OPEN so the
+        atomic claim (which keys on status='open') can win. Creates a
+        RequestResponse(NOTIFIED) per recipient so the shift appears in their
+        inbox and the giver's waiting tally can count. Returns the recipient
+        count. Idempotent-ish: skips workers who already have a response row."""
+        org = self.db.get(Organization, request.organization_id)
+        workers = (
+            self.worker_repository.list_for_tenant(org.tenant_id)
+            if org and org.tenant_id else self.worker_repository.list()
+        )
+        eligible = self.matching_service.eligible_workers(request, workers)
+        recipients = [
+            w for w in eligible
+            if w.id != request.created_by_user_id  # never alert the giver about their own release
+            and self.matching_service.wants_notification(request, w)
+        ]
+        for worker in recipients:
+            self.db.add(RequestNotification(
+                id=uuid4(), staffing_request_id=request.id, worker_user_id=worker.id,
+                channel=NotificationChannel.IN_APP, delivery_status='queued',
+            ))
+            existing = self.db.scalar(select(RequestResponse).where(
+                RequestResponse.staffing_request_id == request.id,
+                RequestResponse.worker_user_id == worker.id,
+            ))
+            if existing is None:
+                self.db.add(RequestResponse(
+                    id=uuid4(), staffing_request_id=request.id,
+                    worker_user_id=worker.id, status=ResponseStatus.NOTIFIED,
+                ))
+        self.db.commit()
+        self.dispatcher.notify_workers(request, recipients)
+        return len(recipients)
+
+    def _copy_requirements(self, source_id: UUID, target_id: UUID) -> None:
+        """Clone the original request's qualification/certification requirements
+        onto the replacement so eligibility filtering is faithful (§4)."""
+        for req in self.db.scalars(select(RequestRequirement).where(
+            RequestRequirement.staffing_request_id == source_id,
+        )):
+            self.db.add(RequestRequirement(
+                id=uuid4(), staffing_request_id=target_id,
+                requirement_type=req.requirement_type,
+                requirement_code=req.requirement_code,
+                requirement_label=req.requirement_label,
+                is_required=req.is_required,
+            ))
 
     def release(self, request_id: UUID, scope: AccessScope, reason: str | None) -> StaffingRequest:
         """A contractor releases a held shift to the pool (§2). Keyed on the
@@ -130,6 +192,7 @@ class ReplacementService:
         )
         self.db.add(replacement)
         self.db.flush()
+        self._copy_requirements(original.id, replacement.id)
 
         self.audit_service.log(
             action='replacement.released',
@@ -146,9 +209,10 @@ class ReplacementService:
         )
         self.db.commit()
         self.db.refresh(replacement)
-        # Phase 3: when policy=auto, broadcast to the eligible pool here and copy
-        # the original request's qualification/certification requirements so
-        # eligibility filtering is faithful.
+        # Auto policy → alert the eligible pool now. Approval policy stays
+        # pending_approval and broadcasts on approve (Phase 5).
+        if replacement.status == RequestStatus.OPEN:
+            self.broadcast(replacement)
         return replacement
 
     def claim(self, request_id: UUID, claimer_user_id: UUID, tenant_id: UUID) -> Assignment:
@@ -243,3 +307,58 @@ class ReplacementService:
             if existing is not None:
                 return existing
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='already_filled')
+
+    def cancel_release(self, request_id: UUID, scope: AccessScope) -> StaffingRequest:
+        """The giver changes their mind before anyone claims (§7). The open
+        replacement is cancelled and they keep the shift (the original
+        assignment was never touched)."""
+        request = self.db.get(StaffingRequest, request_id)
+        if request is None or request.origin != RequestOrigin.WORKER_REPLACEMENT:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, 'Replacement not found.')
+        if request.created_by_user_id != scope.user.id:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, 'Only the giver can cancel this.')
+        if request.status not in (RequestStatus.OPEN, RequestStatus.PENDING_APPROVAL):
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                'This shift has already been claimed or closed.',
+            )
+        request.status = RequestStatus.CANCELLED
+        request.cancelled_at = datetime.now(timezone.utc)
+        self.audit_service.log(
+            action='replacement.cancelled',
+            entity_type='staffing_request',
+            entity_id=request.id,
+            actor_user_id=scope.user.id,
+            organization_id=request.organization_id,
+            payload={'replaces_assignment_id': str(request.replaces_assignment_id)},
+        )
+        self.db.commit()
+        self.db.refresh(request)
+        return request
+
+    def replacement_status(self, request_id: UUID, scope: AccessScope) -> dict:
+        """Compact status for the giver's waiting screen (§6 ReplacementWaiting):
+        live tally + the filled state once someone claims."""
+        request = self.db.get(StaffingRequest, request_id)
+        if request is None or request.origin != RequestOrigin.WORKER_REPLACEMENT:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, 'Replacement not found.')
+        org = self.db.get(Organization, request.organization_id)
+        if scope.tenant_id is None or org.tenant_id != scope.tenant_id:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, 'Out of scope.')
+
+        responses = list(self.db.scalars(select(RequestResponse).where(
+            RequestResponse.staffing_request_id == request_id,
+        )))
+        claimed_by_name = None
+        if request.status == RequestStatus.ASSIGNED and request.assigned_worker_user_id:
+            claimer = self.db.get(User, request.assigned_worker_user_id)
+            if claimer:
+                claimed_by_name = f'{claimer.first_name} {claimer.last_name}'.strip()
+        return {
+            'request_id': request.id,
+            'status': request.status.value,
+            'alerted': len(responses),
+            'viewed': sum(1 for r in responses if r.viewed_at is not None),
+            'filled': request.status == RequestStatus.ASSIGNED,
+            'claimed_by_name': claimed_by_name,
+        }
