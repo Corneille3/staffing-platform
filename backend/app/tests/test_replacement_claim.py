@@ -5,7 +5,7 @@ The unit tests use the savepoint session for behaviour; the concurrency test
 the claims genuinely race, then cleans up its committed rows by hand.
 """
 import threading
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from uuid import UUID, uuid4
 
 import pytest
@@ -368,6 +368,81 @@ def test_worker_invite_sets_employment_type(db_session, seed):
         TenantMembership.user_id == user.id,
     ))
     assert membership.employment_type == EmploymentType.PERMANENT
+
+
+# ── approval mode + escalation sweep (§5, §7) ───────────────────────────────────
+
+def test_approve_publishes_pending_release(db_session, seed):
+    from app.models.request_response import RequestResponse
+    seed.org.replacement_policy = ReplacementPolicy.APPROVAL
+    db_session.flush()
+    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
+    repl = ReplacementService(db_session).release(
+        original.id, _worker_scope(seed, seed.worker_a), reason=None,
+    )
+    assert repl.status == RequestStatus.PENDING_APPROVAL  # not broadcast yet
+
+    approved = ReplacementAdminService(db_session).approve(repl.id, _admin_scope(seed))
+    assert approved.status == RequestStatus.OPEN
+    # broadcast ran on approve → eligible pool now alerted
+    notified = set(db_session.scalars(select(RequestResponse.worker_user_id).where(
+        RequestResponse.staffing_request_id == repl.id,
+    )))
+    assert seed.worker_b.id in notified
+
+
+def test_deny_cancels_and_keeps_shift(db_session, seed):
+    seed.org.replacement_policy = ReplacementPolicy.APPROVAL
+    db_session.flush()
+    original, assignment = _assigned_shift(db_session, seed, seed.worker_a)
+    repl = ReplacementService(db_session).release(
+        original.id, _worker_scope(seed, seed.worker_a), reason=None,
+    )
+    denied = ReplacementAdminService(db_session).deny(repl.id, _admin_scope(seed), reason='not needed')
+    assert denied.status == RequestStatus.CANCELLED
+    db_session.refresh(assignment)
+    assert assignment.status == AssignmentStatus.CONFIRMED  # giver keeps it
+
+
+def test_approve_non_pending_409(db_session, seed):
+    # auto policy → release is OPEN, not pending → approve is a 409.
+    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
+    repl = ReplacementService(db_session).release(
+        original.id, _worker_scope(seed, seed.worker_a), reason=None,
+    )
+    with pytest.raises(HTTPException) as exc:
+        ReplacementAdminService(db_session).approve(repl.id, _admin_scope(seed))
+    assert exc.value.status_code == 409
+
+
+def test_sweep_auto_publishes_timed_out_approval(db_session, seed):
+    seed.org.replacement_policy = ReplacementPolicy.APPROVAL
+    db_session.flush()
+    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
+    repl = ReplacementService(db_session).release(
+        original.id, _worker_scope(seed, seed.worker_a), reason=None,
+    )
+    repl.created_at = datetime.now(timezone.utc) - timedelta(minutes=11)  # past the timeout
+    db_session.flush()
+
+    result = ReplacementAdminService(db_session).sweep(_admin_scope(seed))
+    assert result['auto_published'] >= 1
+    db_session.refresh(repl)
+    assert repl.status == RequestStatus.OPEN
+
+
+def test_sweep_expires_past_cutoff_open(db_session, seed):
+    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
+    repl = ReplacementService(db_session).release(
+        original.id, _worker_scope(seed, seed.worker_a), reason=None,
+    )
+    repl.work_date = date(2020, 1, 1)  # shift long past, never claimed
+    db_session.flush()
+
+    result = ReplacementAdminService(db_session).sweep(_admin_scope(seed))
+    assert result['expired'] >= 1
+    db_session.refresh(repl)
+    assert repl.status == RequestStatus.EXPIRED
 
 
 # ── concurrency (§9 — independent connections, real race) ───────────────────────

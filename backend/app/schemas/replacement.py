@@ -19,6 +19,9 @@ class ReplacementFeedItem(BaseModel):
     reason: str | None = None
     # searching | filled | cancelled | unfilled
     status: str
+    # True only in approval mode before the coordinator acts — drives the
+    # "À valider avant diffusion" queue (§6.1).
+    awaiting_approval: bool = False
     claimer_name: str | None = None
     released_at: datetime
     time_to_fill_minutes: int | None = None

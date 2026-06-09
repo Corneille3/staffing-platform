@@ -1,4 +1,5 @@
 import { Eyebrow, Mono } from "../../../../components/ui";
+import { ReplacementApprovalQueue } from "../../../../components/replacement-approval-queue";
 import { ReplacementPolicyCard } from "../../../../components/replacement-policy-card";
 import { getOrganizations, getReplacementFeed } from "../../../../lib/api";
 import type { ReplacementFeedItem } from "../../../../lib/types";
@@ -42,6 +43,9 @@ export default async function AdminReplacementsPage() {
       <p style={{ margin: "8px 0 24px", color: "var(--ink-2)", fontSize: 14, maxWidth: 640 }}>
         Chaque quart libéré par un·e remplaçant·e. Vous voyez tout — sans être le goulot d&apos;étranglement.
       </p>
+
+      {/* Approval queue (approval-mode orgs only — §6.1) */}
+      <ReplacementApprovalQueue items={feed.items.filter((i) => i.awaiting_approval)} />
 
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 26 }}>

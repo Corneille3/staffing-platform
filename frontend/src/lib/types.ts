@@ -711,6 +711,7 @@ export type ReplacementFeedItem = {
   role: string | null;
   reason: string | null;
   status: "searching" | "filled" | "cancelled" | "unfilled";
+  awaiting_approval: boolean;
   claimer_name: string | null;
   released_at: string;
   time_to_fill_minutes: number | null;

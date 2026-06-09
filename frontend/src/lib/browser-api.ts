@@ -444,6 +444,20 @@ export async function updateReplacementPolicy(
   );
 }
 
+// Approval mode (§5) — coordinator gates a pending release before broadcast.
+export async function approveReplacement(requestId: string): Promise<StaffingRequest> {
+  return postJson<StaffingRequest>(`/api/v1/admin/replacements/${requestId}/approve`, {});
+}
+
+export async function denyReplacement(requestId: string, reason?: string): Promise<StaffingRequest> {
+  return postJson<StaffingRequest>(`/api/v1/admin/replacements/${requestId}/deny`, { reason });
+}
+
+/** Housekeeping (§7): auto-publish timed-out approvals + expire past-cutoff opens. */
+export async function sweepReplacements(): Promise<{ auto_published: number; expired: number }> {
+  return postJson<{ auto_published: number; expired: number }>("/api/v1/admin/replacements/sweep", {});
+}
+
 export async function updateAvailability(
   workerId: string,
   status: "available" | "unavailable",

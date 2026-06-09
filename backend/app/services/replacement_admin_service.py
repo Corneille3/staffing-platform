@@ -24,6 +24,7 @@ from app.schemas.replacement import (
     ReplacementPolicyUpdate,
 )
 from app.services.audit_service import AuditService
+from app.services.replacement_service import ReplacementService
 
 # Request status → feed status (the coordinator's vocabulary, §6.1).
 _FEED_STATUS = {
@@ -34,6 +35,14 @@ _FEED_STATUS = {
     RequestStatus.CANCELLED: 'cancelled',
     RequestStatus.EXPIRED: 'unfilled',
 }
+
+# Approval-mode auto-publish timeout (§7): if the coordinator ignores a pending
+# release this long, the sweep publishes it so a sick worker isn't stuck.
+AUTO_PUBLISH_MINUTES = 10
+
+
+def _shift_started(request: StaffingRequest, now: datetime) -> bool:
+    return datetime.combine(request.work_date, request.start_time, tzinfo=timezone.utc) <= now
 
 
 class ReplacementAdminService:
@@ -82,9 +91,15 @@ class ReplacementAdminService:
                 return int((r.assigned_at - r.created_at).total_seconds() // 60)
             return None
 
+        now = datetime.now(timezone.utc)
         items: list[ReplacementFeedItem] = []
         for r in requests:
             feed_status = _FEED_STATUS.get(r.status, 'searching')
+            # Derived: an open shift whose start time has passed with no claim
+            # reads as unfilled even before the sweep persists it — so the
+            # dashboard is honest without a scheduler.
+            if r.status == RequestStatus.OPEN and _shift_started(r, now):
+                feed_status = 'unfilled'
             if status_filter == 'live' and feed_status != 'searching':
                 continue
             if status_filter == 'history' and feed_status == 'searching':
@@ -99,12 +114,12 @@ class ReplacementAdminService:
                 role=r.role.value if r.role else None,
                 reason=r.release_reason,
                 status=feed_status,
+                awaiting_approval=r.status == RequestStatus.PENDING_APPROVAL,
                 claimer_name=name(r.assigned_worker_user_id),
                 released_at=r.created_at,
                 time_to_fill_minutes=ttf(r),
             ))
 
-        now = datetime.now(timezone.utc)
         week_ago = now - timedelta(days=7)
         filled = [r for r in requests if r.status in (RequestStatus.ASSIGNED, RequestStatus.COMPLETED)]
         ttfs = [t for r in filled if (t := ttf(r)) is not None]
@@ -112,7 +127,12 @@ class ReplacementAdminService:
             released_this_week=sum(1 for r in requests if r.created_at and r.created_at >= week_ago),
             filled=len(filled),
             avg_time_to_fill_minutes=int(sum(ttfs) / len(ttfs)) if ttfs else None,
-            unfilled=sum(1 for r in requests if r.status == RequestStatus.EXPIRED),
+            # Persisted-expired + derived-unfilled (open, shift already started).
+            unfilled=sum(
+                1 for r in requests
+                if r.status == RequestStatus.EXPIRED
+                or (r.status == RequestStatus.OPEN and _shift_started(r, now))
+            ),
         )
         return ReplacementFeedResponse(kpis=kpis, items=items)
 
@@ -157,3 +177,99 @@ class ReplacementAdminService:
         self.db.commit()
         self.db.refresh(org)
         return self.get_policy(org_id, scope)
+
+    # ── approval mode (§5) ──────────────────────────────────────────────────
+
+    def _pending_in_scope(self, request_id: UUID, scope: AccessScope) -> StaffingRequest:
+        request = self.db.get(StaffingRequest, request_id)
+        if request is None or request.origin != RequestOrigin.WORKER_REPLACEMENT:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, 'Replacement not found.')
+        if request.organization_id not in self._accessible_org_ids(scope):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, 'Out of scope.')
+        if request.status != RequestStatus.PENDING_APPROVAL:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                'This release is not awaiting approval.',
+            )
+        return request
+
+    def approve(self, request_id: UUID, scope: AccessScope) -> StaffingRequest:
+        """Approval mode: the coordinator approves a pending release → it opens
+        and broadcasts to the pool (§5)."""
+        request = self._pending_in_scope(request_id, scope)
+        request.status = RequestStatus.OPEN
+        self.audit_service.log(
+            action='replacement.approved', entity_type='staffing_request',
+            entity_id=request.id, actor_user_id=scope.user.id,
+            organization_id=request.organization_id, payload={},
+        )
+        self.db.commit()
+        self.db.refresh(request)
+        ReplacementService(self.db).broadcast(request)
+        return request
+
+    def deny(self, request_id: UUID, scope: AccessScope, reason: str | None) -> StaffingRequest:
+        """Approval mode: the coordinator refuses the release → cancelled, the
+        giver keeps the shift (§5)."""
+        request = self._pending_in_scope(request_id, scope)
+        request.status = RequestStatus.CANCELLED
+        request.cancelled_at = datetime.now(timezone.utc)
+        self.audit_service.log(
+            action='replacement.denied', entity_type='staffing_request',
+            entity_id=request.id, actor_user_id=scope.user.id,
+            organization_id=request.organization_id, payload={'reason': reason},
+        )
+        self.db.commit()
+        self.db.refresh(request)
+        return request
+
+    def sweep(self, scope: AccessScope) -> dict:
+        """Manual/cron-ready housekeeping (§7), scoped to the caller's orgs:
+        auto-publish approvals the coordinator sat on past the timeout, and
+        expire open releases whose shift already started with no claim.
+
+        Proactive coordinator notification on expiry is deferred until this is
+        wired to a scheduler (same status as the reliability cron) — for now the
+        dashboard surfaces unfilled and this persists the state."""
+        org_ids = self._accessible_org_ids(scope)
+        if not org_ids:
+            return {'auto_published': 0, 'expired': 0}
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(minutes=AUTO_PUBLISH_MINUTES)
+
+        pending = list(self.db.scalars(select(StaffingRequest).where(
+            StaffingRequest.origin == RequestOrigin.WORKER_REPLACEMENT,
+            StaffingRequest.organization_id.in_(org_ids),
+            StaffingRequest.status == RequestStatus.PENDING_APPROVAL,
+            StaffingRequest.created_at < cutoff,
+        )))
+        worker_svc = ReplacementService(self.db)
+        for request in pending:
+            request.status = RequestStatus.OPEN
+            self.audit_service.log(
+                action='replacement.auto_published', entity_type='staffing_request',
+                entity_id=request.id, actor_user_id=scope.user.id,
+                organization_id=request.organization_id, payload={'timeout_minutes': AUTO_PUBLISH_MINUTES},
+            )
+        self.db.commit()
+        for request in pending:
+            self.db.refresh(request)
+            worker_svc.broadcast(request)
+
+        opens = list(self.db.scalars(select(StaffingRequest).where(
+            StaffingRequest.origin == RequestOrigin.WORKER_REPLACEMENT,
+            StaffingRequest.organization_id.in_(org_ids),
+            StaffingRequest.status == RequestStatus.OPEN,
+        )))
+        expired = 0
+        for request in opens:
+            if _shift_started(request, now):
+                request.status = RequestStatus.EXPIRED
+                self.audit_service.log(
+                    action='replacement.unfilled', entity_type='staffing_request',
+                    entity_id=request.id, actor_user_id=scope.user.id,
+                    organization_id=request.organization_id, payload={},
+                )
+                expired += 1
+        self.db.commit()
+        return {'auto_published': len(pending), 'expired': expired}
