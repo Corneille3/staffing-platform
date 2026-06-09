@@ -35,6 +35,16 @@ def absence_report_options(
     return {'sites': ReplacementService(db).absence_options(scope)}
 
 
+@router.get('/report-absence/mine')
+def my_absence_reports(
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> dict:
+    """The worker's own reported absences + status, so they can return to the
+    page and see whether each was covered (SELF_SERVE §1)."""
+    return {'items': ReplacementService(db).my_absence_reports(scope)}
+
+
 @router.post('/report-absence')
 def report_absence(
     payload: AbsenceReportCreate,

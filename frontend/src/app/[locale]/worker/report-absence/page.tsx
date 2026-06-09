@@ -7,11 +7,10 @@ import { Link } from "../../../../i18n/navigation";
 import {
   cancelRelease,
   fetchAbsenceOptions,
-  fetchReplacementStatus,
+  fetchMyAbsenceReports,
   reportAbsence,
-  type ReplacementStatus,
 } from "../../../../lib/browser-api";
-import type { AbsenceSite } from "../../../../lib/types";
+import type { AbsenceSite, MyAbsenceItem } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -24,14 +23,32 @@ const ROLE_LABELS: Record<string, string> = {
 };
 const REASONS = ["sick", "family", "personal", "other"] as const;
 
+const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
+  searching: { bg: "var(--terra-soft)", color: "var(--terra-ink)" },
+  filled: { bg: "var(--moss-soft)", color: "var(--moss)" },
+  unfilled: { bg: "var(--rose-soft)", color: "var(--rose)" },
+  cancelled: { bg: "var(--paper-2)", color: "var(--ink-3)" },
+};
+
+function fmtDate(value: string): string {
+  try {
+    return new Date(value).toLocaleDateString("fr-CA", { weekday: "short", month: "short", day: "numeric" });
+  } catch {
+    return value;
+  }
+}
+
 export default function ReportAbsencePage() {
   const { worker } = useWorkerSession();
   const t = useTranslations("worker.absence");
 
   const [sites, setSites] = useState<AbsenceSite[]>([]);
+  const [reports, setReports] = useState<MyAbsenceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
 
   const [siteId, setSiteId] = useState("");
   const [role, setRole] = useState("");
@@ -41,42 +58,40 @@ export default function ReportAbsencePage() {
   const [reason, setReason] = useState<(typeof REASONS)[number]>("sick");
   const [note, setNote] = useState("");
 
-  // post-submit waiting state
-  const [reportedId, setReportedId] = useState<string | null>(null);
-  const [status, setStatus] = useState<ReplacementStatus | null>(null);
+  async function loadReports() {
+    const { items } = await fetchMyAbsenceReports();
+    setReports(items);
+    return items;
+  }
 
   useEffect(() => {
     let alive = true;
-    fetchAbsenceOptions()
-      .then((d) => {
+    Promise.all([fetchAbsenceOptions(), fetchMyAbsenceReports()])
+      .then(([opts, mine]) => {
         if (!alive) return;
-        setSites(d.sites);
-        if (d.sites[0]) {
-          setSiteId(d.sites[0].id);
-          setRole(d.sites[0].allowed_roles[0] ?? "");
+        setSites(opts.sites);
+        if (opts.sites[0]) {
+          setSiteId(opts.sites[0].id);
+          setRole(opts.sites[0].allowed_roles[0] ?? "");
         }
+        setReports(mine.items);
+        setShowForm(mine.items.length === 0); // no reports yet → open the form
       })
       .catch((e) => alive && setError(e instanceof Error ? e.message : "Load failed"))
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
   }, []);
 
-  const site = useMemo(() => sites.find((s) => s.id === siteId) ?? null, [sites, siteId]);
+  const hasSearching = reports.some((r) => r.status === "searching");
 
-  // Poll the waiting status once reported (no realtime).
+  // Poll while anything is still searching (no realtime).
   useEffect(() => {
-    if (!reportedId || status?.filled) return;
-    let alive = true;
-    const poll = async () => {
-      try {
-        const s = await fetchReplacementStatus(reportedId);
-        if (alive) setStatus(s);
-      } catch { /* transient */ }
-    };
-    void poll();
-    const interval = setInterval(poll, 5000);
-    return () => { alive = false; clearInterval(interval); };
-  }, [reportedId, status?.filled]);
+    if (!hasSearching) return;
+    const interval = setInterval(() => { void loadReports(); }, 8000);
+    return () => clearInterval(interval);
+  }, [hasSearching]);
+
+  const site = useMemo(() => sites.find((s) => s.id === siteId) ?? null, [sites, siteId]);
 
   if (!worker) return null;
 
@@ -88,7 +103,7 @@ export default function ReportAbsencePage() {
     setBusy(true);
     setError(null);
     try {
-      const req = await reportAbsence({
+      await reportAbsence({
         organization_id: siteId,
         role,
         work_date: workDate,
@@ -97,7 +112,10 @@ export default function ReportAbsencePage() {
         reason,
         note: note.trim() || null,
       });
-      setReportedId(req.id);
+      await loadReports();
+      setShowForm(false);
+      setWorkDate("");
+      setNote("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Report failed");
     } finally {
@@ -105,17 +123,16 @@ export default function ReportAbsencePage() {
     }
   }
 
-  async function handleCancel() {
-    if (!reportedId) return;
-    setBusy(true);
+  async function handleCancel(id: string) {
+    setCancelingId(id);
+    setError(null);
     try {
-      await cancelRelease(reportedId);
-      setReportedId(null);
-      setStatus(null);
+      await cancelRelease(id);
+      await loadReports();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Cancel failed");
     } finally {
-      setBusy(false);
+      setCancelingId(null);
     }
   }
 
@@ -132,84 +149,100 @@ export default function ReportAbsencePage() {
         {t("sub")}
       </p>
 
+      {error && <p style={{ margin: "0 0 14px", color: "var(--rose)", fontSize: 13 }}>{error}</p>}
+
       {loading ? (
         <p style={{ color: "var(--ink-3)", fontSize: 14 }}>{t("loading")}</p>
-      ) : reportedId ? (
-        // ── Waiting / filled ──
-        status?.filled ? (
-          <Notice tone="moss">{t("filled", { name: status.claimed_by_name ?? t("someone") })}</Notice>
-        ) : (
-          <section style={CARD}>
-            <div style={{ fontFamily: "var(--serif)", fontSize: 18, marginBottom: 4 }}>{t("waitingTitle")}</div>
-            <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>{t("waitingSub")}</p>
-            <div style={{ display: "flex", gap: 18, marginBottom: 14 }}>
-              <Tally value={status?.alerted ?? 0} label={t("alerted")} />
-              <Tally value={status?.viewed ?? 0} label={t("viewed")} />
-            </div>
-            <button type="button" onClick={handleCancel} disabled={busy} style={GHOST_BTN}>
-              {t("cancel")}
-            </button>
-          </section>
-        )
-      ) : sites.length === 0 ? (
-        <Notice tone="muted">{t("noSites")}</Notice>
       ) : (
-        // ── Form ──
-        <div style={{ display: "grid", gap: 18 }}>
-          <Field label={t("site")}>
-            <select value={siteId} onChange={(e) => { setSiteId(e.target.value); const s = sites.find((x) => x.id === e.target.value); setRole(s?.allowed_roles[0] ?? ""); }} style={INPUT}>
-              {sites.map((s) => <option key={s.id} value={s.id}>{s.name} · {s.city}</option>)}
-            </select>
-          </Field>
+        <>
+          {/* ── My reported absences (persists across navigation) ── */}
+          {reports.length > 0 && (
+            <section style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--ink-3)", fontWeight: 500, marginBottom: 10 }}>
+                {t("yourReports")}
+              </div>
+              <div style={{ display: "grid", gap: 10 }}>
+                {reports.map((r) => {
+                  const s = STATUS_STYLE[r.status] ?? STATUS_STYLE.searching;
+                  const label =
+                    r.status === "filled" ? t("st_filled", { name: r.claimed_by_name ?? t("someone") })
+                    : r.status === "unfilled" ? t("st_unfilled")
+                    : r.status === "cancelled" ? t("st_cancelled")
+                    : t("st_searching");
+                  return (
+                    <div key={r.request_id} style={CARD}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>
+                          {r.role ? ROLE_LABELS[r.role] ?? r.role : r.title}
+                        </div>
+                        <span style={{ flexShrink: 0, padding: "3px 9px", borderRadius: 99, background: s.bg, color: s.color, fontSize: 11, fontWeight: 600 }}>
+                          {label}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 3 }}>
+                        {fmtDate(r.work_date)} · {r.start_time.slice(0, 5)}–{r.end_time.slice(0, 5)}
+                      </div>
+                      {r.status === "searching" && (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
+                          <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
+                            {r.alerted} {t("alerted")} · {r.viewed} {t("viewed")}
+                          </span>
+                          <button type="button" onClick={() => handleCancel(r.request_id)} disabled={cancelingId === r.request_id}
+                            style={{ padding: "6px 12px", borderRadius: 99, border: "0.5px solid var(--line)", background: "transparent", color: "var(--ink-2)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "var(--ui)" }}>
+                            {t("cancel")}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
-          <Field label={t("role")}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-              {(site?.allowed_roles ?? []).map((r) => {
-                const active = role === r;
-                return (
-                  <button key={r} type="button" onClick={() => setRole(r)} style={chip(active)}>
-                    {ROLE_LABELS[r] ?? r}
-                  </button>
-                );
-              })}
+          {/* ── Form (toggle when there are existing reports) ── */}
+          {!showForm ? (
+            <button type="button" onClick={() => setShowForm(true)} style={{ ...PRIMARY_BTN, width: "100%" }}>
+              {t("reportAnother")}
+            </button>
+          ) : sites.length === 0 ? (
+            <Notice tone="muted">{t("noSites")}</Notice>
+          ) : (
+            <div style={{ display: "grid", gap: 18 }}>
+              <Field label={t("site")}>
+                <select value={siteId} onChange={(e) => { setSiteId(e.target.value); const s = sites.find((x) => x.id === e.target.value); setRole(s?.allowed_roles[0] ?? ""); }} style={INPUT}>
+                  {sites.map((s) => <option key={s.id} value={s.id}>{s.name} · {s.city}</option>)}
+                </select>
+              </Field>
+              <Field label={t("role")}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                  {(site?.allowed_roles ?? []).map((r) => (
+                    <button key={r} type="button" onClick={() => setRole(r)} style={chip(role === r)}>{ROLE_LABELS[r] ?? r}</button>
+                  ))}
+                </div>
+              </Field>
+              <Field label={t("date")}>
+                <input type="date" value={workDate} onChange={(e) => setWorkDate(e.target.value)} style={INPUT} />
+              </Field>
+              <div style={{ display: "flex", gap: 12 }}>
+                <Field label={t("start")} style={{ flex: 1 }}><input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={INPUT} /></Field>
+                <Field label={t("end")} style={{ flex: 1 }}><input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={INPUT} /></Field>
+              </div>
+              <Field label={t("reason")}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                  {REASONS.map((r) => <button key={r} type="button" onClick={() => setReason(r)} style={chip(reason === r)}>{t(`reason_${r}`)}</button>)}
+                </div>
+              </Field>
+              <Field label={t("note")}>
+                <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} style={{ ...INPUT, resize: "vertical" }} placeholder={t("notePlaceholder")} />
+              </Field>
+              <button type="button" onClick={submit} disabled={busy} style={{ ...PRIMARY_BTN, opacity: busy ? 0.6 : 1 }}>
+                <Check size={15} /> {busy ? t("submitting") : t("submit")}
+              </button>
             </div>
-          </Field>
-
-          <Field label={t("date")}>
-            <input type="date" value={workDate} onChange={(e) => setWorkDate(e.target.value)} style={INPUT} />
-          </Field>
-
-          <div style={{ display: "flex", gap: 12 }}>
-            <Field label={t("start")} style={{ flex: 1 }}>
-              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={INPUT} />
-            </Field>
-            <Field label={t("end")} style={{ flex: 1 }}>
-              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={INPUT} />
-            </Field>
-          </div>
-
-          <Field label={t("reason")}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-              {REASONS.map((r) => (
-                <button key={r} type="button" onClick={() => setReason(r)} style={chip(reason === r)}>
-                  {t(`reason_${r}`)}
-                </button>
-              ))}
-            </div>
-          </Field>
-
-          <Field label={t("note")}>
-            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} style={{ ...INPUT, resize: "vertical" }} placeholder={t("notePlaceholder")} />
-          </Field>
-
-          {error && <p style={{ margin: 0, color: "var(--rose)", fontSize: 13 }}>{error}</p>}
-
-          <button type="button" onClick={submit} disabled={busy} style={{ ...PRIMARY_BTN, opacity: busy ? 0.6 : 1 }}>
-            <Check size={15} /> {busy ? t("submitting") : t("submit")}
-          </button>
-        </div>
+          )}
+        </>
       )}
-      {error && reportedId && <p style={{ margin: "10px 0 0", color: "var(--rose)", fontSize: 13 }}>{error}</p>}
     </div>
   );
 }
@@ -223,15 +256,6 @@ function Field({ label, children, style }: { label: string; children: React.Reac
   );
 }
 
-function Tally({ value, label }: { value: number; label: string }) {
-  return (
-    <div>
-      <div style={{ fontFamily: "var(--mono)", fontSize: 24, fontWeight: 600 }}>{value}</div>
-      <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>{label}</div>
-    </div>
-  );
-}
-
 function Notice({ tone, children }: { tone: "moss" | "muted"; children: React.ReactNode }) {
   const p = tone === "moss"
     ? { bg: "var(--moss-soft)", color: "var(--moss)", border: "#C8DCC1" }
@@ -239,10 +263,9 @@ function Notice({ tone, children }: { tone: "moss" | "muted"; children: React.Re
   return <div style={{ background: p.bg, color: p.color, border: `0.5px solid ${p.border}`, borderRadius: 12, padding: "12px 14px", fontSize: 13, fontWeight: 500 }}>{children}</div>;
 }
 
-const CARD: React.CSSProperties = { background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: 18, padding: 18 };
+const CARD: React.CSSProperties = { background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: 16, padding: "14px 16px" };
 const INPUT: React.CSSProperties = { padding: "10px 12px", borderRadius: 10, border: "0.5px solid var(--line)", background: "var(--paper)", color: "var(--ink)", fontSize: 14, fontFamily: "var(--ui)", appearance: "none" as const };
 const PRIMARY_BTN: React.CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, minHeight: 48, borderRadius: 14, border: "none", background: "var(--terra)", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "var(--ui)" };
-const GHOST_BTN: React.CSSProperties = { width: "100%", minHeight: 44, borderRadius: 14, border: "0.5px solid var(--line)", background: "transparent", color: "var(--ink-2)", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "var(--ui)" };
 
 function chip(active: boolean): React.CSSProperties {
   return {

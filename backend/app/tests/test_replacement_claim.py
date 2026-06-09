@@ -472,6 +472,22 @@ def test_report_absence_role_not_allowed_403(db_session, seed):
     assert exc.value.status_code == 403
 
 
+def test_my_absence_reports_shows_status(db_session, seed):
+    svc = ReplacementService(db_session)
+    repl = svc.report_absence(_absence_payload(seed, reason=None), _worker_scope(seed, seed.worker_a))
+    # The reporter can list it back with status (so it survives navigating away).
+    mine = svc.my_absence_reports(_worker_scope(seed, seed.worker_a))
+    row = next(m for m in mine if m['request_id'] == repl.id)
+    assert row['status'] == 'searching'
+    assert row['alerted'] >= 1
+
+    svc.claim(repl.id, seed.worker_b.id, seed.tenant.id)
+    mine2 = svc.my_absence_reports(_worker_scope(seed, seed.worker_a))
+    row2 = next(m for m in mine2 if m['request_id'] == repl.id)
+    assert row2['status'] == 'filled'
+    assert row2['claimed_by_name'] == f'{seed.worker_b.first_name} {seed.worker_b.last_name}'
+
+
 def test_reported_absence_is_claimable(db_session, seed):
     repl = ReplacementService(db_session).report_absence(
         _absence_payload(seed, reason=None), _worker_scope(seed, seed.worker_a),
