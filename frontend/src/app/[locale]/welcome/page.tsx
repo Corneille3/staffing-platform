@@ -10,6 +10,7 @@ import {
   fetchOrganizationsForTenant,
   fetchTenantProfile,
   inviteCoordinator,
+  patchAdminOrganization,
   patchTenantProfile,
 } from "../../../lib/browser-api";
 import type { Organization, TenantProfile } from "../../../lib/types";
@@ -68,6 +69,9 @@ export default function WelcomeWizard() {
   const [orgCity, setOrgCity] = useState("");
   const [orgLang, setOrgLang] = useState<"fr" | "en" | "bilingual">("fr");
   const [orgAddress, setOrgAddress] = useState("");
+  // The org created in step 2, so returning to the step updates it instead of
+  // creating a duplicate (the wizard's step rail + Back button let you revisit).
+  const [createdOrgId, setCreatedOrgId] = useState<string | null>(null);
   // Step 3
   const [coordFirst, setCoordFirst] = useState("");
   const [coordLast, setCoordLast] = useState("");
@@ -129,12 +133,29 @@ export default function WelcomeWizard() {
     setBusy(true);
     setError(null);
     try {
-      const org = await createOrganization({
-        name: orgName.trim(), type: orgType, city: orgCity.trim(),
-        preferred_language: orgLang, address_line1: orgAddress.trim() || null,
-      });
-      setOrgs((prev) => [...prev, org]);
-      if (!coordOrgId) setCoordOrgId(org.id);
+      if (createdOrgId) {
+        // Revisiting step 2 — update the org we already made rather than
+        // creating a second one. city/type are fixed at creation (same as the
+        // §2.3 edit modal), so only the editable fields are sent.
+        await patchAdminOrganization(createdOrgId, {
+          name: orgName.trim(),
+          preferred_language: orgLang,
+          address_line1: orgAddress.trim() || null,
+        });
+        setOrgs((prev) =>
+          prev.map((o) =>
+            o.id === createdOrgId ? { ...o, name: orgName.trim(), preferred_language: orgLang } : o,
+          ),
+        );
+      } else {
+        const org = await createOrganization({
+          name: orgName.trim(), type: orgType, city: orgCity.trim(),
+          preferred_language: orgLang, address_line1: orgAddress.trim() || null,
+        });
+        setCreatedOrgId(org.id);
+        setOrgs((prev) => [...prev, org]);
+        if (!coordOrgId) setCoordOrgId(org.id);
+      }
       next();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create organization");
