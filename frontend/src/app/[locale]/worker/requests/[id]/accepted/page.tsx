@@ -6,10 +6,13 @@ import { ArrowLeft, Check, Circle } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "../../../../../../i18n/navigation";
 import {
+  cancelRelease,
+  fetchReplacementStatus,
   fetchRequest,
   fetchRequestResponses,
   releaseShift,
   withdrawRequest,
+  type ReplacementStatus,
 } from "../../../../../../lib/browser-api";
 import { formatWorkDate, locationLabel, roleSectorSubtitle } from "../../../../../../lib/format";
 import { RequestResponse, StaffingRequest } from "../../../../../../lib/types";
@@ -31,10 +34,12 @@ export default function WorkerRequestAcceptedPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Self-serve replacement (§2): the release sheet + the result once broadcast.
+  // Self-serve replacement (§2): the release sheet + the broadcast result.
   const [releaseSheet, setReleaseSheet] = useState(false);
   const [releaseReason, setReleaseReason] = useState<"sick" | "family" | "personal" | "other">("sick");
   const [released, setReleased] = useState(false);
+  const [replacementId, setReplacementId] = useState<string | null>(null);
+  const [replStatus, setReplStatus] = useState<ReplacementStatus | null>(null);
 
   useEffect(() => {
     if (!worker || !requestId) return;
@@ -58,6 +63,24 @@ export default function WorkerRequestAcceptedPage() {
     })();
     return () => { alive = false; };
   }, [worker, requestId]);
+
+  // Poll the release status while waiting for a claim (no realtime — §1 polling
+  // enhancement). Stops once it's filled.
+  useEffect(() => {
+    if (!released || !replacementId || replStatus?.filled) return;
+    let alive = true;
+    const poll = async () => {
+      try {
+        const s = await fetchReplacementStatus(replacementId);
+        if (alive) setReplStatus(s);
+      } catch {
+        /* transient — keep polling */
+      }
+    };
+    void poll();
+    const interval = setInterval(poll, 5000);
+    return () => { alive = false; clearInterval(interval); };
+  }, [released, replacementId, replStatus?.filled]);
 
   if (!worker) return null;
 
@@ -112,7 +135,8 @@ export default function WorkerRequestAcceptedPage() {
     setBusy(true);
     setError(null);
     try {
-      await releaseShift(request.id, releaseReason);
+      const replacement = await releaseShift(request.id, releaseReason);
+      setReplacementId(replacement.id);
       setReleased(true);
       setReleaseSheet(false);
     } catch (err) {
@@ -122,8 +146,25 @@ export default function WorkerRequestAcceptedPage() {
     }
   }
 
+  async function handleCancelRelease() {
+    if (!replacementId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await cancelRelease(replacementId);
+      setReleased(false);
+      setReplacementId(null);
+      setReplStatus(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Cancel failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // You can release a held shift that hasn't started yet (§2).
   const canRelease = isAssignedToMe && !isShiftStarted && !isClosed && !released;
+  const replFilled = replStatus?.filled === true;
 
   return (
     <div style={{ paddingBottom: 32 }}>
@@ -222,9 +263,44 @@ export default function WorkerRequestAcceptedPage() {
         <p style={{ margin: "8px 0 0", color: "var(--rose)", fontWeight: 600, fontSize: 13 }}>{error}</p>
       )}
 
-      {/* Self-serve replacement — broadcast confirmation (§7: still yours until claimed) */}
-      {released && (
-        <Notice tone="moss">{t("released")}</Notice>
+      {/* Self-serve replacement — waiting / filled (§6 ReplacementWaiting) */}
+      {released && replFilled && (
+        <Notice tone="moss">
+          {t("replFilled", { name: replStatus?.claimed_by_name ?? t("replSomeone") })}
+        </Notice>
+      )}
+      {released && !replFilled && (
+        <section style={{
+          background: "var(--card)",
+          border: "0.5px solid var(--line)",
+          borderRadius: 18,
+          padding: 18,
+          marginBottom: 8,
+        }}>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 18, marginBottom: 4 }}>
+            {t("replWaitingTitle")}
+          </div>
+          <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
+            {t("replWaitingSub")}
+          </p>
+          <div style={{ display: "flex", gap: 18, marginBottom: 14 }}>
+            <Tally value={replStatus?.alerted ?? 0} label={t("replAlerted")} />
+            <Tally value={replStatus?.viewed ?? 0} label={t("replViewed")} />
+          </div>
+          <button
+            type="button"
+            onClick={handleCancelRelease}
+            disabled={busy}
+            style={{
+              width: "100%", minHeight: 44, borderRadius: 14,
+              border: "0.5px solid var(--line)", background: "transparent",
+              color: "var(--ink-2)", fontSize: 14, fontWeight: 600,
+              cursor: busy ? "wait" : "pointer", fontFamily: "inherit",
+            }}
+          >
+            {t("replCancel")}
+          </button>
+        </section>
       )}
 
       {/* Self-serve replacement — trigger + confirm sheet (§2) */}
@@ -424,6 +500,15 @@ function Notice({ tone, children }: { tone: "moss" | "muted"; children: React.Re
       fontWeight: 500,
     }}>
       {children}
+    </div>
+  );
+}
+
+function Tally({ value, label }: { value: number; label: string }) {
+  return (
+    <div>
+      <Mono style={{ fontSize: 24, fontWeight: 600 }}>{value}</Mono>
+      <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>{label}</div>
     </div>
   );
 }

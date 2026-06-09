@@ -257,7 +257,12 @@
       "declineConfirm": "Envoyer le refus",
       "decliningProgress": "Envoi…",
       "cancel": "Annuler",
-      "modifiedBanner": "Ce quart a été modifié depuis votre dernière consultation — veuillez revoir les détails ci-dessous."
+      "modifiedBanner": "Ce quart a été modifié depuis votre dernière consultation — veuillez revoir les détails ci-dessous.",
+      "replacementRace": "Premier arrivé, premier servi — prenez-le avant quelqu'un d'autre.",
+      "replacementWon": "C'est à vous — voir les détails de votre quart.",
+      "replacementLost": "Déjà comblé. Quelqu'un a été plus rapide — on vous alertera au prochain quart.",
+      "claimCta": "Je le prends",
+      "claiming": "En cours…"
     },
     "requestAccepted": {
       "back": "Retour",
@@ -284,7 +289,14 @@
       "reason_other": "Autre",
       "releaseCancel": "Annuler",
       "releaseConfirm": "Diffuser",
-      "releaseBusy": "Diffusion…"
+      "releaseBusy": "Diffusion…",
+      "replWaitingTitle": "Recherche d'une suppléance",
+      "replWaitingSub": "Les remplaçant(e)s admissibles ont été alerté(e)s. Le quart reste à vous tant que personne ne l'a pris.",
+      "replAlerted": "alerté(e)s",
+      "replViewed": "vu",
+      "replCancel": "Annuler — garder mon quart",
+      "replFilled": "{name} a pris le quart — vous êtes libéré(e). Merci d'avoir prévenu.",
+      "replSomeone": "Quelqu'un"
     },
     "profile": {
       "language": "Langue",

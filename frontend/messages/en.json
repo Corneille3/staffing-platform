@@ -257,7 +257,12 @@
       "declineConfirm": "Send decline",
       "decliningProgress": "Sending…",
       "cancel": "Cancel",
-      "modifiedBanner": "This shift was updated since you last viewed it — please review the details below."
+      "modifiedBanner": "This shift was updated since you last viewed it — please review the details below.",
+      "replacementRace": "First come, first served — claim it before someone else does.",
+      "replacementWon": "It's yours — see your shift details.",
+      "replacementLost": "Already covered. Someone got there first — we'll alert you for the next shift.",
+      "claimCta": "I'll take it",
+      "claiming": "Claiming…"
     },
     "requestAccepted": {
       "back": "Back",
@@ -284,7 +289,14 @@
       "reason_other": "Other",
       "releaseCancel": "Cancel",
       "releaseConfirm": "Broadcast",
-      "releaseBusy": "Broadcasting…"
+      "releaseBusy": "Broadcasting…",
+      "replWaitingTitle": "Looking for a replacement",
+      "replWaitingSub": "Eligible substitutes have been alerted. The shift is still yours until someone takes it.",
+      "replAlerted": "alerted",
+      "replViewed": "viewed",
+      "replCancel": "Cancel — keep my shift",
+      "replFilled": "{name} took the shift — you're free. Thanks for giving notice.",
+      "replSomeone": "Someone"
     },
     "profile": {
       "language": "Language",

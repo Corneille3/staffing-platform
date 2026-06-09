@@ -497,6 +497,10 @@ export type StaffingRequest = {
   start_time: string;
   end_time: string;
   status: string;
+  origin?: "coordinator" | "worker_replacement" | "staff_absence";
+  auto_assign?: boolean;
+  replaces_assignment_id?: string | null;
+  release_reason?: string | null;
   urgency_level: number;
   language_requirement: string | null;
   coverage_type: "same_day_urgent" | "planned_absence" | "recurring" | "emergency" | null;

@@ -403,6 +403,31 @@ export async function releaseShift(
   return postJson<StaffingRequest>(`/api/v1/requests/${requestId}/release`, { reason });
 }
 
+/** Self-serve replacement (§3): claim an open replacement. Resolves to the new
+ * assignment on win; throws (409 already_filled / 403 not eligible) otherwise. */
+export async function claimShift(requestId: string): Promise<Assignment> {
+  return postJson<Assignment>(`/api/v1/requests/${requestId}/claim`, {});
+}
+
+/** Self-serve replacement (§7): the giver cancels their release before a claim. */
+export async function cancelRelease(requestId: string): Promise<StaffingRequest> {
+  return postJson<StaffingRequest>(`/api/v1/requests/${requestId}/cancel-release`, {});
+}
+
+export type ReplacementStatus = {
+  request_id: string;
+  status: string;
+  alerted: number;
+  viewed: number;
+  filled: boolean;
+  claimed_by_name: string | null;
+};
+
+/** Live tally + filled state for the giver's waiting screen (§6). */
+export async function fetchReplacementStatus(requestId: string): Promise<ReplacementStatus> {
+  return getJson<ReplacementStatus>(`/api/v1/requests/${requestId}/replacement-status`);
+}
+
 export async function updateAvailability(
   workerId: string,
   status: "available" | "unavailable",
