@@ -90,7 +90,15 @@ export default async function SignUpPage({
             Dev (no Clerk key): the widget would crash outside ClerkProvider,
             so render a placeholder — keeps the page verifiable locally. */}
         {CLERK_ENABLED ? (
-          <SignUp path={`/${locale}/sign-up`} signInUrl={`/${locale}/sign-in`} />
+          // fallbackRedirectUrl → the locale root, whose page routes by DB role
+          // (a new tenant admin lands on /apf → /welcome, a coordinator on /admin,
+          // a substitute on /worker/onboarding). Never hardcode a surface here:
+          // invited users of every role sign up through this widget.
+          <SignUp
+            path={`/${locale}/sign-up`}
+            signInUrl={`/${locale}/sign-in`}
+            fallbackRedirectUrl={`/${locale}`}
+          />
         ) : (
           <div
             style={{

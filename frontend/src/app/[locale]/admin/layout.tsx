@@ -1,4 +1,5 @@
 import React from "react";
+import { redirect } from "next/navigation";
 import { Search, Bell, User as UserIcon } from "lucide-react";
 import { AdminNavigation } from "../../../components/admin-navigation";
 import { AdminOrgSwitcher } from "../../../components/admin-org-switcher";
@@ -42,6 +43,21 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   if (CLERK_ENABLED && suspended) {
     return <WorkspaceSuspendedScreen />;
+  }
+
+  // A tenant admin whose network hasn't finished onboarding belongs in the
+  // setup wizard, not the coordinator surface. Mirrors the /apf guard so a
+  // network_admin who lands on /admin (e.g. via a stale Clerk after-sign-in
+  // URL or any premature route) is sent to /welcome instead of being stranded
+  // here. org_admins only exist post-onboarding; a platform operator visiting
+  // via grant is platform_admin, not network_admin — so neither trips this.
+  if (
+    CLERK_ENABLED &&
+    sessionRole === "network_admin" &&
+    tenantProfile &&
+    tenantProfile.status !== "active"
+  ) {
+    redirect("/welcome");
   }
   const viaGrant = tenantProfile?.via_grant === true;
 

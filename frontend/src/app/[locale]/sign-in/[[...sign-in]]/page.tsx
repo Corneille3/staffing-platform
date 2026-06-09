@@ -90,7 +90,15 @@ export default async function SignInPage({
             Dev (no Clerk key): the widget would crash outside ClerkProvider,
             so render a placeholder — keeps the page verifiable locally. */}
         {CLERK_ENABLED ? (
-          <SignIn path={`/${locale}/sign-in`} signUpUrl={`/${locale}/sign-up`} />
+          // fallbackRedirectUrl → the locale root, whose page routes by DB role
+          // (/apf → /welcome for a new tenant admin, /admin for a coordinator,
+          // /worker for a substitute). Never hardcode a surface here: this widget
+          // serves every role. Fallback (not force) preserves ?redirect_url deep links.
+          <SignIn
+            path={`/${locale}/sign-in`}
+            signUpUrl={`/${locale}/sign-up`}
+            fallbackRedirectUrl={`/${locale}`}
+          />
         ) : (
           <div
             style={{
