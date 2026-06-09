@@ -1,10 +1,10 @@
 {
   "common": {
-    "loading": "Loading\u2026",
+    "loading": "Loading…",
     "add": "Add",
     "cancel": "Cancel",
     "save": "Save",
-    "saving": "Saving\u2026",
+    "saving": "Saving…",
     "saved": "Saved",
     "remove": "Remove",
     "signOut": "Sign out",
@@ -60,7 +60,7 @@
       "chipDeclined": "Declined",
       "iCanTakeIt": "I can take it",
       "waitingForConfirmation": "Waiting for confirmation",
-      "modifiedBanner": "Updated \u2014 please review"
+      "modifiedBanner": "Updated — please review"
     },
     "schedule": {
       "noShifts": "No shifts",
@@ -77,7 +77,7 @@
       "arrivalCheckIn": "On arrival",
       "checkInHint": "Tap to check in when you arrive on site. Location is captured if granted.",
       "checkInCta": "Check in",
-      "checkingIn": "Checking in\u2026",
+      "checkingIn": "Checking in…",
       "checkedIn": "Checked in"
     },
     "notifications": {
@@ -111,16 +111,16 @@
       "welcomeBlurb": "Pick the cities you can cover. Coordinators only see you for requests in these places.",
       "citiesTitle": "Cities you can cover",
       "citiesHint": "Add every city you can realistically commute to.",
-      "cityPlaceholder": "City name\u2026",
+      "cityPlaceholder": "City name…",
       "credentialsTitlePre": "Your",
       "credentialsTitleAccent": "credentials",
       "credentialsBlurb": "Add what you hold. Coordinators filter on these when a request has specific requirements.",
       "qualificationsTitle": "Qualifications",
       "qualificationsHint": "Diplomas and training (e.g. ECE_LEVEL_1).",
-      "qualificationPlaceholder": "Add a qualification\u2026",
+      "qualificationPlaceholder": "Add a qualification…",
       "certificationsTitle": "Certifications",
       "certificationsHint": "Active certifications (e.g. FIRST_AID).",
-      "certificationPlaceholder": "Add a certification\u2026",
+      "certificationPlaceholder": "Add a certification…",
       "languagesTitlePre": "Your working",
       "languagesTitleAccent": "language",
       "languagesBlurb": "Pick the language you're comfortable working in. Coordinators match this against the request.",
@@ -132,7 +132,7 @@
       "countLanguagePending": "Pick one",
       "continue": "Continue",
       "finish": "Finish setup",
-      "saving": "Saving\u2026",
+      "saving": "Saving…",
       "genericError": "Something went wrong."
     },
     "availability": {
@@ -144,7 +144,7 @@
       "preferredCities": "Preferred cities",
       "citiesInfo": "Only requests in these cities will be matched to you.",
       "noCities": "No cities added yet.",
-      "addCityPlaceholder": "Add a city\u2026",
+      "addCityPlaceholder": "Add a city…",
       "preferences": "Preferences",
       "urgentAlerts": "Urgent alerts",
       "urgentAlertsSub": "Notify me for same-day requests",
@@ -181,7 +181,7 @@
       "unavailableNotice": "You are unavailable. Set your availability to receive new requests.",
       "filledByOther": "This request has been filled by another substitute.",
       "confirmModalSub": "Your response will be sent to the coordinator for final confirmation.",
-      "declineModalSub": "{title} \u00b7 {city} \u00b7 {date}",
+      "declineModalSub": "{title} · {city} · {date}",
       "subtitleNew": "Pick a shift that matches your skills and location.",
       "subtitleAccepted": "Your responses are being reviewed by coordinators.",
       "tabAll": "All",
@@ -196,8 +196,8 @@
       "declinedCount": "Declined ({n})",
       "filledCount": "Filled ({n})",
       "noPending": "No pending requests.",
-      "responseReceived": "Response received \u00b7 Awaiting confirmation.",
-      "responseSent": "Response sent \u00b7 Awaiting coordinator.",
+      "responseReceived": "Response received · Awaiting confirmation.",
+      "responseSent": "Response sent · Awaiting coordinator.",
       "reasonPrefix": "Reason: ",
       "iCanTakeIt": "I can take it",
       "decline": "Decline",
@@ -240,7 +240,7 @@
       "location": "Location",
       "iCanTakeIt": "I can take it",
       "cant": "Can't",
-      "loading": "Loading\u2026",
+      "loading": "Loading…",
       "notFound": "Request not found.",
       "filled": "This request has been filled.",
       "alreadyAccepted": "You've accepted this shift. The coordinator will confirm soon.",
@@ -255,9 +255,14 @@
       },
       "declineNotesPlaceholder": "Anything else the coordinator should know? (optional)",
       "declineConfirm": "Send decline",
-      "decliningProgress": "Sending\u2026",
+      "decliningProgress": "Sending…",
       "cancel": "Cancel",
-      "modifiedBanner": "This shift was updated since you last viewed it \u2014 please review the details below."
+      "modifiedBanner": "This shift was updated since you last viewed it — please review the details below.",
+      "replacementRace": "First come, first served — claim it before someone else does.",
+      "replacementWon": "It's yours — see your shift details.",
+      "replacementLost": "Already covered. Someone got there first — we'll alert you for the next shift.",
+      "claimCta": "I'll take it",
+      "claiming": "Claiming…"
     },
     "requestAccepted": {
       "back": "Back",
@@ -269,11 +274,29 @@
       "timelineConfirmed": "Confirmed",
       "timelineShiftStarts": "Shift starts",
       "withdraw": "Withdraw response",
-      "withdrawing": "Withdrawing\u2026",
-      "loading": "Loading\u2026",
+      "withdrawing": "Withdrawing…",
+      "loading": "Loading…",
       "notFound": "Response not found.",
       "alreadyAssigned": "This shift is confirmed. Withdraw is no longer available.",
-      "withdrawn": "You've withdrawn this response."
+      "withdrawn": "You've withdrawn this response.",
+      "released": "Broadcast to the pool. The shift is still yours until someone claims it — you'll be notified the moment it's covered.",
+      "releaseCta": "I need a replacement",
+      "releaseSheetTitle": "Release this shift?",
+      "releaseSheetSub": "We'll alert eligible substitutes. The first to accept takes it — and it stays yours until then.",
+      "reason_sick": "Sick",
+      "reason_family": "Family",
+      "reason_personal": "Personal",
+      "reason_other": "Other",
+      "releaseCancel": "Cancel",
+      "releaseConfirm": "Broadcast",
+      "releaseBusy": "Broadcasting…",
+      "replWaitingTitle": "Looking for a replacement",
+      "replWaitingSub": "Eligible substitutes have been alerted. The shift is still yours until someone takes it.",
+      "replAlerted": "alerted",
+      "replViewed": "viewed",
+      "replCancel": "Cancel — keep my shift",
+      "replFilled": "{name} took the shift — you're free. Thanks for giving notice.",
+      "replSomeone": "Someone"
     },
     "profile": {
       "language": "Language",
@@ -293,22 +316,22 @@
     "signIn": {
       "eyebrow": "Welcome back",
       "title": "Sign in to <em>Staffig</em>",
-      "blurb": "Staffig is invite-only \u2014 use the email your coordinator used to invite you."
+      "blurb": "Staffig is invite-only — use the email your coordinator used to invite you."
     },
     "signUp": {
       "eyebrow": "You were invited",
       "title": "Create your <em>account</em>",
-      "blurb": "Use the same email address your coordinator invited you with \u2014 it links your account automatically."
+      "blurb": "Use the same email address your coordinator invited you with — it links your account automatically."
     },
     "notInvited": {
-      "eyebrow": "Hold on \u2014",
+      "eyebrow": "Hold on —",
       "title": "You haven't been <em>invited yet</em>.",
-      "blurb": "Staffig is invite-only \u2014 coordinators add substitutes one at a time so the right people get the right shifts.",
+      "blurb": "Staffig is invite-only — coordinators add substitutes one at a time so the right people get the right shifts.",
       "signedInAs": "You signed in as <strong>{email}</strong>, but we don't have a record of that address.",
       "noRecord": "We don't have a record of the address you signed in with.",
       "twoWays": "Two ways forward",
       "way1Title": "Sign in with a different account.",
-      "way1Body": "If your coordinator invited you, they used a specific email \u2014 check it.",
+      "way1Body": "If your coordinator invited you, they used a specific email — check it.",
       "way2Title": "Ask your organization to invite you.",
       "way2Body": "Send them this address and they'll add you from their Staffig account.",
       "cta": "Try a different account"

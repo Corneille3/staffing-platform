@@ -112,6 +112,7 @@ class WorkerService:
             user_id=user.id,
             tenant_id=tenant_id,
             role=UserRole.WORKER,
+            employment_type=payload.employment_type,
         ))
 
         self.audit_service.log(

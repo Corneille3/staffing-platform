@@ -6,9 +6,13 @@ import { ArrowLeft, Check, Circle } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "../../../../../../i18n/navigation";
 import {
+  cancelRelease,
+  fetchReplacementStatus,
   fetchRequest,
   fetchRequestResponses,
+  releaseShift,
   withdrawRequest,
+  type ReplacementStatus,
 } from "../../../../../../lib/browser-api";
 import { formatWorkDate, locationLabel, roleSectorSubtitle } from "../../../../../../lib/format";
 import { RequestResponse, StaffingRequest } from "../../../../../../lib/types";
@@ -30,6 +34,12 @@ export default function WorkerRequestAcceptedPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Self-serve replacement (§2): the release sheet + the broadcast result.
+  const [releaseSheet, setReleaseSheet] = useState(false);
+  const [releaseReason, setReleaseReason] = useState<"sick" | "family" | "personal" | "other">("sick");
+  const [released, setReleased] = useState(false);
+  const [replacementId, setReplacementId] = useState<string | null>(null);
+  const [replStatus, setReplStatus] = useState<ReplacementStatus | null>(null);
 
   useEffect(() => {
     if (!worker || !requestId) return;
@@ -53,6 +63,24 @@ export default function WorkerRequestAcceptedPage() {
     })();
     return () => { alive = false; };
   }, [worker, requestId]);
+
+  // Poll the release status while waiting for a claim (no realtime — §1 polling
+  // enhancement). Stops once it's filled.
+  useEffect(() => {
+    if (!released || !replacementId || replStatus?.filled) return;
+    let alive = true;
+    const poll = async () => {
+      try {
+        const s = await fetchReplacementStatus(replacementId);
+        if (alive) setReplStatus(s);
+      } catch {
+        /* transient — keep polling */
+      }
+    };
+    void poll();
+    const interval = setInterval(poll, 5000);
+    return () => { alive = false; clearInterval(interval); };
+  }, [released, replacementId, replStatus?.filled]);
 
   if (!worker) return null;
 
@@ -101,6 +129,42 @@ export default function WorkerRequestAcceptedPage() {
       setBusy(false);
     }
   }
+
+  async function handleRelease() {
+    if (!request) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const replacement = await releaseShift(request.id, releaseReason);
+      setReplacementId(replacement.id);
+      setReleased(true);
+      setReleaseSheet(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Release failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleCancelRelease() {
+    if (!replacementId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await cancelRelease(replacementId);
+      setReleased(false);
+      setReplacementId(null);
+      setReplStatus(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Cancel failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // You can release a held shift that hasn't started yet (§2).
+  const canRelease = isAssignedToMe && !isShiftStarted && !isClosed && !released;
+  const replFilled = replStatus?.filled === true;
 
   return (
     <div style={{ paddingBottom: 32 }}>
@@ -197,6 +261,139 @@ export default function WorkerRequestAcceptedPage() {
 
       {error && (
         <p style={{ margin: "8px 0 0", color: "var(--rose)", fontWeight: 600, fontSize: 13 }}>{error}</p>
+      )}
+
+      {/* Self-serve replacement — waiting / filled (§6 ReplacementWaiting) */}
+      {released && replFilled && (
+        <Notice tone="moss">
+          {t("replFilled", { name: replStatus?.claimed_by_name ?? t("replSomeone") })}
+        </Notice>
+      )}
+      {released && !replFilled && (
+        <section style={{
+          background: "var(--card)",
+          border: "0.5px solid var(--line)",
+          borderRadius: 18,
+          padding: 18,
+          marginBottom: 8,
+        }}>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 18, marginBottom: 4 }}>
+            {t("replWaitingTitle")}
+          </div>
+          <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
+            {t("replWaitingSub")}
+          </p>
+          <div style={{ display: "flex", gap: 18, marginBottom: 14 }}>
+            <Tally value={replStatus?.alerted ?? 0} label={t("replAlerted")} />
+            <Tally value={replStatus?.viewed ?? 0} label={t("replViewed")} />
+          </div>
+          <button
+            type="button"
+            onClick={handleCancelRelease}
+            disabled={busy}
+            style={{
+              width: "100%", minHeight: 44, borderRadius: 14,
+              border: "0.5px solid var(--line)", background: "transparent",
+              color: "var(--ink-2)", fontSize: 14, fontWeight: 600,
+              cursor: busy ? "wait" : "pointer", fontFamily: "inherit",
+            }}
+          >
+            {t("replCancel")}
+          </button>
+        </section>
+      )}
+
+      {/* Self-serve replacement — trigger + confirm sheet (§2) */}
+      {canRelease && !releaseSheet && (
+        <button
+          type="button"
+          onClick={() => setReleaseSheet(true)}
+          style={{
+            width: "100%",
+            marginTop: 8,
+            border: "0.5px solid var(--terra)",
+            borderRadius: 14,
+            padding: "14px 18px",
+            background: "transparent",
+            color: "var(--terra)",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            minHeight: 44,
+          }}
+        >
+          {t("releaseCta")}
+        </button>
+      )}
+
+      {canRelease && releaseSheet && (
+        <section style={{
+          marginTop: 8,
+          background: "var(--card)",
+          border: "0.5px solid var(--line)",
+          borderRadius: 18,
+          padding: 18,
+        }}>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 18, marginBottom: 4 }}>
+            {t("releaseSheetTitle")}
+          </div>
+          <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
+            {t("releaseSheetSub")}
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+            {(["sick", "family", "personal", "other"] as const).map((r) => {
+              const active = releaseReason === r;
+              return (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setReleaseReason(r)}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 99,
+                    border: `0.5px solid ${active ? "transparent" : "var(--line)"}`,
+                    background: active ? "var(--ink)" : "#fff",
+                    color: active ? "var(--paper)" : "var(--ink)",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    minHeight: 40,
+                  }}
+                >
+                  {t(`reason_${r}`)}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              type="button"
+              onClick={() => setReleaseSheet(false)}
+              disabled={busy}
+              style={{
+                flex: 1, minHeight: 44, borderRadius: 14, border: "0.5px solid var(--line)",
+                background: "transparent", color: "var(--ink-2)", fontSize: 14, fontWeight: 600,
+                cursor: busy ? "wait" : "pointer", fontFamily: "inherit",
+              }}
+            >
+              {t("releaseCancel")}
+            </button>
+            <button
+              type="button"
+              onClick={handleRelease}
+              disabled={busy}
+              style={{
+                flex: 1, minHeight: 44, borderRadius: 14, border: "none",
+                background: "var(--terra)", color: "#fff", fontSize: 14, fontWeight: 600,
+                cursor: busy ? "wait" : "pointer", opacity: busy ? 0.6 : 1, fontFamily: "inherit",
+              }}
+            >
+              {busy ? t("releaseBusy") : t("releaseConfirm")}
+            </button>
+          </div>
+        </section>
       )}
 
       {/* Withdraw */}
@@ -303,6 +500,15 @@ function Notice({ tone, children }: { tone: "moss" | "muted"; children: React.Re
       fontWeight: 500,
     }}>
       {children}
+    </div>
+  );
+}
+
+function Tally({ value, label }: { value: number; label: string }) {
+  return (
+    <div>
+      <Mono style={{ fontSize: 24, fontWeight: 600 }}>{value}</Mono>
+      <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>{label}</div>
     </div>
   );
 }

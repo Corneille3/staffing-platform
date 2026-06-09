@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
@@ -8,10 +9,76 @@ from app.auth.scope import AccessScope, get_access_scope
 from app.models.enums import ResponseStatus
 from app.repositories.response_repository import ResponseRepository
 from app.repositories.staffing_request_repository import StaffingRequestRepository
+from app.schemas.assignment import AssignmentRead
 from app.schemas.request_response import RequestResponseAction, RequestResponseRead
+from app.schemas.staffing_request import StaffingRequestRead
+from app.services.matching_service import MatchingService
+from app.services.replacement_service import ReplacementService
 from app.services.response_service import ResponseService
 
+
+class RequestRelease(BaseModel):
+    reason: str | None = None  # sick | family | personal | other
+
+
 router = APIRouter()
+
+
+@router.post('/{request_id}/release')
+def release_shift(
+    request_id: UUID,
+    payload: RequestRelease,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> StaffingRequestRead:
+    """Self-serve: the worker holding this shift releases it to the eligible
+    pool (SELF_SERVE_REPLACEMENT §2). Returns the new worker_replacement
+    request the pool will claim."""
+    replacement = ReplacementService(db).release(request_id, scope, payload.reason)
+    return StaffingRequestRead.model_validate(replacement)
+
+
+@router.post('/{request_id}/claim')
+def claim_shift(
+    request_id: UUID,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> AssignmentRead:
+    """A substitute claims an open replacement (§3). First-claim-wins; losers
+    get 409 ``already_filled``. Eligibility is re-checked at the moment of the
+    tap (§7) — availability may have changed since the broadcast."""
+    request = StaffingRequestRepository(db).get(request_id)
+    if request is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Shift not found.')
+    if not MatchingService(db=db).eligibility_result(request, scope.user).eligible:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='You are no longer eligible for this shift.',
+        )
+    assignment = ReplacementService(db).claim(request_id, scope.user.id, scope.tenant_id)
+    return AssignmentRead.model_validate(assignment)
+
+
+@router.post('/{request_id}/cancel-release')
+def cancel_release(
+    request_id: UUID,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> StaffingRequestRead:
+    """The giver cancels their own release before anyone claims (§7) — they
+    keep the shift."""
+    request = ReplacementService(db).cancel_release(request_id, scope)
+    return StaffingRequestRead.model_validate(request)
+
+
+@router.get('/{request_id}/replacement-status')
+def replacement_status(
+    request_id: UUID,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> dict:
+    """Live tally + filled state for the giver's waiting screen (§6)."""
+    return ReplacementService(db).replacement_status(request_id, scope)
 
 
 @router.get('/{request_id}/responses')

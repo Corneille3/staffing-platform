@@ -30,4 +30,9 @@ class Assignment(Base):
     checked_in_longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
     notes: Mapped[str | None] = mapped_column(Text)
 
-    staffing_request = relationship('StaffingRequest', back_populates='assignment')
+    # foreign_keys pinned: staffing_requests.replaces_assignment_id adds a second
+    # path between the tables, so the join column must be stated explicitly.
+    staffing_request = relationship(
+        'StaffingRequest', back_populates='assignment',
+        foreign_keys=[staffing_request_id],
+    )

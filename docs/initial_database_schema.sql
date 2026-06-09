@@ -6,13 +6,17 @@
 CREATE TYPE user_role AS ENUM ('apf_admin', 'org_admin', 'worker');
 CREATE TYPE organization_type AS ENUM ('childcare', 'long_term_care', 'community_care', 'home_care', 'assisted_living', 'other');
 CREATE TYPE request_type AS ENUM ('urgent_replacement', 'planned_replacement', 'open_staffing_need');
-CREATE TYPE request_status AS ENUM ('draft', 'open', 'notified', 'responses_received', 'assigned', 'completed', 'cancelled', 'expired');
+CREATE TYPE request_status AS ENUM ('draft', 'open', 'notified', 'responses_received', 'assigned', 'completed', 'cancelled', 'expired', 'pending_approval');
 CREATE TYPE response_status AS ENUM ('notified', 'viewed', 'accepted', 'declined', 'withdrawn', 'no_response');
-CREATE TYPE assignment_status AS ENUM ('pending_confirmation', 'confirmed', 'cancelled', 'completed');
+CREATE TYPE assignment_status AS ENUM ('pending_confirmation', 'confirmed', 'cancelled', 'completed', 'released');
 CREATE TYPE availability_status AS ENUM ('available', 'unavailable');
 CREATE TYPE notification_channel AS ENUM ('email', 'in_app', 'sms');
 CREATE TYPE request_requirement_type AS ENUM ('qualification', 'certification');
 CREATE TYPE coverage_type AS ENUM ('same_day_urgent', 'planned_absence', 'recurring', 'emergency');
+-- Self-serve replacement (SELF_SERVE_REPLACEMENT_HANDOFF §1, §5)
+CREATE TYPE request_origin AS ENUM ('coordinator', 'worker_replacement', 'staff_absence');
+CREATE TYPE employment_type AS ENUM ('permanent', 'contractor');
+CREATE TYPE replacement_policy AS ENUM ('auto', 'managed');
 
 -- Tables
 
@@ -33,6 +37,10 @@ CREATE TABLE organizations (
     capacity INTEGER,
     enrolled_count INTEGER,
     hours_label VARCHAR(120),
+    -- Self-serve replacement policy (SELF_SERVE_REPLACEMENT_HANDOFF §5)
+    replacement_policy replacement_policy NOT NULL DEFAULT 'auto',
+    replacement_allowed_roles JSONB NOT NULL DEFAULT '["educator","assistant_educator","psw","nurse"]'::jsonb,
+    min_release_lead_minutes INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -122,6 +130,11 @@ CREATE TABLE staffing_requests (
     contact_phone VARCHAR(50),
     contact_email VARCHAR(255),
     arrival_instructions TEXT,
+    -- Self-serve replacement (SELF_SERVE_REPLACEMENT_HANDOFF §1)
+    origin request_origin NOT NULL DEFAULT 'coordinator',
+    auto_assign BOOLEAN NOT NULL DEFAULT FALSE,
+    replaces_assignment_id UUID REFERENCES assignments(id) ON DELETE SET NULL,
+    release_reason VARCHAR(20),
     assigned_worker_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     assigned_at TIMESTAMPTZ,
     cancelled_at TIMESTAMPTZ,
