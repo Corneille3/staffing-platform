@@ -60,7 +60,8 @@
       "chipDeclined": "Décliné",
       "iCanTakeIt": "Je peux le prendre",
       "waitingForConfirmation": "En attente de confirmation",
-      "modifiedBanner": "Modifié — à revoir"
+      "modifiedBanner": "Modifié — à revoir",
+      "reportAbsence": "Signaler une absence"
     },
     "schedule": {
       "noShifts": "Aucun quart",
@@ -310,6 +311,35 @@
       "qualifications": "Qualifications",
       "certifications": "Certifications",
       "urgentAlerts": "Alertes urgentes"
+    },
+    "absence": {
+      "back": "Retour",
+      "title": "Signaler une absence",
+      "sub": "Vous ne pouvez pas assurer un quart à venir ? Décrivez-le et nous chercherons une suppléance dans le bassin.",
+      "loading": "Chargement…",
+      "required": "Le site, le rôle et la date sont requis.",
+      "noSites": "Aucun site n'est encore configuré pour la suppléance en libre-service.",
+      "site": "Site",
+      "role": "Rôle à couvrir",
+      "date": "Date",
+      "start": "Début",
+      "end": "Fin",
+      "reason": "Raison",
+      "reason_sick": "Maladie",
+      "reason_family": "Famille",
+      "reason_personal": "Personnel",
+      "reason_other": "Autre",
+      "note": "Note (facultatif)",
+      "notePlaceholder": "Ce que la suppléance devrait savoir…",
+      "submit": "Signaler et diffuser",
+      "submitting": "Diffusion…",
+      "waitingTitle": "Recherche d'une suppléance",
+      "waitingSub": "Les remplaçant(e)s admissibles ont été alerté(e)s.",
+      "alerted": "alerté(e)s",
+      "viewed": "vu",
+      "cancel": "Annuler ce signalement",
+      "filled": "{name} couvre le quart — merci d'avoir prévenu.",
+      "someone": "Quelqu'un"
     }
   },
   "edge": {

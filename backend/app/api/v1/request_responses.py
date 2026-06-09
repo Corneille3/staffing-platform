@@ -10,6 +10,7 @@ from app.models.enums import ResponseStatus
 from app.repositories.response_repository import ResponseRepository
 from app.repositories.staffing_request_repository import StaffingRequestRepository
 from app.schemas.assignment import AssignmentRead
+from app.schemas.replacement import AbsenceReportCreate
 from app.schemas.request_response import RequestResponseAction, RequestResponseRead
 from app.schemas.staffing_request import StaffingRequestRead
 from app.services.matching_service import MatchingService
@@ -22,6 +23,28 @@ class RequestRelease(BaseModel):
 
 
 router = APIRouter()
+
+
+@router.get('/report-absence/options')
+def absence_report_options(
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> dict:
+    """Sites (the worker's tenant orgs) + each site's allowed roles, for the
+    permanent-staff absence form (SELF_SERVE §1)."""
+    return {'sites': ReplacementService(db).absence_options(scope)}
+
+
+@router.post('/report-absence')
+def report_absence(
+    payload: AbsenceReportCreate,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> StaffingRequestRead:
+    """Permanent staff report a shift they'll miss → a staff_absence request
+    that broadcasts to the eligible pool (SELF_SERVE §1)."""
+    replacement = ReplacementService(db).report_absence(payload, scope)
+    return StaffingRequestRead.model_validate(replacement)
 
 
 @router.post('/{request_id}/release')

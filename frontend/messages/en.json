@@ -60,7 +60,8 @@
       "chipDeclined": "Declined",
       "iCanTakeIt": "I can take it",
       "waitingForConfirmation": "Waiting for confirmation",
-      "modifiedBanner": "Updated — please review"
+      "modifiedBanner": "Updated — please review",
+      "reportAbsence": "Report an absence"
     },
     "schedule": {
       "noShifts": "No shifts",
@@ -310,6 +311,35 @@
       "qualifications": "Qualifications",
       "certifications": "Certifications",
       "urgentAlerts": "Urgent alerts"
+    },
+    "absence": {
+      "back": "Back",
+      "title": "Report an absence",
+      "sub": "Can't make an upcoming shift? Describe it and we'll find a replacement from the pool.",
+      "loading": "Loading…",
+      "required": "Site, role and date are required.",
+      "noSites": "No sites are set up for self-serve replacement yet.",
+      "site": "Site",
+      "role": "Role to cover",
+      "date": "Date",
+      "start": "Start",
+      "end": "End",
+      "reason": "Reason",
+      "reason_sick": "Sick",
+      "reason_family": "Family",
+      "reason_personal": "Personal",
+      "reason_other": "Other",
+      "note": "Note (optional)",
+      "notePlaceholder": "Anything the replacement should know…",
+      "submit": "Report & broadcast",
+      "submitting": "Broadcasting…",
+      "waitingTitle": "Looking for a replacement",
+      "waitingSub": "Eligible substitutes have been alerted.",
+      "alerted": "alerted",
+      "viewed": "viewed",
+      "cancel": "Cancel this report",
+      "filled": "{name} is covering it — thank you for the notice.",
+      "someone": "Someone"
     }
   },
   "edge": {

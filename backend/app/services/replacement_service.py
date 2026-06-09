@@ -221,15 +221,101 @@ class ReplacementService:
         )
         self.db.commit()
         self.db.refresh(replacement)
-        # Alert the eligible pool. Managed → publish through the normal dispatch
-        # (status NOTIFIED; workers accept/decline, coordinator assigns). Auto →
-        # broadcast and stay OPEN so the atomic claim can win.
+        self._dispatch(replacement, managed)
+        return replacement
+
+    def _dispatch(self, replacement: StaffingRequest, managed: bool) -> None:
+        """Alert the eligible pool. Managed → publish through the normal dispatch
+        (status NOTIFIED; workers accept/decline, coordinator assigns). Auto →
+        broadcast and stay OPEN so the atomic claim can win."""
         if managed:
             StaffingRequestService(self.db).publish(replacement.id)
             self.db.refresh(replacement)
         else:
             self.broadcast(replacement)
+
+    def report_absence(self, payload, scope: AccessScope) -> StaffingRequest:
+        """Permanent-staff path (§0, §1): a worker whose schedule lives OUTSIDE
+        StaffiG describes a shift they'll miss. No held assignment to release —
+        this creates a staff_absence request and broadcasts it like a release.
+        """
+        from app.models.enums import RequestType  # local: avoid top-level churn
+
+        if scope.tenant_id is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, 'No tenant associated with your account.')
+        if payload.reason is not None and payload.reason not in RELEASE_REASONS:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, 'Unknown reason.')
+
+        org = self.db.get(Organization, payload.organization_id)
+        if org is None or org.tenant_id != scope.tenant_id:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, 'Out of scope.')
+        if payload.role.value not in (org.replacement_allowed_roles or []):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                'This role is not enabled for self-serve replacement.',
+            )
+
+        shift_start = datetime.combine(payload.work_date, payload.start_time, tzinfo=timezone.utc)
+        if (shift_start - datetime.now(timezone.utc)).total_seconds() / 60 < org.min_release_lead_minutes:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                'Too close to the shift start to report it.',
+            )
+
+        managed = org.replacement_policy == ReplacementPolicy.MANAGED
+        note = (payload.note or '').strip()
+        replacement = StaffingRequest(
+            id=uuid4(),
+            organization_id=org.id,
+            created_by_user_id=scope.user.id,
+            request_type=RequestType.PLANNED_REPLACEMENT,
+            role=payload.role,
+            status=RequestStatus.OPEN,
+            origin=RequestOrigin.STAFF_ABSENCE,
+            auto_assign=not managed,
+            replaces_assignment_id=None,  # permanent staff hold no StaffiG shift
+            release_reason=payload.reason,
+            title=note or 'Absence à couvrir',
+            description=note or None,
+            city=org.city,
+            work_date=payload.work_date,
+            start_time=payload.start_time,
+            end_time=payload.end_time,
+            language_requirement=org.preferred_language,
+        )
+        self.db.add(replacement)
+        self.db.flush()
+        self.audit_service.log(
+            action='replacement.absence_reported',
+            entity_type='staffing_request',
+            entity_id=replacement.id,
+            actor_user_id=scope.user.id,
+            organization_id=org.id,
+            payload={'reason': payload.reason, 'policy': org.replacement_policy.value},
+        )
+        self.db.commit()
+        self.db.refresh(replacement)
+        self._dispatch(replacement, managed)
         return replacement
+
+    def absence_options(self, scope: AccessScope) -> list[dict]:
+        """The sites a worker can report an absence at (their tenant's orgs) +
+        each site's self-serve-allowed roles, for the AbsenceReport form."""
+        if scope.tenant_id is None:
+            return []
+        orgs = self.db.scalars(select(Organization).where(
+            Organization.tenant_id == scope.tenant_id,
+            Organization.is_active.is_(True),
+        ).order_by(Organization.name))
+        return [
+            {
+                'id': str(o.id),
+                'name': o.name,
+                'city': o.city,
+                'allowed_roles': o.replacement_allowed_roles or [],
+            }
+            for o in orgs
+        ]
 
     def claim(self, request_id: UUID, claimer_user_id: UUID, tenant_id: UUID) -> Assignment:
         """Claim an open replacement. Exactly one concurrent caller wins (§3).
@@ -330,7 +416,7 @@ class ReplacementService:
         assignment was never touched). Works while it's still seeking a fill —
         OPEN (auto) or NOTIFIED/RESPONSES_RECEIVED (managed)."""
         request = self.db.get(StaffingRequest, request_id)
-        if request is None or request.origin != RequestOrigin.WORKER_REPLACEMENT:
+        if request is None or request.origin not in SELF_SERVE_ORIGINS:
             raise HTTPException(status.HTTP_404_NOT_FOUND, 'Replacement not found.')
         if request.created_by_user_id != scope.user.id:
             raise HTTPException(status.HTTP_403_FORBIDDEN, 'Only the giver can cancel this.')
@@ -357,7 +443,7 @@ class ReplacementService:
         """Compact status for the giver's waiting screen (§6 ReplacementWaiting):
         live tally + the filled state once someone claims."""
         request = self.db.get(StaffingRequest, request_id)
-        if request is None or request.origin != RequestOrigin.WORKER_REPLACEMENT:
+        if request is None or request.origin not in SELF_SERVE_ORIGINS:
             raise HTTPException(status.HTTP_404_NOT_FOUND, 'Replacement not found.')
         org = self.db.get(Organization, request.organization_id)
         if scope.tenant_id is None or org.tenant_id != scope.tenant_id:
