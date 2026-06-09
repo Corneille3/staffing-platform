@@ -5,6 +5,7 @@ import {
   AdminActivity,
   AdminActivityFilter,
   AdminOrganizationSite,
+  MyAbsenceItem,
   AdminRequestsResponse,
   AdminSubstitutesResponse,
   ApfActivity,
@@ -419,6 +420,11 @@ export async function cancelRelease(requestId: string): Promise<StaffingRequest>
 // Permanent-staff absence report (§1).
 export async function fetchAbsenceOptions(): Promise<{ sites: AbsenceSite[] }> {
   return getJson<{ sites: AbsenceSite[] }>("/api/v1/requests/report-absence/options");
+}
+
+/** The worker's own reported absences + live status (the report-absence hub). */
+export async function fetchMyAbsenceReports(): Promise<{ items: MyAbsenceItem[] }> {
+  return getJson<{ items: MyAbsenceItem[] }>("/api/v1/requests/report-absence/mine");
 }
 
 export async function reportAbsence(payload: {

@@ -19,6 +19,22 @@ class AbsenceReportCreate(BaseModel):
     note: str | None = Field(default=None, max_length=500)
 
 
+class MyAbsenceItem(BaseModel):
+    """A worker's own reported absence + its live status, so they can leave and
+    come back to see whether it was covered (the report-absence hub)."""
+    request_id: UUID
+    title: str
+    role: str | None = None
+    work_date: date
+    start_time: time
+    end_time: time
+    reason: str | None = None
+    status: str  # searching | filled | unfilled | cancelled
+    claimed_by_name: str | None = None
+    alerted: int
+    viewed: int
+
+
 class ReplacementFeedItem(BaseModel):
     request_id: UUID
     giver_name: str

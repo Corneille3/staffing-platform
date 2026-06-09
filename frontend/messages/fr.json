@@ -339,7 +339,13 @@
       "viewed": "vu",
       "cancel": "Annuler ce signalement",
       "filled": "{name} couvre le quart — merci d'avoir prévenu.",
-      "someone": "Quelqu'un"
+      "someone": "Quelqu'un",
+      "yourReports": "Vos absences signalées",
+      "reportAnother": "Signaler une absence",
+      "st_searching": "En recherche",
+      "st_filled": "Couvert par {name}",
+      "st_unfilled": "Non comblé",
+      "st_cancelled": "Annulé"
     }
   },
   "edge": {
