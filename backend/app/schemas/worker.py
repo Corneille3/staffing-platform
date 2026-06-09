@@ -35,6 +35,9 @@ class WorkerRead(BaseModel):
     phone: str | None = None
     preferred_language: str
     is_active: bool
+    # Drives which self-serve trigger the worker app shows (SELF_SERVE §1):
+    # contractor → release held shifts; permanent → report absences.
+    employment_type: EmploymentType = EmploymentType.CONTRACTOR
     profile: WorkerProfileRead | None = None
 
 

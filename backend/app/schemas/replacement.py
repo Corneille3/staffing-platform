@@ -5,7 +5,18 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import ReplacementPolicy
+from app.models.enums import ReplacementPolicy, RequestRole
+
+
+class AbsenceReportCreate(BaseModel):
+    """Permanent staff describe a shift they'll miss (SELF_SERVE §1)."""
+    organization_id: UUID
+    role: RequestRole
+    work_date: date
+    start_time: time
+    end_time: time
+    reason: str | None = None  # sick | family | personal | other
+    note: str | None = Field(default=None, max_length=500)
 
 
 class ReplacementFeedItem(BaseModel):

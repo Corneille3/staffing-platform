@@ -468,7 +468,15 @@ export type Worker = {
   email: string;
   preferred_language: string;
   is_active: boolean;
+  employment_type?: "permanent" | "contractor";
   profile: WorkerProfile | null;
+};
+
+export type AbsenceSite = {
+  id: string;
+  name: string;
+  city: string;
+  allowed_roles: string[];
 };
 
 export type OrganizationSummary = {

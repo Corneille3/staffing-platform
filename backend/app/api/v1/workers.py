@@ -4,9 +4,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from sqlalchemy import select
+
 from app.api.deps import get_db_session
 from app.auth.permissions import require_network_admin
 from app.auth.scope import AccessScope, get_access_scope
+from app.models.enums import EmploymentType
+from app.models.tenant_membership import TenantMembership
 from app.schemas.availability import (
     AvailabilityCellRead,
     AvailabilityCopyRequest,
@@ -26,7 +30,11 @@ from app.services.worker_service import WorkerService
 router = APIRouter()
 
 
-def _to_worker_read(worker) -> WorkerRead:
+def _to_worker_read(worker, db: Session) -> WorkerRead:
+    membership = db.scalar(select(TenantMembership).where(
+        TenantMembership.user_id == worker.id,
+        TenantMembership.is_active.is_(True),
+    ))
     return WorkerRead(
         id=worker.id,
         clerk_user_id=worker.clerk_user_id,
@@ -36,6 +44,7 @@ def _to_worker_read(worker) -> WorkerRead:
         phone=worker.phone,
         preferred_language=worker.preferred_language,
         is_active=worker.is_active,
+        employment_type=membership.employment_type if membership else EmploymentType.CONTRACTOR,
         profile=WorkerProfileRead.model_validate(worker.worker_profile) if worker.worker_profile else None,
     )
 
@@ -46,7 +55,7 @@ def list_workers(
     db: Session = Depends(get_db_session),
 ) -> dict[str, list[WorkerRead]]:
     workers = WorkerService(db).list_for_scope(scope)
-    return {'items': [_to_worker_read(worker) for worker in workers]}
+    return {'items': [_to_worker_read(worker, db) for worker in workers]}
 
 
 @router.post('/invite', status_code=201, dependencies=[Depends(require_network_admin)])
@@ -56,7 +65,7 @@ def invite_worker(
     db: Session = Depends(get_db_session),
 ) -> WorkerRead:
     worker = WorkerService(db).invite(payload, scope)
-    return _to_worker_read(worker)
+    return _to_worker_read(worker, db)
 
 
 @router.get('/{user_id}')
@@ -70,7 +79,7 @@ def get_worker(
     worker = WorkerService(db).get(user_id)
     if worker is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Worker not found')
-    return _to_worker_read(worker)
+    return _to_worker_read(worker, db)
 
 
 @router.post('/{user_id}/onboard', status_code=201)

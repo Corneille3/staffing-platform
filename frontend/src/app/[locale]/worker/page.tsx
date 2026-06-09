@@ -172,6 +172,31 @@ export default function WorkerHome() {
         <p style={{ margin: "-12px 0 16px", fontSize: 12, color: "var(--rose)" }}>{preferenceError}</p>
       )}
 
+      {/* Permanent staff: report an absence (their schedule lives outside StaffiG,
+          so there's no held shift to release — they describe the shift). */}
+      {worker.employment_type === "permanent" && (
+        <Link
+          href="/worker/report-absence"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "12px 14px",
+            background: "var(--card)",
+            border: "0.5px solid var(--terra)",
+            borderRadius: 14,
+            marginBottom: 20,
+            textDecoration: "none",
+            color: "var(--terra)",
+            fontSize: 14,
+            fontWeight: 600,
+          }}
+        >
+          <Calendar size={16} />
+          {t("reportAbsence")}
+        </Link>
+      )}
+
       {/* Tabs */}
       <div style={{ display: "flex", gap: 0, marginBottom: 12, borderBottom: "0.5px solid var(--line)" }}>
         {(["active", "history"] as const).map((tabKey) => {
