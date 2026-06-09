@@ -22,6 +22,7 @@ import {
   PlatformOperatorsResponse,
   PlatformSettings,
   PlatformTenantsResponse,
+  ReplacementFeed,
   RequestResponse,
   StaffingRequest,
   TenantAccessGrantsResponse,
@@ -285,6 +286,13 @@ export async function getTenantProfile(): Promise<TenantProfile> {
 
 export async function getApfSnapshot(): Promise<ApfSnapshot> {
   return fetchJson<ApfSnapshot>("/api/v1/apf/snapshot");
+}
+
+export async function getReplacementFeed(
+  status?: "live" | "history",
+): Promise<ReplacementFeed> {
+  const qs = status ? `?status=${status}` : "";
+  return fetchJson<ReplacementFeed>(`/api/v1/admin/replacements${qs}`);
 }
 
 export async function getApfActivity(

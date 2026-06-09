@@ -20,6 +20,7 @@ import {
   Organization,
   OrphanScanResult,
   PlatformOperator,
+  ReplacementPolicy,
   PlatformSettings,
   RequestResponse,
   SlotPeriod,
@@ -394,6 +395,60 @@ export async function withdrawRequest(
   });
 }
 
+/** Self-serve replacement (§2): release a held shift to the pool. Returns the
+ * new worker_replacement request the pool will claim. */
+export async function releaseShift(
+  requestId: string,
+  reason: "sick" | "family" | "personal" | "other" | null,
+): Promise<StaffingRequest> {
+  return postJson<StaffingRequest>(`/api/v1/requests/${requestId}/release`, { reason });
+}
+
+/** Self-serve replacement (§3): claim an open replacement. Resolves to the new
+ * assignment on win; throws (409 already_filled / 403 not eligible) otherwise. */
+export async function claimShift(requestId: string): Promise<Assignment> {
+  return postJson<Assignment>(`/api/v1/requests/${requestId}/claim`, {});
+}
+
+/** Self-serve replacement (§7): the giver cancels their release before a claim. */
+export async function cancelRelease(requestId: string): Promise<StaffingRequest> {
+  return postJson<StaffingRequest>(`/api/v1/requests/${requestId}/cancel-release`, {});
+}
+
+export type ReplacementStatus = {
+  request_id: string;
+  status: string;
+  alerted: number;
+  viewed: number;
+  filled: boolean;
+  claimed_by_name: string | null;
+};
+
+/** Live tally + filled state for the giver's waiting screen (§6). */
+export async function fetchReplacementStatus(requestId: string): Promise<ReplacementStatus> {
+  return getJson<ReplacementStatus>(`/api/v1/requests/${requestId}/replacement-status`);
+}
+
+// Per-org self-serve policy (§5) — coordinator settings.
+export async function fetchReplacementPolicy(organizationId: string): Promise<ReplacementPolicy> {
+  return getJson<ReplacementPolicy>(`/api/v1/admin/replacements/policy?organization_id=${organizationId}`);
+}
+
+export async function updateReplacementPolicy(
+  organizationId: string,
+  partial: { policy?: "auto" | "managed"; allowed_roles?: string[]; min_release_lead_minutes?: number },
+): Promise<ReplacementPolicy> {
+  return patchJson<ReplacementPolicy>(
+    `/api/v1/admin/replacements/policy?organization_id=${organizationId}`,
+    partial,
+  );
+}
+
+/** Housekeeping (§7): expire still-searching releases whose shift already started. */
+export async function sweepReplacements(): Promise<{ expired: number }> {
+  return postJson<{ expired: number }>("/api/v1/admin/replacements/sweep", {});
+}
+
 export async function updateAvailability(
   workerId: string,
   status: "available" | "unavailable",
@@ -425,6 +480,7 @@ export async function inviteWorker(payload: {
   email: string;
   phone?: string;
   preferred_language?: string;
+  employment_type?: "permanent" | "contractor";
 }): Promise<Worker> {
   return postJson<Worker>("/api/v1/workers/invite", payload);
 }

@@ -497,6 +497,10 @@ export type StaffingRequest = {
   start_time: string;
   end_time: string;
   status: string;
+  origin?: "coordinator" | "worker_replacement" | "staff_absence";
+  auto_assign?: boolean;
+  replaces_assignment_id?: string | null;
+  release_reason?: string | null;
   urgency_level: number;
   language_requirement: string | null;
   coverage_type: "same_day_urgent" | "planned_absence" | "recurring" | "emergency" | null;
@@ -694,6 +698,42 @@ export type OrphanScanResult = {
   /** False when the Clerk Backend API is unreachable — clerk_only is then unknown, not empty. */
   clerk_available: boolean;
   scanned_at: string;
+};
+
+// ── Self-serve replacement — coordinator surface ──────────────────────────────
+export type ReplacementFeedItem = {
+  request_id: string;
+  giver_name: string;
+  title: string;
+  work_date: string;
+  start_time: string;
+  end_time: string;
+  role: string | null;
+  reason: string | null;
+  status: "searching" | "filled" | "cancelled" | "unfilled";
+  claimer_name: string | null;
+  released_at: string;
+  time_to_fill_minutes: number | null;
+};
+
+export type ReplacementKpis = {
+  released_this_week: number;
+  filled: number;
+  avg_time_to_fill_minutes: number | null;
+  unfilled: number;
+};
+
+export type ReplacementFeed = {
+  kpis: ReplacementKpis;
+  items: ReplacementFeedItem[];
+};
+
+export type ReplacementPolicy = {
+  organization_id: string;
+  organization_name: string;
+  policy: "auto" | "managed";
+  allowed_roles: string[];
+  min_release_lead_minutes: number;
 };
 
 export type TenantProfile = {

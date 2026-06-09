@@ -4,7 +4,14 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import CoverageType, OrganizationType, RequestRole, RequestStatus, RequestType
+from app.models.enums import (
+    CoverageType,
+    OrganizationType,
+    RequestOrigin,
+    RequestRole,
+    RequestStatus,
+    RequestType,
+)
 from app.schemas.common import TimestampedSchema
 
 
@@ -84,6 +91,10 @@ class StaffingRequestStatusUpdate(BaseModel):
 class StaffingRequestRead(StaffingRequestBase, TimestampedSchema):
     id: UUID
     status: RequestStatus
+    origin: RequestOrigin = RequestOrigin.COORDINATOR
+    auto_assign: bool = False
+    replaces_assignment_id: UUID | None = None
+    release_reason: str | None = None
     assigned_worker_user_id: UUID | None = None
     assigned_at: datetime | None = None
     cancelled_at: datetime | None = None

@@ -60,6 +60,7 @@ export default function InviteWorkerPage() {
     email: "",
     phone: "",
     preferred_language: "fr",
+    employment_type: "contractor",
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +81,7 @@ export default function InviteWorkerPage() {
         email: form.email.trim(),
         phone: form.phone.trim() || undefined,
         preferred_language: form.preferred_language,
+        employment_type: form.employment_type as "permanent" | "contractor",
       });
       setCreated(worker);
     } catch (err) {
@@ -120,7 +122,7 @@ export default function InviteWorkerPage() {
               type="button"
               onClick={() => {
                 setCreated(null);
-                setForm({ first_name: "", last_name: "", email: "", phone: "", preferred_language: "fr" });
+                setForm({ first_name: "", last_name: "", email: "", phone: "", preferred_language: "fr", employment_type: "contractor" });
               }}
               style={SECONDARY_BTN}
             >
@@ -208,6 +210,21 @@ export default function InviteWorkerPage() {
             <option value="fr">French (FR)</option>
             <option value="en">English (EN)</option>
           </select>
+        </div>
+
+        <div>
+          <label style={LABEL}>Employment type</label>
+          <select
+            style={{ ...FIELD, appearance: "none" }}
+            value={form.employment_type}
+            onChange={(e) => set("employment_type", e.target.value)}
+          >
+            <option value="contractor">Contractor / on-call — releases held shifts</option>
+            <option value="permanent">Permanent staff — reports absences</option>
+          </select>
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--ink-3)", lineHeight: 1.4 }}>
+            Drives how they self-serve a replacement. Editable later on their profile.
+          </p>
         </div>
 
         {error && <p style={{ margin: 0, color: "var(--rose)", fontSize: 14 }}>{error}</p>}

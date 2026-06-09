@@ -7,6 +7,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "../../../../../i18n/navigation";
 import {
   acceptRequest,
+  claimShift,
   declineRequest,
   fetchRequest,
   fetchRequestEligibility,
@@ -45,6 +46,8 @@ export default function WorkerRequestDetailPage() {
   const [declineModalOpen, setDeclineModalOpen] = useState(false);
   const [declineReason, setDeclineReason] = useState<string>("");
   const [declineNotes, setDeclineNotes] = useState("");
+  // Self-serve replacement (§3): someone else grabbed it first.
+  const [lost, setLost] = useState(false);
 
   useEffect(() => {
     if (!worker || !requestId) return;
@@ -91,7 +94,13 @@ export default function WorkerRequestDetailPage() {
   const isFilled = FILLED_STATUSES.includes(request.status);
   const alreadyAccepted = myResponse?.status === "accepted";
   const alreadyDeclined = myResponse?.status === "declined";
-  const showCtas = !isFilled && !alreadyAccepted && !alreadyDeclined;
+  // Self-serve replacement: an AUTO release is claimed (first-come-first-served).
+  // A MANAGED release (auto_assign=false) is accepted/declined like any request —
+  // the coordinator picks who to assign — so it falls through to the normal CTAs.
+  const isAutoReplacement = request.origin === "worker_replacement" && request.auto_assign === true;
+  const wonByMe = request.status === "assigned" && request.assigned_worker_user_id === worker.id;
+  const canClaim = isAutoReplacement && !isFilled && !lost;
+  const showCtas = !isAutoReplacement && !isFilled && !alreadyAccepted && !alreadyDeclined;
 
   const subtitle = roleSectorSubtitle(request, locale);
   const dateLabel = formatWorkDate(request.work_date, locale);
@@ -126,8 +135,27 @@ export default function WorkerRequestDetailPage() {
     }
   }
 
+  async function handleClaim() {
+    if (!request) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await claimShift(request.id);
+      router.push(`/worker/requests/${request.id}/accepted`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Claim failed";
+      // "already_filled" → someone beat us to it (ReplacementLost), no error tone.
+      if (msg.includes("already_filled")) {
+        setLost(true);
+      } else {
+        setError(msg);
+      }
+      setBusy(false);
+    }
+  }
+
   return (
-    <div style={{ paddingBottom: showCtas ? 96 : 32 }}>
+    <div style={{ paddingBottom: showCtas || canClaim ? 96 : 32 }}>
       {/* Header with back arrow */}
       <div style={{ display: "flex", alignItems: "center", paddingTop: 16, marginBottom: 16 }}>
         <Link
@@ -302,7 +330,7 @@ export default function WorkerRequestDetailPage() {
       )}
 
       {/* State notices */}
-      {isFilled && (
+      {isFilled && !isAutoReplacement && (
         <Notice tone="muted">{t("filled")}</Notice>
       )}
       {alreadyAccepted && !isFilled && (
@@ -310,6 +338,27 @@ export default function WorkerRequestDetailPage() {
       )}
       {alreadyDeclined && !isFilled && (
         <Notice tone="muted">{t("alreadyDeclined")}</Notice>
+      )}
+
+      {/* Self-serve replacement — race / won / lost (§3) */}
+      {canClaim && (
+        <div style={{
+          margin: "0 0 8px",
+          padding: "10px 14px",
+          borderRadius: 12,
+          background: "var(--terra-soft)",
+          color: "var(--terra-ink)",
+          fontSize: 13,
+          fontWeight: 600,
+        }}>
+          {t("replacementRace")}
+        </div>
+      )}
+      {isAutoReplacement && wonByMe && (
+        <Notice tone="moss">{t("replacementWon")}</Notice>
+      )}
+      {isAutoReplacement && (lost || (isFilled && !wonByMe)) && (
+        <Notice tone="muted">{t("replacementLost")}</Notice>
       )}
 
       {error && (
@@ -371,6 +420,43 @@ export default function WorkerRequestDetailPage() {
             }}
           >
             {t("iCanTakeIt")}
+          </button>
+        </div>
+      )}
+
+      {/* Self-serve replacement — single claim CTA (§3) */}
+      {canClaim && (
+        <div style={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 64,
+          padding: "12px 16px",
+          background: "var(--paper)",
+          borderTop: "0.5px solid var(--line)",
+          maxWidth: 480,
+          margin: "0 auto",
+        }}>
+          <button
+            type="button"
+            onClick={handleClaim}
+            disabled={busy}
+            style={{
+              width: "100%",
+              border: "none",
+              borderRadius: 12,
+              padding: "14px 18px",
+              background: "var(--terra)",
+              color: "#fff",
+              fontSize: 15,
+              fontWeight: 700,
+              cursor: busy ? "wait" : "pointer",
+              opacity: busy ? 0.5 : 1,
+              fontFamily: "inherit",
+              minHeight: 48,
+            }}
+          >
+            {busy ? t("claiming") : t("claimCta")}
           </button>
         </div>
       )}

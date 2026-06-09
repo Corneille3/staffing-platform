@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
-from app.models.enums import AvailabilityStatus
+from app.models.enums import AvailabilityStatus, EmploymentType
 from app.schemas.common import TimestampedSchema
 
 
@@ -64,6 +64,9 @@ class WorkerInviteCreate(BaseModel):
     email: EmailStr
     phone: str | None = None
     preferred_language: str = 'fr'
+    # Self-serve replacement (§1): the tenant admin sets the worker's
+    # relationship at invite. Default contractor → the release path.
+    employment_type: EmploymentType = EmploymentType.CONTRACTOR
 
 
 class WorkerOnboardCreate(BaseModel):
