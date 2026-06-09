@@ -426,6 +426,62 @@ def test_sweep_expires_past_cutoff_open(db_session, seed):
     assert repl.status == RequestStatus.EXPIRED
 
 
+# ── permanent-staff absence report (§1) ─────────────────────────────────────────
+
+def _absence_payload(seed, role=RequestRole.EDUCATOR, reason='sick'):
+    from app.schemas.replacement import AbsenceReportCreate
+    return AbsenceReportCreate(
+        organization_id=seed.org.id, role=role,
+        work_date=date(2026, 7, 1), start_time=time(8, 0), end_time=time(16, 0),
+        reason=reason, note='Rendez-vous médical',
+    )
+
+
+def test_report_absence_creates_staff_absence_and_broadcasts(db_session, seed):
+    from app.models.request_response import RequestResponse
+    repl = ReplacementService(db_session).report_absence(
+        _absence_payload(seed), _worker_scope(seed, seed.worker_a),
+    )
+    assert repl.origin == RequestOrigin.STAFF_ABSENCE
+    assert repl.replaces_assignment_id is None  # no held shift
+    assert repl.auto_assign is True             # auto policy
+    assert repl.status == RequestStatus.OPEN
+    notified = set(db_session.scalars(select(RequestResponse.worker_user_id).where(
+        RequestResponse.staffing_request_id == repl.id,
+    )))
+    assert seed.worker_b.id in notified  # pool alerted
+
+
+def test_report_absence_managed_publishes(db_session, seed):
+    seed.org.replacement_policy = ReplacementPolicy.MANAGED
+    db_session.flush()
+    repl = ReplacementService(db_session).report_absence(
+        _absence_payload(seed), _worker_scope(seed, seed.worker_a),
+    )
+    assert repl.status == RequestStatus.NOTIFIED
+    assert repl.auto_assign is False
+
+
+def test_report_absence_role_not_allowed_403(db_session, seed):
+    seed.org.replacement_allowed_roles = ['psw']  # educator not allowed
+    db_session.flush()
+    with pytest.raises(HTTPException) as exc:
+        ReplacementService(db_session).report_absence(
+            _absence_payload(seed), _worker_scope(seed, seed.worker_a),
+        )
+    assert exc.value.status_code == 403
+
+
+def test_reported_absence_is_claimable(db_session, seed):
+    repl = ReplacementService(db_session).report_absence(
+        _absence_payload(seed, reason=None), _worker_scope(seed, seed.worker_a),
+    )
+    assignment = ReplacementService(db_session).claim(repl.id, seed.worker_b.id, seed.tenant.id)
+    assert assignment.worker_user_id == seed.worker_b.id
+    db_session.refresh(repl)
+    assert repl.status == RequestStatus.ASSIGNED  # staff_absence claimed like a release
+
+
 # ── concurrency (§9 — independent connections, real race) ───────────────────────
 
 def test_fifty_simultaneous_claims_yield_exactly_one_winner(db_engine):

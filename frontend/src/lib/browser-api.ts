@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AbsenceSite,
   AdminActivity,
   AdminActivityFilter,
   AdminOrganizationSite,
@@ -413,6 +414,23 @@ export async function claimShift(requestId: string): Promise<Assignment> {
 /** Self-serve replacement (§7): the giver cancels their release before a claim. */
 export async function cancelRelease(requestId: string): Promise<StaffingRequest> {
   return postJson<StaffingRequest>(`/api/v1/requests/${requestId}/cancel-release`, {});
+}
+
+// Permanent-staff absence report (§1).
+export async function fetchAbsenceOptions(): Promise<{ sites: AbsenceSite[] }> {
+  return getJson<{ sites: AbsenceSite[] }>("/api/v1/requests/report-absence/options");
+}
+
+export async function reportAbsence(payload: {
+  organization_id: string;
+  role: string;
+  work_date: string;
+  start_time: string;
+  end_time: string;
+  reason: string | null;
+  note: string | null;
+}): Promise<StaffingRequest> {
+  return postJson<StaffingRequest>("/api/v1/requests/report-absence", payload);
 }
 
 export type ReplacementStatus = {
