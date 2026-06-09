@@ -57,6 +57,16 @@ class AssignmentService:
         staffing_request.assigned_at = datetime.now(timezone.utc)
         self.request_repository.save(staffing_request)
 
+        # Self-serve replacement, managed mode (SELF_SERVE §5): assigning a
+        # released shift frees the original holder — mirrors what the atomic
+        # claim does in auto mode.
+        if staffing_request.replaces_assignment_id is not None:
+            original = self.assignment_repository.get(staffing_request.replaces_assignment_id)
+            if original is not None and original.status == AssignmentStatus.CONFIRMED:
+                # Tracked ORM object — the commit at the end of assign() persists it.
+                original.status = AssignmentStatus.RELEASED
+                original.cancelled_at = datetime.now(timezone.utc)
+
         self.audit_service.log(
             action='assignment.confirmed',
             entity_type='assignment',

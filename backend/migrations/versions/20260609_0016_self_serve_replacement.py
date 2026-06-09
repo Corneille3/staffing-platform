@@ -32,7 +32,7 @@ employment_type = postgresql.ENUM(
     name='employment_type', create_type=False,
 )
 replacement_policy = postgresql.ENUM(
-    'auto', 'approval',
+    'auto', 'managed',
     name='replacement_policy', create_type=False,
 )
 

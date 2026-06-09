@@ -1,13 +1,13 @@
 """Coordinator self-serve replacement surface (SELF_SERVE_REPLACEMENT §5, §6.1).
 
 GET  /api/v1/admin/replacements          — the self-filled feed + KPIs
-GET  /api/v1/admin/replacements/policy   — per-org policy (auto|approval + roles + lead)
+GET  /api/v1/admin/replacements/policy   — per-org policy (auto|managed + roles + lead)
 PATCH /api/v1/admin/replacements/policy  — edit it
+POST /api/v1/admin/replacements/sweep    — expire still-searching, past-cutoff releases
 """
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
@@ -18,13 +18,7 @@ from app.schemas.replacement import (
     ReplacementPolicyRead,
     ReplacementPolicyUpdate,
 )
-from app.schemas.staffing_request import StaffingRequestRead
 from app.services.replacement_admin_service import ReplacementAdminService
-
-
-class ReplacementDeny(BaseModel):
-    reason: str | None = None
-
 
 router = APIRouter(dependencies=[Depends(require_admin)])
 
@@ -62,27 +56,7 @@ def sweep_replacements(
     scope: AccessScope = Depends(get_access_scope),
     db: Session = Depends(get_db_session),
 ) -> dict:
-    """Housekeeping (§7): auto-publish timed-out approvals + expire past-cutoff
-    opens. Manual for now (cron-ready) — see the reliability-recompute pattern."""
+    """Housekeeping (§7): expire still-searching releases whose shift already
+    started with no fill. Manual for now (cron-ready) — see the
+    reliability-recompute pattern."""
     return ReplacementAdminService(db).sweep(scope)
-
-
-@router.post('/{request_id}/approve', response_model=StaffingRequestRead)
-def approve_replacement(
-    request_id: UUID,
-    scope: AccessScope = Depends(get_access_scope),
-    db: Session = Depends(get_db_session),
-) -> StaffingRequestRead:
-    request = ReplacementAdminService(db).approve(request_id, scope)
-    return StaffingRequestRead.model_validate(request)
-
-
-@router.post('/{request_id}/deny', response_model=StaffingRequestRead)
-def deny_replacement(
-    request_id: UUID,
-    payload: ReplacementDeny,
-    scope: AccessScope = Depends(get_access_scope),
-    db: Session = Depends(get_db_session),
-) -> StaffingRequestRead:
-    request = ReplacementAdminService(db).deny(request_id, scope, payload.reason)
-    return StaffingRequestRead.model_validate(request)

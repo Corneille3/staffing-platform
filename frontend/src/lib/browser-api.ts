@@ -436,7 +436,7 @@ export async function fetchReplacementPolicy(organizationId: string): Promise<Re
 
 export async function updateReplacementPolicy(
   organizationId: string,
-  partial: { policy?: "auto" | "approval"; allowed_roles?: string[]; min_release_lead_minutes?: number },
+  partial: { policy?: "auto" | "managed"; allowed_roles?: string[]; min_release_lead_minutes?: number },
 ): Promise<ReplacementPolicy> {
   return patchJson<ReplacementPolicy>(
     `/api/v1/admin/replacements/policy?organization_id=${organizationId}`,
@@ -444,18 +444,9 @@ export async function updateReplacementPolicy(
   );
 }
 
-// Approval mode (§5) — coordinator gates a pending release before broadcast.
-export async function approveReplacement(requestId: string): Promise<StaffingRequest> {
-  return postJson<StaffingRequest>(`/api/v1/admin/replacements/${requestId}/approve`, {});
-}
-
-export async function denyReplacement(requestId: string, reason?: string): Promise<StaffingRequest> {
-  return postJson<StaffingRequest>(`/api/v1/admin/replacements/${requestId}/deny`, { reason });
-}
-
-/** Housekeeping (§7): auto-publish timed-out approvals + expire past-cutoff opens. */
-export async function sweepReplacements(): Promise<{ auto_published: number; expired: number }> {
-  return postJson<{ auto_published: number; expired: number }>("/api/v1/admin/replacements/sweep", {});
+/** Housekeeping (§7): expire still-searching releases whose shift already started. */
+export async function sweepReplacements(): Promise<{ expired: number }> {
+  return postJson<{ expired: number }>("/api/v1/admin/replacements/sweep", {});
 }
 
 export async function updateAvailability(

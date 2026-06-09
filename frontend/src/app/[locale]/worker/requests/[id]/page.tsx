@@ -94,12 +94,13 @@ export default function WorkerRequestDetailPage() {
   const isFilled = FILLED_STATUSES.includes(request.status);
   const alreadyAccepted = myResponse?.status === "accepted";
   const alreadyDeclined = myResponse?.status === "declined";
-  // Self-serve replacement: a worker_replacement shift is claimed (first-come-
-  // first-served), not accepted/declined.
-  const isReplacement = request.origin === "worker_replacement";
+  // Self-serve replacement: an AUTO release is claimed (first-come-first-served).
+  // A MANAGED release (auto_assign=false) is accepted/declined like any request —
+  // the coordinator picks who to assign — so it falls through to the normal CTAs.
+  const isAutoReplacement = request.origin === "worker_replacement" && request.auto_assign === true;
   const wonByMe = request.status === "assigned" && request.assigned_worker_user_id === worker.id;
-  const canClaim = isReplacement && !isFilled && !lost;
-  const showCtas = !isReplacement && !isFilled && !alreadyAccepted && !alreadyDeclined;
+  const canClaim = isAutoReplacement && !isFilled && !lost;
+  const showCtas = !isAutoReplacement && !isFilled && !alreadyAccepted && !alreadyDeclined;
 
   const subtitle = roleSectorSubtitle(request, locale);
   const dateLabel = formatWorkDate(request.work_date, locale);
@@ -329,7 +330,7 @@ export default function WorkerRequestDetailPage() {
       )}
 
       {/* State notices */}
-      {isFilled && !isReplacement && (
+      {isFilled && !isAutoReplacement && (
         <Notice tone="muted">{t("filled")}</Notice>
       )}
       {alreadyAccepted && !isFilled && (
@@ -353,10 +354,10 @@ export default function WorkerRequestDetailPage() {
           {t("replacementRace")}
         </div>
       )}
-      {isReplacement && wonByMe && (
+      {isAutoReplacement && wonByMe && (
         <Notice tone="moss">{t("replacementWon")}</Notice>
       )}
-      {isReplacement && (lost || (isFilled && !wonByMe)) && (
+      {isAutoReplacement && (lost || (isFilled && !wonByMe)) && (
         <Notice tone="muted">{t("replacementLost")}</Notice>
       )}
 

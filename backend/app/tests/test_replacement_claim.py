@@ -210,14 +210,22 @@ def test_release_twice_is_409(db_session, seed):
     assert exc.value.status_code == 409
 
 
-def test_release_approval_policy_yields_pending(db_session, seed):
-    seed.org.replacement_policy = ReplacementPolicy.APPROVAL
+def test_release_managed_policy_publishes_for_responses(db_session, seed):
+    # Managed: broadcast like a normal request (NOTIFIED, not auto-assign) so
+    # workers accept/decline and the coordinator assigns.
+    from app.models.request_response import RequestResponse
+    seed.org.replacement_policy = ReplacementPolicy.MANAGED
     db_session.flush()
     original, _ = _assigned_shift(db_session, seed, seed.worker_a)
     replacement = ReplacementService(db_session).release(
         original.id, _worker_scope(seed, seed.worker_a), reason=None,
     )
-    assert replacement.status == RequestStatus.PENDING_APPROVAL
+    assert replacement.status == RequestStatus.NOTIFIED
+    assert replacement.auto_assign is False
+    notified = set(db_session.scalars(select(RequestResponse.worker_user_id).where(
+        RequestResponse.staffing_request_id == replacement.id,
+    )))
+    assert seed.worker_b.id in notified  # pool alerted via the normal publish
 
 
 # ── broadcast + claim endpoint + cancel + status ────────────────────────────────
@@ -341,10 +349,10 @@ def test_policy_get_and_set(db_session, seed):
 
     updated = admin.set_policy(
         seed.org.id,
-        ReplacementPolicyUpdate(policy=ReplacementPolicy.APPROVAL, min_release_lead_minutes=120),
+        ReplacementPolicyUpdate(policy=ReplacementPolicy.MANAGED, min_release_lead_minutes=120),
         _admin_scope(seed),
     )
-    assert updated.policy == ReplacementPolicy.APPROVAL
+    assert updated.policy == ReplacementPolicy.MANAGED
     assert updated.min_release_lead_minutes == 120
 
 
@@ -370,65 +378,38 @@ def test_worker_invite_sets_employment_type(db_session, seed):
     assert membership.employment_type == EmploymentType.PERMANENT
 
 
-# ── approval mode + escalation sweep (§5, §7) ───────────────────────────────────
+# ── managed mode (coordinator assigns) + escalation sweep (§5, §7) ──────────────
 
-def test_approve_publishes_pending_release(db_session, seed):
-    from app.models.request_response import RequestResponse
-    seed.org.replacement_policy = ReplacementPolicy.APPROVAL
+def test_managed_release_assigned_by_coordinator_frees_giver(db_session, seed):
+    """Managed mode: released shift broadcasts, a worker accepts, the
+    coordinator assigns them — and that frees the giver's original shift."""
+    from app.models.enums import ResponseStatus
+    from app.schemas.assignment import AssignmentCreate
+    from app.services.assignment_service import AssignmentService
+    from app.services.response_service import ResponseService
+
+    seed.org.replacement_policy = ReplacementPolicy.MANAGED
     db_session.flush()
-    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
+    original, giver_assignment = _assigned_shift(db_session, seed, seed.worker_a)
     repl = ReplacementService(db_session).release(
         original.id, _worker_scope(seed, seed.worker_a), reason=None,
     )
-    assert repl.status == RequestStatus.PENDING_APPROVAL  # not broadcast yet
+    assert repl.status == RequestStatus.NOTIFIED
 
-    approved = ReplacementAdminService(db_session).approve(repl.id, _admin_scope(seed))
-    assert approved.status == RequestStatus.OPEN
-    # broadcast ran on approve → eligible pool now alerted
-    notified = set(db_session.scalars(select(RequestResponse.worker_user_id).where(
-        RequestResponse.staffing_request_id == repl.id,
-    )))
-    assert seed.worker_b.id in notified
+    # worker_b accepts (the normal response flow), then the coordinator assigns.
+    ResponseService(db_session).set_status(repl.id, seed.worker_b.id, ResponseStatus.ACCEPTED)
+    AssignmentService(db_session).assign(AssignmentCreate(
+        staffing_request_id=repl.id,
+        worker_user_id=seed.worker_b.id,
+        assigned_by_user_id=seed.org_admin.id,
+    ))
 
-
-def test_deny_cancels_and_keeps_shift(db_session, seed):
-    seed.org.replacement_policy = ReplacementPolicy.APPROVAL
-    db_session.flush()
-    original, assignment = _assigned_shift(db_session, seed, seed.worker_a)
-    repl = ReplacementService(db_session).release(
-        original.id, _worker_scope(seed, seed.worker_a), reason=None,
-    )
-    denied = ReplacementAdminService(db_session).deny(repl.id, _admin_scope(seed), reason='not needed')
-    assert denied.status == RequestStatus.CANCELLED
-    db_session.refresh(assignment)
-    assert assignment.status == AssignmentStatus.CONFIRMED  # giver keeps it
-
-
-def test_approve_non_pending_409(db_session, seed):
-    # auto policy → release is OPEN, not pending → approve is a 409.
-    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
-    repl = ReplacementService(db_session).release(
-        original.id, _worker_scope(seed, seed.worker_a), reason=None,
-    )
-    with pytest.raises(HTTPException) as exc:
-        ReplacementAdminService(db_session).approve(repl.id, _admin_scope(seed))
-    assert exc.value.status_code == 409
-
-
-def test_sweep_auto_publishes_timed_out_approval(db_session, seed):
-    seed.org.replacement_policy = ReplacementPolicy.APPROVAL
-    db_session.flush()
-    original, _ = _assigned_shift(db_session, seed, seed.worker_a)
-    repl = ReplacementService(db_session).release(
-        original.id, _worker_scope(seed, seed.worker_a), reason=None,
-    )
-    repl.created_at = datetime.now(timezone.utc) - timedelta(minutes=11)  # past the timeout
-    db_session.flush()
-
-    result = ReplacementAdminService(db_session).sweep(_admin_scope(seed))
-    assert result['auto_published'] >= 1
     db_session.refresh(repl)
-    assert repl.status == RequestStatus.OPEN
+    db_session.refresh(giver_assignment)
+    assert repl.status == RequestStatus.ASSIGNED
+    assert repl.assigned_worker_user_id == seed.worker_b.id
+    # The coordinator's assignment freed the original holder (mirrors the claim).
+    assert giver_assignment.status == AssignmentStatus.RELEASED
 
 
 def test_sweep_expires_past_cutoff_open(db_session, seed):

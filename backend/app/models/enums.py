@@ -124,9 +124,13 @@ class EmploymentType(str, Enum):
 
 
 class ReplacementPolicy(str, Enum):
-    """Per-org self-serve policy (SELF_SERVE_REPLACEMENT §5)."""
-    AUTO = 'auto'          # released shift broadcasts instantly, first-claim wins
-    APPROVAL = 'approval'  # coordinator approves before it broadcasts
+    """Per-org self-serve policy (SELF_SERVE_REPLACEMENT §5, adapted).
+
+    AUTO    — released shift broadcasts instantly, first-claim wins (no coordinator).
+    MANAGED — released shift broadcasts too, but workers accept/decline and the
+              coordinator picks who to assign (the existing dispatch flow)."""
+    AUTO = 'auto'
+    MANAGED = 'managed'
 
 
 class AvailabilityStatus(str, Enum):

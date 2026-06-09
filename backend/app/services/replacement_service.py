@@ -36,11 +36,19 @@ from app.notifications.notification_dispatcher import NotificationDispatcher
 from app.repositories.worker_repository import WorkerRepository
 from app.services.audit_service import AuditService
 from app.services.matching_service import MatchingService
+from app.services.staffing_request_service import StaffingRequestService
 
 # Only worker-originated, auto-assign requests are claimable this way.
 SELF_SERVE_ORIGINS = (RequestOrigin.WORKER_REPLACEMENT, RequestOrigin.STAFF_ABSENCE)
 # A reason must be one of these (or omitted).
 RELEASE_REASONS = {'sick', 'family', 'personal', 'other'}
+# A release is "live" (one per held assignment) while it's still seeking a fill,
+# whether auto (OPEN) or managed (NOTIFIED / RESPONSES_RECEIVED).
+_ACTIVE_RELEASE_STATUSES = (
+    RequestStatus.OPEN,
+    RequestStatus.NOTIFIED,
+    RequestStatus.RESPONSES_RECEIVED,
+)
 
 
 class ReplacementService:
@@ -104,9 +112,12 @@ class ReplacementService:
     def release(self, request_id: UUID, scope: AccessScope, reason: str | None) -> StaffingRequest:
         """A contractor releases a held shift to the pool (§2). Keyed on the
         request the worker holds — the worker UI has the request, not the
-        assignment. Creates an open (or pending_approval, per org policy)
-        worker_replacement request that points at their assignment. The giver
-        KEEPS the shift until someone claims it (§7).
+        assignment. Creates a worker_replacement request pointing at their
+        assignment and broadcasts per the org policy:
+          - auto:    stays OPEN + auto_assign, first-claim wins (no coordinator)
+          - managed: published through the normal dispatch — workers accept/
+                     decline and the coordinator assigns from the responses.
+        Either way the giver KEEPS the shift until it's filled (§7).
         """
         if reason is not None and reason not in RELEASE_REASONS:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, 'Unknown release reason.')
@@ -153,7 +164,7 @@ class ReplacementService:
         existing = self.db.scalar(
             select(StaffingRequest).where(
                 StaffingRequest.replaces_assignment_id == assignment.id,
-                StaffingRequest.status.in_([RequestStatus.OPEN, RequestStatus.PENDING_APPROVAL]),
+                StaffingRequest.status.in_(_ACTIVE_RELEASE_STATUSES),
             )
         )
         if existing is not None:
@@ -162,7 +173,7 @@ class ReplacementService:
                 'A replacement is already being sought for this shift.',
             )
 
-        needs_approval = org.replacement_policy == ReplacementPolicy.APPROVAL
+        managed = org.replacement_policy == ReplacementPolicy.MANAGED
         replacement = StaffingRequest(
             id=uuid4(),
             organization_id=original.organization_id,
@@ -170,9 +181,10 @@ class ReplacementService:
             request_type=original.request_type,
             role=original.role,
             hourly_rate=original.hourly_rate,
-            status=RequestStatus.PENDING_APPROVAL if needs_approval else RequestStatus.OPEN,
+            status=RequestStatus.OPEN,
             origin=RequestOrigin.WORKER_REPLACEMENT,
-            auto_assign=True,
+            # auto → claimable (first wins); managed → coordinator assigns from responses.
+            auto_assign=not managed,
             replaces_assignment_id=assignment.id,
             release_reason=reason,
             title=original.title,
@@ -209,9 +221,13 @@ class ReplacementService:
         )
         self.db.commit()
         self.db.refresh(replacement)
-        # Auto policy → alert the eligible pool now. Approval policy stays
-        # pending_approval and broadcasts on approve (Phase 5).
-        if replacement.status == RequestStatus.OPEN:
+        # Alert the eligible pool. Managed → publish through the normal dispatch
+        # (status NOTIFIED; workers accept/decline, coordinator assigns). Auto →
+        # broadcast and stay OPEN so the atomic claim can win.
+        if managed:
+            StaffingRequestService(self.db).publish(replacement.id)
+            self.db.refresh(replacement)
+        else:
             self.broadcast(replacement)
         return replacement
 
@@ -309,15 +325,16 @@ class ReplacementService:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='already_filled')
 
     def cancel_release(self, request_id: UUID, scope: AccessScope) -> StaffingRequest:
-        """The giver changes their mind before anyone claims (§7). The open
+        """The giver changes their mind before the shift is filled (§7). The
         replacement is cancelled and they keep the shift (the original
-        assignment was never touched)."""
+        assignment was never touched). Works while it's still seeking a fill —
+        OPEN (auto) or NOTIFIED/RESPONSES_RECEIVED (managed)."""
         request = self.db.get(StaffingRequest, request_id)
         if request is None or request.origin != RequestOrigin.WORKER_REPLACEMENT:
             raise HTTPException(status.HTTP_404_NOT_FOUND, 'Replacement not found.')
         if request.created_by_user_id != scope.user.id:
             raise HTTPException(status.HTTP_403_FORBIDDEN, 'Only the giver can cancel this.')
-        if request.status not in (RequestStatus.OPEN, RequestStatus.PENDING_APPROVAL):
+        if request.status not in _ACTIVE_RELEASE_STATUSES:
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
                 'This shift has already been claimed or closed.',

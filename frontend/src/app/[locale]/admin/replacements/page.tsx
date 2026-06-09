@@ -1,5 +1,5 @@
+import { Link } from "../../../../i18n/navigation";
 import { Eyebrow, Mono } from "../../../../components/ui";
-import { ReplacementApprovalQueue } from "../../../../components/replacement-approval-queue";
 import { ReplacementPolicyCard } from "../../../../components/replacement-policy-card";
 import { getOrganizations, getReplacementFeed } from "../../../../lib/api";
 import type { ReplacementFeedItem } from "../../../../lib/types";
@@ -43,9 +43,6 @@ export default async function AdminReplacementsPage() {
       <p style={{ margin: "8px 0 24px", color: "var(--ink-2)", fontSize: 14, maxWidth: 640 }}>
         Chaque quart libéré par un·e remplaçant·e. Vous voyez tout — sans être le goulot d&apos;étranglement.
       </p>
-
-      {/* Approval queue (approval-mode orgs only — §6.1) */}
-      <ReplacementApprovalQueue items={feed.items.filter((i) => i.awaiting_approval)} />
 
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 26 }}>
@@ -91,8 +88,13 @@ function Kpi({ value, label, tone }: { value: number | string; label: string; to
 
 function FeedRow({ item, last }: { item: ReplacementFeedItem; last: boolean }) {
   const s = STATUS_STYLE[item.status] ?? STATUS_STYLE.searching;
+  // Row links to the request detail — where the coordinator reviews responses
+  // and assigns (managed mode) or just sees the audit (auto mode).
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1.4fr 1fr 1.2fr 0.8fr", padding: "13px 18px", borderTop: last ? undefined : "0.5px solid var(--line-soft)", alignItems: "center", fontSize: 13 }}>
+    <Link
+      href={`/admin/requests/${item.request_id}`}
+      style={{ display: "grid", gridTemplateColumns: "1.4fr 1.4fr 1fr 1.2fr 0.8fr", padding: "13px 18px", borderTop: last ? undefined : "0.5px solid var(--line-soft)", alignItems: "center", fontSize: 13, textDecoration: "none", color: "inherit" }}
+    >
       <div style={{ fontWeight: 500 }}>{item.giver_name}</div>
       <div style={{ color: "var(--ink-2)" }}>
         {item.title}
@@ -107,6 +109,6 @@ function FeedRow({ item, last }: { item: ReplacementFeedItem; last: boolean }) {
       </div>
       <div style={{ color: item.claimer_name ? "var(--ink)" : "var(--ink-3)" }}>{item.claimer_name ?? "—"}</div>
       <Mono style={{ fontSize: 12, color: "var(--ink-2)" }}>{fmtTtf(item.time_to_fill_minutes)}</Mono>
-    </div>
+    </Link>
   );
 }

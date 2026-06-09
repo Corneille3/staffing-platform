@@ -16,7 +16,7 @@ CREATE TYPE coverage_type AS ENUM ('same_day_urgent', 'planned_absence', 'recurr
 -- Self-serve replacement (SELF_SERVE_REPLACEMENT_HANDOFF §1, §5)
 CREATE TYPE request_origin AS ENUM ('coordinator', 'worker_replacement', 'staff_absence');
 CREATE TYPE employment_type AS ENUM ('permanent', 'contractor');
-CREATE TYPE replacement_policy AS ENUM ('auto', 'approval');
+CREATE TYPE replacement_policy AS ENUM ('auto', 'managed');
 
 -- Tables
 

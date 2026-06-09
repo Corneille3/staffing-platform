@@ -73,9 +73,9 @@ export function ReplacementPolicyCard({
         {organizationName}
       </p>
 
-      {/* auto vs approval */}
+      {/* auto vs managed */}
       <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-        {(["auto", "approval"] as const).map((mode) => {
+        {(["auto", "managed"] as const).map((mode) => {
           const active = policy.policy === mode;
           return (
             <button
@@ -94,12 +94,12 @@ export function ReplacementPolicyCard({
               }}
             >
               <div style={{ fontSize: 13, fontWeight: 600, color: active ? "var(--terra-ink)" : "var(--ink)" }}>
-                {mode === "auto" ? "Automatique" : "Avec approbation"}
+                {mode === "auto" ? "Automatique" : "Géré par le coordonnateur"}
               </div>
               <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 3, lineHeight: 1.4 }}>
                 {mode === "auto"
-                  ? "Diffusé au bassin immédiatement · premier arrivé"
-                  : "Le coordonnateur approuve avant la diffusion"}
+                  ? "Diffusé au bassin · premier arrivé, premier servi"
+                  : "Diffusé au bassin · le coordonnateur choisit qui assigner"}
               </div>
             </button>
           );
