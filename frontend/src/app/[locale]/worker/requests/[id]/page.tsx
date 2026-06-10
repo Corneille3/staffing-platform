@@ -97,7 +97,11 @@ export default function WorkerRequestDetailPage() {
   // Self-serve replacement: an AUTO release is claimed (first-come-first-served).
   // A MANAGED release (auto_assign=false) is accepted/declined like any request —
   // the coordinator picks who to assign — so it falls through to the normal CTAs.
-  const isAutoReplacement = request.origin === "worker_replacement" && request.auto_assign === true;
+  // Both self-serve origins honour the org policy: on-call (worker_replacement)
+  // AND permanent-staff absences (staff_absence) are claimable when auto.
+  const isAutoReplacement =
+    (request.origin === "worker_replacement" || request.origin === "staff_absence") &&
+    request.auto_assign === true;
   const wonByMe = request.status === "assigned" && request.assigned_worker_user_id === worker.id;
   const canClaim = isAutoReplacement && !isFilled && !lost;
   const showCtas = !isAutoReplacement && !isFilled && !alreadyAccepted && !alreadyDeclined;
