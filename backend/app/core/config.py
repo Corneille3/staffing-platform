@@ -54,6 +54,20 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ''
     twilio_from_number: str = ''
 
+    # ── background scheduler (replacement sweep + nightly reliability) ──
+    # In-process daemon thread (decision 2026-06-10: no new infra/deps; the
+    # single-uvicorn-worker entrypoint means exactly one runner per container).
+    scheduler_enabled: bool = True
+    replacement_sweep_interval_seconds: int = 300
+    # Escalate a still-unfilled release/absence to the coordinator when the
+    # shift starts within this many minutes (one email per request).
+    replacement_escalation_lead_minutes: int = 60
+    reliability_recompute_hour_utc: int = 7  # ~02:00–03:00 in Québec
+    # Shift work_date/start_time are stored naive — Québec wall clock as
+    # entered. Every "how soon is this shift" comparison interprets them in
+    # this zone (treating them as UTC would skew expiry/escalation by ~4-5 h).
+    shift_timezone: str = 'America/Toronto'
+
     @field_validator('app_env')
     @classmethod
     def validate_env(cls, value: str) -> str:

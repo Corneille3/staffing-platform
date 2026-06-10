@@ -41,7 +41,8 @@ export default async function AdminReplacementsPage() {
         Quarts <em style={{ fontStyle: "italic" }}>comblés par le bassin</em>
       </h1>
       <p style={{ margin: "8px 0 24px", color: "var(--ink-2)", fontSize: 14, maxWidth: 640 }}>
-        Chaque quart libéré par un·e remplaçant·e. Vous voyez tout — sans être le goulot d&apos;étranglement.
+        Chaque quart libéré par un·e remplaçant·e ou signalé en absence par le personnel.
+        Vous voyez tout — sans être le goulot d&apos;étranglement.
       </p>
 
       {/* KPI strip */}
@@ -56,7 +57,7 @@ export default async function AdminReplacementsPage() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 20, alignItems: "start" }}>
         <div style={{ border: "0.5px solid var(--line)", borderRadius: 16, overflow: "hidden", background: "var(--card)" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1.4fr 1fr 1.2fr 0.8fr", padding: "11px 18px", borderBottom: "0.5px solid var(--line)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink-3)", fontWeight: 500 }}>
-            <div>Remplaçant·e</div><div>Quart</div><div>Statut</div><div>Pris par</div><div>Délai</div>
+            <div>Personne</div><div>Quart</div><div>Statut</div><div>Pris par</div><div>Délai</div>
           </div>
           {feed.items.length === 0 ? (
             <div style={{ padding: "28px 18px", fontSize: 13, color: "var(--ink-3)" }}>
@@ -95,7 +96,15 @@ function FeedRow({ item, last }: { item: ReplacementFeedItem; last: boolean }) {
       href={`/admin/requests/${item.request_id}`}
       style={{ display: "grid", gridTemplateColumns: "1.4fr 1.4fr 1fr 1.2fr 0.8fr", padding: "13px 18px", borderTop: last ? undefined : "0.5px solid var(--line-soft)", alignItems: "center", fontSize: 13, textDecoration: "none", color: "inherit" }}
     >
-      <div style={{ fontWeight: 500 }}>{item.giver_name}</div>
+      <div style={{ fontWeight: 500 }}>
+        {item.giver_name}
+        {/* Tag the permanent-staff path; releases stay unmarked (the default). */}
+        {item.origin === "staff_absence" && (
+          <span style={{ display: "inline-block", marginLeft: 7, padding: "2px 8px", borderRadius: 99, border: "0.5px solid var(--line)", background: "var(--sand-soft)", color: "var(--ink-2)", fontSize: 10.5, fontWeight: 600, verticalAlign: "middle" }}>
+            Absence
+          </span>
+        )}
+      </div>
       <div style={{ color: "var(--ink-2)" }}>
         {item.title}
         <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>

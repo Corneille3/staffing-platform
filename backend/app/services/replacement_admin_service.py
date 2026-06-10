@@ -1,20 +1,29 @@
 """Coordinator-facing self-serve replacement (SELF_SERVE_REPLACEMENT §5, §6.1).
 
-Read-only awareness (the self-filled feed + KPIs) plus the per-org policy.
-Kept separate from ReplacementService, which owns the worker actions.
+Awareness (the self-filled feed + KPIs, both releases and permanent-staff
+absences), the per-org policy, and the escalate-then-expire sweep the
+background scheduler drives. Kept separate from ReplacementService, which
+owns the worker actions.
 """
+import logging
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.scope import AccessScope
-from app.models.enums import RequestOrigin, RequestStatus
+from app.core.config import settings
+from app.core.timeutil import shift_start_utc
+from app.models.enums import RequestStatus, ResponseStatus, UserRole
 from app.models.organization import Organization
+from app.models.organization_membership import OrganizationMembership
+from app.models.request_response import RequestResponse
 from app.models.staffing_request import StaffingRequest
 from app.models.user import User
+from app.notifications.email_service import EmailMessage, EmailNotificationService
+from app.notifications.i18n import localized, localized_subject
 from app.repositories.organization_repository import OrganizationRepository
 from app.schemas.replacement import (
     ReplacementFeedItem,
@@ -24,6 +33,9 @@ from app.schemas.replacement import (
     ReplacementPolicyUpdate,
 )
 from app.services.audit_service import AuditService
+from app.services.replacement_service import SELF_SERVE_ORIGINS
+
+logger = logging.getLogger(__name__)
 
 # A released shift is still seeking a fill in any of these (auto: OPEN; managed:
 # NOTIFIED/RESPONSES_RECEIVED while workers respond and the coordinator decides).
@@ -46,7 +58,7 @@ _FEED_STATUS = {
 
 
 def _shift_started(request: StaffingRequest, now: datetime) -> bool:
-    return datetime.combine(request.work_date, request.start_time, tzinfo=timezone.utc) <= now
+    return shift_start_utc(request.work_date, request.start_time) <= now
 
 
 class ReplacementAdminService:
@@ -69,7 +81,9 @@ class ReplacementAdminService:
         requests = list(self.db.scalars(
             select(StaffingRequest)
             .where(
-                StaffingRequest.origin == RequestOrigin.WORKER_REPLACEMENT,
+                # Both self-serve origins: contractor releases AND
+                # permanent-staff absences (same visibility, §6.1).
+                StaffingRequest.origin.in_(SELF_SERVE_ORIGINS),
                 StaffingRequest.organization_id.in_(org_ids),
             )
             .order_by(StaffingRequest.created_at.desc())
@@ -110,6 +124,7 @@ class ReplacementAdminService:
                 continue
             items.append(ReplacementFeedItem(
                 request_id=r.id,
+                origin=r.origin.value,
                 giver_name=name(r.created_by_user_id) or '—',
                 title=r.title,
                 work_date=r.work_date,
@@ -181,35 +196,159 @@ class ReplacementAdminService:
         self.db.refresh(org)
         return self.get_policy(org_id, scope)
 
-    # ── escalation (§7) ─────────────────────────────────────────────────────
+    # ── escalation + expiry (§7, scheduler-wired 2026-06-10) ────────────────
 
-    def sweep(self, scope: AccessScope) -> dict:
-        """Manual/cron-ready housekeeping (§7), scoped to the caller's orgs:
-        expire still-searching releases whose shift already started with no fill
-        (auto: nobody claimed; managed: nobody the coordinator assigned).
+    def tick(
+        self,
+        org_ids: list[UUID] | None = None,
+        actor_user_id: UUID | None = None,
+        now: datetime | None = None,
+    ) -> dict:
+        """One sweep pass over still-searching self-serve requests — both
+        origins (contractor releases AND permanent-staff absences):
 
-        Proactive coordinator notification on expiry is deferred until this is
-        wired to a scheduler (same status as the reliability cron) — for now the
-        dashboard surfaces unfilled and this persists the state."""
-        org_ids = self._accessible_org_ids(scope)
-        if not org_ids:
-            return {'expired': 0}
-        now = datetime.now(timezone.utc)
+          1. **escalate** — the shift starts within the escalation lead and
+             nobody has filled it → stamp ``escalated_at`` (one warning per
+             request, not per tick), audit ``replacement.escalated``, and email
+             the org's coordinators while they can still act.
+          2. **expire** — the shift start has passed unfilled (auto: nobody
+             claimed; managed: nobody assigned) → EXPIRED, audit
+             ``replacement.unfilled``.
 
-        searching = list(self.db.scalars(select(StaffingRequest).where(
-            StaffingRequest.origin == RequestOrigin.WORKER_REPLACEMENT,
-            StaffingRequest.organization_id.in_(org_ids),
+        ``org_ids=None`` means ALL orgs (the scheduler path, no caller);
+        the manual endpoint passes the caller's accessible orgs. Emails go
+        out after commit, best-effort — a mail hiccup never breaks the sweep.
+        """
+        now = now or datetime.now(timezone.utc)
+        lead = timedelta(minutes=settings.replacement_escalation_lead_minutes)
+
+        query = select(StaffingRequest).where(
+            StaffingRequest.origin.in_(SELF_SERVE_ORIGINS),
             StaffingRequest.status.in_(_SEARCHING_STATUSES),
-        )))
+        )
+        if org_ids is not None:
+            if not org_ids:
+                return {'escalated': 0, 'expired': 0}
+            query = query.where(StaffingRequest.organization_id.in_(org_ids))
+
+        escalated: list[StaffingRequest] = []
         expired = 0
-        for request in searching:
-            if _shift_started(request, now):
+        for request in self.db.scalars(query):
+            start = shift_start_utc(request.work_date, request.start_time)
+            if start <= now:
                 request.status = RequestStatus.EXPIRED
                 self.audit_service.log(
                     action='replacement.unfilled', entity_type='staffing_request',
-                    entity_id=request.id, actor_user_id=scope.user.id,
+                    entity_id=request.id, actor_user_id=actor_user_id,
                     organization_id=request.organization_id, payload={},
                 )
                 expired += 1
+            elif request.escalated_at is None and start - now <= lead:
+                request.escalated_at = now
+                self.audit_service.log(
+                    action='replacement.escalated', entity_type='staffing_request',
+                    entity_id=request.id, actor_user_id=actor_user_id,
+                    organization_id=request.organization_id,
+                    payload={'minutes_to_start': int((start - now).total_seconds() // 60)},
+                )
+                escalated.append(request)
         self.db.commit()
-        return {'expired': expired}
+
+        for request in escalated:
+            try:
+                self._email_coordinators(request, now)
+            except Exception:  # pragma: no cover — never let mail break the sweep
+                logger.exception('Escalation email failed for request %s', request.id)
+
+        return {'escalated': len(escalated), 'expired': expired}
+
+    def sweep(self, scope: AccessScope) -> dict:
+        """Manual trigger of the same pass, scoped to the caller's orgs."""
+        return self.tick(
+            org_ids=self._accessible_org_ids(scope),
+            actor_user_id=scope.user.id,
+        )
+
+    def _email_coordinators(self, request: StaffingRequest, now: datetime) -> None:
+        """Warn the org's coordinators (active org_admins) that a self-serve
+        shift is about to start unfilled — while they can still step in."""
+        org = self.db.get(Organization, request.organization_id)
+        admins = list(self.db.scalars(
+            select(User)
+            .join(OrganizationMembership, OrganizationMembership.user_id == User.id)
+            .where(
+                OrganizationMembership.organization_id == request.organization_id,
+                OrganizationMembership.role == UserRole.ORG_ADMIN,
+                OrganizationMembership.is_active.is_(True),
+                User.is_active.is_(True),
+            )
+        ))
+        if not admins:
+            logger.warning('No active coordinator to escalate request %s to', request.id)
+            return
+
+        giver = self.db.get(User, request.created_by_user_id)
+        giver_name = f'{giver.first_name} {giver.last_name}'.strip() if giver else '—'
+        accepted = self.db.scalar(
+            select(func.count()).select_from(RequestResponse).where(
+                RequestResponse.staffing_request_id == request.id,
+                RequestResponse.status == ResponseStatus.ACCEPTED,
+            )
+        ) or 0
+        start = shift_start_utc(request.work_date, request.start_time)
+        minutes = max(0, int((start - now).total_seconds() // 60))
+        date_str = request.work_date.strftime('%Y-%m-%d')
+        time_str = f"{request.start_time.strftime('%H:%M')}–{request.end_time.strftime('%H:%M')}"
+        org_name = org.name if org else ''
+        portal = (
+            settings.allowed_origins[0].rstrip('/')
+            if settings.allowed_origins else 'http://localhost:3000'
+        )
+
+        is_absence = request.origin.value == 'staff_absence'
+        context_fr = (
+            f'Absence signalée par {giver_name}.' if is_absence
+            else f'Quart libéré par {giver_name}.'
+        )
+        context_en = (
+            f'Absence reported by {giver_name}.' if is_absence
+            else f'Shift released by {giver_name}.'
+        )
+        waiting_fr = (
+            f'{accepted} candidature(s) en attente d\'assignation.\n' if accepted else ''
+        )
+        waiting_en = f'{accepted} response(s) awaiting assignment.\n' if accepted else ''
+
+        email_service = EmailNotificationService()
+        for admin in admins:
+            fr = (
+                f'Bonjour {admin.first_name},\n\n'
+                f'Le quart du {date_str} ({time_str}) à {org_name} n\'est toujours pas '
+                f'comblé et débute dans environ {minutes} minutes.\n\n'
+                f'{context_fr}\n'
+                f'{waiting_fr}\n'
+                f'Vous pouvez encore intervenir — assigner quelqu\'un depuis la demande '
+                f'ou contacter une personne directement :\n'
+                f'{portal}/fr/admin/requests/{request.id}\n\n'
+                f'— Staffig'
+            )
+            en = (
+                f'Hi {admin.first_name},\n\n'
+                f'The {date_str} shift ({time_str}) at {org_name} is still unfilled '
+                f'and starts in about {minutes} minutes.\n\n'
+                f'{context_en}\n'
+                f'{waiting_en}\n'
+                f'There is still time to step in — assign someone from the request '
+                f'or reach out directly:\n'
+                f'{portal}/en/admin/requests/{request.id}\n\n'
+                f'— Staffig'
+            )
+            email_service.send(EmailMessage(
+                to_email=admin.email,
+                subject=localized_subject(
+                    admin.preferred_language,
+                    f'Quart non comblé — {date_str} {time_str} ({org_name})',
+                    f'Unfilled shift — {date_str} {time_str} ({org_name})',
+                ),
+                body=localized(admin.preferred_language, fr, en),
+            ))

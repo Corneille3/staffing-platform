@@ -135,6 +135,7 @@ CREATE TABLE staffing_requests (
     auto_assign BOOLEAN NOT NULL DEFAULT FALSE,
     replaces_assignment_id UUID REFERENCES assignments(id) ON DELETE SET NULL,
     release_reason VARCHAR(20),
+    escalated_at TIMESTAMPTZ, -- unfilled-warning emailed to coordinator (once)
     assigned_worker_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     assigned_at TIMESTAMPTZ,
     cancelled_at TIMESTAMPTZ,

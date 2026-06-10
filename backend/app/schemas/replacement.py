@@ -37,6 +37,8 @@ class MyAbsenceItem(BaseModel):
 
 class ReplacementFeedItem(BaseModel):
     request_id: UUID
+    # worker_replacement (contractor release) | staff_absence (permanent staff)
+    origin: str
     giver_name: str
     title: str
     work_date: date

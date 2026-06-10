@@ -60,6 +60,9 @@ class StaffingRequest(Base):
         ForeignKey('assignments.id', ondelete='SET NULL')
     )
     release_reason: Mapped[str | None] = mapped_column(String(20))  # sick|family|personal|other
+    # Stamped by the sweep when a still-unfilled release/absence enters the
+    # escalation window — the coordinator is emailed once, not every tick.
+    escalated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     assigned_worker_user_id: Mapped[UUID | None] = mapped_column(ForeignKey('users.id', ondelete='SET NULL'))
     assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
