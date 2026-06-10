@@ -17,6 +17,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.auth.scope import AccessScope
+from app.core.timeutil import shift_start_utc
 from app.models.assignment import Assignment
 from app.models.enums import (
     AssignmentStatus,
@@ -149,10 +150,9 @@ class ReplacementService:
                 'This role is not enabled for self-serve replacement.',
             )
 
-        # Lead-time window. Shift times are stored naive; treat as UTC for now
-        # (min_release_lead_minutes defaults to 0, so this is a no-op until an
-        # org sets it). Revisit if per-org timezones land.
-        shift_start = datetime.combine(original.work_date, original.start_time, tzinfo=timezone.utc)
+        # Lead-time window. Shift times are Québec wall clock — interpreted in
+        # settings.shift_timezone (see core/timeutil).
+        shift_start = shift_start_utc(original.work_date, original.start_time)
         minutes_until = (shift_start - datetime.now(timezone.utc)).total_seconds() / 60
         if minutes_until < org.min_release_lead_minutes:
             raise HTTPException(
@@ -255,7 +255,7 @@ class ReplacementService:
                 'This role is not enabled for self-serve replacement.',
             )
 
-        shift_start = datetime.combine(payload.work_date, payload.start_time, tzinfo=timezone.utc)
+        shift_start = shift_start_utc(payload.work_date, payload.start_time)
         if (shift_start - datetime.now(timezone.utc)).total_seconds() / 60 < org.min_release_lead_minutes:
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
@@ -316,8 +316,7 @@ class ReplacementService:
             responses = list(self.db.scalars(select(RequestResponse).where(
                 RequestResponse.staffing_request_id == r.id,
             )))
-            shift_started = datetime.combine(
-                r.work_date, r.start_time, tzinfo=timezone.utc) <= now
+            shift_started = shift_start_utc(r.work_date, r.start_time) <= now
             if r.status in (RequestStatus.ASSIGNED, RequestStatus.COMPLETED):
                 st = 'filled'
             elif r.status == RequestStatus.CANCELLED:

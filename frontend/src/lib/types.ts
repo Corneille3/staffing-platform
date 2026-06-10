@@ -725,6 +725,8 @@ export type OrphanScanResult = {
 // ── Self-serve replacement — coordinator surface ──────────────────────────────
 export type ReplacementFeedItem = {
   request_id: string;
+  // worker_replacement (contractor release) | staff_absence (permanent staff)
+  origin: "worker_replacement" | "staff_absence";
   giver_name: string;
   title: string;
   work_date: string;

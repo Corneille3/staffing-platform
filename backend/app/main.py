@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
@@ -13,6 +14,7 @@ from app.auth.permissions import require_authenticated
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.db.session import engine
+from app.scheduler import scheduler
 
 configure_logging()
 
@@ -29,7 +31,21 @@ def _alembic_head() -> str | None:
 
 _ALEMBIC_HEAD = _alembic_head()
 
-app = FastAPI(title=settings.app_name)
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Start the background scheduler with the app, stop it on shutdown.
+
+    Tests construct TestClient without entering it as a context manager, so
+    lifespan never runs there; the flag gate is belt-and-suspenders (conftest
+    also sets scheduler_enabled=False)."""
+    if settings.scheduler_enabled and settings.app_env != 'test':
+        scheduler.start()
+    yield
+    scheduler.stop()
+
+
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

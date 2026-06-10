@@ -56,7 +56,8 @@ def sweep_replacements(
     scope: AccessScope = Depends(get_access_scope),
     db: Session = Depends(get_db_session),
 ) -> dict:
-    """Housekeeping (§7): expire still-searching releases whose shift already
-    started with no fill. Manual for now (cron-ready) — see the
-    reliability-recompute pattern."""
+    """Manual trigger of the escalate-then-expire pass (§7), scoped to the
+    caller's orgs. The background scheduler runs the same pass across all
+    orgs every few minutes — this endpoint remains for ops/debugging.
+    Returns ``{escalated, expired}``."""
     return ReplacementAdminService(db).sweep(scope)

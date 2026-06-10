@@ -63,6 +63,11 @@ def db_engine():
     # Re-read settings so the alembic env.py uses the test URL.
     from app.core.config import settings as _settings
     _settings.database_url = TEST_DATABASE_URL
+    # Tests build shift datetimes relative to utcnow — pin the shift timezone
+    # to UTC so time math is deterministic, and keep the background scheduler
+    # out of the test process entirely.
+    _settings.shift_timezone = 'UTC'
+    _settings.scheduler_enabled = False
     alembic_command.upgrade(Config('alembic.ini'), 'head')
     yield engine
     engine.dispose()
