@@ -151,9 +151,16 @@ class ReplacementService:
             )
 
         # Lead-time window. Shift times are Québec wall clock — interpreted in
-        # settings.shift_timezone (see core/timeutil).
+        # settings.shift_timezone (see core/timeutil). Distinct messages: a
+        # shift that already started is a different mistake than one inside
+        # the org's lead window.
         shift_start = shift_start_utc(original.work_date, original.start_time)
         minutes_until = (shift_start - datetime.now(timezone.utc)).total_seconds() / 60
+        if minutes_until < 0:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                'This shift has already started — contact your coordinator instead.',
+            )
         if minutes_until < org.min_release_lead_minutes:
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
@@ -256,7 +263,13 @@ class ReplacementService:
             )
 
         shift_start = shift_start_utc(payload.work_date, payload.start_time)
-        if (shift_start - datetime.now(timezone.utc)).total_seconds() / 60 < org.min_release_lead_minutes:
+        minutes_until = (shift_start - datetime.now(timezone.utc)).total_seconds() / 60
+        if minutes_until < 0:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                'That shift is already in the past — pick an upcoming one.',
+            )
+        if minutes_until < org.min_release_lead_minutes:
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
                 'Too close to the shift start to report it.',

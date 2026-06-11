@@ -42,7 +42,20 @@ interface DraftState {
 }
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  // LOCAL today — toISOString() is UTC, which after 20h in Montréal is
+  // already tomorrow (en-CA locale formats as YYYY-MM-DD).
+  return new Date().toLocaleDateString("en-CA");
+}
+
+/** True when the drafted shift has fully ended (end <= start crosses
+ * midnight, same convention as the duration display). Publishing mid-shift
+ * stays allowed — urgent coverage for an underway shift is legitimate;
+ * the backend enforces the same rule at publish. */
+function shiftEnded(d: DraftState): boolean {
+  if (!d.work_date || !d.start_time || !d.end_time) return false;
+  const end = new Date(`${d.work_date}T${d.end_time}`);
+  if (d.end_time <= d.start_time) end.setDate(end.getDate() + 1);
+  return end <= new Date();
 }
 
 function emptyDraft(firstOrg: Organization | undefined): DraftState {
@@ -318,18 +331,25 @@ export function AdminRequestNewForm({ organizations }: { organizations: Organiza
                 Continue <ArrowRight size={14} strokeWidth={1.8} />
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={handlePublish}
-                disabled={publishing || !draftId}
-                style={{
-                  ...primaryBtn,
-                  opacity: publishing || !draftId ? 0.6 : 1,
-                  cursor: publishing || !draftId ? "not-allowed" : "pointer",
-                }}
-              >
-                {publishing ? "Publishing…" : "Publish request"} <Check size={14} strokeWidth={2.2} />
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                {shiftEnded(draft) && (
+                  <span style={{ fontSize: 12.5, color: "var(--rose)" }}>
+                    This shift has already ended — adjust the date to publish.
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handlePublish}
+                  disabled={publishing || !draftId || shiftEnded(draft)}
+                  style={{
+                    ...primaryBtn,
+                    opacity: publishing || !draftId || shiftEnded(draft) ? 0.6 : 1,
+                    cursor: publishing || !draftId || shiftEnded(draft) ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {publishing ? "Publishing…" : "Publish request"} <Check size={14} strokeWidth={2.2} />
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -501,7 +521,7 @@ function StepWhere({
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
         <Field label="Date">
-          <input type="date" value={draft.work_date} onChange={(e) => update("work_date", e.target.value)} style={inputStyle} />
+          <input type="date" min={todayIso()} value={draft.work_date} onChange={(e) => update("work_date", e.target.value)} style={inputStyle} />
         </Field>
         <Field label="Start">
           <input type="time" value={draft.start_time} onChange={(e) => update("start_time", e.target.value)} style={inputStyle} />

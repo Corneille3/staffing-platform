@@ -318,6 +318,7 @@
       "sub": "Vous ne pouvez pas assurer un quart à venir ? Décrivez-le et nous chercherons une suppléance dans le bassin.",
       "loading": "Chargement…",
       "required": "Le site, le rôle et la date sont requis.",
+      "pastDate": "Ce quart est déjà passé — choisissez une date à venir.",
       "noSites": "Aucun site n'est encore configuré pour la suppléance en libre-service.",
       "site": "Site",
       "role": "Rôle à couvrir",

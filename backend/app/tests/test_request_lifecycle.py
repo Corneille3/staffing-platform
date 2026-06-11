@@ -89,11 +89,16 @@ def test_publish_same_day_counts_as_urgent(apf_client, worker_a_client, seed):
         json={'urgent_alert_opt_in': False},
     )
 
+    # Same-day by definition — but publish rejects ENDED shifts, so the window
+    # must stay open whenever the suite runs. 13:00→23:59 keeps an afternoon
+    # start (no weekend-overnight gate interplay) and an end that's future for
+    # all but the day's final minute.
     request_id = apf_client.post(
         '/api/v1/requests',
         json=request_payload(
             seed.org.id, seed.apf.id,
             work_date=date.today().isoformat(), urgency_level=1,
+            start_time='13:00', end_time='23:59',
         ),
     ).json()['id']
     apf_client.post(f'/api/v1/requests/{request_id}/publish')

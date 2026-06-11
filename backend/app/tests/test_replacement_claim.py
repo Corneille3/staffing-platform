@@ -63,7 +63,9 @@ def _make_request(session, org_id, creator_id, *, origin, status, replaces=None)
         request_type=RequestType.URGENT_REPLACEMENT, role=RequestRole.EDUCATOR,
         status=status, origin=origin, auto_assign=origin != RequestOrigin.COORDINATOR,
         replaces_assignment_id=replaces, title='Couverture matin', city='IntTestCity',
-        work_date=date(2026, 7, 1), start_time=time(8, 0), end_time=time(16, 0),
+        # Relative — release()/publish reject past shifts, a literal date rots.
+        work_date=date.today() + timedelta(days=21),
+        start_time=time(8, 0), end_time=time(16, 0),
     )
     session.add(req)
     session.flush()
@@ -432,7 +434,8 @@ def _absence_payload(seed, role=RequestRole.EDUCATOR, reason='sick'):
     from app.schemas.replacement import AbsenceReportCreate
     return AbsenceReportCreate(
         organization_id=seed.org.id, role=role,
-        work_date=date(2026, 7, 1), start_time=time(8, 0), end_time=time(16, 0),
+        work_date=date.today() + timedelta(days=21),
+        start_time=time(8, 0), end_time=time(16, 0),
         reason=reason, note='Rendez-vous médical',
     )
 

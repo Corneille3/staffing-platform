@@ -318,6 +318,7 @@
       "sub": "Can't make an upcoming shift? Describe it and we'll find a replacement from the pool.",
       "loading": "Loading…",
       "required": "Site, role and date are required.",
+      "pastDate": "That shift is already in the past — pick an upcoming date.",
       "noSites": "No sites are set up for self-serve replacement yet.",
       "site": "Site",
       "role": "Role to cover",

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -27,6 +27,7 @@ def _json_safe(value):
     return str(value)
 
 from app.auth.scope import AccessScope
+from app.core.timeutil import shift_end_utc
 from app.models.enums import NotificationChannel, RequestStatus, ResponseStatus
 from app.models.enums import RequestRequirementType
 from app.models.request_notification import RequestNotification
@@ -238,10 +239,29 @@ class StaffingRequestService:
             return self.worker_repository.list_for_tenant(org.tenant_id)
         return self.worker_repository.list()
 
+    @staticmethod
+    def _reject_ended_shift(staffing_request: StaffingRequest) -> None:
+        """Broadcasting coverage for a shift that already ENDED is always a
+        mistake (a 2026-06-10 prod leftover sat 'searching' for a day). Keyed
+        on the end, not the start — publishing mid-shift is legitimate urgent
+        staffing (the 8h05 no-show covered at 8h30). Drafts can hold any date;
+        this fires only at the broadcast moments (publish / re-notify)."""
+        ends = shift_end_utc(
+            staffing_request.work_date,
+            staffing_request.start_time,
+            staffing_request.end_time,
+        )
+        if ends <= datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='This shift has already ended — adjust the date before notifying.',
+            )
+
     def publish(self, request_id: UUID) -> StaffingRequest:
         staffing_request = self._get_required(request_id)
         if staffing_request.status not in {RequestStatus.DRAFT, RequestStatus.OPEN}:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='Request cannot be published')
+        self._reject_ended_shift(staffing_request)
 
         workers = self._workers_for_request(staffing_request)
         eligible_workers = self.matching_service.eligible_workers(staffing_request, workers)
@@ -300,6 +320,7 @@ class StaffingRequestService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail='Request cannot be re-notified in its current state.',
             )
+        self._reject_ended_shift(staffing_request)
 
         workers = self._workers_for_request(staffing_request)
         eligible_workers = self.matching_service.eligible_workers(staffing_request, workers)
