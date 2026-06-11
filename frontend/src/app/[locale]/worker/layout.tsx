@@ -10,6 +10,7 @@ import {
   useWorkerSession,
   WorkerSessionProvider,
 } from "../../../lib/worker-session";
+import { registerServiceWorker } from "../../../lib/push";
 
 function useNavItems() {
   const t = useTranslations("worker.nav");
@@ -44,6 +45,12 @@ function WorkerShell({ children }: { children: React.ReactNode }) {
       router.push("/worker/onboarding");
     }
   }, [worker, pathname, router]);
+
+  // Keep the push service worker installed/updated for devices that already
+  // opted in (the opt-in card registers it on first enable).
+  useEffect(() => {
+    registerServiceWorker();
+  }, []);
 
   if (pathname === "/worker/onboarding") {
     return <>{children}</>;

@@ -101,6 +101,15 @@
         "assigned": "Vous êtes confirmé·e pour {title} à {city}",
         "notSelected": "Un·e autre remplaçant·e a été choisi·e pour {title} à {city}",
         "cancelled": "Votre affectation pour {title} à {city} a été annulée"
+      },
+      "push": {
+        "title": "Notifications push",
+        "enableLabel": "Alertes sur cet appareil",
+        "enableSub": "Soyez averti·e dès qu’un remplacement est diffusé — même si l’app est fermée.",
+        "denied": "Les notifications sont bloquées pour Staffig dans les réglages de votre navigateur.",
+        "error": "Impossible d’activer les notifications. Réessayez.",
+        "iosTitle": "Installez l’app pour recevoir les alertes",
+        "iosBody": "Sur iPhone : touchez Partager, puis « Ajouter à l’écran d’accueil ». Ouvrez Staffig depuis votre écran d’accueil et activez les alertes ici."
       }
     },
     "onboarding": {

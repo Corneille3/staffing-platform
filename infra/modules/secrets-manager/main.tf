@@ -42,5 +42,10 @@ resource "aws_secretsmanager_secret_version" "app_env" {
     TWILIO_ACCOUNT_SID = var.twilio_account_sid
     TWILIO_AUTH_TOKEN  = var.twilio_auth_token
     TWILIO_FROM_NUMBER = var.twilio_from_number
+
+    # Web Push (PWA). Blank keys = WebPushService skips — push off.
+    VAPID_PUBLIC_KEY  = var.vapid_public_key
+    VAPID_PRIVATE_KEY = var.vapid_private_key
+    VAPID_SUBJECT     = var.vapid_subject
   })
 }

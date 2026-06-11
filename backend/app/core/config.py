@@ -58,6 +58,13 @@ class Settings(BaseSettings):
     # Confirmations/cancellations always text.
     sms_broadcast_lead_hours: int = 24
 
+    # Web Push (PWA). Leave blank to disable — the worker UI hides the toggle
+    # when the public-key endpoint returns empty. Generate a pair with
+    # `python -m app.scripts.generate_vapid_keys`; both keys are base64url.
+    vapid_public_key: str = ''
+    vapid_private_key: str = ''
+    vapid_subject: str = 'mailto:noreply@staffig.kouamvision.com'
+
     # ── background scheduler (replacement sweep + nightly reliability) ──
     # In-process daemon thread (decision 2026-06-10: no new infra/deps; the
     # single-uvicorn-worker entrypoint means exactly one runner per container).

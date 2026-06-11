@@ -101,6 +101,10 @@ module "secrets" {
   twilio_auth_token  = var.twilio_auth_token
   twilio_from_number = var.twilio_from_number
 
+  vapid_public_key  = var.vapid_public_key
+  vapid_private_key = var.vapid_private_key
+  vapid_subject     = var.vapid_subject
+
   tags = local.tags
 }
 

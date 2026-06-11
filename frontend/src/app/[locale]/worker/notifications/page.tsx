@@ -7,6 +7,7 @@ import { fetchNotificationFeed } from "../../../../lib/browser-api";
 import { NotificationFeedItem } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
 import { Eyebrow, Mono } from "../../../../components/ui";
+import { PushNotificationsCard } from "../../../../components/push-notifications-card";
 
 type NotifType = NotificationFeedItem["type"];
 
@@ -76,6 +77,8 @@ export default function WorkerNotificationsPage() {
           {t("headlinePre")} <em style={{ fontStyle: "italic" }}>{t("headlineAccent")}</em>
         </h1>
       </header>
+
+      <PushNotificationsCard workerId={worker.id} />
 
       {error ? (
         <div style={{

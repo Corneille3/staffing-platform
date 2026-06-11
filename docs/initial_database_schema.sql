@@ -167,6 +167,17 @@ CREATE TABLE request_notifications (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE push_subscriptions (
+    id UUID PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL UNIQUE, -- natural key: re-subscribe upserts
+    p256dh VARCHAR(255) NOT NULL,
+    auth VARCHAR(255) NOT NULL,
+    user_agent VARCHAR(255),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX ix_push_subscriptions_user_id ON push_subscriptions(user_id);
+
 CREATE TABLE request_responses (
     id UUID PRIMARY KEY,
     staffing_request_id UUID NOT NULL REFERENCES staffing_requests(id) ON DELETE CASCADE,
