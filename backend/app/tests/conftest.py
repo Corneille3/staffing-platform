@@ -13,6 +13,7 @@ jwt.get_unverified_claims() — any valid JWT structure is accepted.  We set the
 can resolve the identity.
 """
 import os
+from datetime import date, timedelta
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -228,7 +229,9 @@ def request_payload(org_id, creator_id, **overrides) -> dict:
         'request_type': 'urgent_replacement',
         'title': 'Integration test shift',
         'city': 'IntTestCity',
-        'work_date': '2026-06-15',
+        # Relative — publish/renotify reject ended shifts, so a hardcoded date
+        # would turn into a time bomb the day it passes.
+        'work_date': (date.today() + timedelta(days=14)).isoformat(),
         'start_time': '08:00',
         'end_time': '16:00',
         'urgency_level': 2,

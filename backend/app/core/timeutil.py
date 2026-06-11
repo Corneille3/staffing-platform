@@ -11,7 +11,7 @@ the coordinator escalation email would fire in the middle of the night.
 All shift-vs-now comparisons must go through this helper. Revisit if
 per-org timezones ever land (settings.shift_timezone is global for now).
 """
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from app.core.config import settings
@@ -22,3 +22,12 @@ def shift_start_utc(work_date: date, start_time: time) -> datetime:
     naive wall-clock values in ``settings.shift_timezone``."""
     tz = ZoneInfo(settings.shift_timezone)
     return datetime.combine(work_date, start_time, tzinfo=tz).astimezone(timezone.utc)
+
+
+def shift_end_utc(work_date: date, start_time: time, end_time: time) -> datetime:
+    """The shift's end as an aware UTC datetime. ``end_time <= start_time``
+    means the shift crosses midnight and ends the next day — the same
+    convention the worker UI's duration display uses."""
+    tz = ZoneInfo(settings.shift_timezone)
+    end_date = work_date if end_time > start_time else work_date + timedelta(days=1)
+    return datetime.combine(end_date, end_time, tzinfo=tz).astimezone(timezone.utc)

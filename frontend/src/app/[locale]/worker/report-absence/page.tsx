@@ -100,6 +100,12 @@ export default function ReportAbsencePage() {
       setError(t("required"));
       return;
     }
+    // The shift must still be ahead (the backend enforces the same, keyed on
+    // the start — once it's started, the coordinator handles it).
+    if (new Date(`${workDate}T${startTime}`) <= new Date()) {
+      setError(t("pastDate"));
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -222,7 +228,7 @@ export default function ReportAbsencePage() {
                 </div>
               </Field>
               <Field label={t("date")}>
-                <input type="date" value={workDate} onChange={(e) => setWorkDate(e.target.value)} style={INPUT} />
+                <input type="date" min={new Date().toLocaleDateString("en-CA")} value={workDate} onChange={(e) => setWorkDate(e.target.value)} style={INPUT} />
               </Field>
               <div style={{ display: "flex", gap: 12 }}>
                 <Field label={t("start")} style={{ flex: 1 }}><input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={INPUT} /></Field>
