@@ -53,6 +53,11 @@ class WebPushService:
                     # fresh one per call.
                     vapid_claims={'sub': settings.vapid_subject},
                     ttl=_PUSH_TTL_SECONDS,
+                    # Everything we push is time-sensitive (a broadcast is a
+                    # race; confirmations/cancellations change someone's day).
+                    # Without this, Android Doze batches the message and it
+                    # only lands when the user wakes the phone.
+                    headers={'Urgency': 'high'},
                 )
                 sent += 1
             except WebPushException as exc:
