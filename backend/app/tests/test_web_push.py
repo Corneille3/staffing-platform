@@ -111,7 +111,10 @@ def test_service_sends_and_prunes_dead_endpoints(db_session, seed, monkeypatch):
 
     import pywebpush
 
+    calls = []
+
     def fake_webpush(subscription_info, data=None, **kwargs):
+        calls.append(kwargs)
         if subscription_info['endpoint'].endswith('/dead'):
             raise pywebpush.WebPushException(
                 'gone', response=SimpleNamespace(status_code=410),
@@ -124,6 +127,9 @@ def test_service_sends_and_prunes_dead_endpoints(db_session, seed, monkeypatch):
     assert result == {'sent': 1, 'pruned': 1, 'failed': 0}
     rows = db_session.scalars(select(PushSubscription)).all()
     assert [r.id for r in rows] == [alive.id]
+    # Urgency: high on every send — Android Doze batches normal-priority
+    # pushes until the phone wakes, which defeats a first-claim-wins race.
+    assert all(call['headers'] == {'Urgency': 'high'} for call in calls)
 
 
 # ── dispatcher wiring ─────────────────────────────────────────────────────────
