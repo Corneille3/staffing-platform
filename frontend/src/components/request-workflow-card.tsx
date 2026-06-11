@@ -197,7 +197,12 @@ export function RequestWorkflowCard({
             Publish request
           </button>
         ) : null}
-        {request.status === "responses_received" && acceptedResponses.length === 0 ? (
+        {/* Re-notify serves two cases: nudging non-responders AND alerting the
+            pool after a post-publish edit (the edit form points here). The
+            backend allows it for notified too — hide it only once someone
+            accepted (the next move there is assigning). */}
+        {(request.status === "notified" || request.status === "responses_received") &&
+        acceptedResponses.length === 0 ? (
           <button
             type="button"
             disabled={isPending}

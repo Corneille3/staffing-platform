@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { AdminRequestEditForm } from "../../../../../../components/admin-request-edit-form";
 import { Eyebrow } from "../../../../../../components/ui";
-import { getOrganizations, getRequest } from "../../../../../../lib/api";
+import { getOrganizations, getRequest, getRequestResponses } from "../../../../../../lib/api";
 
 // Mirrors StaffingRequestService.EDITABLE_STATUSES — only pre-assigned requests
 // can be edited. Anything assigned/closed bounces back to the read-only detail.
@@ -32,6 +32,10 @@ export default async function EditRequestPage({
     organizations.find((o) => o.id === request.organization_id)?.name ??
     request.organization?.name ??
     "Organization";
+  // The warning under the form points at Re-notify, which hides once someone
+  // accepted — fetch responses so the copy can tell the truth in both cases.
+  const responses = await getRequestResponses(id).catch(() => []);
+  const hasAccepted = responses.some((r) => r.status === "accepted");
 
   return (
     <>
@@ -71,7 +75,7 @@ export default async function EditRequestPage({
         </p>
       </div>
 
-      <AdminRequestEditForm request={request} orgName={orgName} />
+      <AdminRequestEditForm request={request} orgName={orgName} hasAccepted={hasAccepted} />
     </>
   );
 }

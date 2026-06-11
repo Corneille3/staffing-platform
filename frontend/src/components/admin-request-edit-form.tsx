@@ -61,9 +61,13 @@ function initialState(request: StaffingRequest): EditState {
 export function AdminRequestEditForm({
   request,
   orgName,
+  hasAccepted = false,
 }: {
   request: StaffingRequest;
   orgName: string;
+  /** Someone already accepted — Re-notify is hidden on the request page, so
+   * the warning must not promise it. */
+  hasAccepted?: boolean;
 }) {
   const router = useRouter();
   const [form, setForm] = useState<EditState>(() => initialState(request));
@@ -138,12 +142,21 @@ export function AdminRequestEditForm({
           }}
         >
           <TriangleAlert size={18} strokeWidth={1.6} style={{ flexShrink: 0, marginTop: 1 }} />
-          <div>
-            Substitutes have already been notified about this shift. Saving here
-            <strong style={{ fontWeight: 600 }}> won&rsquo;t re-notify them</strong> — if you change the
-            date, time, or location, use <strong style={{ fontWeight: 600 }}>Re-notify</strong> on the
-            request page afterwards so they&rsquo;re alerted to the change.
-          </div>
+          {hasAccepted ? (
+            <div>
+              A substitute has already accepted this shift. Saving here
+              <strong style={{ fontWeight: 600 }}> won&rsquo;t alert them</strong> — they&rsquo;ll see a
+              &ldquo;modified&rdquo; notice next time they open it. For a date or time change,
+              consider contacting them directly.
+            </div>
+          ) : (
+            <div>
+              Substitutes have already been notified about this shift. Saving here
+              <strong style={{ fontWeight: 600 }}> won&rsquo;t re-notify them</strong> — if you change the
+              date, time, or location, use <strong style={{ fontWeight: 600 }}>Re-notify</strong> on the
+              request page afterwards so they&rsquo;re alerted to the change.
+            </div>
+          )}
         </div>
       )}
 
