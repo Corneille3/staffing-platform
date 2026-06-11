@@ -1,7 +1,10 @@
 import logging
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.timeutil import shift_start_utc
 from app.models.organization import Organization
 from app.models.staffing_request import StaffingRequest
 from app.models.user import User
@@ -103,11 +106,14 @@ def _body_assignment_cancelled(worker: User, request: StaffingRequest) -> str:
 
 
 # ── SMS bodies (short, ≤160 chars per segment) ────────────────────────────────
+# Stick to GSM-7 characters (é à è ç are fine; — î ô are NOT): one non-GSM char
+# silently re-encodes the whole message as UCS-2 — 70 chars/segment instead of
+# 160 — and the per-text price doubles or triples. Hence plain hyphens here.
 
 def _sms_new_request(worker: User, request: StaffingRequest) -> str:
     start = _fmt_time(request.start_time)
     return (
-        f'[Staffig] {worker.first_name}: nouveau remplacement / new coverage — '
+        f'[Staffig] {worker.first_name}: nouveau remplacement / new coverage - '
         f'{request.title} le/on {request.work_date} à/at {start} ({request.city}). '
         f'Connectez-vous / Sign in to respond.'
     )
@@ -117,14 +123,14 @@ def _sms_assignment_confirmed(worker: User, request: StaffingRequest) -> str:
     start = _fmt_time(request.start_time)
     contact = f' Contact: {request.contact_name}' if request.contact_name else ''
     return (
-        f'[Staffig] {worker.first_name}: affectation confirmée / assignment confirmed — '
+        f'[Staffig] {worker.first_name}: affectation confirmée / assignment confirmed - '
         f'{request.title} {request.work_date} {start} ({request.city}).{contact}'
     )
 
 
 def _sms_assignment_cancelled(worker: User, request: StaffingRequest) -> str:
     return (
-        f'[Staffig] {worker.first_name}: affectation annulée / assignment cancelled — '
+        f'[Staffig] {worker.first_name}: affectation annulée / assignment cancelled - '
         f'{request.title} {request.work_date}. '
         f'Connectez-vous / Sign in for available coverage.'
     )
@@ -143,7 +149,7 @@ class NotificationDispatcher:
         worker: User,
         subject: str,
         email_body: str,
-        sms_body: str,
+        sms_body: str | None,
     ) -> None:
         try:
             self.email.send(EmailMessage(
@@ -154,23 +160,37 @@ class NotificationDispatcher:
         except Exception:
             logger.exception('Email failed for worker %s', worker.id)
 
-        if worker.phone:
+        if worker.phone and sms_body:
             try:
                 self.sms.send(worker.phone, sms_body)
             except Exception:
                 logger.exception('SMS failed for worker %s', worker.id)
+
+    @staticmethod
+    def _sms_broadcast_eligible(request: StaffingRequest) -> bool:
+        """SMS costs money and attention — broadcasts text only when speed
+        matters (2026-06-10 decision): urgent, or the shift starts within
+        ``sms_broadcast_lead_hours`` (24). A shift already underway counts
+        (mid-shift coverage is maximal urgency). Assignment confirmations and
+        cancellations always text — they're personal, not broadcast."""
+        if request.urgency_level and request.urgency_level >= 3:
+            return True
+        lead = timedelta(hours=settings.sms_broadcast_lead_hours)
+        starts = shift_start_utc(request.work_date, request.start_time)
+        return starts - datetime.now(timezone.utc) <= lead
 
     def notify_workers(self, request: StaffingRequest, workers: list[User]) -> None:
         if not workers:
             return
         org_name = _org_name(self.db, request)
         subject = f'[Staffig] Nouveau remplacement : {request.title} / New coverage: {request.title}'
+        sms_eligible = self._sms_broadcast_eligible(request)
         for worker in workers:
             self._send_to_worker(
                 worker,
                 subject=subject,
                 email_body=_body_new_request(worker, request, org_name),
-                sms_body=_sms_new_request(worker, request),
+                sms_body=_sms_new_request(worker, request) if sms_eligible else None,
             )
 
     def notify_assignment_confirmed(self, request: StaffingRequest, worker: User) -> None:

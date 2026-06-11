@@ -97,6 +97,10 @@ module "secrets" {
 
   platform_mfa_enforced = var.platform_mfa_enforced
 
+  twilio_account_sid = var.twilio_account_sid
+  twilio_auth_token  = var.twilio_auth_token
+  twilio_from_number = var.twilio_from_number
+
   tags = local.tags
 }
 

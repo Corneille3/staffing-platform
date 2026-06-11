@@ -50,4 +50,22 @@ variable "platform_mfa_enforced" {
   description = "Tier-0 2FA gate (PLATFORM_HANDOFF §1). Set false while the Clerk plan has no MFA (paid feature)."
 }
 
+# SMS (Twilio). Empty = SMS disabled — SmsNotificationService skips when the
+# account SID is blank, so environments without credentials keep working.
+variable "twilio_account_sid" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+variable "twilio_auth_token" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+variable "twilio_from_number" {
+  type        = string
+  default     = ""
+  description = "E.164, e.g. +15145551234"
+}
+
 variable "tags" { type = map(string) }

@@ -54,3 +54,21 @@ variable "platform_mfa_enforced" {
   type    = bool
   default = true
 }
+
+# SMS (Twilio). Leave blank to keep SMS disabled — the backend skips
+# sending when the account SID is empty. Values live in terraform.tfvars
+# (NOT committed — see .gitignore).
+variable "twilio_account_sid" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+variable "twilio_auth_token" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+variable "twilio_from_number" {
+  type    = string
+  default = ""
+}
