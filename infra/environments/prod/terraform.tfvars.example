@@ -30,3 +30,8 @@ ses_mail_from_address    = "noreply@staffig.yourdomain.com"
 apf_bootstrap_email      = "you@yourdomain.com"
 apf_bootstrap_first_name = "Your"
 apf_bootstrap_last_name  = "Name"
+
+# SMS (Twilio). Leave blank (or omit — defaults to "") to keep SMS off.
+twilio_account_sid = "AC..."
+twilio_auth_token  = "CHANGE_ME"
+twilio_from_number = "+15145551234"

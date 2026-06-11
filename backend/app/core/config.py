@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     twilio_account_sid: str = ''
     twilio_auth_token: str = ''
     twilio_from_number: str = ''
+    # Broadcast SMS gate (2026-06-10 decision): new-shift broadcasts text only
+    # when urgent (level >= 3) or the shift starts within this many hours.
+    # Confirmations/cancellations always text.
+    sms_broadcast_lead_hours: int = 24
 
     # ── background scheduler (replacement sweep + nightly reliability) ──
     # In-process daemon thread (decision 2026-06-10: no new infra/deps; the
