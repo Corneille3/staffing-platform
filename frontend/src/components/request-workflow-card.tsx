@@ -66,6 +66,11 @@ export function RequestWorkflowCard({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  // Set the moment a button is clicked — the fetch itself is the slow part
+  // (the backend fans out email/SMS/push synchronously), and isPending only
+  // covers the router.refresh() afterwards. Without this the button looks
+  // dead for seconds and repeat clicks fire duplicate notifications.
+  const [busyAction, setBusyAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancelAssignmentOpen, setCancelAssignmentOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState(ASSIGNMENT_CANCELLATION_REASONS[0]);
@@ -78,29 +83,39 @@ export function RequestWorkflowCard({
   const assignedWorkerProfile = workers.find((worker) => worker.id === assignment?.worker_user_id) || null;
   const isClosed = request.status === "assigned" || request.status === "cancelled" || request.status === "completed";
 
+  const working = busyAction !== null || isPending;
+
   async function post(path: string, payload?: object) {
+    if (working) return;
     setError(null);
-    let token: string | null = null;
-    if (CLERK_ENABLED && typeof window !== "undefined") {
-      token = (await (window as unknown as { Clerk?: ClerkLike }).Clerk?.session?.getToken()) ?? null;
-    }
-    const response = await fetch(`${browserApiBaseUrl}${path}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: payload ? JSON.stringify(payload) : undefined,
-    });
+    setBusyAction(path);
+    try {
+      let token: string | null = null;
+      if (CLERK_ENABLED && typeof window !== "undefined") {
+        token = (await (window as unknown as { Clerk?: ClerkLike }).Clerk?.session?.getToken()) ?? null;
+      }
+      const response = await fetch(`${browserApiBaseUrl}${path}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: payload ? JSON.stringify(payload) : undefined,
+      });
 
-    if (!response.ok) {
-      setError(await errorMessageFromResponse(response, `Action failed with status ${response.status}`));
-      return;
-    }
+      if (!response.ok) {
+        setError(await errorMessageFromResponse(response, `Action failed with status ${response.status}`));
+        return;
+      }
 
-    startTransition(() => {
-      router.refresh();
-    });
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch {
+      setError("Network error — please try again.");
+    } finally {
+      setBusyAction(null);
+    }
   }
 
   return (
@@ -179,7 +194,7 @@ export function RequestWorkflowCard({
         {request.status === "draft" ? (
           <button
             type="button"
-            disabled={isPending}
+            disabled={working}
             onClick={() => post(`/api/v1/requests/${request.id}/publish`)}
             style={{
               border: 0,
@@ -187,14 +202,15 @@ export function RequestWorkflowCard({
               padding: "10px 16px",
               background: "var(--ink)",
               color: "var(--paper)",
-              cursor: isPending ? "wait" : "pointer",
+              cursor: working ? "wait" : "pointer",
+              opacity: working ? 0.6 : 1,
               fontWeight: 500,
               fontSize: 13,
               fontFamily: "inherit",
               minHeight: 40,
             }}
           >
-            Publish request
+            {busyAction?.endsWith("/publish") ? "Publishing…" : "Publish request"}
           </button>
         ) : null}
         {/* Re-notify serves two cases: nudging non-responders AND alerting the
@@ -205,7 +221,7 @@ export function RequestWorkflowCard({
         acceptedResponses.length === 0 ? (
           <button
             type="button"
-            disabled={isPending}
+            disabled={working}
             onClick={() => post(`/api/v1/requests/${request.id}/renotify`)}
             style={{
               border: 0,
@@ -213,20 +229,21 @@ export function RequestWorkflowCard({
               padding: "10px 16px",
               background: "var(--moss)",
               color: "#FFFFFF",
-              cursor: isPending ? "wait" : "pointer",
+              cursor: working ? "wait" : "pointer",
+              opacity: working ? 0.6 : 1,
               fontWeight: 500,
               fontSize: 13,
               fontFamily: "inherit",
               minHeight: 40,
             }}
           >
-            Re-notify workers
+            {busyAction?.endsWith("/renotify") ? "Re-notifying…" : "Re-notify workers"}
           </button>
         ) : null}
         {!isClosed ? (
           <button
             type="button"
-            disabled={isPending}
+            disabled={working}
             onClick={() => post(`/api/v1/requests/${request.id}/cancel`)}
             style={{
               border: "0.5px solid var(--line)",
@@ -234,14 +251,15 @@ export function RequestWorkflowCard({
               padding: "10px 16px",
               background: "transparent",
               color: "var(--rose)",
-              cursor: isPending ? "wait" : "pointer",
+              cursor: working ? "wait" : "pointer",
+              opacity: working ? 0.6 : 1,
               fontWeight: 500,
               fontSize: 13,
               fontFamily: "inherit",
               minHeight: 40,
             }}
           >
-            Cancel request
+            {busyAction?.endsWith("/cancel") && busyAction?.includes("/requests/") ? "Cancelling…" : "Cancel request"}
           </button>
         ) : null}
       </div>
@@ -256,7 +274,7 @@ export function RequestWorkflowCard({
         <AssignedWorkerCard
           worker={assignedWorkerProfile}
           assignment={assignment}
-          disabled={isPending}
+          disabled={working}
           onCancel={() => setCancelAssignmentOpen(true)}
         />
       ) : null}
@@ -321,7 +339,7 @@ export function RequestWorkflowCard({
                   <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                     <button
                       type="button"
-                      disabled={isPending || response.status === "accepted"}
+                      disabled={working || response.status === "accepted"}
                       onClick={() =>
                         post(`/api/v1/requests/${request.id}/responses/accept`, {
                           worker_user_id: response.worker_user_id,
@@ -345,7 +363,7 @@ export function RequestWorkflowCard({
                     </button>
                     <button
                       type="button"
-                      disabled={isPending || response.status === "declined"}
+                      disabled={working || response.status === "declined"}
                       onClick={() =>
                         post(`/api/v1/requests/${request.id}/responses/decline`, {
                           worker_user_id: response.worker_user_id,
@@ -386,7 +404,7 @@ export function RequestWorkflowCard({
                 key={worker.id}
                 worker={worker}
                 request={request}
-                disabled={isPending}
+                disabled={working}
                 onConfirm={() =>
                   post("/api/v1/assignments", {
                     staffing_request_id: request.id,
@@ -424,7 +442,7 @@ export function RequestWorkflowCard({
           }
           reason={cancelReason}
           notes={cancelNotes}
-          disabled={isPending}
+          disabled={working}
           onReasonChange={setCancelReason}
           onNotesChange={setCancelNotes}
           onClose={() => setCancelAssignmentOpen(false)}
