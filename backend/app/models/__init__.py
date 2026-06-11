@@ -3,6 +3,7 @@ from app.models.audit_log import AuditLog
 from app.models.availability import Availability
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
+from app.models.push_subscription import PushSubscription
 from app.models.tenant import Tenant
 from app.models.tenant_membership import TenantMembership
 from app.models.request_notification import RequestNotification
@@ -21,6 +22,7 @@ __all__ = [
     'Availability',
     'Organization',
     'OrganizationMembership',
+    'PushSubscription',
     'RequestNotification',
     'RequestRequirement',
     'RequestResponse',

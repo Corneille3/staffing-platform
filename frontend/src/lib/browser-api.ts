@@ -498,6 +498,31 @@ export async function updateWorkerPreferences(
   return patchJson<WorkerProfile>(`/api/v1/workers/${workerId}/availability`, payload);
 }
 
+// ── Web Push (PWA) ───────────────────────────────────────────────────────────
+
+export async function fetchPushPublicKey(): Promise<string> {
+  const data = await getJson<{ public_key: string }>("/api/v1/workers/push/public-key");
+  return data.public_key;
+}
+
+export async function savePushSubscription(
+  workerId: string,
+  payload: {
+    endpoint: string;
+    keys: { p256dh: string; auth: string };
+    user_agent?: string;
+  },
+): Promise<{ id: string }> {
+  return postJson<{ id: string }>(`/api/v1/workers/${workerId}/push/subscribe`, payload);
+}
+
+export async function removePushSubscription(
+  workerId: string,
+  endpoint: string,
+): Promise<{ removed: boolean }> {
+  return postJson<{ removed: boolean }>(`/api/v1/workers/${workerId}/push/unsubscribe`, { endpoint });
+}
+
 export async function inviteWorker(payload: {
   first_name: string;
   last_name: string;

@@ -68,4 +68,21 @@ variable "twilio_from_number" {
   description = "E.164, e.g. +15145551234"
 }
 
+# Web Push (PWA). Empty = push disabled — WebPushService skips when the keys
+# are blank, so environments without them keep working.
+variable "vapid_public_key" {
+  type    = string
+  default = ""
+}
+variable "vapid_private_key" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+variable "vapid_subject" {
+  type        = string
+  default     = "mailto:noreply@staffig.kouamvision.com"
+  description = "mailto: contact for push-service operators"
+}
+
 variable "tags" { type = map(string) }

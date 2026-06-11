@@ -101,6 +101,15 @@
         "assigned": "You've been confirmed for {title} in {city}",
         "notSelected": "Another substitute was chosen for {title} in {city}",
         "cancelled": "Your assignment for {title} in {city} was cancelled"
+      },
+      "push": {
+        "title": "Push notifications",
+        "enableLabel": "Alerts on this device",
+        "enableSub": "Get notified the moment a shift goes out — even when the app is closed.",
+        "denied": "Notifications are blocked for Staffig in your browser settings.",
+        "error": "Couldn't enable notifications. Please try again.",
+        "iosTitle": "Install the app to get alerts",
+        "iosBody": "On iPhone: tap Share, then “Add to Home Screen”. Open Staffig from your home screen and turn alerts on here."
       }
     },
     "onboarding": {

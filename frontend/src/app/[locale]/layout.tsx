@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import React from "react";
 import { Inter_Tight, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
@@ -35,6 +35,13 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Staffig",
   description: "Staffig — bilingual substitute dispatch",
+  icons: { apple: "/icons/apple-touch-icon.png" },
+  // iOS standalone (PWA) chrome — Android reads the same from the manifest.
+  appleWebApp: { capable: true, title: "Staffig", statusBarStyle: "default" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#F6F4EE",
 };
 
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;

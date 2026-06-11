@@ -10,6 +10,7 @@ from app.models.staffing_request import StaffingRequest
 from app.models.user import User
 from app.notifications.email_service import EmailMessage, EmailNotificationService
 from app.notifications.sms_service import SmsNotificationService
+from app.notifications.web_push_service import WebPushService
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +137,49 @@ def _sms_assignment_cancelled(worker: User, request: StaffingRequest) -> str:
     )
 
 
+# ── Web Push payloads (single-locale, short) ─────────────────────────────────
+# A push notification is a phone-lockscreen one-liner — bilingual bodies don't
+# fit, so pick the worker's language ('bilingual' reads French: Québec default).
+
+def _push_lang(worker: User) -> str:
+    return 'en' if worker.preferred_language == 'en' else 'fr'
+
+
+def _push_new_request(worker: User, request: StaffingRequest) -> dict:
+    lang = _push_lang(worker)
+    start = _fmt_time(request.start_time)
+    title = 'Nouveau remplacement' if lang == 'fr' else 'New coverage'
+    if request.urgency_level and request.urgency_level >= 3:
+        title = f'Urgent — {title.lower()}'
+    return {
+        'title': title,
+        'body': f'{request.title} · {request.work_date} {start} · {request.city}',
+        'url': f'/{lang}/worker/requests/{request.id}',
+        'tag': f'request-{request.id}',
+    }
+
+
+def _push_assignment_confirmed(worker: User, request: StaffingRequest) -> dict:
+    lang = _push_lang(worker)
+    start = _fmt_time(request.start_time)
+    return {
+        'title': 'Affectation confirmée' if lang == 'fr' else 'Assignment confirmed',
+        'body': f'{request.title} · {request.work_date} {start} · {request.city}',
+        'url': f'/{lang}/worker/requests/{request.id}/accepted',
+        'tag': f'request-{request.id}',
+    }
+
+
+def _push_assignment_cancelled(worker: User, request: StaffingRequest) -> dict:
+    lang = _push_lang(worker)
+    return {
+        'title': 'Affectation annulée' if lang == 'fr' else 'Assignment cancelled',
+        'body': f'{request.title} · {request.work_date}',
+        'url': f'/{lang}/worker',
+        'tag': f'request-{request.id}',
+    }
+
+
 # ── dispatcher ────────────────────────────────────────────────────────────────
 
 class NotificationDispatcher:
@@ -143,6 +187,7 @@ class NotificationDispatcher:
         self.db = db
         self.email = EmailNotificationService()
         self.sms = SmsNotificationService()
+        self.push = WebPushService()
 
     def _send_to_worker(
         self,
@@ -150,6 +195,7 @@ class NotificationDispatcher:
         subject: str,
         email_body: str,
         sms_body: str | None,
+        push_payload: dict | None = None,
     ) -> None:
         try:
             self.email.send(EmailMessage(
@@ -165,6 +211,12 @@ class NotificationDispatcher:
                 self.sms.send(worker.phone, sms_body)
             except Exception:
                 logger.exception('SMS failed for worker %s', worker.id)
+
+        if push_payload:
+            try:
+                self.push.send_to_user(self.db, worker.id, push_payload)
+            except Exception:
+                logger.exception('Web Push failed for worker %s', worker.id)
 
     @staticmethod
     def _sms_broadcast_eligible(request: StaffingRequest) -> bool:
@@ -191,6 +243,7 @@ class NotificationDispatcher:
                 subject=subject,
                 email_body=_body_new_request(worker, request, org_name),
                 sms_body=_sms_new_request(worker, request) if sms_eligible else None,
+                push_payload=_push_new_request(worker, request),
             )
 
     def notify_assignment_confirmed(self, request: StaffingRequest, worker: User) -> None:
@@ -201,6 +254,7 @@ class NotificationDispatcher:
             subject=subject,
             email_body=_body_assignment_confirmed(worker, request, org_name),
             sms_body=_sms_assignment_confirmed(worker, request),
+            push_payload=_push_assignment_confirmed(worker, request),
         )
 
     def notify_assignment_cancelled(self, request: StaffingRequest, worker: User) -> None:
@@ -210,4 +264,5 @@ class NotificationDispatcher:
             subject=subject,
             email_body=_body_assignment_cancelled(worker, request),
             sms_body=_sms_assignment_cancelled(worker, request),
+            push_payload=_push_assignment_cancelled(worker, request),
         )

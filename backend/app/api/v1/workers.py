@@ -17,6 +17,11 @@ from app.schemas.availability import (
     AvailabilityGridRead,
     AvailabilityGridWrite,
 )
+from app.schemas.push import (
+    PushPublicKeyRead,
+    PushSubscriptionCreate,
+    PushSubscriptionDelete,
+)
 from app.schemas.worker import (
     WorkerAvailabilityUpdate,
     WorkerInviteCreate,
@@ -24,10 +29,19 @@ from app.schemas.worker import (
     WorkerProfileRead,
     WorkerRead,
 )
+from app.core.config import settings
 from app.services.availability_service import AvailabilityService
+from app.services.push_subscription_service import PushSubscriptionService
 from app.services.worker_service import WorkerService
 
 router = APIRouter()
+
+
+# Declared before the /{user_id} routes: "push" must never be parsed as a
+# worker id.
+@router.get('/push/public-key', dependencies=[Depends(get_access_scope)])
+def get_push_public_key() -> PushPublicKeyRead:
+    return PushPublicKeyRead(public_key=settings.vapid_public_key)
 
 
 def _to_worker_read(worker, db: Session) -> WorkerRead:
@@ -156,6 +170,30 @@ def put_availability_grid(
         week_start=payload.week_start,
         cells=[AvailabilityCellRead.model_validate(c) for c in cells],
     )
+
+
+@router.post('/{user_id}/push/subscribe', status_code=201)
+def subscribe_push(
+    user_id: UUID,
+    payload: PushSubscriptionCreate,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> dict[str, str]:
+    _check_scope_self(scope, user_id)
+    subscription = PushSubscriptionService(db).subscribe(user_id, payload)
+    return {'id': str(subscription.id)}
+
+
+@router.post('/{user_id}/push/unsubscribe')
+def unsubscribe_push(
+    user_id: UUID,
+    payload: PushSubscriptionDelete,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> dict[str, bool]:
+    _check_scope_self(scope, user_id)
+    removed = PushSubscriptionService(db).unsubscribe(user_id, payload.endpoint)
+    return {'removed': removed}
 
 
 @router.post('/{user_id}/availability/grid/copy-previous')

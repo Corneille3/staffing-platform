@@ -72,3 +72,20 @@ variable "twilio_from_number" {
   type    = string
   default = ""
 }
+
+# Web Push (PWA). Blank = push disabled — the backend skips sending and the
+# worker UI hides the toggle. Generate a pair with
+# `python -m app.scripts.generate_vapid_keys`; values live in terraform.tfvars.
+variable "vapid_public_key" {
+  type    = string
+  default = ""
+}
+variable "vapid_private_key" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+variable "vapid_subject" {
+  type    = string
+  default = "mailto:noreply@staffig.kouamvision.com"
+}
