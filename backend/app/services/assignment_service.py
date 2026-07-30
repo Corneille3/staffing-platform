@@ -41,6 +41,22 @@ class AssignmentService:
                 detail='Worker must accept the request before assignment',
             )
 
+        # Double-booking guard: one human, one place. Checked across tenants —
+        # accepting two overlapping requests is allowed (coordinators want to
+        # see willingness), but only one can become an assignment.
+        conflicts = self.assignment_repository.overlapping_active_for_worker(
+            payload.worker_user_id,
+            staffing_request.work_date,
+            staffing_request.start_time,
+            staffing_request.end_time,
+            exclude_request_id=staffing_request.id,
+        )
+        if conflicts:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='Worker already has an overlapping assignment on this date',
+            )
+
         assignment = Assignment(
             id=uuid4(),
             staffing_request_id=payload.staffing_request_id,

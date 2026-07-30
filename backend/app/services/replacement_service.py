@@ -34,6 +34,7 @@ from app.models.request_response import RequestResponse
 from app.models.staffing_request import StaffingRequest
 from app.models.user import User
 from app.notifications.notification_dispatcher import NotificationDispatcher
+from app.repositories.assignment_repository import AssignmentRepository
 from app.repositories.worker_repository import WorkerRepository
 from app.services.audit_service import AuditService
 from app.services.matching_service import MatchingService
@@ -57,6 +58,7 @@ class ReplacementService:
         self.db = db
         self.audit_service = AuditService(db)
         self.matching_service = MatchingService(db=db)
+        self.assignment_repository = AssignmentRepository(db)
         self.worker_repository = WorkerRepository(db)
         self.dispatcher = NotificationDispatcher(db)
 
@@ -389,6 +391,27 @@ class ReplacementService:
         must belong to ``tenant_id``) — we scope in-app, not via Postgres RLS.
         """
         now = datetime.now(timezone.utc)
+
+        # Double-booking guard: lock the claimer's user row first so two
+        # simultaneous taps by the SAME worker on different overlapping
+        # releases serialize — the second sees the first's fresh assignment
+        # and 409s. Different claimers lock different rows, so the
+        # request-level first-claim-wins race is untouched.
+        self.db.execute(select(User.id).where(User.id == claimer_user_id).with_for_update())
+        claimed = self.db.get(StaffingRequest, request_id)
+        if claimed is not None and self.assignment_repository.overlapping_active_for_worker(
+            claimer_user_id,
+            claimed.work_date,
+            claimed.start_time,
+            claimed.end_time,
+            exclude_request_id=request_id,  # winner's double-tap stays idempotent
+        ):
+            self.db.rollback()  # release the row lock — nothing was written
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='You already have a shift that overlaps this one.',
+            )
+
         org_in_tenant = select(Organization.id).where(Organization.tenant_id == tenant_id)
 
         won = self.db.execute(

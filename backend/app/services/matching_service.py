@@ -9,6 +9,7 @@ from app.models.availability import Availability
 from app.models.enums import SlotPeriod
 from app.models.staffing_request import StaffingRequest
 from app.models.user import User
+from app.repositories.assignment_repository import AssignmentRepository
 from app.schemas.eligibility import EligibilityReason, EligibilityResult
 
 
@@ -83,6 +84,28 @@ class MatchingService:
                 )
             )
             return EligibilityResult(eligible=False, score=0, reasons=reasons)
+
+        # Double-booking guard: a worker already committed to an overlapping
+        # shift is ineligible — keeps them out of broadcasts and reach counts,
+        # and surfaces "Already booked" in ranking panels. Excludes this
+        # request's own assignment so re-checks on a won shift stay sane.
+        if self.db is not None:
+            booked = AssignmentRepository(self.db).overlapping_active_for_worker(
+                worker.id,
+                staffing_request.work_date,
+                staffing_request.start_time,
+                staffing_request.end_time,
+                exclude_request_id=staffing_request.id,
+            )
+            if booked:
+                reasons.append(
+                    EligibilityReason(
+                        type='availability',
+                        status='missing',
+                        label='Already booked',
+                    )
+                )
+                return EligibilityResult(eligible=False, score=0, reasons=reasons)
 
         if profile.availability_status.value == 'available':
             if self.db is not None:
