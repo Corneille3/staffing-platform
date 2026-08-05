@@ -538,6 +538,12 @@ export async function removeUser(userId: string): Promise<{ id: string; is_activ
   return deleteJson<{ id: string; is_active: boolean }>(`/api/v1/users/${userId}`);
 }
 
+export async function removeOrganization(
+  organizationId: string,
+): Promise<{ id: string; is_active: boolean }> {
+  return deleteJson<{ id: string; is_active: boolean }>(`/api/v1/organizations/${organizationId}`);
+}
+
 export async function removeUserByEmail(email: string): Promise<{
   id: string;
   email: string;
