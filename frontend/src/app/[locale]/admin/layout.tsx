@@ -1,6 +1,7 @@
 import React from "react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Search, Bell, User as UserIcon } from "lucide-react";
+import { ArrowLeft, Search, Bell, User as UserIcon } from "lucide-react";
 import { AdminNavigation } from "../../../components/admin-navigation";
 import { AdminOrgSwitcher } from "../../../components/admin-org-switcher";
 import { AdminBreadcrumb } from "../../../components/admin-breadcrumb";
@@ -126,6 +127,31 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 : "—"
           }
         />
+
+        {/* Return path for network/platform admins visiting via the /apf
+            "Coordinator view" bridge — org_admins have no /apf to go back to. */}
+        {isMultiOrgRole && (
+          <Link href="/apf" style={{ textDecoration: "none" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "9px 12px",
+                margin: "8px 0 4px",
+                borderRadius: 10,
+                background: "var(--card)",
+                border: "0.5px solid var(--line)",
+                color: "var(--ink-2)",
+                fontSize: 12,
+                fontWeight: 500,
+              }}
+            >
+              <ArrowLeft size={13} style={{ color: "var(--terra)" }} />
+              Network view
+            </div>
+          </Link>
+        )}
 
         {/* Workspace nav */}
         <div
