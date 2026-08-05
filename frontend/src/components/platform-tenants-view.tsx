@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ArrowUpRight, Eye, Plus, Shield, X } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Eye, Plus, Shield, Trash2, X } from "lucide-react";
 import {
   invitePlatformTenant,
   platformTenantAction,
   releaseTenantAccessGrant,
+  removeNetwork,
   requestTenantAccess,
 } from "../lib/browser-api";
 import type { PlatformTenantRow, PlatformTenantsResponse, TenantProfile } from "../lib/types";
@@ -149,7 +150,10 @@ function TenantRow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accessOpen, setAccessOpen] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
   const s = STATUS_META[t.status] ?? STATUS_META.active;
+  // Own workspace (not a §2.2 visit) can never be removed — backend refuses too.
+  const canRemove = !readOnlyOperator && !(workspace && !workspace.via_grant);
   const initials = t.name.split(" ").map((p) => p[0]).slice(0, 2).join("");
 
   async function run(action: "suspend" | "reactivate" | "resend" | "revoke") {
@@ -250,10 +254,22 @@ function TenantRow({
             {!readOnlyOperator && (
               <button type="button" disabled={busy} onClick={() => run("suspend")} style={rowBtn}>Suspend</button>
             )}
+            {canRemove && (
+              <button type="button" disabled={busy} onClick={() => setRemoveOpen(true)} style={dangerBtn}>
+                <Trash2 size={12} /> Remove
+              </button>
+            )}
           </>
         )}
         {t.status === "suspended" && !readOnlyOperator && (
-          <button type="button" disabled={busy} onClick={() => run("reactivate")} style={rowBtn}>Reactivate</button>
+          <>
+            <button type="button" disabled={busy} onClick={() => run("reactivate")} style={rowBtn}>Reactivate</button>
+            {canRemove && (
+              <button type="button" disabled={busy} onClick={() => setRemoveOpen(true)} style={dangerBtn}>
+                <Trash2 size={12} /> Remove
+              </button>
+            )}
+          </>
         )}
       </div>
       {accessOpen && (
@@ -266,6 +282,80 @@ function TenantRow({
           }}
         />
       )}
+      {removeOpen && (
+        <RemoveTenantModal
+          tenant={t}
+          onClose={() => setRemoveOpen(false)}
+          onDone={() => {
+            setRemoveOpen(false);
+            onAction();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function RemoveTenantModal({
+  tenant,
+  onClose,
+  onDone,
+}: {
+  tenant: PlatformTenantRow;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function confirm() {
+    setBusy(true);
+    setError(null);
+    try {
+      await removeNetwork(tenant.id);
+      onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Removal failed");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(21,20,15,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 20 }} onClick={() => !busy && onClose()}>
+      <div style={{ ...card, width: 460, maxWidth: "100%", padding: "28px 30px", background: "#fff", boxShadow: "0 30px 80px -20px rgba(0,0,0,.4)" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+          <div>
+            <div className="stf-h-eyebrow" style={{ ...eyebrow, color: "var(--rose)" }}>Destructive action</div>
+            <h2 style={{ fontFamily: "var(--serif)", fontSize: 26, lineHeight: 1.05, margin: "4px 0 0" }}>
+              Remove <em style={{ fontStyle: "italic" }}>{tenant.name}</em>?
+            </h2>
+          </div>
+          <button type="button" onClick={onClose} style={{ ...rowBtn, width: 32, height: 32, borderRadius: 99, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            <X size={15} />
+          </button>
+        </div>
+        <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
+          This deactivates the network and <strong>every member</strong> in it — the network
+          admin, all coordinators, all substitutes. They are signed out immediately and cannot
+          sign back in. Their email addresses are released, so the same people can be
+          re-invited later under a fresh account.
+        </p>
+        <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
+          Audit history is preserved. This cannot be undone from the console.
+        </p>
+        {error ? <p style={{ margin: "0 0 12px", color: "var(--rose)", fontSize: 12 }}>{error}</p> : null}
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button type="button" onClick={onClose} disabled={busy} style={rowBtn}>Cancel</button>
+          <button
+            type="button"
+            onClick={confirm}
+            disabled={busy}
+            style={{ ...primaryBtn, background: "var(--rose)", opacity: busy ? 0.6 : 1 }}
+          >
+            <Trash2 size={14} /> {busy ? "Removing…" : "Remove network"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -510,6 +600,21 @@ const primaryBtn: React.CSSProperties = {
   border: 0,
   color: "var(--paper)",
   fontSize: 13,
+  fontWeight: 500,
+  cursor: "pointer",
+  fontFamily: "var(--ui)",
+};
+
+const dangerBtn: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "6px 12px",
+  borderRadius: 999,
+  background: "transparent",
+  border: "0.5px solid var(--rose)",
+  color: "var(--rose)",
+  fontSize: 11,
   fontWeight: 500,
   cursor: "pointer",
   fontFamily: "var(--ui)",
