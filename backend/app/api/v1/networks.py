@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
-from app.auth.permissions import require_platform_admin
+from app.auth.permissions import require_platform_admin, require_platform_operator_mfa
 from app.auth.scope import AccessScope
 from app.schemas.tenant import (
     TenantAdminRead,
@@ -69,7 +69,10 @@ def create_network(
 @router.delete('/{tenant_id}')
 def remove_network(
     tenant_id: UUID,
-    scope: AccessScope = Depends(require_platform_admin),
+    # Most destructive lifecycle mutation (cascades member deactivation +
+    # Clerk deletion) — gate it like suspend/revoke: owner/operator with 2FA,
+    # never `support`. Was the least-guarded route before this.
+    scope: AccessScope = Depends(require_platform_operator_mfa),
     db: Session = Depends(get_db_session),
 ) -> TenantNetworkRead:
     tenant = TenantService(db).remove_tenant(tenant_id, scope)

@@ -692,6 +692,35 @@ def test_network_admin_cannot_remove_network(apf_client, seed):
     assert resp.status_code == 403
 
 
+def test_support_operator_cannot_remove_network(db_session, seed):
+    """Removal is the most destructive lifecycle mutation — `support` operators
+    (read-only tier) must be rejected like they are for suspend/revoke."""
+    from app.api.deps import get_db_session
+    from app.main import app
+    from app.models.enums import PlatformOperatorRole, UserRole
+    from app.models.platform_operator import PlatformOperator
+    from app.models.user import User
+    from app.tests.conftest import _make_test_client
+
+    user = User(
+        id=uuid4(), clerk_user_id='int-scope-support', first_name='Sup', last_name='Port',
+        email=f'support-{uuid4().hex[:8]}@inttest.example', role=UserRole.PLATFORM_ADMIN,
+        preferred_language='en',
+    )
+    db_session.add(user)
+    db_session.flush()
+    db_session.add(PlatformOperator(
+        id=uuid4(), user_id=user.id, role=PlatformOperatorRole.SUPPORT, mfa_enabled=True,
+    ))
+    db_session.flush()
+    client = _make_test_client(db_session, 'int-scope-support', 'platform_admin')
+    try:
+        resp = client.delete(f'/api/v1/networks/{seed.tenant.id}')
+        assert resp.status_code == 403
+    finally:
+        app.dependency_overrides.pop(get_db_session, None)
+
+
 def test_platform_admin_can_remove_orphan_user_by_email(
     platform_admin_client, db_session, monkeypatch
 ):
