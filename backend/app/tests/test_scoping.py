@@ -680,6 +680,12 @@ def test_platform_admin_can_remove_other_network(platform_admin_client, db_sessi
     ).all()
     assert all(m.is_active is False for m in memberships)
 
+    # And the platform console no longer lists it (soft-delete keeps the row
+    # in the DB with status unchanged — the overview must filter is_active).
+    overview = platform_admin_client.get('/api/v1/platform/tenants')
+    assert overview.status_code == 200, overview.text
+    assert str(new_tenant_id) not in [row['id'] for row in overview.json()['tenants']]
+
 
 def test_platform_admin_cannot_remove_own_tenant(platform_admin_client, seed):
     resp = platform_admin_client.delete(f'/api/v1/networks/{seed.tenant.id}')

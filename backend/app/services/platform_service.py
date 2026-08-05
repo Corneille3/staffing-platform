@@ -67,7 +67,14 @@ class PlatformService:
 
     def tenants_overview(self) -> dict:
         cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-        tenants = self.db.scalars(select(Tenant).order_by(Tenant.created_at.desc())).all()
+        # Removed tenants are a soft-delete (is_active=False, status untouched)
+        # — without this filter they'd reappear as ghost "Active" rows and
+        # inflate the console KPIs.
+        tenants = self.db.scalars(
+            select(Tenant)
+            .where(Tenant.is_active.is_(True))
+            .order_by(Tenant.created_at.desc())
+        ).all()
 
         rows: list[dict] = []
         active_tenants = 0
