@@ -204,7 +204,9 @@ class ReportingService:
         org_filter = self._scope_org_filter(scope)
 
         orgs = self.db.scalars(
-            select(Organization).where(org_filter).order_by(Organization.name)
+            select(Organization)
+            .where(org_filter, Organization.is_active.is_(True))
+            .order_by(Organization.name)
         ).all()
 
         if not orgs:

@@ -10,6 +10,7 @@ from app.models.organization import Organization
 from app.repositories.organization_repository import OrganizationRepository
 from app.schemas.organization import OrganizationCreate, OrganizationRead
 from app.services.audit_service import AuditService
+from app.services.organization_service import OrganizationService
 
 router = APIRouter()
 
@@ -43,6 +44,18 @@ def list_organizations(
 ) -> dict[str, list[OrganizationRead]]:
     organizations = OrganizationRepository(db).list_for_scope(scope)
     return {'items': [OrganizationRead.model_validate(item) for item in organizations]}
+
+
+@router.delete('/{organization_id}', dependencies=[Depends(require_network_admin)])
+def remove_organization(
+    organization_id: UUID,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> OrganizationRead:
+    """Soft-delete an org: deactivates it + its memberships, preserves all
+    history. 409 while the org still has live requests."""
+    organization = OrganizationService(db).remove(organization_id, scope)
+    return OrganizationRead.model_validate(organization)
 
 
 @router.get('/{organization_id}')

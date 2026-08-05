@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { RemoveOrganizationButton } from "../../../../components/remove-organization-button";
 import { Eyebrow, Mono } from "../../../../components/ui";
 import { getOrganizations } from "../../../../lib/api";
 
@@ -94,7 +95,7 @@ export default async function OrganizationsPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "2fr 1.2fr 1fr 1fr 0.8fr",
+            gridTemplateColumns: "2fr 1.2fr 1fr 1fr 0.8fr 0.6fr",
             gap: 12,
             padding: "8px 14px",
             fontSize: 10,
@@ -110,32 +111,33 @@ export default async function OrganizationsPage() {
           <span>City</span>
           <span>Language</span>
           <span>Status</span>
+          <span />
         </div>
 
         <div style={{ display: "grid" }}>
           {organizations.map((org) => (
-            <Link
+            <div
               key={org.id}
-              href={`/apf/organizations/${org.id}`}
               style={{
                 display: "grid",
-                gridTemplateColumns: "2fr 1.2fr 1fr 1fr 0.8fr",
+                gridTemplateColumns: "2fr 1.2fr 1fr 1fr 0.8fr 0.6fr",
                 gap: 12,
                 padding: "14px",
                 alignItems: "center",
                 borderBottom: "0.5px solid var(--line-soft)",
-                textDecoration: "none",
-                color: "inherit",
               }}
             >
-              <div>
+              <Link
+                href={`/apf/organizations/${org.id}`}
+                style={{ textDecoration: "none", color: "inherit" }}
+              >
                 <div style={{ fontWeight: 500, fontSize: 14, color: "var(--ink)" }}>{org.name}</div>
                 {org.contact_email && (
                   <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
                     {org.contact_email}
                   </div>
                 )}
-              </div>
+              </Link>
               <span style={{ fontSize: 13, color: "var(--ink)" }}>
                 {ORG_TYPE_LABEL[org.type] ?? org.type}
               </span>
@@ -172,7 +174,8 @@ export default async function OrganizationsPage() {
               >
                 {org.is_active ? "Active" : "Inactive"}
               </span>
-            </Link>
+              <RemoveOrganizationButton organizationId={org.id} organizationName={org.name} />
+            </div>
           ))}
           {organizations.length === 0 && (
             <p style={{ margin: "12px 0 0", color: "var(--ink-3)" }}>
