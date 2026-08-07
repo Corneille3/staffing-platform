@@ -664,9 +664,10 @@ def test_platform_admin_can_remove_other_network(platform_admin_client, db_sessi
     del_resp = platform_admin_client.delete(f'/api/v1/networks/{new_tenant_id}')
     assert del_resp.status_code == 200, del_resp.text
 
-    # Tenant inactive.
+    # Tenant inactive + terminal status (migration 0019).
     tenant = db_session.scalar(select(Tenant).where(Tenant.id == new_tenant_id))
     assert tenant.is_active is False
+    assert tenant.status.value == 'removed'
 
     # Admin deactivated, email tombstoned, original email free for re-use.
     db_session.refresh(new_admin)
