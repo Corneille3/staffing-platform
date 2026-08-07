@@ -7,7 +7,9 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.schemas.common import NormalizedEmail
 
 
 class PlatformKpis(BaseModel):
@@ -44,7 +46,7 @@ class PlatformTenantCreate(BaseModel):
     region: str | None = Field(default=None, max_length=100)
     admin_first_name: str = Field(..., min_length=1, max_length=100)
     admin_last_name: str = Field(..., min_length=1, max_length=100)
-    admin_email: EmailStr
+    admin_email: NormalizedEmail
     admin_phone: str | None = Field(default=None, max_length=50)
     admin_preferred_language: str = Field(default='fr', pattern=r'^(fr|en|bilingual)$')
 
@@ -76,7 +78,7 @@ class PlatformOperatorsResponse(BaseModel):
 
 
 class PlatformOperatorInvite(BaseModel):
-    email: EmailStr
+    email: NormalizedEmail
     role: str = Field(pattern=r'^(owner|operator|support)$')
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)

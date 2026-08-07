@@ -2,14 +2,14 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from app.schemas.common import ORMModel
+from app.schemas.common import NormalizedEmailLoose, ORMModel
 from app.schemas.organization import OrganizationRead
 
 
 class CoordinatorInviteCreate(BaseModel):
     first_name: str
     last_name: str
-    email: str
+    email: NormalizedEmailLoose
     phone: str | None = None
     preferred_language: str = 'fr'
     org_ids: list[UUID]

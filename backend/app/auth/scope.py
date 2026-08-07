@@ -121,7 +121,7 @@ def get_access_scope(
 ) -> AccessScope:
     user = db.scalar(select(User).where(User.clerk_user_id == current_user.sub))
     if user is None and settings.app_env == 'dev' and settings.dev_auth_bypass and current_user.email:
-        user = db.scalar(select(User).where(User.email == current_user.email))
+        user = db.scalar(select(User).where(User.email == current_user.email.strip().lower()))
         if user is not None and user.clerk_user_id is None:
             user.clerk_user_id = current_user.sub
             db.add(user)
