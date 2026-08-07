@@ -16,6 +16,7 @@ class TenantStatus(str, Enum):
     ONBOARDING = 'onboarding'  # first admin signed up, running the wizard
     ACTIVE = 'active'          # workspace live
     SUSPENDED = 'suspended'    # operator paused; data preserved
+    REMOVED = 'removed'        # soft-deleted; hidden from the console, history kept
 
 
 class PlatformOperatorRole(str, Enum):

@@ -56,6 +56,31 @@ def test_platform_invite_then_lifecycle(platform_admin_client, seed, db_session)
     assert platform_admin_client.post(f'/api/v1/platform/tenants/{tid2}/revoke').status_code == 409
 
 
+def test_console_lists_suspended_but_not_removed(platform_admin_client, seed):
+    """Suspension must stay visible — its Reactivate button lives in that list
+    (2026-08-06 regression: filtering on is_active hid suspended tenants).
+    REMOVED is the only state the console forgets."""
+    suffix = uuid4().hex[:8]
+    tid = platform_admin_client.post('/api/v1/platform/tenants', json={
+        'name': f'Vis {suffix}', 'slug': f'vis-{suffix}',
+        'admin_first_name': 'Vi', 'admin_last_name': 'Sible',
+        'admin_email': f'vi-{suffix}@net.example',
+    }).json()['id']
+
+    platform_admin_client.post(f'/api/v1/platform/tenants/{tid}/suspend')
+    listed = platform_admin_client.get('/api/v1/platform/tenants').json()['tenants']
+    row = next((r for r in listed if r['id'] == tid), None)
+    assert row is not None, 'suspended tenant must stay listed'
+    assert row['status'] == 'suspended'
+
+    # Removing a SUSPENDED tenant works and takes it off the console.
+    resp = platform_admin_client.delete(f'/api/v1/networks/{tid}')
+    assert resp.status_code == 200, resp.text
+    assert resp.json()['status'] == 'removed'
+    listed_after = platform_admin_client.get('/api/v1/platform/tenants').json()['tenants']
+    assert all(r['id'] != tid for r in listed_after)
+
+
 def test_platform_endpoints_forbidden_for_network_admin(apf_client):
     assert apf_client.get('/api/v1/platform/tenants').status_code == 403
     assert apf_client.post('/api/v1/platform/tenants', json={

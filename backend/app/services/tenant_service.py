@@ -367,6 +367,11 @@ class TenantService:
         )
 
         tenant.is_active = False
+        # Distinct terminal state (migration 0019): suspension also writes
+        # is_active=False, so the console filters on status — without this a
+        # removed tenant would ghost as "Active" or, worse, hide suspended
+        # rows from the list (the 2026-08-06 regression).
+        tenant.status = TenantStatus.REMOVED
 
         self.audit_service.log(
             action='tenant.removed',

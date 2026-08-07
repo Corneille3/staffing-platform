@@ -67,12 +67,13 @@ class PlatformService:
 
     def tenants_overview(self) -> dict:
         cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-        # Removed tenants are a soft-delete (is_active=False, status untouched)
-        # — without this filter they'd reappear as ghost "Active" rows and
-        # inflate the console KPIs.
+        # Filter on status, not is_active: suspension ALSO writes
+        # is_active=False, and hiding suspended tenants makes their
+        # Reactivate button unreachable (2026-08-06 regression). REMOVED
+        # is the only state the console forgets.
         tenants = self.db.scalars(
             select(Tenant)
-            .where(Tenant.is_active.is_(True))
+            .where(Tenant.status != TenantStatus.REMOVED)
             .order_by(Tenant.created_at.desc())
         ).all()
 
