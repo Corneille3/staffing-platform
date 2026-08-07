@@ -50,9 +50,13 @@ class AssignmentRepository:
         return list(self.db.scalars(stmt).all())
 
     def get_by_request(self, request_id):
+        # The LIVE assignment for a request. CANCELLED and RELEASED are both
+        # dead: RELEASED means the giver handed the shift off via self-serve
+        # replacement, so their row must not surface as the current assignee
+        # on the original request (Finding #1, hand-off truth).
         stmt = select(Assignment).where(
             Assignment.staffing_request_id == request_id,
-            Assignment.status != AssignmentStatus.CANCELLED,
+            Assignment.status.notin_((AssignmentStatus.CANCELLED, AssignmentStatus.RELEASED)),
         )
         return self.db.scalar(stmt)
 

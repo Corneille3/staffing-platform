@@ -414,6 +414,31 @@ def test_managed_release_assigned_by_coordinator_frees_giver(db_session, seed):
     assert giver_assignment.status == AssignmentStatus.RELEASED
 
 
+def test_claim_rejects_ended_shift(db_session, seed):
+    """Belt-and-suspenders: an OPEN replacement whose shift already ENDED is not
+    claimable even before the sweep marks it EXPIRED."""
+    replacement, _ = _scenario(db_session, seed, seed.worker_a)
+    replacement.work_date = date.today() - timedelta(days=1)  # 08:00–16:00 yesterday
+    db_session.flush()
+    with pytest.raises(HTTPException) as exc:
+        ReplacementService(db_session).claim(replacement.id, seed.worker_b.id, seed.tenant.id)
+    assert exc.value.status_code == 409
+    assert 'ended' in exc.value.detail.lower()
+
+
+def test_replacement_status_reads_expired_after_end(db_session, seed):
+    """The giver's waiting screen reflects an ended-unfilled shift as expired on
+    read, not 'searching' until the next sweep tick."""
+    replacement, _ = _scenario(db_session, seed, seed.worker_a)
+    replacement.work_date = date.today() - timedelta(days=1)
+    db_session.flush()
+    result = ReplacementService(db_session).replacement_status(
+        replacement.id, _worker_scope(seed, seed.worker_a),
+    )
+    assert result['status'] == 'expired'
+    assert result['filled'] is False
+
+
 def test_sweep_expires_past_cutoff_open(db_session, seed):
     original, _ = _assigned_shift(db_session, seed, seed.worker_a)
     repl = ReplacementService(db_session).release(
@@ -541,7 +566,7 @@ def test_fifty_simultaneous_claims_yield_exactly_one_winner(db_engine):
             request_type=RequestType.URGENT_REPLACEMENT, role=RequestRole.EDUCATOR,
             status=RequestStatus.ASSIGNED, origin=RequestOrigin.COORDINATOR,
             title='Quart original', city='RaceCity',
-            work_date=date(2026, 7, 1), start_time=time(8, 0), end_time=time(16, 0),
+            work_date=date.today() + timedelta(days=21), start_time=time(8, 0), end_time=time(16, 0),
         ))
         setup.add(Assignment(
             id=giver_assignment_id, staffing_request_id=original_req_id, worker_user_id=giver_id,
@@ -556,7 +581,7 @@ def test_fifty_simultaneous_claims_yield_exactly_one_winner(db_engine):
             status=RequestStatus.OPEN, origin=RequestOrigin.WORKER_REPLACEMENT,
             auto_assign=True, replaces_assignment_id=giver_assignment_id,
             title='Besoin de suppléance', city='RaceCity',
-            work_date=date(2026, 7, 1), start_time=time(8, 0), end_time=time(16, 0),
+            work_date=date.today() + timedelta(days=21), start_time=time(8, 0), end_time=time(16, 0),
         ))
         setup.commit()
         setup.close()

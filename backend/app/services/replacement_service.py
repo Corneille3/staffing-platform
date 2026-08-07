@@ -17,7 +17,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.auth.scope import AccessScope
-from app.core.timeutil import shift_start_utc
+from app.core.timeutil import shift_end_utc, shift_start_utc
 from app.models.assignment import Assignment
 from app.models.enums import (
     AssignmentStatus,
@@ -379,6 +379,19 @@ class ReplacementService:
             for o in orgs
         ]
 
+    def _retire_giver_response(self, original_request_id: UUID, giver_id: UUID, when: datetime) -> None:
+        """Move the giver's ACCEPTED response on the original request to WITHDRAWN
+        when their released shift gets filled. Idempotent: only touches an
+        ACCEPTED row, so a re-run (or a giver who never had a response, e.g. a
+        staff_absence report) is a no-op."""
+        response = self.db.scalar(select(RequestResponse).where(
+            RequestResponse.staffing_request_id == original_request_id,
+            RequestResponse.worker_user_id == giver_id,
+        ))
+        if response is not None and response.status == ResponseStatus.ACCEPTED:
+            response.status = ResponseStatus.WITHDRAWN
+            response.responded_at = when
+
     def claim(self, request_id: UUID, claimer_user_id: UUID, tenant_id: UUID) -> Assignment:
         """Claim an open replacement. Exactly one concurrent caller wins (§3).
 
@@ -399,6 +412,20 @@ class ReplacementService:
         # request-level first-claim-wins race is untouched.
         self.db.execute(select(User.id).where(User.id == claimer_user_id).with_for_update())
         claimed = self.db.get(StaffingRequest, request_id)
+
+        # Ended-shift guard (belt-and-suspenders for the async sweep): an OPEN
+        # shift whose end has passed must not be claimable, even if the sweep
+        # hasn't marked it EXPIRED yet. Keyed on the END, so covering a shift
+        # already underway (the 8h05 no-show taken at 8h30) stays legal.
+        if claimed is not None and shift_end_utc(
+            claimed.work_date, claimed.start_time, claimed.end_time,
+        ) <= now:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='This shift has already ended.',
+            )
+
         if claimed is not None and self.assignment_repository.overlapping_active_for_worker(
             claimer_user_id,
             claimed.work_date,
@@ -457,6 +484,12 @@ class ReplacementService:
                 .where(Assignment.id == replaces_assignment_id)
                 .values(status=AssignmentStatus.RELEASED, cancelled_at=now)
             )
+            # Hand-off truth (Finding #1): retire the giver's ACCEPTED response on
+            # the ORIGINAL request so their tracking page + history stop claiming
+            # a shift they gave away. The RELEASED assignment carries the record.
+            released = self.db.get(Assignment, replaces_assignment_id)
+            if released is not None:
+                self._retire_giver_response(released.staffing_request_id, released.worker_user_id, now)
 
         self.audit_service.log(
             action='replacement.claimed',
@@ -535,16 +568,26 @@ class ReplacementService:
         responses = list(self.db.scalars(select(RequestResponse).where(
             RequestResponse.staffing_request_id == request_id,
         )))
+        filled = request.status == RequestStatus.ASSIGNED
         claimed_by_name = None
-        if request.status == RequestStatus.ASSIGNED and request.assigned_worker_user_id:
+        if filled and request.assigned_worker_user_id:
             claimer = self.db.get(User, request.assigned_worker_user_id)
             if claimer:
                 claimed_by_name = f'{claimer.first_name} {claimer.last_name}'.strip()
+
+        # Belt-and-suspenders for the async sweep: an unfilled shift whose end
+        # has passed reads as expired now, not "searching" until the next tick.
+        status_value = request.status.value
+        if not filled and status_value not in ('cancelled', 'expired') and shift_end_utc(
+            request.work_date, request.start_time, request.end_time,
+        ) <= datetime.now(timezone.utc):
+            status_value = 'expired'
+
         return {
             'request_id': request.id,
-            'status': request.status.value,
+            'status': status_value,
             'alerted': len(responses),
             'viewed': sum(1 for r in responses if r.viewed_at is not None),
-            'filled': request.status == RequestStatus.ASSIGNED,
+            'filled': filled,
             'claimed_by_name': claimed_by_name,
         }

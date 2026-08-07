@@ -121,7 +121,22 @@ export default async function RequestDetailPage({
   const organization = organizations.find((item) => item.id === request.organization_id);
   // Pre-assigned requests can still be edited (mirrors backend EDITABLE_STATUSES).
   const isEditable = ["draft", "open", "notified", "responses_received"].includes(request.status);
-  const assignment = assignments.find((item) => item.staffing_request_id === request.id && item.status !== "cancelled") || null;
+  // "released" (giver handed the shift off via self-serve replacement) is dead
+  // like "cancelled" — it must not surface as the current assignee (Finding #1).
+  const assignment = assignments.find(
+    (item) =>
+      item.staffing_request_id === request.id &&
+      item.status !== "cancelled" &&
+      item.status !== "released",
+  ) || null;
+  // A released assignment (no live one) means the giver handed the shift off —
+  // show that explicitly instead of "no assignment yet" (Finding #1).
+  const releasedAssignment =
+    !assignment
+      ? assignments.find(
+          (item) => item.staffing_request_id === request.id && item.status === "released",
+        ) || null
+      : null;
   const assignedWorker = assignment ? formatWorkerName(users, assignment.worker_user_id) : null;
   const counts = responseCounts(responses);
   const viewedCount = responses.filter((r) => r.viewed_at != null).length;
@@ -451,6 +466,11 @@ export default async function RequestDetailPage({
                   <strong style={{ color: "var(--ink)" }}>Notes:</strong> {assignment.notes || "None"}
                 </span>
               </div>
+            ) : releasedAssignment ? (
+              <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>
+                <strong style={{ color: "var(--ink)" }}>Released</strong> — the substitute
+                handed this shift off. It&apos;s being covered through a replacement request.
+              </p>
             ) : (
               <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>
                 No assignment has been confirmed for this request yet.
