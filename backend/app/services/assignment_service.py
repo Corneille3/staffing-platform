@@ -82,6 +82,14 @@ class AssignmentService:
                 # Tracked ORM object — the commit at the end of assign() persists it.
                 original.status = AssignmentStatus.RELEASED
                 original.cancelled_at = datetime.now(timezone.utc)
+                # Hand-off truth (Finding #1): retire the giver's ACCEPTED response
+                # on the original request so their app stops showing it as theirs.
+                giver_response = self.response_repository.get_for_request_and_worker(
+                    original.staffing_request_id, original.worker_user_id,
+                )
+                if giver_response is not None and giver_response.status == ResponseStatus.ACCEPTED:
+                    giver_response.status = ResponseStatus.WITHDRAWN
+                    giver_response.responded_at = datetime.now(timezone.utc)
 
         self.audit_service.log(
             action='assignment.confirmed',

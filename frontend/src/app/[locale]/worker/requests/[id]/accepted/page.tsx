@@ -92,11 +92,16 @@ export default function WorkerRequestAcceptedPage() {
     return <Centered>{error ?? t("notFound")}</Centered>;
   }
 
+  // A withdrawn response means the giver either withdrew their acceptance or
+  // released this shift and someone filled it (Finding #1 hand-off) — in both
+  // cases it's no longer theirs, so it must not read as an assigned held shift.
+  const withdrawn = myResponse?.status === "withdrawn";
   const isAssignedToMe =
-    request.status === "assigned" && request.assigned_worker_user_id === worker.id;
+    request.status === "assigned" &&
+    request.assigned_worker_user_id === worker.id &&
+    !withdrawn;
   const isClosed = ["cancelled", "completed", "expired"].includes(request.status);
   const isShiftStarted = new Date(`${request.work_date}T${request.start_time}`).getTime() <= Date.now();
-  const withdrawn = myResponse?.status === "withdrawn";
   const canWithdraw =
     myResponse?.status === "accepted" &&
     !isAssignedToMe &&

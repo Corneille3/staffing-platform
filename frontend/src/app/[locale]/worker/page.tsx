@@ -22,7 +22,7 @@ import { Assignment, RequestResponse, StaffingRequest, Worker } from "../../../l
 import { useWorkerSession } from "../../../lib/worker-session";
 import { Avatar, Chip, Meta, Mono } from "../../../components/ui";
 
-type CardStatus = "new" | "sent" | "filled" | "declined";
+type CardStatus = "new" | "sent" | "filled" | "declined" | "released";
 
 interface InboxItem {
   request: StaffingRequest;
@@ -75,7 +75,12 @@ export default function WorkerHome() {
     .map((req) => {
       const myResponse = responses.find((r) => r.staffing_request_id === req.id);
       let status: CardStatus = "new";
-      if (["assigned", "completed", "cancelled", "expired"].includes(req.status)) {
+      if (myResponse?.status === "withdrawn") {
+        // The giver released this shift (or withdrew) — check before req.status,
+        // whose "assigned" would otherwise mislabel a handed-off shift "filled"
+        // as if this worker got it (Finding #1).
+        status = "released";
+      } else if (["assigned", "completed", "cancelled", "expired"].includes(req.status)) {
         status = "filled";
       } else if (myResponse?.status === "declined") {
         status = "declined";
@@ -91,7 +96,9 @@ export default function WorkerHome() {
     });
 
   const activeItems = inboxItems.filter((i) => i.status === "new" || i.status === "sent");
-  const historyItems = inboxItems.filter((i) => i.status === "filled" || i.status === "declined");
+  const historyItems = inboxItems.filter(
+    (i) => i.status === "filled" || i.status === "declined" || i.status === "released",
+  );
   const displayed = tab === "active" ? activeItems : historyItems;
 
   const firstName = worker.first_name;
@@ -293,7 +300,7 @@ function RequestCard({
   const isAssignedToMe =
     request.status === "assigned" && request.assigned_worker_user_id === worker.id;
   const detailHref =
-    status === "sent" || isAssignedToMe
+    status === "sent" || status === "released" || isAssignedToMe
       ? `/worker/requests/${request.id}/accepted`
       : `/worker/requests/${request.id}`;
   const openDetail = () => router.push(detailHref);
@@ -356,6 +363,7 @@ function RequestCard({
           {status === "sent"     && <Chip variant="sand"  dot>{t("chipSent")}</Chip>}
           {status === "declined" && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{t("chipDeclined")}</Chip>}
           {status === "filled"   && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{tCommon("filled")}</Chip>}
+          {status === "released" && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{t("chipReleased")}</Chip>}
         </div>
         <Mono style={{ fontSize: 10, color: "var(--ink-3)" }}>{timeAgo}</Mono>
       </div>
