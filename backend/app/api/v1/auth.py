@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -98,8 +98,12 @@ def sync_current_user(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail='Could not determine email for current Clerk user.',
         )
+    # Match invites case-insensitively at the query level — robust even against
+    # any legacy row a pre-normalization invite may have stored with capitals
+    # (Finding #2). Clerk lowercases sign-in emails; we lower both sides.
+    email = email.strip().lower()
 
-    by_email = db.scalar(select(User).where(User.email == email))
+    by_email = db.scalar(select(User).where(func.lower(User.email) == email))
     if by_email is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
