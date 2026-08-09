@@ -52,13 +52,26 @@ export default function WorkerSchedulePage() {
 
   if (!worker) return null;
 
-  // Upcoming: soonest shift first (base sort is ascending). Past: most recent
-  // first, so the last shift worked is at the top instead of the oldest.
-  const upcoming = items.filter(
-    (i) => i.assignment.status === "pending_confirmation" || i.assignment.status === "confirmed",
-  );
+  // work_date is an ISO "YYYY-MM-DD" string, so string compare is date compare.
+  const today = new Date();
+  const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const isLive = (i: EnrichedAssignment) =>
+    i.assignment.status === "pending_confirmation" || i.assignment.status === "confirmed";
+  // Date-aware: a confirmed shift whose date has passed belongs in History, not
+  // the "upcoming" hero — the backend never marks past assignments completed,
+  // so status alone would keep a 2-days-ago shift as the current one.
+  const isPastDate = (i: EnrichedAssignment) => (i.request?.work_date ?? "") < todayIso;
+
+  // Upcoming: today or later, soonest first (base sort is ascending). Past:
+  // done/cancelled OR a live shift whose date has passed, most recent first.
+  const upcoming = items.filter((i) => isLive(i) && !isPastDate(i));
   const past = items
-    .filter((i) => i.assignment.status === "completed" || i.assignment.status === "cancelled")
+    .filter(
+      (i) =>
+        i.assignment.status === "completed" ||
+        i.assignment.status === "cancelled" ||
+        (isLive(i) && isPastDate(i)),
+    )
     .sort((a, b) => (b.request?.work_date || "").localeCompare(a.request?.work_date || ""));
 
   const hero = upcoming[0];
