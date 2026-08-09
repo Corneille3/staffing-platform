@@ -237,7 +237,10 @@ export default function WorkerRequestAcceptedPage() {
       </section>
       )}
 
-      {/* Timeline */}
+      {/* Timeline — hidden once released/withdrawn: the shift is no longer the
+          giver's, so the in-progress stepper (which would fall back to
+          "reviewing") would contradict the "you released this" message below. */}
+      {!withdrawn && (
       <section style={{
         background: "var(--card)",
         border: "0.5px solid var(--line)",
@@ -255,6 +258,7 @@ export default function WorkerRequestAcceptedPage() {
           ]}
         />
       </section>
+      )}
 
       {/* State notices */}
       {withdrawn && (
