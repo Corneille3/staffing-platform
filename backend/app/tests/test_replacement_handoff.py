@@ -68,6 +68,37 @@ def _giver_response(db_session, request_id, giver_id):
     ))
 
 
+# ── two-hop: a claimer who then releases must also be retired ───────────────────
+
+def test_claimer_who_releases_is_retired_on_next_handoff(db_session, seed):
+    """A giver who obtained the shift by CLAIMING has a NOTIFIED response (from
+    the broadcast), not ACCEPTED. When they release and it's re-claimed, their
+    response must still retire to WITHDRAWN — else their tracking page leaks the
+    'I need a replacement' CTA back (Finding, 2026-08-09)."""
+    from app.models.enums import ReplacementPolicy
+
+    seed.org.replacement_policy = ReplacementPolicy.AUTO
+    db_session.flush()
+
+    # Hop 1: worker_a holds, releases; worker_b claims → b now holds via claim.
+    original, _ = _original_with_giver(db_session, seed, seed.worker_a)
+    repl1 = ReplacementService(db_session).release(
+        original.id, _worker_scope(seed, seed.worker_a), reason='sick',
+    )
+    ReplacementService(db_session).claim(repl1.id, seed.worker_b.id, seed.tenant.id)
+    # b's response on repl1 is NOTIFIED (broadcast), not ACCEPTED.
+    assert _giver_response(db_session, repl1.id, seed.worker_b.id).status == ResponseStatus.NOTIFIED
+
+    # Hop 2: b releases repl1; worker_a claims it back.
+    repl2 = ReplacementService(db_session).release(
+        repl1.id, _worker_scope(seed, seed.worker_b), reason='family',
+    )
+    ReplacementService(db_session).claim(repl2.id, seed.worker_a.id, seed.tenant.id)
+
+    # b handed repl1 off → their response on repl1 must be retired to WITHDRAWN.
+    assert _giver_response(db_session, repl1.id, seed.worker_b.id).status == ResponseStatus.WITHDRAWN
+
+
 # ── auto (claim) ───────────────────────────────────────────────────────────────
 
 def test_claim_retires_giver_response_and_assignment(db_session, seed):
