@@ -121,6 +121,37 @@ def test_managed_assign_retires_giver_response(db_session, seed):
     assert _giver_response(db_session, original.id, seed.worker_a.id).status == ResponseStatus.WITHDRAWN
 
 
+# ── active-replacement lookup (giver's "waiting" state on reload) ──────────────
+
+def test_active_replacement_tracks_pending_then_clears(db_session, seed):
+    original, _ = _original_with_giver(db_session, seed, seed.worker_a)
+    svc = ReplacementService(db_session)
+    giver = _worker_scope(seed, seed.worker_a)
+
+    # Nothing pending before release.
+    assert svc.active_replacement_for(original.id, giver) is None
+
+    # After release → the giver's tracking page can show "waiting for a claim".
+    svc.release(original.id, giver, reason='sick')
+    pending = svc.active_replacement_for(original.id, giver)
+    assert pending is not None
+    assert pending['filled'] is False
+    assert pending['status'] in ('open', 'notified')
+
+    # Once claimed, it's no longer an active release → None (page shows released).
+    svc.claim(pending['request_id'], seed.worker_b.id, seed.tenant.id)
+    assert svc.active_replacement_for(original.id, giver) is None
+
+
+def test_active_replacement_none_for_non_holder(db_session, seed):
+    original, _ = _original_with_giver(db_session, seed, seed.worker_a)
+    ReplacementService(db_session).release(original.id, _worker_scope(seed, seed.worker_a), reason=None)
+    # worker_b doesn't hold this shift → no pending release from their view.
+    assert ReplacementService(db_session).active_replacement_for(
+        original.id, _worker_scope(seed, seed.worker_b),
+    ) is None
+
+
 # ── regression: a normal confirmed assignment is still "live" ──────────────────
 
 def test_get_by_request_still_returns_confirmed(db_session, seed):

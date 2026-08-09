@@ -453,6 +453,13 @@ export async function fetchReplacementStatus(requestId: string): Promise<Replace
   return getJson<ReplacementStatus>(`/api/v1/requests/${requestId}/replacement-status`);
 }
 
+/** For an ORIGINAL request the caller holds, the release already in flight (or
+ * null) — so the tracking page shows "waiting for a claim" on reload instead of
+ * re-offering release. */
+export async function fetchActiveReplacement(requestId: string): Promise<ReplacementStatus | null> {
+  return getJson<ReplacementStatus | null>(`/api/v1/requests/${requestId}/active-replacement`);
+}
+
 // Per-org self-serve policy (§5) — coordinator settings.
 export async function fetchReplacementPolicy(organizationId: string): Promise<ReplacementPolicy> {
   return getJson<ReplacementPolicy>(`/api/v1/admin/replacements/policy?organization_id=${organizationId}`);

@@ -114,6 +114,18 @@ def replacement_status(
     return ReplacementService(db).replacement_status(request_id, scope)
 
 
+@router.get('/{request_id}/active-replacement')
+def active_replacement(
+    request_id: UUID,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> dict | None:
+    """Given the ORIGINAL request the caller holds, the live release they've
+    already put out (or null). Lets the tracking page show 'waiting for a claim'
+    on reload instead of re-offering release (which would 409)."""
+    return ReplacementService(db).active_replacement_for(request_id, scope)
+
+
 @router.get('/{request_id}/responses')
 def list_request_responses(
     request_id: UUID,

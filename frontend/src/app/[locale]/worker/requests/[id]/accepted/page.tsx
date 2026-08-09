@@ -7,6 +7,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "../../../../../../i18n/navigation";
 import {
   cancelRelease,
+  fetchActiveReplacement,
   fetchReplacementStatus,
   fetchRequest,
   fetchRequestResponses,
@@ -48,13 +49,21 @@ export default function WorkerRequestAcceptedPage() {
       setLoading(true);
       setError(null);
       try {
-        const [req, responses] = await Promise.all([
+        const [req, responses, pendingRelease] = await Promise.all([
           fetchRequest(requestId),
           fetchRequestResponses(requestId).catch(() => [] as RequestResponse[]),
+          // A release already in flight for this held shift → show the waiting
+          // state on load, not the release CTA (which would 409). Null when none.
+          fetchActiveReplacement(requestId).catch(() => null),
         ]);
         if (!alive) return;
         setRequest(req);
         setMyResponse(responses.find((r) => r.worker_user_id === worker.id) ?? null);
+        if (pendingRelease && !pendingRelease.filled) {
+          setReleased(true);
+          setReplacementId(pendingRelease.request_id);
+          setReplStatus(pendingRelease);
+        }
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : "Failed to load");
       } finally {
