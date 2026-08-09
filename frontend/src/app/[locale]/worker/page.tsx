@@ -95,10 +95,16 @@ export default function WorkerHome() {
       return { request: req, status, modified };
     });
 
-  const activeItems = inboxItems.filter((i) => i.status === "new" || i.status === "sent");
-  const historyItems = inboxItems.filter(
-    (i) => i.status === "filled" || i.status === "declined" || i.status === "released",
-  );
+  // Active: soonest shift first (act on the nearest). History: most recent
+  // first. Without this the inbox rendered in raw API order — "no order".
+  const byWorkDate = (dir: 1 | -1) => (a: InboxItem, b: InboxItem) =>
+    dir * (a.request.work_date || "").localeCompare(b.request.work_date || "");
+  const activeItems = inboxItems
+    .filter((i) => i.status === "new" || i.status === "sent")
+    .sort(byWorkDate(1));
+  const historyItems = inboxItems
+    .filter((i) => i.status === "filled" || i.status === "declined" || i.status === "released")
+    .sort(byWorkDate(-1));
   const displayed = tab === "active" ? activeItems : historyItems;
 
   const firstName = worker.first_name;
