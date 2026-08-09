@@ -85,7 +85,9 @@ class AdminRequestService:
         if statuses is not None:
             page_stmt = page_stmt.where(StaffingRequest.status.in_(statuses))
 
-        # Triage order: urgent + unassigned first, then soonest shift.
+        # Order: urgent + unassigned pinned on top (safety — an urgent unfilled
+        # shift must never get buried), then newest-created first. (Was soonest
+        # shift date, which sank a just-created far-out request to the bottom.)
         priority = case(
             (sa.and_(StaffingRequest.urgency_level >= 3, StaffingRequest.status != RequestStatus.ASSIGNED), 0),
             else_=1,
@@ -98,7 +100,7 @@ class AdminRequestService:
                 offset = 0
         rows = list(
             self.db.scalars(
-                page_stmt.order_by(priority, StaffingRequest.work_date.asc(), StaffingRequest.start_time.asc())
+                page_stmt.order_by(priority, StaffingRequest.created_at.desc())
                 .offset(offset)
                 .limit(limit + 1)
             ).all()
