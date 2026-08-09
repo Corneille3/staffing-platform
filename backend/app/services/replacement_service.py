@@ -555,6 +555,29 @@ class ReplacementService:
         self.db.refresh(request)
         return request
 
+    def active_replacement_for(self, original_request_id: UUID, scope: AccessScope) -> dict | None:
+        """The caller's live release for a shift they still hold, if any.
+
+        Lets the giver's tracking page render the 'waiting for a claim' state on
+        a fresh load (new tab / back-arrow / from History) instead of re-offering
+        the release CTA — which would 409 'already being sought'. Returns a
+        replacement_status-shaped dict, or None when no release is pending.
+        """
+        assignment = self.db.scalar(select(Assignment).where(
+            Assignment.staffing_request_id == original_request_id,
+            Assignment.worker_user_id == scope.user.id,
+            Assignment.status.in_((AssignmentStatus.CONFIRMED, AssignmentStatus.PENDING_CONFIRMATION)),
+        ))
+        if assignment is None:
+            return None
+        replacement = self.db.scalar(select(StaffingRequest).where(
+            StaffingRequest.replaces_assignment_id == assignment.id,
+            StaffingRequest.status.in_(_ACTIVE_RELEASE_STATUSES),
+        ))
+        if replacement is None:
+            return None
+        return self.replacement_status(replacement.id, scope)
+
     def replacement_status(self, request_id: UUID, scope: AccessScope) -> dict:
         """Compact status for the giver's waiting screen (§6 ReplacementWaiting):
         live tally + the filled state once someone claims."""
