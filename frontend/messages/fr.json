@@ -290,6 +290,7 @@
       "notFound": "Réponse introuvable.",
       "alreadyAssigned": "Ce quart est confirmé. Le retrait n'est plus possible.",
       "withdrawn": "Vous avez retiré cette réponse.",
+      "handedOff": "Vous avez cédé ce quart — il est maintenant couvert.",
       "released": "Diffusé au bassin. Le quart reste à vous tant que personne ne l'a pris — vous serez avisé(e) dès qu'il est comblé.",
       "releaseCta": "Besoin de suppléance",
       "releaseSheetTitle": "Libérer ce quart ?",

@@ -8,6 +8,7 @@ import { Link, useRouter } from "../../../../../../i18n/navigation";
 import {
   cancelRelease,
   fetchActiveReplacement,
+  fetchAssignments,
   fetchReplacementStatus,
   fetchRequest,
   fetchRequestResponses,
@@ -41,6 +42,10 @@ export default function WorkerRequestAcceptedPage() {
   const [released, setReleased] = useState(false);
   const [replacementId, setReplacementId] = useState<string | null>(null);
   const [replStatus, setReplStatus] = useState<ReplacementStatus | null>(null);
+  // True when the caller's assignment for this shift is RELEASED — i.e. they
+  // handed it off and someone took it (vs a plain response withdrawal). Drives
+  // release-specific copy on the terminal notice.
+  const [handedOff, setHandedOff] = useState(false);
 
   useEffect(() => {
     if (!worker || !requestId) return;
@@ -49,12 +54,13 @@ export default function WorkerRequestAcceptedPage() {
       setLoading(true);
       setError(null);
       try {
-        const [req, responses, pendingRelease] = await Promise.all([
+        const [req, responses, pendingRelease, assignments] = await Promise.all([
           fetchRequest(requestId),
           fetchRequestResponses(requestId).catch(() => [] as RequestResponse[]),
           // A release already in flight for this held shift → show the waiting
           // state on load, not the release CTA (which would 409). Null when none.
           fetchActiveReplacement(requestId).catch(() => null),
+          fetchAssignments().catch(() => []),
         ]);
         if (!alive) return;
         setRequest(req);
@@ -64,6 +70,12 @@ export default function WorkerRequestAcceptedPage() {
           setReplacementId(pendingRelease.request_id);
           setReplStatus(pendingRelease);
         }
+        // Assignment is the authoritative "do I still hold this" signal —
+        // RELEASED means it was handed off and taken.
+        const mine = assignments.find(
+          (a) => a.staffing_request_id === requestId && a.worker_user_id === worker.id,
+        );
+        setHandedOff(mine?.status === "released");
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : "Failed to load");
       } finally {
@@ -271,7 +283,7 @@ export default function WorkerRequestAcceptedPage() {
 
       {/* State notices */}
       {withdrawn && (
-        <Notice tone="muted">{t("withdrawn")}</Notice>
+        <Notice tone="muted">{handedOff ? t("handedOff") : t("withdrawn")}</Notice>
       )}
       {isAssignedToMe && !canWithdraw && !withdrawn && (
         <Notice tone="moss">{t("alreadyAssigned")}</Notice>
