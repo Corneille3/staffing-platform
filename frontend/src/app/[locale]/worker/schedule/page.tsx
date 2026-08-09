@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Calendar, CheckCircle2, Mail, MapPin, Navigation, Phone, User } from "lucide-react";
+import { Calendar, CheckCircle2, ChevronRight, Mail, MapPin, Navigation, Phone, User } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { Link } from "../../../../i18n/navigation";
 import { checkInAssignment, fetchAssignments, fetchRequests } from "../../../../lib/browser-api";
 import { formatWorkDate, locationLabel, roleSectorSubtitle } from "../../../../lib/format";
 import { assignmentStatusLabel } from "../../../../lib/status-labels";
@@ -51,12 +52,14 @@ export default function WorkerSchedulePage() {
 
   if (!worker) return null;
 
+  // Upcoming: soonest shift first (base sort is ascending). Past: most recent
+  // first, so the last shift worked is at the top instead of the oldest.
   const upcoming = items.filter(
     (i) => i.assignment.status === "pending_confirmation" || i.assignment.status === "confirmed",
   );
-  const past = items.filter(
-    (i) => i.assignment.status === "completed" || i.assignment.status === "cancelled",
-  );
+  const past = items
+    .filter((i) => i.assignment.status === "completed" || i.assignment.status === "cancelled")
+    .sort((a, b) => (b.request?.work_date || "").localeCompare(a.request?.work_date || ""));
 
   const hero = upcoming[0];
   const rest = upcoming.slice(1);
@@ -190,6 +193,22 @@ function HeroCard({
         >
           {assignmentStatusLabel(assignment.status, locale)}
         </Chip>
+        <Link
+          href={`/worker/requests/${request.id}/accepted`}
+          style={{
+            marginLeft: "auto",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: 12.5,
+            fontWeight: 600,
+            color: "rgba(246,244,238,.85)",
+            textDecoration: "none",
+          }}
+        >
+          {t("manageShift")}
+          <ChevronRight size={14} />
+        </Link>
       </div>
 
       <div>
@@ -461,17 +480,22 @@ function UpcomingRow({
   last: boolean;
 }) {
   return (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 14,
-      padding: "14px 16px",
-      borderBottom: last ? "none" : "0.5px solid var(--line-soft)",
-    }}>
+    <Link
+      href={`/worker/requests/${request.id}/accepted`}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        padding: "14px 16px",
+        borderBottom: last ? "none" : "0.5px solid var(--line-soft)",
+        textDecoration: "none",
+        color: "inherit",
+      }}
+    >
       <div style={{ fontFamily: "var(--serif)", fontSize: 18, width: 48, color: "var(--ink)", flexShrink: 0 }}>
         {request.work_date.slice(5)}
       </div>
-      <div style={{ flex: 1, lineHeight: 1.25 }}>
+      <div style={{ flex: 1, lineHeight: 1.25, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 500 }}>{request.organization?.name ?? request.title}</div>
         <Mono style={{ fontSize: 11, color: "var(--ink-3)", display: "block", marginTop: 2 }}>
           {request.start_time.slice(0, 5)}–{request.end_time.slice(0, 5)}
@@ -484,7 +508,8 @@ function UpcomingRow({
       >
         {assignmentStatusLabel(assignment.status, locale)}
       </Chip>
-    </div>
+      <ChevronRight size={16} style={{ color: "var(--ink-3)", flexShrink: 0 }} />
+    </Link>
   );
 }
 
@@ -498,17 +523,22 @@ function PastCard({
   locale: "en" | "fr";
 }) {
   return (
-    <article style={{
-      background: "var(--card)",
-      border: "0.5px solid var(--line)",
-      borderRadius: 14,
-      padding: "14px 16px",
-      display: "flex",
-      alignItems: "center",
-      gap: 14,
-      opacity: 0.65,
-    }}>
-      <div style={{ flex: 1 }}>
+    <Link
+      href={`/worker/requests/${request.id}/accepted`}
+      style={{
+        background: "var(--card)",
+        border: "0.5px solid var(--line)",
+        borderRadius: 14,
+        padding: "14px 16px",
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        opacity: 0.7,
+        textDecoration: "none",
+        color: "inherit",
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 500 }}>{request.organization?.name ?? request.title}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, color: "var(--ink-3)", fontSize: 12 }}>
           <Calendar size={12} />
@@ -526,7 +556,7 @@ function PastCard({
       >
         {assignmentStatusLabel(assignment.status, locale)}
       </Chip>
-    </article>
+    </Link>
   );
 }
 
