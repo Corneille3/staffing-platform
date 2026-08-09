@@ -290,6 +290,7 @@
       "notFound": "Response not found.",
       "alreadyAssigned": "This shift is confirmed. Withdraw is no longer available.",
       "withdrawn": "You've withdrawn this response.",
+      "handedOff": "You released this shift — it's now covered.",
       "released": "Broadcast to the pool. The shift is still yours until someone claims it — you'll be notified the moment it's covered.",
       "releaseCta": "I need a replacement",
       "releaseSheetTitle": "Release this shift?",
