@@ -68,6 +68,37 @@ def _giver_response(db_session, request_id, giver_id):
     ))
 
 
+# ── two-hop: a claimer who then releases must also be retired ───────────────────
+
+def test_claimer_who_releases_is_retired_on_next_handoff(db_session, seed):
+    """A giver who obtained the shift by CLAIMING has a NOTIFIED response (from
+    the broadcast), not ACCEPTED. When they release and it's re-claimed, their
+    response must still retire to WITHDRAWN — else their tracking page leaks the
+    'I need a replacement' CTA back (Finding, 2026-08-09)."""
+    from app.models.enums import ReplacementPolicy
+
+    seed.org.replacement_policy = ReplacementPolicy.AUTO
+    db_session.flush()
+
+    # Hop 1: worker_a holds, releases; worker_b claims → b now holds via claim.
+    original, _ = _original_with_giver(db_session, seed, seed.worker_a)
+    repl1 = ReplacementService(db_session).release(
+        original.id, _worker_scope(seed, seed.worker_a), reason='sick',
+    )
+    ReplacementService(db_session).claim(repl1.id, seed.worker_b.id, seed.tenant.id)
+    # b's response on repl1 is NOTIFIED (broadcast), not ACCEPTED.
+    assert _giver_response(db_session, repl1.id, seed.worker_b.id).status == ResponseStatus.NOTIFIED
+
+    # Hop 2: b releases repl1; worker_a claims it back.
+    repl2 = ReplacementService(db_session).release(
+        repl1.id, _worker_scope(seed, seed.worker_b), reason='family',
+    )
+    ReplacementService(db_session).claim(repl2.id, seed.worker_a.id, seed.tenant.id)
+
+    # b handed repl1 off → their response on repl1 must be retired to WITHDRAWN.
+    assert _giver_response(db_session, repl1.id, seed.worker_b.id).status == ResponseStatus.WITHDRAWN
+
+
 # ── auto (claim) ───────────────────────────────────────────────────────────────
 
 def test_claim_retires_giver_response_and_assignment(db_session, seed):
@@ -119,6 +150,37 @@ def test_managed_assign_retires_giver_response(db_session, seed):
     db_session.refresh(giver_assignment)
     assert giver_assignment.status == AssignmentStatus.RELEASED
     assert _giver_response(db_session, original.id, seed.worker_a.id).status == ResponseStatus.WITHDRAWN
+
+
+# ── active-replacement lookup (giver's "waiting" state on reload) ──────────────
+
+def test_active_replacement_tracks_pending_then_clears(db_session, seed):
+    original, _ = _original_with_giver(db_session, seed, seed.worker_a)
+    svc = ReplacementService(db_session)
+    giver = _worker_scope(seed, seed.worker_a)
+
+    # Nothing pending before release.
+    assert svc.active_replacement_for(original.id, giver) is None
+
+    # After release → the giver's tracking page can show "waiting for a claim".
+    svc.release(original.id, giver, reason='sick')
+    pending = svc.active_replacement_for(original.id, giver)
+    assert pending is not None
+    assert pending['filled'] is False
+    assert pending['status'] in ('open', 'notified')
+
+    # Once claimed, it's no longer an active release → None (page shows released).
+    svc.claim(pending['request_id'], seed.worker_b.id, seed.tenant.id)
+    assert svc.active_replacement_for(original.id, giver) is None
+
+
+def test_active_replacement_none_for_non_holder(db_session, seed):
+    original, _ = _original_with_giver(db_session, seed, seed.worker_a)
+    ReplacementService(db_session).release(original.id, _worker_scope(seed, seed.worker_a), reason=None)
+    # worker_b doesn't hold this shift → no pending release from their view.
+    assert ReplacementService(db_session).active_replacement_for(
+        original.id, _worker_scope(seed, seed.worker_b),
+    ) is None
 
 
 # ── regression: a normal confirmed assignment is still "live" ──────────────────

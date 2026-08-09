@@ -1,4 +1,5 @@
 """Admin /admin/requests draft create + PATCH autosave + triage index."""
+from datetime import date, timedelta
 from uuid import uuid4
 
 from app.models.enums import OrganizationType
@@ -11,6 +12,39 @@ def _publish(client, seed):
     rid = client.post('/api/v1/requests', json=request_payload(seed.org.id, seed.org_admin.id)).json()['id']
     client.post(f'/api/v1/requests/{rid}/publish')
     return rid
+
+
+def test_admin_requests_index_orders_newest_first(db_session, org_admin_client, seed):
+    """Non-urgent requests list newest-created first, regardless of shift date —
+    a just-created far-out request must not sink below an older, sooner one.
+
+    created_at is set explicitly: within the test's single transaction Postgres
+    now() is constant, so API-created rows would share a timestamp."""
+    from datetime import datetime, time, timezone
+
+    from app.models.enums import RequestRole, RequestStatus, RequestType
+    from app.models.staffing_request import StaffingRequest
+
+    def _req(title, work_offset, created_at):
+        r = StaffingRequest(
+            id=uuid4(), organization_id=seed.org.id, created_by_user_id=seed.org_admin.id,
+            request_type=RequestType.URGENT_REPLACEMENT, role=RequestRole.EDUCATOR,
+            status=RequestStatus.OPEN, title=title, city='IntTestCity', urgency_level=2,
+            work_date=date.today() + timedelta(days=work_offset),
+            start_time=time(8, 0), end_time=time(16, 0), created_at=created_at,
+        )
+        db_session.add(r)
+        db_session.flush()
+        return str(r.id)
+
+    # 'soon' created earlier, shift in 2 days; 'far' created later, shift in 20.
+    soon = _req('Soon', 2, datetime(2026, 1, 1, tzinfo=timezone.utc))
+    far = _req('Far', 20, datetime(2026, 6, 1, tzinfo=timezone.utc))
+
+    items = org_admin_client.get('/api/v1/admin/requests?tab=active').json()['items']
+    ids = [r['id'] for r in items]
+    # Later-created 'far' outranks earlier-created 'soon', despite its later shift.
+    assert ids.index(far) < ids.index(soon)
 
 
 def test_admin_requests_index_shape_and_tabs(org_admin_client, seed):

@@ -7,6 +7,8 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "../../../../../../i18n/navigation";
 import {
   cancelRelease,
+  fetchActiveReplacement,
+  fetchAssignments,
   fetchReplacementStatus,
   fetchRequest,
   fetchRequestResponses,
@@ -40,6 +42,10 @@ export default function WorkerRequestAcceptedPage() {
   const [released, setReleased] = useState(false);
   const [replacementId, setReplacementId] = useState<string | null>(null);
   const [replStatus, setReplStatus] = useState<ReplacementStatus | null>(null);
+  // True when the caller's assignment for this shift is RELEASED — i.e. they
+  // handed it off and someone took it (vs a plain response withdrawal). Drives
+  // release-specific copy on the terminal notice.
+  const [handedOff, setHandedOff] = useState(false);
 
   useEffect(() => {
     if (!worker || !requestId) return;
@@ -48,13 +54,28 @@ export default function WorkerRequestAcceptedPage() {
       setLoading(true);
       setError(null);
       try {
-        const [req, responses] = await Promise.all([
+        const [req, responses, pendingRelease, assignments] = await Promise.all([
           fetchRequest(requestId),
           fetchRequestResponses(requestId).catch(() => [] as RequestResponse[]),
+          // A release already in flight for this held shift → show the waiting
+          // state on load, not the release CTA (which would 409). Null when none.
+          fetchActiveReplacement(requestId).catch(() => null),
+          fetchAssignments().catch(() => []),
         ]);
         if (!alive) return;
         setRequest(req);
         setMyResponse(responses.find((r) => r.worker_user_id === worker.id) ?? null);
+        if (pendingRelease && !pendingRelease.filled) {
+          setReleased(true);
+          setReplacementId(pendingRelease.request_id);
+          setReplStatus(pendingRelease);
+        }
+        // Assignment is the authoritative "do I still hold this" signal —
+        // RELEASED means it was handed off and taken.
+        const mine = assignments.find(
+          (a) => a.staffing_request_id === requestId && a.worker_user_id === worker.id,
+        );
+        setHandedOff(mine?.status === "released");
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : "Failed to load");
       } finally {
@@ -237,7 +258,10 @@ export default function WorkerRequestAcceptedPage() {
       </section>
       )}
 
-      {/* Timeline */}
+      {/* Timeline — hidden once released/withdrawn: the shift is no longer the
+          giver's, so the in-progress stepper (which would fall back to
+          "reviewing") would contradict the "you released this" message below. */}
+      {!withdrawn && (
       <section style={{
         background: "var(--card)",
         border: "0.5px solid var(--line)",
@@ -255,10 +279,11 @@ export default function WorkerRequestAcceptedPage() {
           ]}
         />
       </section>
+      )}
 
       {/* State notices */}
       {withdrawn && (
-        <Notice tone="muted">{t("withdrawn")}</Notice>
+        <Notice tone="muted">{handedOff ? t("handedOff") : t("withdrawn")}</Notice>
       )}
       {isAssignedToMe && !canWithdraw && !withdrawn && (
         <Notice tone="moss">{t("alreadyAssigned")}</Notice>

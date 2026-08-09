@@ -380,15 +380,22 @@ class ReplacementService:
         ]
 
     def _retire_giver_response(self, original_request_id: UUID, giver_id: UUID, when: datetime) -> None:
-        """Move the giver's ACCEPTED response on the original request to WITHDRAWN
-        when their released shift gets filled. Idempotent: only touches an
-        ACCEPTED row, so a re-run (or a giver who never had a response, e.g. a
-        staff_absence report) is a no-op."""
+        """Retire the giver's response on the original request to WITHDRAWN when
+        their released shift gets filled.
+
+        Retires ANY non-terminal status, not just ACCEPTED: a giver who obtained
+        the shift by CLAIMING an earlier release holds a NOTIFIED response (from
+        the broadcast), so an ACCEPTED-only check left it un-retired and the
+        tracking page leaked the release CTA back (2026-08-09). DECLINED /
+        already-WITHDRAWN are left alone; a missing response (staff_absence) is
+        a no-op."""
         response = self.db.scalar(select(RequestResponse).where(
             RequestResponse.staffing_request_id == original_request_id,
             RequestResponse.worker_user_id == giver_id,
         ))
-        if response is not None and response.status == ResponseStatus.ACCEPTED:
+        if response is not None and response.status not in (
+            ResponseStatus.WITHDRAWN, ResponseStatus.DECLINED,
+        ):
             response.status = ResponseStatus.WITHDRAWN
             response.responded_at = when
 
@@ -554,6 +561,29 @@ class ReplacementService:
         self.db.commit()
         self.db.refresh(request)
         return request
+
+    def active_replacement_for(self, original_request_id: UUID, scope: AccessScope) -> dict | None:
+        """The caller's live release for a shift they still hold, if any.
+
+        Lets the giver's tracking page render the 'waiting for a claim' state on
+        a fresh load (new tab / back-arrow / from History) instead of re-offering
+        the release CTA — which would 409 'already being sought'. Returns a
+        replacement_status-shaped dict, or None when no release is pending.
+        """
+        assignment = self.db.scalar(select(Assignment).where(
+            Assignment.staffing_request_id == original_request_id,
+            Assignment.worker_user_id == scope.user.id,
+            Assignment.status.in_((AssignmentStatus.CONFIRMED, AssignmentStatus.PENDING_CONFIRMATION)),
+        ))
+        if assignment is None:
+            return None
+        replacement = self.db.scalar(select(StaffingRequest).where(
+            StaffingRequest.replaces_assignment_id == assignment.id,
+            StaffingRequest.status.in_(_ACTIVE_RELEASE_STATUSES),
+        ))
+        if replacement is None:
+            return None
+        return self.replacement_status(replacement.id, scope)
 
     def replacement_status(self, request_id: UUID, scope: AccessScope) -> dict:
         """Compact status for the giver's waiting screen (§6 ReplacementWaiting):

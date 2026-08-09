@@ -82,12 +82,16 @@ class AssignmentService:
                 # Tracked ORM object — the commit at the end of assign() persists it.
                 original.status = AssignmentStatus.RELEASED
                 original.cancelled_at = datetime.now(timezone.utc)
-                # Hand-off truth (Finding #1): retire the giver's ACCEPTED response
-                # on the original request so their app stops showing it as theirs.
+                # Hand-off truth (Finding #1): retire the giver's response on the
+                # original request so their app stops showing it as theirs. Any
+                # non-terminal status (a claimer-giver holds NOTIFIED, not
+                # ACCEPTED — 2026-08-09), leaving DECLINED/WITHDRAWN alone.
                 giver_response = self.response_repository.get_for_request_and_worker(
                     original.staffing_request_id, original.worker_user_id,
                 )
-                if giver_response is not None and giver_response.status == ResponseStatus.ACCEPTED:
+                if giver_response is not None and giver_response.status not in (
+                    ResponseStatus.WITHDRAWN, ResponseStatus.DECLINED,
+                ):
                     giver_response.status = ResponseStatus.WITHDRAWN
                     giver_response.responded_at = datetime.now(timezone.utc)
 
