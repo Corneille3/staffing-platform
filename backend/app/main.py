@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.api.v1.router import api_router
+from app.api.v1.webhooks import router as webhooks_router
 from app.auth.permissions import require_authenticated
 from app.core.config import settings
 from app.core.logging import configure_logging
@@ -59,6 +60,14 @@ app.include_router(
     api_router,
     prefix=settings.api_v1_prefix,
     dependencies=[Depends(require_authenticated)],
+)
+
+# Mounted separately and WITHOUT require_authenticated: Twilio posts here with
+# no Clerk JWT. Authenticity is the X-Twilio-Signature HMAC, checked inside the
+# handler before anything touches the database.
+app.include_router(
+    webhooks_router,
+    prefix=f'{settings.api_v1_prefix}/webhooks',
 )
 
 

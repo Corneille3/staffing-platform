@@ -4,7 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from app.models.enums import AvailabilityStatus, EmploymentType
-from app.schemas.common import NormalizedEmail, TimestampedSchema
+from app.schemas.common import NormalizedEmail, NormalizedPhone, TimestampedSchema
 
 
 class WorkerProfileBase(BaseModel):
@@ -76,7 +76,7 @@ class WorkerInviteCreate(BaseModel):
     first_name: str
     last_name: str
     email: NormalizedEmail
-    phone: str | None = None
+    phone: NormalizedPhone = None
     preferred_language: str = 'fr'
     # Self-serve replacement (§1): the tenant admin sets the worker's
     # relationship at invite. Default contractor → the release path.
