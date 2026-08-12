@@ -466,7 +466,11 @@ export type Worker = {
   first_name: string;
   last_name: string;
   email: string;
+  phone: string | null;
   preferred_language: string;
+  // true = don't text. Lives on the user row beside `phone`, not on `profile`,
+  // because it also carries an inbound STOP/ARRET.
+  sms_opt_out: boolean;
   is_active: boolean;
   employment_type?: "permanent" | "contractor";
   profile: WorkerProfile | null;

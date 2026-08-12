@@ -9,6 +9,7 @@ import {
   saveAvailabilityGrid,
   updateAvailability,
   updateWorkerPreferences,
+  updateWorkerSmsPreference,
 } from "../../../../lib/browser-api";
 import { SlotPeriod } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
@@ -149,6 +150,11 @@ export default function WorkerAvailabilityPage() {
   const urgentAlertsOn = worker.profile?.urgent_alert_opt_in ?? false;
   const notifyFarOn = worker.profile?.notify_far ?? false;
   const notifyWeekendOvernightOn = worker.profile?.notify_weekend_overnight ?? false;
+  // Stored negative (sms_opt_out) but shown positive — the switch reads
+  // "Text me about shifts", so ON means opted in. Hidden without a phone on
+  // file, where the choice would be meaningless either way.
+  const hasPhone = Boolean(worker.phone);
+  const smsOn = !worker.sms_opt_out;
 
   async function setStatus(next: "available" | "unavailable") {
     if (!worker) return;
@@ -192,6 +198,24 @@ export default function WorkerAvailabilityPage() {
     prefFlash.start();
     try {
       await updateWorkerPreferences(worker.id, partial);
+      await refresh();
+      prefFlash.succeed();
+    } catch (err) {
+      prefFlash.fail();
+      setPrefError(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveSmsPreference(nextOn: boolean) {
+    if (!worker) return;
+    setBusy(true);
+    setPrefError(null);
+    prefFlash.start();
+    try {
+      // The switch is positive, the column is negative.
+      await updateWorkerSmsPreference(worker.id, !nextOn);
       await refresh();
       prefFlash.succeed();
     } catch (err) {
@@ -562,8 +586,18 @@ export default function WorkerAvailabilityPage() {
             on={notifyWeekendOvernightOn}
             onToggle={() => savePreference({ notify_weekend_overnight: !notifyWeekendOvernightOn })}
             disabled={busy}
-            last
+            last={!hasPhone}
           />
+          {hasPhone ? (
+            <ToggleRow
+              label={t("smsAlerts")}
+              sub={t("smsAlertsSub")}
+              on={smsOn}
+              onToggle={() => saveSmsPreference(!smsOn)}
+              disabled={busy}
+              last
+            />
+          ) : null}
         </div>
         {prefError ? (
           <p style={{ margin: "10px 0 0", color: "var(--rose)", fontWeight: 600, fontSize: 13 }}>{prefError}</p>

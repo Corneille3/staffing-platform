@@ -54,6 +54,10 @@ CREATE TABLE users (
     phone VARCHAR(50),
     role user_role NOT NULL,
     preferred_language VARCHAR(20) NOT NULL DEFAULT 'fr',
+    -- true = don't text this person (own toggle, or an inbound STOP/ARRET).
+    -- Sits beside `phone` because it governs that number; the notify_* toggles
+    -- on worker_profiles are matching preferences, a different thing.
+    sms_opt_out BOOLEAN NOT NULL DEFAULT FALSE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

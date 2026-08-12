@@ -252,6 +252,30 @@ class WorkerService:
             self.recompute_reliability_for(user_id)
         return len(worker_ids)
 
+    def set_sms_opt_out(self, user_id: UUID, opt_out: bool) -> User | None:
+        """Silence (or re-enable) texts for one person.
+
+        Deliberately keyed on the user row rather than the worker profile:
+        the inbound STOP/ARRET handler resolves a bare phone number to a
+        User and has no profile to lean on, and a worker who was invited but
+        never onboarded still has a phone we must be able to stop texting.
+        """
+        user = self.repository.get(user_id)
+        if user is None:
+            return None
+
+        user.sms_opt_out = opt_out
+        self.audit_service.log(
+            action='worker.sms_opt_out_updated',
+            entity_type='user',
+            entity_id=user.id,
+            actor_user_id=user_id,
+            payload={'sms_opt_out': opt_out},
+        )
+        self.db.commit()
+        self.db.refresh(user)
+        return user
+
     def update_availability(
         self,
         user_id: UUID,

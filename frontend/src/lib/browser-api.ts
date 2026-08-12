@@ -505,6 +505,18 @@ export async function updateWorkerPreferences(
   return patchJson<WorkerProfile>(`/api/v1/workers/${workerId}/availability`, payload);
 }
 
+// Separate endpoint from the preferences above: sms_opt_out lives on the user
+// row, not the worker profile, so it returns the Worker and keeps working for
+// someone who has no profile yet.
+export async function updateWorkerSmsPreference(
+  workerId: string,
+  smsOptOut: boolean,
+): Promise<Worker> {
+  return patchJson<Worker>(`/api/v1/workers/${workerId}/sms-preference`, {
+    sms_opt_out: smsOptOut,
+  });
+}
+
 // ── Web Push (PWA) ───────────────────────────────────────────────────────────
 
 export async function fetchPushPublicKey(): Promise<string> {

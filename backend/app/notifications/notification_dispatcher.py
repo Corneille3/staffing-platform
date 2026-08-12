@@ -206,7 +206,9 @@ class NotificationDispatcher:
         except Exception:
             logger.exception('Email failed for worker %s', worker.id)
 
-        if worker.phone and sms_body:
+        # sms_opt_out covers both a worker's own toggle and an inbound
+        # STOP/ARRET — it silences texts only; email and push still go out.
+        if worker.phone and not worker.sms_opt_out and sms_body:
             try:
                 self.sms.send(worker.phone, sms_body)
             except Exception:

@@ -34,6 +34,9 @@ class WorkerRead(BaseModel):
     email: EmailStr
     phone: str | None = None
     preferred_language: str
+    # true = don't text this worker (own toggle, or an inbound STOP/ARRET).
+    # Lives on the user row beside `phone`, not on `profile`.
+    sms_opt_out: bool = False
     is_active: bool
     # Drives which self-serve trigger the worker app shows (SELF_SERVE §1):
     # contractor → release held shifts; permanent → report absences.
@@ -59,6 +62,14 @@ class WorkerAvailabilityUpdate(BaseModel):
         ):
             raise ValueError('At least one worker preference must be provided.')
         return self
+
+
+class WorkerSmsPreferenceUpdate(BaseModel):
+    """Separate from WorkerAvailabilityUpdate on purpose: that endpoint writes
+    profile columns and 404s when no profile exists, while this flag lives on
+    the user row and must stay settable for anyone with a phone."""
+
+    sms_opt_out: bool
 
 
 class WorkerInviteCreate(BaseModel):
