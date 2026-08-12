@@ -28,6 +28,7 @@ from app.schemas.worker import (
     WorkerOnboardCreate,
     WorkerProfileRead,
     WorkerRead,
+    WorkerSmsPreferenceUpdate,
 )
 from app.core.config import settings
 from app.services.availability_service import AvailabilityService
@@ -57,6 +58,7 @@ def _to_worker_read(worker, db: Session) -> WorkerRead:
         email=worker.email,
         phone=worker.phone,
         preferred_language=worker.preferred_language,
+        sms_opt_out=worker.sms_opt_out,
         is_active=worker.is_active,
         employment_type=membership.employment_type if membership else EmploymentType.CONTRACTOR,
         profile=WorkerProfileRead.model_validate(worker.worker_profile) if worker.worker_profile else None,
@@ -132,6 +134,24 @@ def update_worker_availability(
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Worker profile not found')
     return WorkerProfileRead.model_validate(profile)
+
+
+@router.patch('/{user_id}/sms-preference')
+def update_worker_sms_preference(
+    user_id: UUID,
+    payload: WorkerSmsPreferenceUpdate,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> WorkerRead:
+    if not scope.is_admin and scope.user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='Workers may only update their own SMS preference.',
+        )
+    user = WorkerService(db).set_sms_opt_out(user_id, payload.sms_opt_out)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Worker not found')
+    return _to_worker_read(user, db)
 
 
 def _check_scope_self(scope: AccessScope, user_id: UUID) -> None:

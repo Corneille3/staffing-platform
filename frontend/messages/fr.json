@@ -164,6 +164,8 @@
       "notifyFarSub": "M'avertir pour les demandes hors de mon secteur habituel",
       "notifyWeekendOvernight": "Nuits de fin de semaine",
       "notifyWeekendOvernightSub": "M'avertir pour les quarts de nuit en fin de semaine",
+      "smsAlerts": "M'envoyer des textos",
+      "smsAlertsSub": "Désactive pour ne plus recevoir de textos. Tu gardes les courriels et les alertes de l'app.",
       "available": "Disponible",
       "unavailable": "Indisponible",
       "weeklyGrid": "Disponibilités hebdomadaires",

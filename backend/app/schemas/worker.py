@@ -4,7 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from app.models.enums import AvailabilityStatus, EmploymentType
-from app.schemas.common import NormalizedEmail, TimestampedSchema
+from app.schemas.common import NormalizedEmail, NormalizedPhone, TimestampedSchema
 
 
 class WorkerProfileBase(BaseModel):
@@ -34,6 +34,9 @@ class WorkerRead(BaseModel):
     email: EmailStr
     phone: str | None = None
     preferred_language: str
+    # true = don't text this worker (own toggle, or an inbound STOP/ARRET).
+    # Lives on the user row beside `phone`, not on `profile`.
+    sms_opt_out: bool = False
     is_active: bool
     # Drives which self-serve trigger the worker app shows (SELF_SERVE §1):
     # contractor → release held shifts; permanent → report absences.
@@ -61,11 +64,19 @@ class WorkerAvailabilityUpdate(BaseModel):
         return self
 
 
+class WorkerSmsPreferenceUpdate(BaseModel):
+    """Separate from WorkerAvailabilityUpdate on purpose: that endpoint writes
+    profile columns and 404s when no profile exists, while this flag lives on
+    the user row and must stay settable for anyone with a phone."""
+
+    sms_opt_out: bool
+
+
 class WorkerInviteCreate(BaseModel):
     first_name: str
     last_name: str
     email: NormalizedEmail
-    phone: str | None = None
+    phone: NormalizedPhone = None
     preferred_language: str = 'fr'
     # Self-serve replacement (§1): the tenant admin sets the worker's
     # relationship at invite. Default contractor → the release path.

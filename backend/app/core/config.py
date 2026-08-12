@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     # when urgent (level >= 3) or the shift starts within this many hours.
     # Confirmations/cancellations always text.
     sms_broadcast_lead_hours: int = 24
+    # How far back an inbound "1" reply may claim: the newest NOTIFIED
+    # response within this window wins. Consumed by the reply-to-claim
+    # webhook (spec Feature 1 step 2) — declared here with the rest of the
+    # SMS config so the two land together.
+    sms_claim_window_hours: int = 6
 
     # Web Push (PWA). Leave blank to disable — the worker UI hides the toggle
     # when the public-key endpoint returns empty. Generate a pair with

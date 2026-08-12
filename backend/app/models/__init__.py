@@ -1,6 +1,7 @@
 from app.models.assignment import Assignment
 from app.models.audit_log import AuditLog
 from app.models.availability import Availability
+from app.models.inbound_sms import InboundSms
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
 from app.models.push_subscription import PushSubscription
@@ -23,6 +24,7 @@ __all__ = [
     'Organization',
     'OrganizationMembership',
     'PushSubscription',
+    'InboundSms',
     'RequestNotification',
     'RequestRequirement',
     'RequestResponse',

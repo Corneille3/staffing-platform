@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from app.schemas.common import ORMModel
+from app.schemas.common import NormalizedPhone, ORMModel
 
 
 class ApfSnapshotKpis(BaseModel):
@@ -133,7 +133,7 @@ class BulkInviteEntry(BaseModel):
     first_name: str
     last_name: str
     email: str
-    phone: str | None = None
+    phone: NormalizedPhone = None
     preferred_language: str = 'fr'
 
 

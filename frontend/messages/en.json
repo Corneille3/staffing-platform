@@ -164,6 +164,8 @@
       "notifyFarSub": "Notify me for requests beyond my usual area",
       "notifyWeekendOvernight": "Weekend overnights",
       "notifyWeekendOvernightSub": "Notify me for overnight shifts on weekends",
+      "smsAlerts": "Text me about shifts",
+      "smsAlertsSub": "Turn this off to stop texts. You'll still get email and app alerts.",
       "available": "Available",
       "unavailable": "Unavailable",
       "weeklyGrid": "Weekly availability",

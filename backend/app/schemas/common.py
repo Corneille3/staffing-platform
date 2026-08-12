@@ -20,6 +20,25 @@ NormalizedEmail = Annotated[EmailStr, BeforeValidator(_normalize_email)]
 NormalizedEmailLoose = Annotated[str, BeforeValidator(_normalize_email)]
 
 
+def _normalize_phone(value):
+    """Store phones in E.164 so an inbound SMS can be matched to a person.
+
+    Same reasoning as the email normalization above: Twilio hands us
+    `+15145550001` while a coordinator types `(514) 555-0001`, and a reply that
+    matches nobody silently loses the worker's claim. Migration 0022 backfilled
+    existing rows; this keeps new ones canonical. Unparseable input passes
+    through untouched rather than being mangled.
+    """
+    if not isinstance(value, str):
+        return value
+    from app.core.phone import normalize_e164
+
+    return normalize_e164(value)
+
+
+NormalizedPhone = Annotated[str | None, BeforeValidator(_normalize_phone)]
+
+
 class ORMModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
