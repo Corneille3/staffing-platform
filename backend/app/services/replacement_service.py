@@ -20,6 +20,7 @@ from app.auth.scope import AccessScope
 from app.core.timeutil import shift_end_utc, shift_start_utc
 from app.models.assignment import Assignment
 from app.models.enums import (
+    SELF_SERVE_ORIGINS,
     AssignmentStatus,
     NotificationChannel,
     RequestOrigin,
@@ -40,8 +41,9 @@ from app.services.audit_service import AuditService
 from app.services.matching_service import MatchingService
 from app.services.staffing_request_service import StaffingRequestService
 
-# Only worker-originated, auto-assign requests are claimable this way.
-SELF_SERVE_ORIGINS = (RequestOrigin.WORKER_REPLACEMENT, RequestOrigin.STAFF_ABSENCE)
+# Only worker-originated, auto-assign requests are claimable this way. Defined
+# in models.enums (and re-exported here, where callers already look for it) so
+# the notification dispatcher can share the rule without a circular import.
 # A reason must be one of these (or omitted).
 RELEASE_REASONS = {'sick', 'family', 'personal', 'other'}
 # A release is "live" (one per held assignment) while it's still seeking a fill,

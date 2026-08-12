@@ -1,10 +1,12 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.timeutil import shift_start_utc
+from app.models.enums import SELF_SERVE_ORIGINS, ReplacementPolicy
 from app.models.organization import Organization
 from app.models.staffing_request import StaffingRequest
 from app.models.user import User
@@ -111,12 +113,13 @@ def _body_assignment_cancelled(worker: User, request: StaffingRequest) -> str:
 # silently re-encodes the whole message as UCS-2 — 70 chars/segment instead of
 # 160 — and the per-text price doubles or triples. Hence plain hyphens here.
 
-def _sms_new_request(worker: User, request: StaffingRequest) -> str:
+def _sms_new_request(worker: User, request: StaffingRequest, claim_hint: str = '') -> str:
     start = _fmt_time(request.start_time)
+    call_to_action = claim_hint or 'Connectez-vous / Sign in to respond.'
     return (
         f'[Staffig] {worker.first_name}: nouveau remplacement / new coverage - '
         f'{request.title} le/on {request.work_date} à/at {start} ({request.city}). '
-        f'Connectez-vous / Sign in to respond.'
+        f'{call_to_action}'
     )
 
 
@@ -220,6 +223,39 @@ class NotificationDispatcher:
             except Exception:
                 logger.exception('Web Push failed for worker %s', worker.id)
 
+    def _sms_claim_hint(self, request: StaffingRequest) -> str:
+        """The 'Reply 1' line — only when replying 1 would actually work.
+
+        Three things have to be true, and every one of them has bitten
+        somewhere already:
+
+        * Twilio must be configured, or there is no inbound webhook to answer
+          and the worker texts into a void.
+        * The request must be self-serve (a released shift or a reported
+          absence). ``ReplacementService.claim`` only accepts those origins, so
+          promising it on a coordinator-created request would send the worker
+          a reply saying no shift is open — worse than saying nothing.
+        * The wording has to match the org's policy. Under MANAGED a reply
+          records an offer for the coordinator to weigh, it does not take the
+          shift; telling someone they took it would be a lie they act on.
+
+        GSM-7 only (é è à ç are safe, em dashes are not) — one stray character
+        re-encodes the whole message as UCS-2 and doubles the price.
+        """
+        if not settings.twilio_account_sid:
+            return ''
+        if request.origin not in SELF_SERVE_ORIGINS:
+            return ''
+
+        policy = self.db.scalar(
+            select(Organization.replacement_policy).where(
+                Organization.id == request.organization_id
+            )
+        )
+        if policy == ReplacementPolicy.MANAGED:
+            return 'Réponds 1 pour te proposer / Reply 1 to offer.'
+        return 'Réponds 1 pour le prendre / Reply 1 to take it.'
+
     @staticmethod
     def _sms_broadcast_eligible(request: StaffingRequest) -> bool:
         """SMS costs money and attention — broadcasts text only when speed
@@ -239,12 +275,13 @@ class NotificationDispatcher:
         org_name = _org_name(self.db, request)
         subject = f'[Staffig] Nouveau remplacement : {request.title} / New coverage: {request.title}'
         sms_eligible = self._sms_broadcast_eligible(request)
+        claim_hint = self._sms_claim_hint(request) if sms_eligible else ''
         for worker in workers:
             self._send_to_worker(
                 worker,
                 subject=subject,
                 email_body=_body_new_request(worker, request, org_name),
-                sms_body=_sms_new_request(worker, request) if sms_eligible else None,
+                sms_body=_sms_new_request(worker, request, claim_hint) if sms_eligible else None,
                 push_payload=_push_new_request(worker, request),
             )
 

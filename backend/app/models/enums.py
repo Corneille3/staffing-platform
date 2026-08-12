@@ -97,6 +97,14 @@ class RequestOrigin(str, Enum):
     STAFF_ABSENCE = 'staff_absence'            # permanent staff reported an absence
 
 
+# The origins ReplacementService.claim will accept — i.e. the shifts a worker
+# can take themselves. Lives here rather than in replacement_service so the
+# notification dispatcher can consult it too (that module is imported *by*
+# replacement_service, so importing back would be circular), and so the rule
+# stays defined once.
+SELF_SERVE_ORIGINS = (RequestOrigin.WORKER_REPLACEMENT, RequestOrigin.STAFF_ABSENCE)
+
+
 class ResponseStatus(str, Enum):
     NOTIFIED = 'notified'
     VIEWED = 'viewed'
