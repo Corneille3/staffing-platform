@@ -513,6 +513,15 @@ class ReplacementService:
         )
         self.db.commit()
         self.db.refresh(assignment)
+
+        # Tell the rest of the pool it's gone. After the commit and outside the
+        # transaction on purpose: the claim is already durable, and a failing
+        # push must never roll back a won shift. Push only — see
+        # notify_request_filled for why this isn't an SMS.
+        claimed_request = self.db.get(StaffingRequest, request_id)
+        if claimed_request is not None:
+            self.dispatcher.notify_request_filled(claimed_request, claimer_user_id)
+
         return assignment
 
     def _lost_or_idempotent(self, request_id: UUID, claimer_user_id: UUID) -> Assignment:

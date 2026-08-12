@@ -6,8 +6,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.timeutil import shift_start_utc
-from app.models.enums import SELF_SERVE_ORIGINS, ReplacementPolicy
+from app.models.enums import SELF_SERVE_ORIGINS, ReplacementPolicy, ResponseStatus
 from app.models.organization import Organization
+from app.models.request_response import RequestResponse
 from app.models.staffing_request import StaffingRequest
 from app.models.user import User
 from app.notifications.email_service import EmailMessage, EmailNotificationService
@@ -162,6 +163,23 @@ def _push_new_request(worker: User, request: StaffingRequest) -> dict:
     }
 
 
+def _push_request_filled(worker: User, request: StaffingRequest) -> dict:
+    """Sent to everyone who was offered the shift but didn't get it.
+
+    Reuses `tag: request-{id}` on purpose — a phone that still shows the
+    original "New coverage" banner replaces it in place rather than stacking a
+    second notification about the same shift.
+    """
+    lang = _push_lang(worker)
+    start = _fmt_time(request.start_time)
+    return {
+        'title': 'Quart comblé' if lang == 'fr' else 'Shift filled',
+        'body': f'{request.title} · {request.work_date} {start} · {request.city}',
+        'url': f'/{lang}/worker',
+        'tag': f'request-{request.id}',
+    }
+
+
 def _push_assignment_confirmed(worker: User, request: StaffingRequest) -> dict:
     lang = _push_lang(worker)
     start = _fmt_time(request.start_time)
@@ -305,3 +323,42 @@ class NotificationDispatcher:
             sms_body=_sms_assignment_cancelled(worker, request),
             push_payload=_push_assignment_cancelled(worker, request),
         )
+
+    def notify_request_filled(self, request: StaffingRequest, winner_user_id) -> int:
+        """Tell everyone who was offered this shift that it's gone.
+
+        Push only — deliberately no SMS and no email. A StaffiG text has to
+        keep meaning *opportunity*; texting people to say they lost turns the
+        channel into noise and trains them to ignore it. Email would be the
+        same clutter with a longer half-life.
+
+        This matters more now that broadcasts invite an SMS reply: the pool
+        races, and without this the losers only find out by opening the app or
+        by replying and being turned away.
+
+        Returns how many workers were pinged, so callers can record it. Never
+        raises — a claim must not fail because a notification did.
+        """
+        recipients = self.db.scalars(
+            select(RequestResponse.worker_user_id).where(
+                RequestResponse.staffing_request_id == request.id,
+                RequestResponse.worker_user_id != winner_user_id,
+                # DECLINED and WITHDRAWN already opted out of this shift;
+                # telling them it's filled is noise about a thing they left.
+                RequestResponse.status.in_(
+                    (ResponseStatus.NOTIFIED, ResponseStatus.VIEWED, ResponseStatus.ACCEPTED)
+                ),
+            )
+        ).all()
+
+        pinged = 0
+        for user_id in recipients:
+            worker = self.db.get(User, user_id)
+            if worker is None or not worker.is_active:
+                continue
+            try:
+                self.push.send_to_user(self.db, worker.id, _push_request_filled(worker, request))
+                pinged += 1
+            except Exception:
+                logger.exception('Filled push failed for worker %s', worker.id)
+        return pinged
