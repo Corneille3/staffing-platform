@@ -188,11 +188,16 @@ function HeroCard({
       display: "grid",
       gap: 16,
     }}>
+      {/* Decorative only. It sits absolutely in the top-right corner, which is
+          exactly where "Manage this shift" lands (marginLeft: auto) — and being
+          positioned, it paints over that static link and swallowed its clicks.
+          pointerEvents: none keeps it purely ornamental. */}
       <svg
-        style={{ position: "absolute", right: -30, top: -30, opacity: 0.1 }}
+        style={{ position: "absolute", right: -30, top: -30, opacity: 0.1, pointerEvents: "none" }}
         width="160"
         height="160"
         viewBox="0 0 200 200"
+        aria-hidden="true"
       >
         <circle cx="100" cy="100" r="80" stroke="#DC5A2A" strokeWidth="1" fill="none" />
         <circle cx="100" cy="100" r="40" stroke="#DC5A2A" strokeWidth="1" fill="none" />
