@@ -4,7 +4,7 @@ import ssl
 from dataclasses import dataclass
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.utils import formataddr, parseaddr
+from email.utils import formataddr, formatdate, make_msgid, parseaddr
 
 from app.core.config import settings
 
@@ -46,6 +46,13 @@ class EmailNotificationService:
             mime['Subject'] = message.subject
             mime['From'] = from_header
             mime['To'] = message.to_email
+            # RFC 5322 makes Date mandatory and Message-ID all but required; we
+            # set neither, leaving it to whatever the relay decides to add. Own
+            # them here so every message is well-formed at the source and each
+            # one is individually addressable (a stable Message-ID is what a
+            # mail client threads and de-duplicates on).
+            mime['Date'] = formatdate(localtime=True)
+            mime['Message-ID'] = make_msgid(domain=envelope_from.rpartition('@')[2] or None)
             mime.attach(MIMEText(message.body, 'plain', 'utf-8'))
 
             if settings.smtp_use_tls:

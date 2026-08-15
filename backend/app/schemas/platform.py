@@ -9,7 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.common import NormalizedEmail
+from app.schemas.common import NormalizedEmail, NormalizedPhone
 
 
 class PlatformKpis(BaseModel):
@@ -47,7 +47,8 @@ class PlatformTenantCreate(BaseModel):
     admin_first_name: str = Field(..., min_length=1, max_length=100)
     admin_last_name: str = Field(..., min_length=1, max_length=100)
     admin_email: NormalizedEmail
-    admin_phone: str | None = Field(default=None, max_length=50)
+    # Normalized to E.164 at the boundary — see TenantNetworkCreate.admin_phone.
+    admin_phone: NormalizedPhone = None
     admin_preferred_language: str = Field(default='fr', pattern=r'^(fr|en|bilingual)$')
 
 
