@@ -224,11 +224,15 @@ export default function WorkerRequestAcceptedPage() {
         position: "relative",
         overflow: "hidden",
       }}>
+        {/* Same decorative overlay as the Schedule hero, same guard: nothing
+            interactive sits under it today, but the corner it covers is where a
+            corner action would naturally go. */}
         <svg
-          style={{ position: "absolute", right: -30, top: -30, opacity: 0.15 }}
+          style={{ position: "absolute", right: -30, top: -30, opacity: 0.15, pointerEvents: "none" }}
           width="160"
           height="160"
           viewBox="0 0 200 200"
+          aria-hidden="true"
         >
           <circle cx="100" cy="100" r="80" stroke="#fff" strokeWidth="1" fill="none" />
           <circle cx="100" cy="100" r="40" stroke="#fff" strokeWidth="1" fill="none" />
