@@ -128,7 +128,7 @@ class TenantService:
             first_name=payload.admin_first_name.strip(),
             last_name=payload.admin_last_name.strip(),
             email=admin_email,
-            phone=payload.admin_phone.strip() if payload.admin_phone else None,
+            phone=payload.admin_phone,  # already E.164 via NormalizedPhone
             role=UserRole.NETWORK_ADMIN,
             preferred_language=payload.admin_preferred_language,
             is_active=True,

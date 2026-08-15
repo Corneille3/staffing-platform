@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.models.assignment import Assignment
 from app.models.enums import AvailabilityStatus, UserRole
 from app.models.request_response import RequestResponse
+from app.models.tenant import Tenant
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 from app.models.worker_certification import WorkerCertification
@@ -38,7 +39,7 @@ class WorkerService:
             return settings.allowed_origins[0].rstrip('/')
         return 'http://localhost:3000'
 
-    def _send_invite_email(self, user: User) -> None:
+    def _send_invite_email(self, user: User, network_name: str | None = None) -> None:
         portal_url = self._portal_url()
         signup_url = f'{portal_url}/sign-up?email_address={quote(user.email)}'
         fr = (
@@ -55,10 +56,20 @@ class WorkerService:
             f'{signup_url}\n\n'
             f'After you sign up, you will be prompted to complete your profile.\n'
         )
+        # Naming the network isn't decoration. A byte-identical subject to the
+        # same mailbox is what mail clients fold into one already-read
+        # conversation — a re-invited substitute never sees the second message
+        # arrive. The coordinator and tenant invites already name their org or
+        # network; this one was the last constant subject.
         subject = localized_subject(
             user.preferred_language,
-            '[Staffig] Invitation à rejoindre le bassin de remplaçant(e)s',
-            '[Staffig] Invitation to join the substitute pool',
+            # Network first, not "... de {name}": it dodges the French elision
+            # ("de APF" wants "d'APF") and puts the distinguishing word where a
+            # crowded inbox actually gets scanned.
+            f'[Staffig] {network_name} — invitation à rejoindre le bassin de remplaçant(e)s'
+            if network_name else '[Staffig] Invitation à rejoindre le bassin de remplaçant(e)s',
+            f'[Staffig] {network_name} — invitation to join the substitute pool'
+            if network_name else '[Staffig] Invitation to join the substitute pool',
         )
         body = localized(user.preferred_language, fr, en)
         self.email.send(EmailMessage(to_email=user.email, subject=subject, body=body))
@@ -125,7 +136,8 @@ class WorkerService:
         self.db.commit()
         self.db.refresh(user)
         try:
-            self._send_invite_email(user)
+            network_name = self.db.scalar(select(Tenant.name).where(Tenant.id == tenant_id))
+            self._send_invite_email(user, network_name)
         except Exception:
             # Invitation creation is the primary action; email delivery is best-effort.
             pass

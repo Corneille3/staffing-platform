@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.common import NormalizedEmail
+from app.schemas.common import NormalizedEmail, NormalizedPhone
 
 
 class TenantNetworkCreate(BaseModel):
@@ -18,7 +18,10 @@ class TenantNetworkCreate(BaseModel):
     admin_first_name: str = Field(..., min_length=1, max_length=100)
     admin_last_name: str = Field(..., min_length=1, max_length=100)
     admin_email: NormalizedEmail
-    admin_phone: str | None = Field(default=None, max_length=50)
+    # E.164 at the boundary like every other invite path: inbound SMS matches
+    # on exact string equality, so a raw "(514) 555-0002" here would mean this
+    # admin's STOP could never be resolved to them.
+    admin_phone: NormalizedPhone = None
     admin_preferred_language: str = Field(default='fr', pattern=r'^(fr|en|bilingual)$')
 
 
