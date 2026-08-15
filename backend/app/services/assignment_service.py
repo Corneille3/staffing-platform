@@ -107,6 +107,10 @@ class AssignmentService:
         worker = self.worker_repository.get(payload.worker_user_id)
         if worker:
             self.dispatcher.notify_assignment_confirmed(staffing_request, worker)
+        # Everyone else who was offered this shift learns it's gone — the same
+        # courtesy the auto-claim path extends. Push only, after the commit, so
+        # a notification failure can't undo the assignment.
+        self.dispatcher.notify_request_filled(staffing_request, payload.worker_user_id)
         return created
 
     def check_in(

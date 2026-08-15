@@ -20,6 +20,7 @@ from app.auth.scope import AccessScope
 from app.core.timeutil import shift_end_utc, shift_start_utc
 from app.models.assignment import Assignment
 from app.models.enums import (
+    SELF_SERVE_ORIGINS,
     AssignmentStatus,
     NotificationChannel,
     RequestOrigin,
@@ -40,8 +41,9 @@ from app.services.audit_service import AuditService
 from app.services.matching_service import MatchingService
 from app.services.staffing_request_service import StaffingRequestService
 
-# Only worker-originated, auto-assign requests are claimable this way.
-SELF_SERVE_ORIGINS = (RequestOrigin.WORKER_REPLACEMENT, RequestOrigin.STAFF_ABSENCE)
+# Only worker-originated, auto-assign requests are claimable this way. Defined
+# in models.enums (and re-exported here, where callers already look for it) so
+# the notification dispatcher can share the rule without a circular import.
 # A reason must be one of these (or omitted).
 RELEASE_REASONS = {'sick', 'family', 'personal', 'other'}
 # A release is "live" (one per held assignment) while it's still seeking a fill,
@@ -511,6 +513,15 @@ class ReplacementService:
         )
         self.db.commit()
         self.db.refresh(assignment)
+
+        # Tell the rest of the pool it's gone. After the commit and outside the
+        # transaction on purpose: the claim is already durable, and a failing
+        # push must never roll back a won shift. Push only — see
+        # notify_request_filled for why this isn't an SMS.
+        claimed_request = self.db.get(StaffingRequest, request_id)
+        if claimed_request is not None:
+            self.dispatcher.notify_request_filled(claimed_request, claimer_user_id)
+
         return assignment
 
     def _lost_or_idempotent(self, request_id: UUID, claimer_user_id: UUID) -> Assignment:

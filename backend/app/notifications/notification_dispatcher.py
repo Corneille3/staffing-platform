@@ -1,11 +1,14 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.timeutil import shift_start_utc
+from app.models.enums import SELF_SERVE_ORIGINS, ReplacementPolicy, ResponseStatus
 from app.models.organization import Organization
+from app.models.request_response import RequestResponse
 from app.models.staffing_request import StaffingRequest
 from app.models.user import User
 from app.notifications.email_service import EmailMessage, EmailNotificationService
@@ -111,12 +114,13 @@ def _body_assignment_cancelled(worker: User, request: StaffingRequest) -> str:
 # silently re-encodes the whole message as UCS-2 — 70 chars/segment instead of
 # 160 — and the per-text price doubles or triples. Hence plain hyphens here.
 
-def _sms_new_request(worker: User, request: StaffingRequest) -> str:
+def _sms_new_request(worker: User, request: StaffingRequest, claim_hint: str = '') -> str:
     start = _fmt_time(request.start_time)
+    call_to_action = claim_hint or 'Connectez-vous / Sign in to respond.'
     return (
         f'[Staffig] {worker.first_name}: nouveau remplacement / new coverage - '
         f'{request.title} le/on {request.work_date} à/at {start} ({request.city}). '
-        f'Connectez-vous / Sign in to respond.'
+        f'{call_to_action}'
     )
 
 
@@ -155,6 +159,23 @@ def _push_new_request(worker: User, request: StaffingRequest) -> dict:
         'title': title,
         'body': f'{request.title} · {request.work_date} {start} · {request.city}',
         'url': f'/{lang}/worker/requests/{request.id}',
+        'tag': f'request-{request.id}',
+    }
+
+
+def _push_request_filled(worker: User, request: StaffingRequest) -> dict:
+    """Sent to everyone who was offered the shift but didn't get it.
+
+    Reuses `tag: request-{id}` on purpose — a phone that still shows the
+    original "New coverage" banner replaces it in place rather than stacking a
+    second notification about the same shift.
+    """
+    lang = _push_lang(worker)
+    start = _fmt_time(request.start_time)
+    return {
+        'title': 'Quart comblé' if lang == 'fr' else 'Shift filled',
+        'body': f'{request.title} · {request.work_date} {start} · {request.city}',
+        'url': f'/{lang}/worker',
         'tag': f'request-{request.id}',
     }
 
@@ -220,6 +241,39 @@ class NotificationDispatcher:
             except Exception:
                 logger.exception('Web Push failed for worker %s', worker.id)
 
+    def _sms_claim_hint(self, request: StaffingRequest) -> str:
+        """The 'Reply 1' line — only when replying 1 would actually work.
+
+        Three things have to be true, and every one of them has bitten
+        somewhere already:
+
+        * Twilio must be configured, or there is no inbound webhook to answer
+          and the worker texts into a void.
+        * The request must be self-serve (a released shift or a reported
+          absence). ``ReplacementService.claim`` only accepts those origins, so
+          promising it on a coordinator-created request would send the worker
+          a reply saying no shift is open — worse than saying nothing.
+        * The wording has to match the org's policy. Under MANAGED a reply
+          records an offer for the coordinator to weigh, it does not take the
+          shift; telling someone they took it would be a lie they act on.
+
+        GSM-7 only (é è à ç are safe, em dashes are not) — one stray character
+        re-encodes the whole message as UCS-2 and doubles the price.
+        """
+        if not settings.twilio_account_sid:
+            return ''
+        if request.origin not in SELF_SERVE_ORIGINS:
+            return ''
+
+        policy = self.db.scalar(
+            select(Organization.replacement_policy).where(
+                Organization.id == request.organization_id
+            )
+        )
+        if policy == ReplacementPolicy.MANAGED:
+            return 'Réponds 1 pour te proposer / Reply 1 to offer.'
+        return 'Réponds 1 pour le prendre / Reply 1 to take it.'
+
     @staticmethod
     def _sms_broadcast_eligible(request: StaffingRequest) -> bool:
         """SMS costs money and attention — broadcasts text only when speed
@@ -239,12 +293,13 @@ class NotificationDispatcher:
         org_name = _org_name(self.db, request)
         subject = f'[Staffig] Nouveau remplacement : {request.title} / New coverage: {request.title}'
         sms_eligible = self._sms_broadcast_eligible(request)
+        claim_hint = self._sms_claim_hint(request) if sms_eligible else ''
         for worker in workers:
             self._send_to_worker(
                 worker,
                 subject=subject,
                 email_body=_body_new_request(worker, request, org_name),
-                sms_body=_sms_new_request(worker, request) if sms_eligible else None,
+                sms_body=_sms_new_request(worker, request, claim_hint) if sms_eligible else None,
                 push_payload=_push_new_request(worker, request),
             )
 
@@ -268,3 +323,42 @@ class NotificationDispatcher:
             sms_body=_sms_assignment_cancelled(worker, request),
             push_payload=_push_assignment_cancelled(worker, request),
         )
+
+    def notify_request_filled(self, request: StaffingRequest, winner_user_id) -> int:
+        """Tell everyone who was offered this shift that it's gone.
+
+        Push only — deliberately no SMS and no email. A StaffiG text has to
+        keep meaning *opportunity*; texting people to say they lost turns the
+        channel into noise and trains them to ignore it. Email would be the
+        same clutter with a longer half-life.
+
+        This matters more now that broadcasts invite an SMS reply: the pool
+        races, and without this the losers only find out by opening the app or
+        by replying and being turned away.
+
+        Returns how many workers were pinged, so callers can record it. Never
+        raises — a claim must not fail because a notification did.
+        """
+        recipients = self.db.scalars(
+            select(RequestResponse.worker_user_id).where(
+                RequestResponse.staffing_request_id == request.id,
+                RequestResponse.worker_user_id != winner_user_id,
+                # DECLINED and WITHDRAWN already opted out of this shift;
+                # telling them it's filled is noise about a thing they left.
+                RequestResponse.status.in_(
+                    (ResponseStatus.NOTIFIED, ResponseStatus.VIEWED, ResponseStatus.ACCEPTED)
+                ),
+            )
+        ).all()
+
+        pinged = 0
+        for user_id in recipients:
+            worker = self.db.get(User, user_id)
+            if worker is None or not worker.is_active:
+                continue
+            try:
+                self.push.send_to_user(self.db, worker.id, _push_request_filled(worker, request))
+                pinged += 1
+            except Exception:
+                logger.exception('Filled push failed for worker %s', worker.id)
+        return pinged
