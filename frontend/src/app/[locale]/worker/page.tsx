@@ -22,7 +22,15 @@ import { Assignment, RequestResponse, StaffingRequest, Worker } from "../../../l
 import { useWorkerSession } from "../../../lib/worker-session";
 import { Avatar, Chip, Meta, Mono } from "../../../components/ui";
 
-type CardStatus = "new" | "sent" | "filled" | "declined" | "released";
+// "filled" used to cover five unrelated outcomes at once — you won it, someone
+// else won it, it was cancelled, it expired unfilled, it ran to completion —
+// all wearing the same "Pourvu" chip, which was simply false for the cancelled
+// and expired cases. Each outcome now names itself.
+//
+// A shift the worker *won* is deliberately absent from this union: it leaves
+// the inbox entirely and lives on the Schedule tab, the one place that answers
+// "what am I working?". The inbox answers "what did I reply to?".
+type CardStatus = "new" | "sent" | "lost" | "cancelled" | "expired" | "declined" | "released";
 
 interface InboxItem {
   request: StaffingRequest;
@@ -70,41 +78,65 @@ export default function WorkerHome() {
   const availabilityStatus = worker.profile?.availability_status || "unavailable";
   const available = availabilityStatus === "available";
 
+  // work_date is an ISO "YYYY-MM-DD" string, so string compare is date compare.
+  const now = new Date();
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  // Returns null for a shift this worker WON: it belongs to the Schedule tab,
+  // which owns "what am I working?". Keeping it here too is what buried a
+  // held, upcoming shift under "History" wearing a "Pourvu" chip.
+  const classify = (req: StaffingRequest, myResponse?: RequestResponse): CardStatus | null => {
+    // The giver released this shift (or withdrew) — check before req.status,
+    // whose "assigned" would otherwise read as if this worker got it
+    // (Finding #1).
+    if (myResponse?.status === "withdrawn") return "released";
+    // My own reply outranks the outcome: once I've declined, what happened to
+    // the shift afterwards isn't my business, and "I said no" is the useful
+    // memory. (Previously req.status won, so a declined shift that later got
+    // filled read "Pourvu" and lost the fact that I turned it down.)
+    if (myResponse?.status === "declined") return "declined";
+    if (req.status === "cancelled") return "cancelled";
+    if (req.status === "expired") return "expired";
+    if (req.status === "assigned" || req.status === "completed") {
+      return req.assigned_worker_user_id === worker.id ? null : "lost";
+    }
+    if (myResponse?.status === "accepted") return "sent";
+    // "viewed" means opened but not yet replied — falls through to "new" so it
+    // stays in the action bucket ("Awaiting your reply"), never the "Reply
+    // sent" chip which is reserved for an actual accept.
+    return "new";
+  };
+
   const inboxItems: InboxItem[] = requests
     .filter((req) => responses.some((r) => r.staffing_request_id === req.id))
     .map((req) => {
       const myResponse = responses.find((r) => r.staffing_request_id === req.id);
-      let status: CardStatus = "new";
-      if (myResponse?.status === "withdrawn") {
-        // The giver released this shift (or withdrew) — check before req.status,
-        // whose "assigned" would otherwise mislabel a handed-off shift "filled"
-        // as if this worker got it (Finding #1).
-        status = "released";
-      } else if (["assigned", "completed", "cancelled", "expired"].includes(req.status)) {
-        status = "filled";
-      } else if (myResponse?.status === "declined") {
-        status = "declined";
-      } else if (myResponse?.status === "accepted") {
-        status = "sent";
-      }
-      // "viewed" means opened but not yet replied — falls through to the
-      // default "new" so it stays in the action bucket ("Awaiting your reply"),
-      // never the "Reply sent" chip which is reserved for an actual accept.
+      const status = classify(req, myResponse);
+      if (status === null) return null;
       const modified =
         (status === "new" || status === "sent") && modifiedSinceReview(req, myResponse);
       return { request: req, status, modified };
-    });
+    })
+    .filter((i): i is InboxItem => i !== null);
 
-  // Active: soonest shift first (act on the nearest). History: most recent
-  // first. Without this the inbox rendered in raw API order — "no order".
+  // Active: soonest shift first (act on the nearest). Without this the inbox
+  // rendered in raw API order — "no order".
   const byWorkDate = (dir: 1 | -1) => (a: InboxItem, b: InboxItem) =>
     dir * (a.request.work_date || "").localeCompare(b.request.work_date || "");
   const activeItems = inboxItems
     .filter((i) => i.status === "new" || i.status === "sent")
     .sort(byWorkDate(1));
-  const historyItems = inboxItems
-    .filter((i) => i.status === "filled" || i.status === "declined" || i.status === "released")
-    .sort(byWorkDate(-1));
+
+  // History opens on what just happened. Settled shifts still in the future (a
+  // shift I declined for next month) are real history for me — they stay, but
+  // below the past ones rather than sorting to the very top, which is what a
+  // plain work_date-descending sort did.
+  const settled = inboxItems.filter((i) => !["new", "sent"].includes(i.status));
+  const isPast = (i: InboxItem) => (i.request.work_date || "") < todayIso;
+  const historyItems = [
+    ...settled.filter(isPast).sort(byWorkDate(-1)),
+    ...settled.filter((i) => !isPast(i)).sort(byWorkDate(1)),
+  ];
   const displayed = tab === "active" ? activeItems : historyItems;
 
   const firstName = worker.first_name;
@@ -299,14 +331,12 @@ function RequestCard({
   const distanceLabel = formatDistance(distanceKm);
   const dateLabel = formatWorkDate(request.work_date, locale);
   const cityLabel = locationLabel(request);
-  // Once the coordinator assigns this worker, the request flips to "filled"
-  // status — but the worker still needs their tracking timeline, so keep
-  // routing the assigned-to-me card to the /accepted page (not the generic
-  // detail), the same as while their reply is pending ("sent").
-  const isAssignedToMe =
-    request.status === "assigned" && request.assigned_worker_user_id === worker.id;
+  // A shift this worker holds no longer reaches the inbox at all (classify
+  // returns null for it), so there's no assigned-to-me case to route here any
+  // more — the Schedule tab owns it. What's left needing the tracking page is
+  // a pending reply and a shift they released.
   const detailHref =
-    status === "sent" || status === "released" || isAssignedToMe
+    status === "sent" || status === "released"
       ? `/worker/requests/${request.id}/accepted`
       : `/worker/requests/${request.id}`;
   const openDetail = () => router.push(detailHref);
@@ -367,9 +397,11 @@ function RequestCard({
           {urgent && <Chip variant="urgent" dot>{tCommon("urgent")}</Chip>}
           {status === "new"      && <Chip variant="terra" dot>{t("chipNew")}</Chip>}
           {status === "sent"     && <Chip variant="sand"  dot>{t("chipSent")}</Chip>}
-          {status === "declined" && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{t("chipDeclined")}</Chip>}
-          {status === "filled"   && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{tCommon("filled")}</Chip>}
-          {status === "released" && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{t("chipReleased")}</Chip>}
+          {status === "declined"  && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{t("chipDeclined")}</Chip>}
+          {status === "lost"      && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{t("chipLost")}</Chip>}
+          {status === "cancelled" && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{t("chipCancelled")}</Chip>}
+          {status === "expired"   && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{t("chipExpired")}</Chip>}
+          {status === "released"  && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{t("chipReleased")}</Chip>}
         </div>
         <Mono style={{ fontSize: 10, color: "var(--ink-3)" }}>{timeAgo}</Mono>
       </div>
