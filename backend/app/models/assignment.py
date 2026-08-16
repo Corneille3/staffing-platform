@@ -28,7 +28,25 @@ class Assignment(Base):
     checked_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     checked_in_latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
     checked_in_longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+    checked_out_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    checked_out_latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+    checked_out_longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+    # Coordinator time correction (SPEC_CHECKOUT_HOURS §5) — who touched the
+    # payroll numbers, when, and why. The UI must never present a corrected
+    # time as if the worker recorded it.
+    hours_adjusted_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey('users.id', ondelete='SET NULL')
+    )
+    hours_adjusted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    hours_adjustment_reason: Mapped[str | None] = mapped_column(Text)
     notes: Mapped[str | None] = mapped_column(Text)
+
+    @property
+    def worked_hours(self) -> float | None:
+        """Derived, never stored — recomputes correctly after a correction."""
+        if self.checked_in_at is None or self.checked_out_at is None:
+            return None
+        return round((self.checked_out_at - self.checked_in_at).total_seconds() / 3600, 2)
 
     # foreign_keys pinned: staffing_requests.replaces_assignment_id adds a second
     # path between the tables, so the join column must be stated explicitly.

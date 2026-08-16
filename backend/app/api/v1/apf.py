@@ -229,6 +229,7 @@ def create_export_job(
         date_to=payload.date_to,
         org_ids=payload.org_ids,
         download_url=download_link,
+        view=payload.view.value,
     )
     return _job_to_dict(job, base_url)
 

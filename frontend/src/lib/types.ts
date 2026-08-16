@@ -203,6 +203,7 @@ export type ApfExportRequest = {
   date_to: string;
   org_ids?: string[];
   format?: "csv";
+  view?: "requests" | "worked_hours";
 };
 
 export type ApfExportJob = {
@@ -302,7 +303,22 @@ export type AdminRosterEntry = {
   role: string | null;
   starts_at: string;
   ends_at: string;
-  status: "on_site" | "arriving" | "en_route";
+  status: "on_site" | "arriving" | "en_route" | "not_checked_in" | "done";
+};
+
+export type AdminCoverageDay = {
+  date: string;
+  open: number;
+  released: number;
+  pending_approval: number;
+  covered: number;
+};
+
+export type AdminCoverageForward = {
+  days: AdminCoverageDay[];
+  uncovered_total: number;
+  urgent_48h: number;
+  not_checked_in_today: number;
 };
 
 export type AdminDashboardUrgent = AdminRequestSummary & {
@@ -318,6 +334,7 @@ export type AdminDashboard = {
   activity_today: ApfActivityRow[];
   week_fill_rate: number[];
   roster_today: AdminRosterEntry[];
+  coverage_forward: AdminCoverageForward;
 };
 
 export type AdminActivityFilter =
@@ -624,6 +641,13 @@ export type Assignment = {
   checked_in_at: string | null;
   checked_in_latitude: string | null;
   checked_in_longitude: string | null;
+  checked_out_at: string | null;
+  checked_out_latitude: string | null;
+  checked_out_longitude: string | null;
+  worked_hours: number | null;
+  hours_adjusted_by_user_id: string | null;
+  hours_adjusted_at: string | null;
+  hours_adjustment_reason: string | null;
   notes: string | null;
 };
 

@@ -57,6 +57,9 @@ class Organization(Base):
     # A shift can only be released this many minutes before it starts (0 = up to
     # start time, which a same-day sick release needs).
     min_release_lead_minutes: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    # Check-in/out geofence radius around (latitude, longitude); NULL falls back
+    # to settings.geofence_default_radius_m (SPEC_CHECKOUT_HOURS §3).
+    geofence_radius_m: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

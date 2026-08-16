@@ -84,7 +84,12 @@
       "checkInHint": "Touchez pour confirmer votre arrivée. La localisation est captée si autorisée.",
       "checkInCta": "Confirmer arrivée",
       "checkingIn": "Confirmation…",
-      "checkedIn": "Arrivée confirmée"
+      "checkedIn": "Arrivée confirmée",
+      "checkOutHint": "Quart en cours depuis {elapsed}. Touchez Terminé quand vous partez.",
+      "checkOutCta": "Terminé",
+      "checkingOut": "Enregistrement…",
+      "checkedOut": "Quart terminé",
+      "hoursRecorded": "{hours} h enregistrées"
     },
     "notifications": {
       "noAlerts": "Aucune alerte",

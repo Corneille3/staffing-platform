@@ -1,11 +1,15 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.geo import site_distance_m
 from app.models.assignment import Assignment
 from app.models.enums import AssignmentStatus, RequestStatus, ResponseStatus
+from app.models.organization import Organization
+from app.schemas.assignment import AssignmentTimesPatch
 from app.repositories.assignment_repository import AssignmentRepository
 from app.repositories.response_repository import ResponseRepository
 from app.repositories.staffing_request_repository import StaffingRequestRepository
@@ -138,6 +142,7 @@ class AssignmentService:
             return assignment  # idempotent — first check-in wins
 
         staffing_request = self.request_repository.get(assignment.staffing_request_id)
+        geo = self._geofence(staffing_request, latitude, longitude)
         assignment.checked_in_at = datetime.now(timezone.utc)
         assignment.checked_in_latitude = latitude
         assignment.checked_in_longitude = longitude
@@ -154,11 +159,174 @@ class AssignmentService:
                 'staffing_request_id': str(assignment.staffing_request_id),
                 'worker_user_id': str(assignment.worker_user_id),
                 'checked_in_at': assignment.checked_in_at.isoformat(),
+                **geo,
             },
         )
         self.db.commit()
         self.db.refresh(assignment)
         return assignment
+
+    def check_out(
+        self,
+        assignment_id: UUID,
+        latitude,
+        longitude,
+        actor_user_id: UUID,
+        is_admin: bool,
+    ) -> Assignment:
+        assignment = self.assignment_repository.get(assignment_id)
+        if assignment is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Assignment not found')
+        if not is_admin and assignment.worker_user_id != actor_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail='Workers may only check out for their own assignment.',
+            )
+        if assignment.checked_out_at is not None:
+            return assignment  # idempotent — first check-out wins
+        if assignment.checked_in_at is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='Check-out requires a check-in first.',
+            )
+        if assignment.status not in (AssignmentStatus.PENDING_CONFIRMATION, AssignmentStatus.CONFIRMED):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='Check-out is only allowed for active assignments.',
+            )
+
+        staffing_request = self.request_repository.get(assignment.staffing_request_id)
+        geo = self._geofence(staffing_request, latitude, longitude)
+        assignment.checked_out_at = datetime.now(timezone.utc)
+        assignment.checked_out_latitude = latitude
+        assignment.checked_out_longitude = longitude
+        # A checked-out shift is done — the only place COMPLETED is set outside
+        # a coordinator correction (§2). No auto-close for forgotten check-outs:
+        # those stay open for a human to correct, never silently invented.
+        assignment.completed_at = assignment.checked_out_at
+        assignment.status = AssignmentStatus.COMPLETED
+        self.db.add(assignment)
+        self.audit_service.log(
+            action='assignment.checked_out',
+            entity_type='assignment',
+            entity_id=assignment.id,
+            actor_user_id=assignment.worker_user_id,
+            organization_id=staffing_request.organization_id if staffing_request else None,
+            payload={
+                'staffing_request_id': str(assignment.staffing_request_id),
+                'worker_user_id': str(assignment.worker_user_id),
+                'checked_out_at': assignment.checked_out_at.isoformat(),
+                'worked_hours': assignment.worked_hours,
+                **geo,
+            },
+        )
+        self.db.commit()
+        self.db.refresh(assignment)
+        return assignment
+
+    def correct_times(
+        self,
+        assignment_id: UUID,
+        payload: AssignmentTimesPatch,
+        actor_user_id: UUID,
+        allowed_org_ids: list[UUID],
+    ) -> Assignment:
+        """Coordinator repair path (§5): fix a wrong stamp or close a forgotten
+        check-out. Reason is mandatory — a payroll edit without a why is the
+        thing an auditor asks about."""
+        assignment = self.assignment_repository.get(assignment_id)
+        if assignment is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Assignment not found')
+        staffing_request = self.request_repository.get(assignment.staffing_request_id)
+        if staffing_request is None or staffing_request.organization_id not in allowed_org_ids:
+            # 404, not 403 — same shape as "not found" so cross-tenant probing
+            # can't map which assignment ids exist.
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Assignment not found')
+        if assignment.status in (AssignmentStatus.CANCELLED, AssignmentStatus.RELEASED):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='Cancelled or released assignments have no worked time to correct.',
+            )
+        if payload.checked_in_at is None and payload.checked_out_at is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='Provide checked_in_at, checked_out_at, or both.',
+            )
+
+        old_in, old_out = assignment.checked_in_at, assignment.checked_out_at
+        new_in = payload.checked_in_at or old_in
+        new_out = payload.checked_out_at or old_out
+        if new_in is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='Cannot set a check-out on an assignment that was never checked in.',
+            )
+        if new_out is not None:
+            if new_out <= new_in:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail='checked_out_at must be after checked_in_at.',
+                )
+            if new_out - new_in > timedelta(hours=settings.max_shift_hours):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f'Corrected window exceeds {settings.max_shift_hours} hours.',
+                )
+
+        assignment.checked_in_at = new_in
+        assignment.checked_out_at = new_out
+        assignment.hours_adjusted_by_user_id = actor_user_id
+        assignment.hours_adjusted_at = datetime.now(timezone.utc)
+        assignment.hours_adjustment_reason = payload.reason
+        if new_out is not None:
+            # The forgotten-checkout repair: closing the window completes the
+            # assignment exactly as a worker tap would have.
+            assignment.completed_at = new_out
+            assignment.status = AssignmentStatus.COMPLETED
+        self.db.add(assignment)
+        self.audit_service.log(
+            action='assignment.times_corrected',
+            entity_type='assignment',
+            entity_id=assignment.id,
+            actor_user_id=actor_user_id,
+            organization_id=staffing_request.organization_id,
+            payload={
+                'staffing_request_id': str(assignment.staffing_request_id),
+                'worker_user_id': str(assignment.worker_user_id),
+                'reason': payload.reason,
+                'old_checked_in_at': old_in.isoformat() if old_in else None,
+                'old_checked_out_at': old_out.isoformat() if old_out else None,
+                'new_checked_in_at': new_in.isoformat() if new_in else None,
+                'new_checked_out_at': new_out.isoformat() if new_out else None,
+            },
+        )
+        self.db.commit()
+        self.db.refresh(assignment)
+        return assignment
+
+    def _geofence(self, staffing_request, latitude, longitude) -> dict:
+        """Validate the stamp position against the site radius (§3).
+
+        Permissive by default: outside the radius is recorded (geo_ok=False)
+        and surfaced, not blocked. With geofence_enforce on, outside → 422
+        carrying the distance. Unknown (no site coords / no device position)
+        is always allowed, noted as geo_unavailable.
+        """
+        org = None
+        if staffing_request is not None:
+            org = self.db.get(Organization, staffing_request.organization_id)
+        distance = site_distance_m(org, latitude, longitude) if org is not None else None
+        if distance is None:
+            return {'geo_ok': None, 'geo_note': 'geo_unavailable'}
+        radius = (org.geofence_radius_m or settings.geofence_default_radius_m)
+        if distance <= radius:
+            return {'geo_ok': True, 'distance_m': int(distance)}
+        if settings.geofence_enforce:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f'outside_site_radius: {int(distance)} m from the site (radius {radius} m).',
+            )
+        return {'geo_ok': False, 'distance_m': int(distance)}
 
     def cancel(self, assignment_id: UUID, payload: AssignmentCancel, actor_user_id: UUID) -> Assignment:
         assignment = self.assignment_repository.get(assignment_id)
@@ -175,12 +343,16 @@ class AssignmentService:
 
         assignment.status = AssignmentStatus.CANCELLED
         assignment.cancelled_at = datetime.now(timezone.utc)
-        # A cancelled assignment "didn't happen" — clear its check-in so a
-        # request never carries check-in data on more than one assignment row.
-        # The check-in event itself is preserved in audit_logs (see check_in).
+        # A cancelled assignment "didn't happen" — clear its attendance stamps
+        # so a request never carries them on more than one assignment row.
+        # The events themselves are preserved in audit_logs (see check_in/out).
         assignment.checked_in_at = None
         assignment.checked_in_latitude = None
         assignment.checked_in_longitude = None
+        assignment.checked_out_at = None
+        assignment.checked_out_latitude = None
+        assignment.checked_out_longitude = None
+        assignment.completed_at = None
         assignment.notes = self._append_cancellation_note(assignment.notes, payload)
         self.db.add(assignment)
 

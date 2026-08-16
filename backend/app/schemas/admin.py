@@ -223,6 +223,23 @@ class AdminRosterEntry(BaseModel):
     status: str
 
 
+class AdminCoverageDay(BaseModel):
+    date: date_cls
+    open: int
+    released: int
+    pending_approval: int
+    covered: int
+
+
+class AdminCoverageForward(BaseModel):
+    """14-day forward gap view (SMS spec Feature 2) + today's absence signal
+    (SPEC_CHECKOUT_HOURS §4)."""
+    days: list[AdminCoverageDay]
+    uncovered_total: int
+    urgent_48h: int
+    not_checked_in_today: int
+
+
 class AdminDashboard(BaseModel):
     coordinator: AdminDashboardCoordinator
     urgent_now: AdminDashboardUrgent | None = None
@@ -231,3 +248,4 @@ class AdminDashboard(BaseModel):
     activity_today: list[ActivityRow]
     week_fill_rate: list[int]
     roster_today: list[AdminRosterEntry]
+    coverage_forward: AdminCoverageForward

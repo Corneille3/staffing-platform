@@ -64,6 +64,20 @@ class Settings(BaseSettings):
     sms_claim_window_hours: int = 6
     sms_inbound_per_minute: int = 10
 
+    # ── attendance (check-in/out, SPEC_CHECKOUT_HOURS) ──
+    # Geofence starts permissive: outside-radius stamps geo_ok=False in the
+    # audit payload and flags the UI, but never blocks — a GPS glitch must not
+    # leave a worker standing outside unable to start a shift. Flip
+    # geofence_enforce once the geo_ok=False rate is known.
+    geofence_default_radius_m: int = 250
+    geofence_enforce: bool = False
+    # A CONFIRMED assignment counts as "not checked in" this many minutes
+    # after its scheduled start — the operational absence signal.
+    checkin_grace_minutes: int = 15
+    # A corrected check-in→check-out window longer than this is a typo, not a
+    # shift.
+    max_shift_hours: int = 24
+
     # Web Push (PWA). Leave blank to disable — the worker UI hides the toggle
     # when the public-key endpoint returns empty. Generate a pair with
     # `python -m app.scripts.generate_vapid_keys`; both keys are base64url.

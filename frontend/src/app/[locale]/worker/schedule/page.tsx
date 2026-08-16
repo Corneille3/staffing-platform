@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Calendar, CheckCircle2, ChevronRight, Mail, MapPin, Navigation, Phone, User } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "../../../../i18n/navigation";
-import { checkInAssignment, fetchAssignments, fetchRequests } from "../../../../lib/browser-api";
+import { checkInAssignment, checkOutAssignment, fetchAssignments, fetchRequests } from "../../../../lib/browser-api";
 import { formatWorkDate, locationLabel, roleSectorSubtitle } from "../../../../lib/format";
 import { assignmentStatusLabel } from "../../../../lib/status-labels";
 import { Assignment, StaffingRequest } from "../../../../lib/types";
@@ -62,13 +62,19 @@ export default function WorkerSchedulePage() {
   // so status alone would keep a 2-days-ago shift as the current one.
   const isPastDate = (i: EnrichedAssignment) => (i.request?.work_date ?? "") < todayIso;
 
+  // A shift completed by today's check-out stays in the hero until midnight so
+  // the worker sees their recorded hours, instead of the card vanishing the
+  // instant they tap "Done".
+  const isDoneToday = (i: EnrichedAssignment) =>
+    i.assignment.status === "completed" && i.request?.work_date === todayIso;
+
   // Upcoming: today or later, soonest first (base sort is ascending). Past:
   // done/cancelled OR a live shift whose date has passed, most recent first.
-  const upcoming = items.filter((i) => isLive(i) && !isPastDate(i));
+  const upcoming = items.filter((i) => (isLive(i) && !isPastDate(i)) || isDoneToday(i));
   const past = items
     .filter(
       (i) =>
-        i.assignment.status === "completed" ||
+        (i.assignment.status === "completed" && !isDoneToday(i)) ||
         i.assignment.status === "cancelled" ||
         (isLive(i) && isPastDate(i)),
     )
@@ -369,6 +375,25 @@ function HeroCard({
   );
 }
 
+async function capturePosition(): Promise<{ latitude: number; longitude: number } | undefined> {
+  if (typeof navigator === "undefined" || !navigator.geolocation) return undefined;
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+      () => resolve(undefined),
+      { enableHighAccuracy: false, maximumAge: 60000, timeout: 5000 },
+    );
+  });
+}
+
+function elapsedLabel(sinceIso: string, now: number): string {
+  const mins = Math.max(0, Math.floor((now - new Date(sinceIso).getTime()) / 60000));
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${h} h ${String(m).padStart(2, "0")}`;
+}
+
 function CheckInCard({
   assignment,
   t,
@@ -380,32 +405,32 @@ function CheckInCard({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const checkedInAt = assignment.checked_in_at;
+  const checkedOutAt = assignment.checked_out_at;
+  const onShift = !!checkedInAt && !checkedOutAt;
 
-  async function handleCheckIn() {
+  // Live elapsed counter while on shift — minute precision is plenty.
+  useEffect(() => {
+    if (!onShift) return;
+    const timer = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, [onShift]);
+
+  async function stamp(action: (id: string, coords?: { latitude: number; longitude: number }) => Promise<Assignment>) {
     setBusy(true);
     setError(null);
-    let coords: { latitude: number; longitude: number } | undefined;
-    if (typeof navigator !== "undefined" && navigator.geolocation) {
-      coords = await new Promise<{ latitude: number; longitude: number } | undefined>((resolve) => {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-          () => resolve(undefined),
-          { enableHighAccuracy: false, maximumAge: 60000, timeout: 5000 },
-        );
-      });
-    }
+    const coords = await capturePosition();
     try {
-      const updated = await checkInAssignment(assignment.id, coords);
-      onCheckedIn(updated);
+      onCheckedIn(await action(assignment.id, coords));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Check-in failed");
+      setError(err instanceof Error ? err.message : "Failed");
     } finally {
       setBusy(false);
     }
   }
 
-  if (checkedInAt) {
+  if (checkedInAt && checkedOutAt) {
     return (
       <div style={{
         background: "rgba(168,217,184,.12)",
@@ -419,12 +444,67 @@ function CheckInCard({
         <CheckCircle2 size={18} style={{ color: "#A8D9B8", flexShrink: 0 }} />
         <div style={{ flex: 1 }}>
           <Eyebrow style={{ color: "rgba(168,217,184,.7)", letterSpacing: ".16em" }}>
-            {t("checkedIn")}
+            {t("checkedOut")}
           </Eyebrow>
           <div style={{ fontSize: 13, color: "var(--paper)", marginTop: 2 }}>
-            {checkedInAt.slice(11, 16)}
+            {assignment.worked_hours != null
+              ? t("hoursRecorded", { hours: assignment.worked_hours.toLocaleString("fr-CA") })
+              : `${checkedInAt.slice(11, 16)} → ${checkedOutAt.slice(11, 16)}`}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (checkedInAt) {
+    return (
+      <div style={{
+        background: "rgba(168,217,184,.12)",
+        border: "0.5px solid rgba(168,217,184,.3)",
+        borderRadius: 14,
+        padding: "14px 16px",
+        display: "grid",
+        gap: 10,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <CheckCircle2 size={18} style={{ color: "#A8D9B8", flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <Eyebrow style={{ color: "rgba(168,217,184,.7)", letterSpacing: ".16em" }}>
+              {t("checkedIn")}
+            </Eyebrow>
+            <div style={{ fontSize: 13, color: "var(--paper)", marginTop: 2 }}>
+              {t("checkOutHint", { elapsed: elapsedLabel(checkedInAt, now) })}
+            </div>
+          </div>
+        </div>
+        {error && (
+          <p style={{ margin: 0, fontSize: 12, color: "#F2B5A8", fontWeight: 600 }}>{error}</p>
+        )}
+        <button
+          type="button"
+          onClick={() => stamp(checkOutAssignment)}
+          disabled={busy}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            borderRadius: 12,
+            padding: "12px 16px",
+            background: "var(--terra)",
+            border: "none",
+            color: "#fff",
+            fontWeight: 600,
+            fontSize: 14,
+            cursor: busy ? "wait" : "pointer",
+            opacity: busy ? 0.6 : 1,
+            fontFamily: "inherit",
+            minHeight: 44,
+          }}
+        >
+          <CheckCircle2 size={15} />
+          {busy ? t("checkingOut") : t("checkOutCta")}
+        </button>
       </div>
     );
   }
@@ -449,7 +529,7 @@ function CheckInCard({
       )}
       <button
         type="button"
-        onClick={handleCheckIn}
+        onClick={() => stamp(checkInAssignment)}
         disabled={busy}
         style={{
           display: "flex",
@@ -565,6 +645,14 @@ function PastCard({
           <Mono style={{ fontSize: 11 }}>
             {request.start_time.slice(0, 5)}–{request.end_time.slice(0, 5)}
           </Mono>
+          {assignment.worked_hours != null && (
+            <>
+              <span>·</span>
+              <Mono style={{ fontSize: 11 }}>
+                {assignment.worked_hours.toLocaleString(locale === "fr" ? "fr-CA" : "en-CA")} h
+              </Mono>
+            </>
+          )}
         </div>
       </div>
       <Chip

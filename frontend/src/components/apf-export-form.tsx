@@ -55,6 +55,7 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
   const [selectedOrgs, setSelectedOrgs] = useState<string[]>(
     initialOrgId ? [initialOrgId] : [],
   );
+  const [view, setView] = useState<"requests" | "worked_hours">("requests");
   const [submitting, setSubmitting] = useState(false);
   const [job, setJob] = useState<ApfExportJob | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +99,7 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
         date_to: dateTo,
         org_ids: selectedOrgs.length > 0 ? selectedOrgs : undefined,
         format: "csv",
+        view,
       });
       setJob(created);
     } catch (err) {
@@ -209,6 +211,44 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
                 })}
               </div>
             )}
+          </div>
+
+          <div>
+            <label style={LABEL}>View</label>
+            <div style={{ display: "grid", gap: 6 }}>
+              {(
+                [
+                  { value: "requests", label: "Requests", hint: "One row per staffing request — status, assignment, time to fill." },
+                  { value: "worked_hours", label: "Worked hours (payroll)", hint: "One row per assignment — scheduled vs actual times, derived hours, corrections." },
+                ] as const
+              ).map((opt) => {
+                const selected = view === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setView(opt.value)}
+                    style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: 10,
+                      padding: "10px 14px",
+                      borderRadius: "var(--r-sm)",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      border: selected ? "0.5px solid var(--terra)" : "0.5px solid var(--line)",
+                      background: selected ? "var(--terra-soft)" : "var(--card)",
+                      color: "var(--ink)",
+                      fontFamily: "var(--ui)",
+                      fontSize: 13,
+                    }}
+                  >
+                    <span style={{ fontWeight: 600 }}>{opt.label}</span>
+                    <span style={{ fontSize: 12, color: "var(--ink-3)" }}>{opt.hint}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div>

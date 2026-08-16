@@ -660,6 +660,13 @@ export async function checkInAssignment(
   return postJson<Assignment>(`/api/v1/assignments/${assignmentId}/check-in`, coords ?? {});
 }
 
+export async function checkOutAssignment(
+  assignmentId: string,
+  coords?: { latitude: number; longitude: number },
+): Promise<Assignment> {
+  return postJson<Assignment>(`/api/v1/assignments/${assignmentId}/check-out`, coords ?? {});
+}
+
 export async function fetchAvailabilityGrid(
   workerId: string,
   weekStart: string,

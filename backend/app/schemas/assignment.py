@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.enums import AssignmentStatus
 from app.schemas.common import ORMModel
@@ -21,6 +21,14 @@ class AssignmentRead(ORMModel):
     checked_in_at: datetime | None = None
     checked_in_latitude: Decimal | None = None
     checked_in_longitude: Decimal | None = None
+    checked_out_at: datetime | None = None
+    checked_out_latitude: Decimal | None = None
+    checked_out_longitude: Decimal | None = None
+    # Derived on the model — checked_out_at − checked_in_at, never stored.
+    worked_hours: float | None = None
+    hours_adjusted_by_user_id: UUID | None = None
+    hours_adjusted_at: datetime | None = None
+    hours_adjustment_reason: str | None = None
     notes: str | None = None
 
 
@@ -41,3 +49,11 @@ class AssignmentCancel(BaseModel):
 class AssignmentCheckIn(BaseModel):
     latitude: Decimal | None = None
     longitude: Decimal | None = None
+
+
+class AssignmentTimesPatch(BaseModel):
+    """Coordinator time correction (SPEC_CHECKOUT_HOURS §5). Omitted fields
+    stay untouched; reason is mandatory."""
+    checked_in_at: datetime | None = None
+    checked_out_at: datetime | None = None
+    reason: str = Field(min_length=1)
