@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     # webhook (spec Feature 1 step 2) — declared here with the rest of the
     # SMS config so the two land together.
     sms_claim_window_hours: int = 6
+    sms_inbound_per_minute: int = 10
 
     # Web Push (PWA). Leave blank to disable — the worker UI hides the toggle
     # when the public-key endpoint returns empty. Generate a pair with
