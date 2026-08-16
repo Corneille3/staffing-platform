@@ -41,6 +41,8 @@ CREATE TABLE organizations (
     replacement_policy replacement_policy NOT NULL DEFAULT 'auto',
     replacement_allowed_roles JSONB NOT NULL DEFAULT '["educator","assistant_educator","psw","nurse"]'::jsonb,
     min_release_lead_minutes INTEGER NOT NULL DEFAULT 0,
+    -- Check-in/out geofence radius; NULL = platform default (SPEC_CHECKOUT_HOURS §3)
+    geofence_radius_m INTEGER,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -206,6 +208,18 @@ CREATE TABLE assignments (
     confirmed_at TIMESTAMPTZ,
     cancelled_at TIMESTAMPTZ,
     completed_at TIMESTAMPTZ,
+    -- Attendance stamps (check-in shipped earlier; check-out per SPEC_CHECKOUT_HOURS §1).
+    -- Worked hours are derived (checked_out_at - checked_in_at), never stored.
+    checked_in_at TIMESTAMPTZ,
+    checked_in_latitude NUMERIC(9,6),
+    checked_in_longitude NUMERIC(9,6),
+    checked_out_at TIMESTAMPTZ,
+    checked_out_latitude NUMERIC(9,6),
+    checked_out_longitude NUMERIC(9,6),
+    -- Coordinator time correction (SPEC_CHECKOUT_HOURS §5)
+    hours_adjusted_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    hours_adjusted_at TIMESTAMPTZ,
+    hours_adjustment_reason TEXT,
     notes TEXT
 );
 

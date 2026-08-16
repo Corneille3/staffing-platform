@@ -85,7 +85,7 @@ export function RequestWorkflowCard({
 
   const working = busyAction !== null || isPending;
 
-  async function post(path: string, payload?: object) {
+  async function post(path: string, payload?: object, method: "POST" | "PATCH" = "POST") {
     if (working) return;
     setError(null);
     setBusyAction(path);
@@ -95,7 +95,7 @@ export function RequestWorkflowCard({
         token = (await (window as unknown as { Clerk?: ClerkLike }).Clerk?.session?.getToken()) ?? null;
       }
       const response = await fetch(`${browserApiBaseUrl}${path}`, {
-        method: "POST",
+        method,
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -274,8 +274,12 @@ export function RequestWorkflowCard({
         <AssignedWorkerCard
           worker={assignedWorkerProfile}
           assignment={assignment}
+          request={request}
           disabled={working}
           onCancel={() => setCancelAssignmentOpen(true)}
+          onAdjustTimes={(payload) =>
+            post(`/api/v1/admin/assignments/${assignment.id}/times`, payload, "PATCH")
+          }
         />
       ) : null}
 
@@ -459,18 +463,59 @@ export function RequestWorkflowCard({
   );
 }
 
+const CHECKIN_GRACE_MINUTES = 15; // mirrors settings.checkin_grace_minutes
+
+function toLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function scheduledHoursOf(request: StaffingRequest): number {
+  const [sh, sm] = request.start_time.split(":").map(Number);
+  const [eh, em] = request.end_time.split(":").map(Number);
+  let minutes = eh * 60 + em - (sh * 60 + sm);
+  if (minutes <= 0) minutes += 24 * 60; // crosses midnight
+  return Math.round((minutes / 60) * 100) / 100;
+}
+
 function AssignedWorkerCard({
   worker,
   assignment,
+  request,
   disabled,
   onCancel,
+  onAdjustTimes,
 }: {
   worker: Worker;
   assignment: Assignment;
+  request: StaffingRequest;
   disabled: boolean;
   onCancel: () => void;
+  onAdjustTimes: (payload: { checked_in_at?: string; checked_out_at?: string; reason: string }) => void;
 }) {
   const profile = worker.profile;
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [adjustIn, setAdjustIn] = useState("");
+  const [adjustOut, setAdjustOut] = useState("");
+  const [adjustReason, setAdjustReason] = useState("");
+
+  const shiftStart = new Date(`${request.work_date}T${request.start_time}`);
+  const startedMinutesAgo = Math.floor((Date.now() - shiftStart.getTime()) / 60000);
+  const notCheckedIn =
+    !assignment.checked_in_at &&
+    assignment.status === "confirmed" &&
+    startedMinutesAgo > CHECKIN_GRACE_MINUTES;
+  const scheduledHours = scheduledHoursOf(request);
+  const canAdjust = !!assignment.checked_in_at && assignment.status !== "cancelled";
+
+  function openAdjust() {
+    setAdjustIn(toLocalInput(assignment.checked_in_at));
+    setAdjustOut(toLocalInput(assignment.checked_out_at));
+    setAdjustReason("");
+    setAdjustOpen(true);
+  }
 
   return (
     <article
@@ -509,10 +554,153 @@ function AssignedWorkerCard({
             Checked in at {assignment.checked_in_at.slice(0, 16).replace("T", " ")}
             {assignment.checked_in_latitude && assignment.checked_in_longitude ? " · location recorded" : ""}
           </span>
+        ) : notCheckedIn ? (
+          <span style={{ color: "var(--rose)", fontWeight: 700 }}>
+            Not checked in — shift started {startedMinutesAgo < 120 ? `${startedMinutesAgo} min` : `${Math.floor(startedMinutesAgo / 60)} h`} ago
+          </span>
         ) : (
           <span style={{ color: "var(--ink-3)" }}><strong style={{ color: "var(--ink)" }}>Check-in:</strong> not checked in yet</span>
         )}
+        {assignment.checked_in_at && (
+          assignment.checked_out_at ? (
+            <span style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--moss)", fontWeight: 600 }}>
+              <CheckCircle2 size={14} strokeWidth={2.5} />
+              Checked out at {assignment.checked_out_at.slice(0, 16).replace("T", " ")}
+            </span>
+          ) : (
+            <span style={{ color: "#8C6B14", fontWeight: 600 }}>Check-out: not recorded yet</span>
+          )
+        )}
+        {assignment.worked_hours != null && (
+          <span>
+            <strong style={{ color: "var(--ink)" }}>Worked:</strong> {assignment.worked_hours} h
+            {" "}<span style={{ color: "var(--ink-3)" }}>
+              (scheduled {scheduledHours} h · variance {assignment.worked_hours - scheduledHours >= 0 ? "+" : ""}
+              {Math.round((assignment.worked_hours - scheduledHours) * 100) / 100} h)
+            </span>
+          </span>
+        )}
+        {assignment.hours_adjusted_at && (
+          <span style={{
+            background: "var(--sand-soft)",
+            border: "0.5px solid var(--sand)",
+            borderRadius: 8,
+            padding: "6px 10px",
+            color: "#8C6B14",
+            fontSize: 12,
+          }}>
+            Times corrected by coordinator
+            {assignment.hours_adjustment_reason ? ` — ${assignment.hours_adjustment_reason}` : ""}
+          </span>
+        )}
       </div>
+
+      {canAdjust && (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={openAdjust}
+          style={{
+            border: "0.5px solid var(--line)",
+            borderRadius: 10,
+            padding: "10px 16px",
+            background: "transparent",
+            color: "var(--ink-2)",
+            cursor: disabled ? "wait" : "pointer",
+            fontWeight: 500,
+            fontSize: 13,
+            fontFamily: "inherit",
+            minHeight: 40,
+          }}
+        >
+          Adjust recorded times
+        </button>
+      )}
+
+      {adjustOpen && (
+        <div style={{
+          border: "0.5px solid var(--line)",
+          borderRadius: 12,
+          padding: 14,
+          background: "var(--card)",
+          display: "grid",
+          gap: 10,
+        }}>
+          <Eyebrow>Correct attendance times</Eyebrow>
+          <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--ink-2)" }}>
+            Check-in
+            <input
+              type="datetime-local"
+              value={adjustIn}
+              onChange={(e) => setAdjustIn(e.target.value)}
+              style={{ border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13 }}
+            />
+          </label>
+          <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--ink-2)" }}>
+            Check-out
+            <input
+              type="datetime-local"
+              value={adjustOut}
+              onChange={(e) => setAdjustOut(e.target.value)}
+              style={{ border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13 }}
+            />
+          </label>
+          <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--ink-2)" }}>
+            Reason (required — this edits a payroll number)
+            <input
+              type="text"
+              value={adjustReason}
+              onChange={(e) => setAdjustReason(e.target.value)}
+              placeholder="e.g. Worker forgot to tap Done"
+              style={{ border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13 }}
+            />
+          </label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              disabled={disabled || !adjustReason.trim()}
+              onClick={() => {
+                setAdjustOpen(false);
+                onAdjustTimes({
+                  ...(adjustIn ? { checked_in_at: new Date(adjustIn).toISOString() } : {}),
+                  ...(adjustOut ? { checked_out_at: new Date(adjustOut).toISOString() } : {}),
+                  reason: adjustReason.trim(),
+                });
+              }}
+              style={{
+                border: "none",
+                borderRadius: 10,
+                padding: "10px 16px",
+                background: adjustReason.trim() ? "var(--ink)" : "var(--line)",
+                color: "var(--paper)",
+                cursor: disabled || !adjustReason.trim() ? "not-allowed" : "pointer",
+                fontWeight: 600,
+                fontSize: 13,
+                fontFamily: "inherit",
+              }}
+            >
+              Save correction
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdjustOpen(false)}
+              style={{
+                border: "0.5px solid var(--line)",
+                borderRadius: 10,
+                padding: "10px 16px",
+                background: "transparent",
+                color: "var(--ink-2)",
+                cursor: "pointer",
+                fontWeight: 500,
+                fontSize: 13,
+                fontFamily: "inherit",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <button
         type="button"

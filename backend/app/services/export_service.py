@@ -20,7 +20,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.scope import AccessScope
+from app.core.config import settings
+from app.core.geo import haversine_m
 from app.models.assignment import Assignment
+from app.models.enums import AssignmentStatus
 from app.models.organization import Organization
 from app.models.staffing_request import StaffingRequest
 from app.models.user import User
@@ -190,6 +193,133 @@ class ExportService:
 
         return buf.getvalue().encode('utf-8'), len(rows)
 
+    # ── Payroll view (SPEC_CHECKOUT_HOURS §6) ───────────────────────────────
+    _WORKED_HOURS_HEADER = [
+        'org', 'work_date', 'worker_name', 'role',
+        'scheduled_start', 'scheduled_end', 'scheduled_hours',
+        'actual_in', 'actual_out', 'worked_hours', 'variance_hours',
+        'geo_ok', 'status', 'corrected', 'corrected_by', 'reason',
+    ]
+
+    def generate_worked_hours_csv(
+        self,
+        scope: AccessScope,
+        date_from: date,
+        date_to: date,
+        org_ids: list[UUID] | None,
+    ) -> tuple[bytes, int]:
+        if date_from > date_to:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='date_from must be on or before date_to.',
+            )
+        scoped_org_ids = self._scope_orgs(scope, org_ids)
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(self._WORKED_HOURS_HEADER)
+        if not scoped_org_ids:
+            return buf.getvalue().encode('utf-8'), 0
+
+        adjuster = sa.orm.aliased(User)
+        rows = self.db.execute(
+            select(
+                Organization.name.label('org_name'),
+                Organization.latitude.label('org_lat'),
+                Organization.longitude.label('org_lon'),
+                Organization.geofence_radius_m,
+                StaffingRequest.work_date,
+                StaffingRequest.role,
+                StaffingRequest.start_time,
+                StaffingRequest.end_time,
+                User.first_name.label('worker_first'),
+                User.last_name.label('worker_last'),
+                Assignment.checked_in_at,
+                Assignment.checked_in_latitude,
+                Assignment.checked_in_longitude,
+                Assignment.checked_out_at,
+                Assignment.checked_out_latitude,
+                Assignment.checked_out_longitude,
+                Assignment.hours_adjusted_at,
+                Assignment.hours_adjustment_reason,
+                adjuster.first_name.label('adjuster_first'),
+                adjuster.last_name.label('adjuster_last'),
+            )
+            .select_from(Assignment)
+            .join(StaffingRequest, StaffingRequest.id == Assignment.staffing_request_id)
+            .join(Organization, StaffingRequest.organization_id == Organization.id)
+            .join(User, Assignment.worker_user_id == User.id)
+            .join(adjuster, Assignment.hours_adjusted_by_user_id == adjuster.id, isouter=True)
+            .where(
+                StaffingRequest.organization_id.in_(scoped_org_ids),
+                StaffingRequest.work_date >= date_from,
+                StaffingRequest.work_date <= date_to,
+                # Cancelled/released rows carry no attendance (stamps cleared
+                # on cancel); confirmed-but-open rows MUST appear — an export
+                # that silently drops them under-reports payroll.
+                Assignment.status.in_((AssignmentStatus.CONFIRMED, AssignmentStatus.COMPLETED)),
+            )
+            .order_by(StaffingRequest.work_date.asc(), StaffingRequest.start_time.asc())
+        ).all()
+
+        for r in rows:
+            scheduled_h = self._scheduled_hours(r.start_time, r.end_time)
+            worked_h = None
+            if r.checked_in_at and r.checked_out_at:
+                worked_h = round((r.checked_out_at - r.checked_in_at).total_seconds() / 3600, 2)
+            if r.checked_in_at is None:
+                row_status = 'non pointé'
+            elif r.checked_out_at is None:
+                row_status = 'sortie non pointée'
+            else:
+                row_status = 'ok'
+            writer.writerow([
+                r.org_name,
+                r.work_date.isoformat(),
+                f'{r.worker_first} {r.worker_last}'.strip(),
+                r.role.value if hasattr(r.role, 'value') else (str(r.role) if r.role else ''),
+                r.start_time.isoformat() if r.start_time else '',
+                r.end_time.isoformat() if r.end_time else '',
+                f'{scheduled_h}' if scheduled_h is not None else '',
+                r.checked_in_at.isoformat() if r.checked_in_at else '',
+                r.checked_out_at.isoformat() if r.checked_out_at else '',
+                f'{worked_h}' if worked_h is not None else '',
+                f'{round(worked_h - scheduled_h, 2)}' if worked_h is not None and scheduled_h is not None else '',
+                self._geo_ok_label(r),
+                row_status,
+                'yes' if r.hours_adjusted_at else 'no',
+                f'{r.adjuster_first} {r.adjuster_last}'.strip() if r.adjuster_first else '',
+                r.hours_adjustment_reason or '',
+            ])
+        return buf.getvalue().encode('utf-8'), len(rows)
+
+    @staticmethod
+    def _scheduled_hours(start_time, end_time) -> float | None:
+        if start_time is None or end_time is None:
+            return None
+        minutes = (end_time.hour * 60 + end_time.minute) - (start_time.hour * 60 + start_time.minute)
+        if minutes <= 0:  # crosses midnight, per timeutil convention
+            minutes += 24 * 60
+        return round(minutes / 60, 2)
+
+    @staticmethod
+    def _geo_ok_label(r) -> str:
+        """'yes' when every computable stamp fell inside the site radius,
+        'no' when any fell outside, '' when nothing was computable."""
+        if r.org_lat is None or r.org_lon is None:
+            return ''
+        radius = r.geofence_radius_m or settings.geofence_default_radius_m
+        checks: list[bool] = []
+        for lat, lon in (
+            (r.checked_in_latitude, r.checked_in_longitude),
+            (r.checked_out_latitude, r.checked_out_longitude),
+        ):
+            if lat is not None and lon is not None:
+                distance = haversine_m(float(r.org_lat), float(r.org_lon), float(lat), float(lon))
+                checks.append(distance <= radius)
+        if not checks:
+            return ''
+        return 'yes' if all(checks) else 'no'
+
     def _empty_csv(self) -> bytes:
         buf = io.StringIO()
         writer = csv.writer(buf)
@@ -209,6 +339,7 @@ class ExportService:
         date_to: date,
         org_ids: list[UUID] | None,
         download_url: str,
+        view: str = 'requests',
     ) -> None:
         """Generate the CSV synchronously and mark the job ready.
 
@@ -219,7 +350,10 @@ class ExportService:
         if job is None:
             return
         try:
-            csv_bytes, row_count = self.generate_csv(scope, date_from, date_to, org_ids)
+            generate = (
+                self.generate_worked_hours_csv if view == 'worked_hours' else self.generate_csv
+            )
+            csv_bytes, row_count = generate(scope, date_from, date_to, org_ids)
             job.csv_bytes = csv_bytes
             job.row_count = row_count
             job.completed_at = datetime.now(timezone.utc)

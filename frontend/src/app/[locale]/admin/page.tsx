@@ -3,7 +3,7 @@ import { Eyebrow, Mono } from "../../../components/ui";
 import { ActivityRowCard } from "../../../components/apf-activity-row";
 import { AdminDashboardUrgentCard } from "../../../components/admin-dashboard-urgent";
 import { getAdminDashboard, getAdminOrganizations } from "../../../lib/api";
-import type { AdminRequestSummary } from "../../../lib/types";
+import type { AdminCoverageForward, AdminRequestSummary } from "../../../lib/types";
 
 const ROLE_LABEL: Record<string, string> = {
   educator: "Educator",
@@ -45,7 +45,7 @@ function greeting(): string {
 export default async function AdminDashboardPage() {
   const [dash, sites] = await Promise.all([getAdminDashboard(), getAdminOrganizations()]);
   const siteNames = Object.fromEntries(sites.map((s) => [s.id, s.name]));
-  const { coordinator, urgent_now, kpis, live_requests, activity_today, week_fill_rate, roster_today } = dash;
+  const { coordinator, urgent_now, kpis, live_requests, activity_today, week_fill_rate, roster_today, coverage_forward } = dash;
 
   const now = new Date();
   const clock = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
@@ -106,6 +106,9 @@ export default async function AdminDashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* 3b · Coverage — next 14 days */}
+      <CoverageForwardCard coverage={coverage_forward} />
 
       {/* 4 · Two-up: live requests | today activity */}
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 22, alignItems: "start", marginBottom: 22 }}>
@@ -174,8 +177,8 @@ export default async function AdminDashboardPage() {
                     <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>{p.name}</div>
                     <div style={{ fontSize: 12, color: "var(--ink-3)" }}>{p.role ?? "Staff"} · <Mono style={{ fontSize: 12 }}>{p.starts_at.slice(0, 5)}→{p.ends_at.slice(0, 5)}</Mono></div>
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: p.status === "on_site" ? "var(--moss)" : "var(--sand)" }}>
-                    {p.status === "on_site" ? "On site" : p.status === "en_route" ? "En route" : "Arriving"}
+                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: p.status === "on_site" || p.status === "done" ? "var(--moss)" : p.status === "not_checked_in" ? "var(--rose)" : "var(--sand)" }}>
+                    {p.status === "on_site" ? "On site" : p.status === "done" ? "Done" : p.status === "not_checked_in" ? "Not checked in" : p.status === "en_route" ? "En route" : "Arriving"}
                   </span>
                 </div>
               ))
@@ -184,6 +187,69 @@ export default async function AdminDashboardPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+const DAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"]; // Date.getDay() order
+
+function CoverageForwardCard({ coverage }: { coverage: AdminCoverageForward }) {
+  const { days, uncovered_total, urgent_48h, not_checked_in_today } = coverage;
+  const risky = urgent_48h > 0;
+  const maxCount = Math.max(1, ...days.map((d) => d.open + d.released + d.pending_approval + d.covered));
+  const headline =
+    uncovered_total === 0
+      ? "All covered for the next 14 days."
+      : `${uncovered_total} uncovered shift${uncovered_total === 1 ? "" : "s"} in the next 14 days.`;
+
+  return (
+    <section style={{ background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: "var(--r-md)", padding: 18, marginBottom: 22 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+        <div>
+          <Eyebrow style={{ marginBottom: 4 }}>Coverage · next 14 days</Eyebrow>
+          <span style={{ fontFamily: "var(--serif)", fontSize: 18, color: risky ? "var(--rose)" : uncovered_total > 0 ? "var(--ink)" : "var(--moss)" }}>
+            {headline}
+          </span>
+          {risky && (
+            <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 700, color: "var(--rose)" }}>
+              {urgent_48h} within 48 h
+            </span>
+          )}
+        </div>
+        {not_checked_in_today > 0 && (
+          <span style={{ background: "var(--rose-soft)", border: "0.5px solid var(--rose)", borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 700, color: "var(--rose)" }}>
+            {not_checked_in_today} not checked in today
+          </span>
+        )}
+      </div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 72 }}>
+        {days.map((d) => {
+          const uncovered = d.open + d.released + d.pending_approval;
+          const total = uncovered + d.covered;
+          const dayDate = new Date(`${d.date}T12:00:00`);
+          const title = `${d.date} — open ${d.open} · released ${d.released} · pending ${d.pending_approval} · covered ${d.covered}`;
+          return (
+            <div key={d.date} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 0 }} title={title}>
+              <div style={{ flex: 1, width: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 1 }}>
+                {uncovered > 0 && (
+                  <div style={{ width: "100%", height: `${(uncovered / maxCount) * 100}%`, minHeight: 6, background: "var(--rose)", borderRadius: 4 }} />
+                )}
+                {d.covered > 0 && (
+                  <div style={{ width: "100%", height: `${(d.covered / maxCount) * 100}%`, minHeight: 6, background: "var(--moss)", opacity: 0.55, borderRadius: 4 }} />
+                )}
+                {total === 0 && <div style={{ width: "100%", height: 3, background: "var(--line)", borderRadius: 4 }} />}
+              </div>
+              <span style={{ fontSize: 9, color: "var(--ink-3)", fontWeight: 500 }}>
+                {DAY_LETTERS[dayDate.getDay()]}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", gap: 14, marginTop: 10, fontSize: 11, color: "var(--ink-3)" }}>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "var(--rose)", marginRight: 5 }} />Uncovered</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "var(--moss)", opacity: 0.55, marginRight: 5 }} />Covered</span>
+      </div>
+    </section>
   );
 }
 

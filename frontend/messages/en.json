@@ -84,7 +84,12 @@
       "checkInHint": "Tap to check in when you arrive on site. Location is captured if granted.",
       "checkInCta": "Check in",
       "checkingIn": "Checking in…",
-      "checkedIn": "Checked in"
+      "checkedIn": "Checked in",
+      "checkOutHint": "On shift for {elapsed}. Tap Done when you leave.",
+      "checkOutCta": "Done",
+      "checkingOut": "Recording…",
+      "checkedOut": "Shift complete",
+      "hoursRecorded": "{hours} h recorded"
     },
     "notifications": {
       "noAlerts": "No alerts",

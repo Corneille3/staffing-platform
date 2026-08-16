@@ -196,11 +196,19 @@ class ApfExportFormat(str, Enum):
     CSV = 'csv'
 
 
+class ApfExportView(str, Enum):
+    REQUESTS = 'requests'
+    # Payroll view (SPEC_CHECKOUT_HOURS §6): one row per assignment with
+    # scheduled vs actual times, derived worked hours, and correction audit.
+    WORKED_HOURS = 'worked_hours'
+
+
 class ApfExportRequest(BaseModel):
     date_from: date_cls
     date_to: date_cls
     org_ids: list[UUID] | None = None
     format: ApfExportFormat = ApfExportFormat.CSV
+    view: ApfExportView = ApfExportView.REQUESTS
 
 
 class ApfExportJob(BaseModel):

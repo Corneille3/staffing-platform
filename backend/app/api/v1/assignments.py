@@ -67,3 +67,20 @@ def check_in_assignment(
         scope.is_admin,
     )
     return AssignmentRead.model_validate(assignment)
+
+
+@router.post('/{assignment_id}/check-out')
+def check_out_assignment(
+    assignment_id: UUID,
+    payload: AssignmentCheckIn,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> AssignmentRead:
+    assignment = AssignmentService(db).check_out(
+        assignment_id,
+        payload.latitude,
+        payload.longitude,
+        scope.user.id,
+        scope.is_admin,
+    )
+    return AssignmentRead.model_validate(assignment)
