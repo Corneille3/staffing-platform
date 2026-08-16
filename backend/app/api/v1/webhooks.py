@@ -7,6 +7,8 @@ so every handler here must validate before it touches the database.
 from __future__ import annotations
 
 import logging
+from collections import defaultdict, deque
+from time import monotonic
 from urllib.parse import parse_qsl
 from xml.sax.saxutils import escape
 
@@ -22,9 +24,31 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Belt-and-braces above the signature check (spec 1.4): a compromised Twilio
+# account could replay validly-signed messages. Sliding one-minute window per
+# sender, in memory — multi-process drift just multiplies the ceiling by the
+# worker count, which is fine for an abuse brake. Over-limit messages are
+# DROPPED with a 200 + empty TwiML rather than 4xx: Twilio retries error
+# statuses, and retrying is exactly what we don't want more of.
+_rate_window: dict[str, deque[float]] = defaultdict(deque)
+
+
+def _rate_limited(from_number: str) -> bool:
+    now = monotonic()
+    window = _rate_window[from_number]
+    while window and now - window[0] > 60:
+        window.popleft()
+    if len(window) >= settings.sms_inbound_per_minute:
+        return True
+    window.append(now)
+    return False
+
 
 def _twiml(message: str) -> str:
     return f'<?xml version="1.0" encoding="UTF-8"?><Response><Message>{escape(message)}</Message></Response>'
+
+
+_TWIML_EMPTY = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
 
 
 @router.post('/twilio/sms')
@@ -48,6 +72,13 @@ async def inbound_sms(request: Request, db: Session = Depends(get_db_session)) -
     ):
         logger.warning('Rejected inbound SMS with bad signature from %s', params.get('From'))
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Invalid signature')
+
+    sender = params.get('From', '')
+    if _rate_limited(sender):
+        # Authenticated (signature passed) but too chatty. Acknowledge and
+        # drop — no reply message, no DB write, nothing for a loop to feed on.
+        logger.warning('Rate-limited inbound SMS from %s', sender)
+        return Response(content=_TWIML_EMPTY, media_type='application/xml')
 
     reply = InboundSmsService(db).handle(
         from_number=params.get('From', ''),

@@ -12,6 +12,7 @@ from app.models.request_response import RequestResponse
 from app.models.staffing_request import StaffingRequest
 from app.models.user import User
 from app.notifications.email_service import EmailMessage, EmailNotificationService
+from app.notifications.i18n import localized
 from app.notifications.sms_service import SmsNotificationService
 from app.notifications.web_push_service import WebPushService
 
@@ -327,10 +328,11 @@ class NotificationDispatcher:
     def notify_request_filled(self, request: StaffingRequest, winner_user_id) -> int:
         """Tell everyone who was offered this shift that it's gone.
 
-        Push only — deliberately no SMS and no email. A StaffiG text has to
-        keep meaning *opportunity*; texting people to say they lost turns the
-        channel into noise and trains them to ignore it. Email would be the
-        same clutter with a longer half-life.
+        Push for everyone; one closure SMS ONLY for workers who had ACCEPTED
+        (they raised a hand — by tap or by texting "1" — and are waiting on
+        an answer). Passive recipients stay push-only: a StaffiG text has to
+        keep meaning *opportunity*, and email would be the same clutter with
+        a longer half-life.
 
         This matters more now that broadcasts invite an SMS reply: the pool
         races, and without this the losers only find out by opening the app or
@@ -339,8 +341,8 @@ class NotificationDispatcher:
         Returns how many workers were pinged, so callers can record it. Never
         raises — a claim must not fail because a notification did.
         """
-        recipients = self.db.scalars(
-            select(RequestResponse.worker_user_id).where(
+        recipients = self.db.execute(
+            select(RequestResponse.worker_user_id, RequestResponse.status).where(
                 RequestResponse.staffing_request_id == request.id,
                 RequestResponse.worker_user_id != winner_user_id,
                 # DECLINED and WITHDRAWN already opted out of this shift;
@@ -352,7 +354,7 @@ class NotificationDispatcher:
         ).all()
 
         pinged = 0
-        for user_id in recipients:
+        for user_id, response_status in recipients:
             worker = self.db.get(User, user_id)
             if worker is None or not worker.is_active:
                 continue
@@ -361,4 +363,21 @@ class NotificationDispatcher:
                 pinged += 1
             except Exception:
                 logger.exception('Filled push failed for worker %s', worker.id)
+            if response_status is not ResponseStatus.ACCEPTED:
+                continue
+            # ACCEPTED means they raised a hand — by tapping accept or by
+            # texting "1". They committed and are waiting; leaving them to
+            # discover the outcome by opening the app is how a channel loses
+            # trust. One closure text, GSM-7, then done. The push-only rule
+            # above still holds for passive recipients.
+            if not worker.phone or worker.sms_opt_out:
+                continue
+            try:
+                self.sms.send(worker.phone, localized(
+                    worker.preferred_language,
+                    "Ce quart est alle a quelqu'un d'autre cette fois - merci d'avoir offert.",
+                    'That shift went to someone else this time - thanks for offering.',
+                ))
+            except Exception:
+                logger.exception('Not-selected SMS failed for worker %s', worker.id)
         return pinged

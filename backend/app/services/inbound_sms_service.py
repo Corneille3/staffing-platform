@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.phone import normalize_e164
+from app.core.timeutil import shift_start_utc
 from app.models.enums import (
     ReplacementPolicy,
     RequestStatus,
@@ -229,7 +230,10 @@ class InboundSmsService:
 
         "Newest wins" is deliberate (spec 1.1): no multi-choice menus in v1.
         The window keeps a reply to last week's text from claiming today's
-        shift.
+        shift, and the start-time check keeps a late reply from claiming a
+        shift that is already underway — being assigned to a room you were
+        due in twenty minutes ago helps nobody. Started candidates are
+        skipped, not fatal: the reply falls through to the next newest.
         """
         cutoff = datetime.now(timezone.utc) - timedelta(hours=settings.sms_claim_window_hours)
         stmt = (
@@ -243,9 +247,13 @@ class InboundSmsService:
                 StaffingRequest.origin.in_(SELF_SERVE_ORIGINS),
             )
             .order_by(RequestResponse.created_at.desc())
-            .limit(1)
+            .limit(5)
         )
-        return self.db.scalar(stmt)
+        now = datetime.now(timezone.utc)
+        for candidate in self.db.scalars(stmt):
+            if shift_start_utc(candidate.work_date, candidate.start_time) > now:
+                return candidate
+        return None
 
     def _tenant_for(self, request: StaffingRequest) -> UUID | None:
         return self.db.scalar(
