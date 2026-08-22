@@ -11,6 +11,7 @@ import csv
 import io
 import logging
 from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
 from threading import Lock
 from uuid import UUID, uuid4
 
@@ -277,11 +278,11 @@ class ExportService:
                 r.work_date.isoformat(),
                 f'{r.worker_first} {r.worker_last}'.strip(),
                 r.role.value if hasattr(r.role, 'value') else (str(r.role) if r.role else ''),
-                r.start_time.isoformat() if r.start_time else '',
-                r.end_time.isoformat() if r.end_time else '',
+                r.start_time.strftime('%H:%M') if r.start_time else '',
+                r.end_time.strftime('%H:%M') if r.end_time else '',
                 f'{scheduled_h}' if scheduled_h is not None else '',
-                r.checked_in_at.isoformat() if r.checked_in_at else '',
-                r.checked_out_at.isoformat() if r.checked_out_at else '',
+                self._local_hhmm(r.checked_in_at),
+                self._local_hhmm(r.checked_out_at),
                 f'{worked_h}' if worked_h is not None else '',
                 f'{round(worked_h - scheduled_h, 2)}' if worked_h is not None and scheduled_h is not None else '',
                 self._geo_ok_label(r),
@@ -291,6 +292,15 @@ class ExportService:
                 r.hours_adjustment_reason or '',
             ])
         return buf.getvalue().encode('utf-8'), len(rows)
+
+    @staticmethod
+    def _local_hhmm(stamp: datetime | None) -> str:
+        """Attendance stamps are stored UTC; the payroll reader thinks in
+        wall-clock next to the scheduled times, so render local HH:MM
+        (settings.shift_timezone, same convention as timeutil)."""
+        if stamp is None:
+            return ''
+        return stamp.astimezone(ZoneInfo(settings.shift_timezone)).strftime('%H:%M')
 
     @staticmethod
     def _scheduled_hours(start_time, end_time) -> float | None:
