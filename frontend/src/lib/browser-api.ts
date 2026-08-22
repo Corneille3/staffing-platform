@@ -37,12 +37,22 @@ import {
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-type ClerkLike = { session?: { getToken: () => Promise<string | null> } };
+type ClerkLike = {
+  loaded?: boolean;
+  session?: { getToken: () => Promise<string | null> };
+};
 
 async function authHeaders(): Promise<Record<string, string>> {
   if (!CLERK_ENABLED || typeof window === "undefined") return {};
-  const clerk = (window as unknown as { Clerk?: ClerkLike }).Clerk;
-  const token = await clerk?.session?.getToken();
+  const w = window as unknown as { Clerk?: ClerkLike };
+  // Hard refresh: a mount-time fetch can beat Clerk's script, firing with no
+  // Authorization header and 401ing ("Authentication credentials were not
+  // provided"). Clerk.loaded flips true once auth state is resolved —
+  // signed-in or not — so wait for that, capped at 5s.
+  for (let i = 0; i < 100 && !w.Clerk?.loaded; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  const token = await w.Clerk?.session?.getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
