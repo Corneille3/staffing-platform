@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
 from app.auth.permissions import require_network_admin
+from app.core.config import settings
 from app.auth.scope import AccessScope, get_access_scope
 from app.schemas.apf import (
     ActivityFilter,
@@ -219,7 +220,11 @@ def create_export_job(
     job = service.create_job(requested_by_email=scope.user.email)
 
     base_url = str(request.url_for('create_export_job')).rstrip('/')
-    download_link = f'{base_url}/{job.id}/download'
+    # The emailed link must point at the app page, not the API: a link click
+    # carries no Authorization header, so the API URL would just 401. The
+    # export page re-offers the download for jobs still in memory.
+    portal = settings.allowed_origins[0].rstrip('/') if settings.allowed_origins else 'http://localhost:3000'
+    download_link = f'{portal}/apf/export'
 
     background_tasks.add_task(
         ExportService(db).run_job,
