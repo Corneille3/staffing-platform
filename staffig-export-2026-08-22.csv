@@ -1,0 +1,23 @@
+request_id,organization,city,title,status,work_date,start_time,end_time,created_at,assigned_worker,assignment_status,assigned_at,time_to_fill_hours
+c7becc37-e4c9-415b-a2d4-c48070f06e68,CPE Les Petites Étoiles,Montreal,Testing sms,assigned,2026-08-15,12:00:00,15:00:00,2026-08-15T12:00:45.721613+00:00,SMS WORKER,confirmed,2026-08-15T12:06:06.963051+00:00,0.09
+3d0bdb5b-857e-4c66-b206-38d6ef7469ad,CPE Les Petites Étoiles,Montreal,Test SMS Cordinator send request,assigned,2026-08-15,17:00:00,23:00:00,2026-08-15T12:09:55.514936+00:00,Mael Kouam,released,2026-08-15T12:13:40.874033+00:00,0.06
+1d151ce0-0ffa-4022-8ce0-1d0d883c6350,CPE Les Petites Étoiles,Montreal,Test SMS Cordinator send request,assigned,2026-08-15,17:00:00,23:00:00,2026-08-15T12:33:13.190618+00:00,SMS WORKER,confirmed,2026-08-15T12:35:08.059188+00:00,0.03
+d7c8df4e-1823-4e9f-bdde-7fead2004fb3,CPE Les Petites Étoiles,Montreal,New test for A and B,assigned,2026-08-16,08:00:00,16:00:00,2026-08-08T14:01:27.901245+00:00,Mael Kouam,released,2026-08-08T14:06:28.442164+00:00,0.08
+688338fa-37de-4ebf-b47e-c22a5a335df5,CPE Les Petites Étoiles,Montreal,New test for A and B,assigned,2026-08-16,08:00:00,16:00:00,2026-08-08T14:07:31.304753+00:00,Eva Kouam,released,2026-08-08T14:08:54.091971+00:00,0.02
+3c6570fa-2878-407f-911a-c0486e44dc41,CPE Les Petites Étoiles,Montreal,New test for A and B,assigned,2026-08-16,08:00:00,16:00:00,2026-08-15T13:45:21.440882+00:00,SMS WORKER,completed,2026-08-15T13:45:34.071945+00:00,0.0
+fe977836-b05d-4528-9127-c146365f6125,CPE Les Petites Étoiles,Montreal,Quart du Jour Testing,assigned,2026-08-16,08:00:00,12:00:00,2026-08-16T13:05:25.623800+00:00,Mael Kouam,completed,2026-08-16T13:16:03.218181+00:00,0.18
+a064b9a2-2c4d-4fb1-95a2-f2ae71a93af1,CPE Les Petites Étoiles,Montreal,New test,assigned,2026-08-17,08:00:00,16:00:00,2026-08-08T14:14:29.755407+00:00,Mael Kouam,released,2026-08-08T14:15:54.840542+00:00,0.02
+a4f5255d-b49c-4552-83df-49942a5e444c,CPE Les Petites Étoiles,Montreal,New test,assigned,2026-08-17,08:00:00,16:00:00,2026-08-08T14:17:24.148473+00:00,Eva Kouam,released,2026-08-08T14:24:40.295191+00:00,0.12
+775cf0a4-62d0-4f3c-b619-8c578236f5b9,CPE Les Petites Étoiles,Montreal,New test,assigned,2026-08-17,08:00:00,16:00:00,2026-08-15T14:28:54.734001+00:00,Mael Kouam,released,2026-08-15T14:29:04.012590+00:00,0.0
+008007bd-09e7-48cd-8818-bb03c8fc7e10,CPE Les Petites Étoiles,Montreal,New test,assigned,2026-08-17,08:00:00,16:00:00,2026-08-15T14:29:35.741141+00:00,Eva Kouam,confirmed,2026-08-15T14:30:01.503314+00:00,0.01
+ca85984e-d928-4965-bbd9-9f7d2c0d1993,CPE Les Petites Étoiles,Montreal,Tuile Testing,assigned,2026-08-17,08:00:00,12:00:00,2026-08-16T13:01:43.289290+00:00,Mael Kouam,confirmed,2026-08-16T13:41:56.023655+00:00,0.67
+3545fc0a-97fd-4d64-b03b-0917bbf0612e,CPE Les Petites Étoiles,Montreal,Testing Tuile urgence,assigned,2026-08-17,16:00:00,23:00:00,2026-08-16T13:35:49.942164+00:00,Mael Kouam,confirmed,2026-08-16T13:41:05.084428+00:00,0.09
+0ee48515-7c78-4e80-89c1-68cd30d2b943,CPE Les Petites Étoiles,Montreal,XXX,assigned,2026-08-18,08:00:00,12:00:00,2026-08-08T14:23:59.689969+00:00,Mael Kouam,released,2026-08-08T14:25:20.272222+00:00,0.02
+17a468a6-a43d-4a2a-816a-94e80a8a2813,CPE Les Petites Étoiles,Montreal,XXX,assigned,2026-08-18,08:00:00,12:00:00,2026-08-08T14:27:04.707649+00:00,Eva Kouam,released,2026-08-08T14:28:02.078103+00:00,0.02
+2c18ca0b-bb2c-45e9-b662-c47aaf7d5c01,CPE Les Petites Étoiles,Montreal,XXX,assigned,2026-08-18,08:00:00,12:00:00,2026-08-15T14:31:04.602292+00:00,Mael Kouam,released,2026-08-15T14:31:14.845575+00:00,0.0
+62dbe87e-712a-428c-9c62-851b945f0230,CPE Les Petites Étoiles,Montreal,XXX,assigned,2026-08-18,08:00:00,12:00:00,2026-08-16T13:25:28.466712+00:00,Eva Kouam,confirmed,2026-08-16T13:25:54.211693+00:00,0.01
+e990977a-2cc4-463c-ab8f-08bae393b68d,CPE Les Petites Étoiles,Montreal,xxx,cancelled,2026-08-21,08:00:00,12:00:00,2026-08-06T23:54:20.460936+00:00,,,,
+f3012c81-fbf1-42d4-99d0-dae93a57e84c,Multi Organisation tenant,Montreal,Test multi org separation,assigned,2026-08-22,08:00:00,12:00:00,2026-08-22T13:53:24.657537+00:00,Eva Kouam,completed,2026-08-22T14:00:56.308985+00:00,0.13
+27b65c84-877c-4da1-b196-5b0ab6762a7b,CPE Les Petites Étoiles,Montreal,Multi Org tes,notified,2026-08-22,08:00:00,12:00:00,2026-08-22T14:54:09.389632+00:00,,,,
+97137f05-e5d6-447a-8759-808eb31205b8,CPE Les Petites Étoiles,Montreal,Replacement Auto,assigned,2026-08-23,08:00:00,12:00:00,2026-08-22T14:05:26.476048+00:00,Eva Kouam,released,2026-08-22T14:07:25.750658+00:00,0.03
+04371058-41bd-4936-a205-f2f8d0e3b493,CPE Les Petites Étoiles,Montreal,Replacement Auto,assigned,2026-08-23,08:00:00,12:00:00,2026-08-22T14:07:34.002647+00:00,SMS WORKER,confirmed,2026-08-22T14:08:20.565015+00:00,0.01

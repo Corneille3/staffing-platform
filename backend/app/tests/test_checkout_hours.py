@@ -419,7 +419,8 @@ def test_empty_window_renders_zeros(db_session, seed, org_admin_client):
 def _rows(csv_bytes: bytes) -> list[list[str]]:
     import csv as csv_mod
     import io
-    return list(csv_mod.reader(io.StringIO(csv_bytes.decode('utf-8'))))
+    # utf-8-sig strips the Excel BOM; ';' matches the fr-Excel delimiter.
+    return list(csv_mod.reader(io.StringIO(csv_bytes.decode('utf-8-sig')), delimiter=';'))
 
 
 def test_worked_hours_export_includes_open_shifts_and_flags_corrections(db_session, seed):
