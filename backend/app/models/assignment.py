@@ -39,6 +39,11 @@ class Assignment(Base):
     )
     hours_adjusted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     hours_adjustment_reason: Mapped[str | None] = mapped_column(Text)
+    # Attendance reminder/alert idempotence (SPEC_NOSHOW): the sweep repasses
+    # every tick — a stamp means "already fired", and doubles as audit.
+    checkin_reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    checkout_reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    no_show_alerted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     notes: Mapped[str | None] = mapped_column(Text)
 
     @property

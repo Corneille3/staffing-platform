@@ -74,6 +74,9 @@ class Settings(BaseSettings):
     # A CONFIRMED assignment counts as "not checked in" this many minutes
     # after its scheduled start — the operational absence signal.
     checkin_grace_minutes: int = 15
+    # Check-out reminder fires this long after scheduled end — right when a
+    # forgotten tap is still fixable from the parking lot (SPEC_NOSHOW §B2).
+    checkout_reminder_delay_minutes: int = 10
     # A corrected check-in→check-out window longer than this is a typo, not a
     # shift.
     max_shift_hours: int = 24

@@ -19,7 +19,9 @@ from app.models.enums import (
     RequestRole,
     RequestStatus,
     RequestType,
+    ResponseStatus,
 )
+from app.models.request_response import RequestResponse
 from app.models.staffing_request import StaffingRequest
 from app.notifications import email_service
 from app.services.replacement_admin_service import ReplacementAdminService
@@ -29,14 +31,16 @@ def _admin_scope(seed) -> AccessScope:
     return AccessScope(user=seed.apf, tenant_id=seed.tenant.id)
 
 
-def _searching_request(session, seed, *, origin, starts_in: timedelta) -> StaffingRequest:
-    """A still-searching self-serve request whose shift starts ``starts_in``
-    from now (UTC — the test timezone)."""
+def _searching_request(session, seed, *, origin, starts_in: timedelta,
+                       status=RequestStatus.OPEN) -> StaffingRequest:
+    """A still-searching request whose shift starts ``starts_in`` from now
+    (UTC — the test timezone). Any origin; coordinator-origin ones are
+    exactly what the SPEC_NOSHOW §C extension sweeps."""
     start = datetime.now(timezone.utc) + starts_in
     req = StaffingRequest(
         id=uuid4(), organization_id=seed.org.id, created_by_user_id=seed.worker_a.id,
         request_type=RequestType.URGENT_REPLACEMENT, role=RequestRole.EDUCATOR,
-        status=RequestStatus.OPEN, origin=origin, auto_assign=True,
+        status=status, origin=origin, auto_assign=True,
         title='Couverture matin', city='IntTestCity',
         work_date=start.date(), start_time=start.time().replace(microsecond=0),
         end_time=time(23, 59),
@@ -153,6 +157,96 @@ def test_manual_sweep_endpoint_returns_both_counts(apf_client, db_session, seed,
     body = resp.json()
     assert body['expired'] >= 1
     assert 'escalated' in body
+
+
+# ── coordinator-origin: escalate & expire (SPEC_NOSHOW §C) ───────────────────
+
+def test_coordinator_origin_escalates_with_own_wording_once(db_session, seed, monkeypatch):
+    """A coordinator-posted request inside the lead escalates like self-serve
+    ones, but the email speaks to the person who posted it."""
+    sent = _capture_emails(monkeypatch)
+    req = _searching_request(
+        db_session, seed, origin=RequestOrigin.COORDINATOR,
+        starts_in=timedelta(minutes=30),
+    )
+
+    result = ReplacementAdminService(db_session).tick()
+
+    assert result['escalated'] == 1
+    db_session.refresh(req)
+    assert req.escalated_at is not None
+    assert req.status == RequestStatus.OPEN
+    assert [m.to_email for m in sent] == [seed.org_admin.email]
+    assert 'Your posted shift' in sent[0].body  # org_admin prefers EN
+    assert 'Re-notify the pool' in sent[0].body
+    # Self-serve framing must NOT leak into the coordinator wording.
+    assert 'released' not in sent[0].body
+
+    # One-shot stamp: second pass is silent.
+    assert ReplacementAdminService(db_session).tick()['escalated'] == 0
+    assert len(sent) == 1
+
+
+def test_coordinator_approval_mode_message(db_session, seed, monkeypatch):
+    """RESPONSES_RECEIVED past the lead = a decision overdue, not a coverage
+    gap — the email says pick one before it expires (§C.3)."""
+    sent = _capture_emails(monkeypatch)
+    req = _searching_request(
+        db_session, seed, origin=RequestOrigin.COORDINATOR,
+        starts_in=timedelta(minutes=30), status=RequestStatus.RESPONSES_RECEIVED,
+    )
+    db_session.add(RequestResponse(
+        id=uuid4(), staffing_request_id=req.id, worker_user_id=seed.worker_a.id,
+        status=ResponseStatus.ACCEPTED,
+    ))
+    db_session.flush()
+
+    assert ReplacementAdminService(db_session).tick()['escalated'] == 1
+    assert len(sent) == 1
+    assert 'accepted your shift' in sent[0].body
+    assert 'pick one before' in sent[0].body
+
+
+def test_coordinator_origin_expires_past_start(db_session, seed, monkeypatch):
+    """The zombie-request gap: coordinator-posted shifts now expire once
+    started unfilled, like self-serve ones."""
+    _capture_emails(monkeypatch)
+    req = _searching_request(
+        db_session, seed, origin=RequestOrigin.COORDINATOR,
+        starts_in=timedelta(hours=-2),
+    )
+
+    result = ReplacementAdminService(db_session).tick()
+
+    assert result['expired'] == 1
+    db_session.refresh(req)
+    assert req.status == RequestStatus.EXPIRED
+    audit = db_session.scalar(select(AuditLog).where(
+        AuditLog.action == 'replacement.unfilled', AuditLog.entity_id == req.id,
+    ))
+    assert audit is not None
+
+
+def test_draft_and_assigned_untouched_by_sweep(db_session, seed, monkeypatch):
+    """Widening the origin filter must not widen the status filter: drafts
+    and assigned requests never escalate or expire."""
+    _capture_emails(monkeypatch)
+    draft = _searching_request(
+        db_session, seed, origin=RequestOrigin.COORDINATOR,
+        starts_in=timedelta(minutes=30), status=RequestStatus.DRAFT,
+    )
+    covered = _searching_request(
+        db_session, seed, origin=RequestOrigin.COORDINATOR,
+        starts_in=timedelta(hours=-1), status=RequestStatus.ASSIGNED,
+    )
+
+    result = ReplacementAdminService(db_session).tick()
+
+    assert result == {'escalated': 0, 'expired': 0}
+    db_session.refresh(draft)
+    db_session.refresh(covered)
+    assert draft.status == RequestStatus.DRAFT
+    assert covered.status == RequestStatus.ASSIGNED
 
 
 # ── coordinator feed covers absences ─────────────────────────────────────────

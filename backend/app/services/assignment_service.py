@@ -352,6 +352,11 @@ class AssignmentService:
         assignment.checked_out_at = None
         assignment.checked_out_latitude = None
         assignment.checked_out_longitude = None
+        # Reminder/alert stamps travel with the attendance they policed — a
+        # re-confirmed assignment must get fresh reminders (SPEC_NOSHOW).
+        assignment.checkin_reminder_sent_at = None
+        assignment.checkout_reminder_sent_at = None
+        assignment.no_show_alerted_at = None
         assignment.completed_at = None
         assignment.notes = self._append_cancellation_note(assignment.notes, payload)
         self.db.add(assignment)
