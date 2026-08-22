@@ -83,6 +83,17 @@ class ExportService:
     def get_job(self, job_id: UUID) -> _ExportJob | None:
         return _fetch(job_id)
 
+    @staticmethod
+    def _excel_buf() -> io.StringIO:
+        """CSV tuned for the actual reader: Québec-French Excel. The UTF-8
+        BOM makes Excel decode accents correctly (else Étoiles → Ã‰toiles),
+        and the ';' delimiter matches the fr locale's list separator (else
+        the whole row lands in one column). Sheets/LibreOffice handle both
+        fine."""
+        buf = io.StringIO()
+        buf.write('\ufeff')
+        return buf
+
     def _scope_orgs(self, scope: AccessScope, requested: list[UUID] | None) -> list[UUID]:
         """Resolve the org IDs to include, restricted to caller's scope."""
         if scope.is_platform_admin or scope.is_network_admin:
@@ -157,8 +168,8 @@ class ExportService:
             .order_by(StaffingRequest.work_date.asc(), StaffingRequest.created_at.asc())
         ).all()
 
-        buf = io.StringIO()
-        writer = csv.writer(buf)
+        buf = self._excel_buf()
+        writer = csv.writer(buf, delimiter=';')
         writer.writerow([
             'request_id', 'organization', 'city', 'title', 'status',
             'work_date', 'start_time', 'end_time', 'created_at',
@@ -215,8 +226,8 @@ class ExportService:
                 detail='date_from must be on or before date_to.',
             )
         scoped_org_ids = self._scope_orgs(scope, org_ids)
-        buf = io.StringIO()
-        writer = csv.writer(buf)
+        buf = self._excel_buf()
+        writer = csv.writer(buf, delimiter=';')
         writer.writerow(self._WORKED_HOURS_HEADER)
         if not scoped_org_ids:
             return buf.getvalue().encode('utf-8'), 0
@@ -331,8 +342,8 @@ class ExportService:
         return 'yes' if all(checks) else 'no'
 
     def _empty_csv(self) -> bytes:
-        buf = io.StringIO()
-        writer = csv.writer(buf)
+        buf = self._excel_buf()
+        writer = csv.writer(buf, delimiter=';')
         writer.writerow([
             'request_id', 'organization', 'city', 'title', 'status',
             'work_date', 'start_time', 'end_time', 'created_at',
