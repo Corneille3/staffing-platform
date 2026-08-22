@@ -6,7 +6,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.scope import AccessScope
+from app.models.enums import UserRole
 from app.models.organization import Organization
+from app.models.organization_membership import OrganizationMembership
+from app.models.user import User
 
 
 class OrganizationRepository:
@@ -36,3 +39,17 @@ class OrganizationRepository:
 
     def get(self, organization_id: UUID) -> Organization | None:
         return self.db.get(Organization, organization_id)
+
+    def active_admins(self, organization_id: UUID) -> list[User]:
+        """Active org_admins of one org — the recipient set for escalation
+        emails and no-show alerts (SPEC_NOSHOW: shared, not copied)."""
+        return list(self.db.scalars(
+            select(User)
+            .join(OrganizationMembership, OrganizationMembership.user_id == User.id)
+            .where(
+                OrganizationMembership.organization_id == organization_id,
+                OrganizationMembership.role == UserRole.ORG_ADMIN,
+                OrganizationMembership.is_active.is_(True),
+                User.is_active.is_(True),
+            )
+        ))

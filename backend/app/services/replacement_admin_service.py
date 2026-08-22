@@ -16,9 +16,8 @@ from sqlalchemy.orm import Session
 from app.auth.scope import AccessScope
 from app.core.config import settings
 from app.core.timeutil import shift_start_utc
-from app.models.enums import RequestStatus, ResponseStatus, UserRole, RequestOrigin
+from app.models.enums import RequestOrigin, RequestStatus, ResponseStatus
 from app.models.organization import Organization
-from app.models.organization_membership import OrganizationMembership
 from app.models.request_response import RequestResponse
 from app.models.staffing_request import StaffingRequest
 from app.models.user import User
@@ -280,16 +279,7 @@ class ReplacementAdminService:
         origins explain who released/reported; coordinator origin speaks to
         the person who posted it (SPEC_NOSHOW §C)."""
         org = self.db.get(Organization, request.organization_id)
-        admins = list(self.db.scalars(
-            select(User)
-            .join(OrganizationMembership, OrganizationMembership.user_id == User.id)
-            .where(
-                OrganizationMembership.organization_id == request.organization_id,
-                OrganizationMembership.role == UserRole.ORG_ADMIN,
-                OrganizationMembership.is_active.is_(True),
-                User.is_active.is_(True),
-            )
-        ))
+        admins = OrganizationRepository(self.db).active_admins(request.organization_id)
         if not admins:
             logger.warning('No active coordinator to escalate request %s to', request.id)
             return

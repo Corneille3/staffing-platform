@@ -173,3 +173,109 @@ def test_cancellation_clears_reminder_stamps(db_session, seed, apf_client, monke
     assert assignment.checkin_reminder_sent_at is None
     assert assignment.checkout_reminder_sent_at is None
     assert assignment.no_show_alerted_at is None
+
+
+# ── A: no-show alert ─────────────────────────────────────────────────────────
+
+def _capture_alert_channels(monkeypatch) -> tuple[list, list]:
+    from app.notifications import email_service, sms_service
+    emails: list = []
+    texts: list = []
+
+    def fake_email(self, message):
+        emails.append(message)
+        return {'channel': 'email', 'delivery_status': 'sent', 'recipient': message.to_email}
+
+    def fake_sms(self, phone_number, body):
+        texts.append((phone_number, body))
+        return {'channel': 'sms', 'delivery_status': 'sent', 'recipient': phone_number}
+
+    monkeypatch.setattr(email_service.EmailNotificationService, 'send', fake_email)
+    monkeypatch.setattr(sms_service.SmsNotificationService, 'send', fake_sms)
+    return emails, texts
+
+
+def test_no_show_alert_fires_once_after_grace(db_session, seed, monkeypatch):
+    _capture_pushes(monkeypatch)
+    emails, texts = _capture_alert_channels(monkeypatch)
+    seed.org_admin.phone = '+15145550001'
+    db_session.flush()
+    grace = timedelta(minutes=16)  # past the 15-min grace
+    assignment = _shift(db_session, seed, started_ago=grace)
+
+    service = AttendanceSweepService(db_session)
+    assert service.tick()['no_show_alerts'] == 1
+    db_session.refresh(assignment)
+    assert assignment.no_show_alerted_at is not None
+    # SMS + email, both to the org's active admin, actionable content.
+    assert len(texts) == 1 and texts[0][0] == '+15145550001'
+    assert "hasn't checked in" in texts[0][1]  # org_admin prefers EN
+    assert [m.to_email for m in emails] == [seed.org_admin.email]
+    assert 'No check-in' in emails[0].subject
+    assert f'/en/admin/requests/{assignment.staffing_request_id}' in emails[0].body
+
+    # Stamp holds on the second pass.
+    assert service.tick()['no_show_alerts'] == 0
+    assert len(emails) == 1 and len(texts) == 1
+
+
+def test_no_alert_inside_grace_or_after_checkin(db_session, seed, monkeypatch):
+    _capture_pushes(monkeypatch)
+    emails, texts = _capture_alert_channels(monkeypatch)
+    # Inside the grace window — B1's reminder territory, not A's.
+    _shift(db_session, seed, started_ago=timedelta(minutes=5))
+    # Checked in late but before the sweep looked — no alert.
+    arrived = _shift(db_session, seed, started_ago=timedelta(minutes=30))
+    arrived.checked_in_at = datetime.now(timezone.utc)
+    db_session.flush()
+
+    assert AttendanceSweepService(db_session).tick()['no_show_alerts'] == 0
+    assert emails == [] and texts == []
+
+
+def test_no_show_respects_sms_opt_out_email_still_sent(db_session, seed, monkeypatch):
+    """STOP is STOP for any role — but the email record still goes out."""
+    _capture_pushes(monkeypatch)
+    emails, texts = _capture_alert_channels(monkeypatch)
+    seed.org_admin.phone = '+15145550001'
+    seed.org_admin.sms_opt_out = True
+    db_session.flush()
+    _shift(db_session, seed, started_ago=timedelta(minutes=20))
+
+    assert AttendanceSweepService(db_session).tick()['no_show_alerts'] == 1
+    assert texts == []
+    assert len(emails) == 1
+
+
+def test_no_show_admin_without_phone_gets_email_only(db_session, seed, monkeypatch):
+    _capture_pushes(monkeypatch)
+    emails, texts = _capture_alert_channels(monkeypatch)
+    seed.org_admin.phone = None
+    db_session.flush()
+    _shift(db_session, seed, started_ago=timedelta(minutes=20))
+
+    assert AttendanceSweepService(db_session).tick()['no_show_alerts'] == 1
+    assert texts == []
+    assert len(emails) == 1
+
+
+def test_b1_then_a_ordering_on_one_assignment(db_session, seed, monkeypatch):
+    """Reminder at start, alert at start + grace — one assignment, two ticks
+    at two moments."""
+    pushes = _capture_pushes(monkeypatch)
+    emails, _texts = _capture_alert_channels(monkeypatch)
+    assignment = _shift(db_session, seed, started_ago=timedelta(minutes=2))
+
+    service = AttendanceSweepService(db_session)
+    first = service.tick()
+    assert first['checkin_reminders'] == 1 and first['no_show_alerts'] == 0
+    assert len(pushes) == 1 and emails == []
+
+    # Simulate the grace elapsing by ticking with a later "now".
+    later = datetime.now(timezone.utc) + timedelta(minutes=20)
+    second = service.tick(now=later)
+    assert second['no_show_alerts'] == 1
+    db_session.refresh(assignment)
+    assert assignment.checkin_reminder_sent_at is not None
+    assert assignment.no_show_alerted_at is not None
+    assert len(emails) == 1
