@@ -43,6 +43,13 @@ class BackgroundScheduler:
     def start(self) -> None:
         if self._thread is not None:
             return
+        # §B1: the check-in grace is the worker's window to act on the
+        # reminder before the no-show alert fires — never let it collapse.
+        if settings.checkin_grace_minutes < 5:
+            raise ValueError(
+                'checkin_grace_minutes must be >= 5 '
+                f'(got {settings.checkin_grace_minutes})'
+            )
         # Initialize to today: the first nightly recompute happens tomorrow,
         # not in a burst at every deploy-time boot.
         self._last_reliability_date = datetime.now(timezone.utc).date()
@@ -71,6 +78,7 @@ class BackgroundScheduler:
             return
         while True:
             self._run_sweep()
+            self._run_attendance_sweep()
             self._maybe_run_reliability()
             if self._stop.wait(settings.replacement_sweep_interval_seconds):
                 return
@@ -90,6 +98,17 @@ class BackgroundScheduler:
                 )
         except Exception:
             logger.exception('Replacement sweep failed')
+
+    def _run_attendance_sweep(self) -> None:
+        try:
+            from app.services.attendance_sweep_service import AttendanceSweepService
+
+            with SessionLocal() as db:
+                result = AttendanceSweepService(db).tick()
+            if any(result.values()):
+                logger.info('Attendance sweep: %s', result)
+        except Exception:
+            logger.exception('Attendance sweep failed')
 
     def _maybe_run_reliability(self) -> None:
         now = datetime.now(timezone.utc)
