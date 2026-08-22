@@ -14,6 +14,7 @@ from app.models.staffing_request import StaffingRequest
 from app.models.user import User
 from app.models.worker_certification import WorkerCertification
 from app.models.worker_profile import WorkerProfile
+from app.models.worker_organization import WorkerOrganization
 from app.models.worker_qualification import WorkerQualification
 from app.models.worker_region import WorkerRegion
 
@@ -33,6 +34,7 @@ __all__ = [
     'TenantMembership',
     'User',
     'WorkerCertification',
+    'WorkerOrganization',
     'WorkerProfile',
     'WorkerQualification',
     'WorkerRegion',

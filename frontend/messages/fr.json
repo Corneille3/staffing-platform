@@ -153,7 +153,12 @@
       "continue": "Continuer",
       "finish": "Terminer",
       "saving": "Enregistrement…",
-      "genericError": "Une erreur s'est produite."
+      "genericError": "Une erreur s'est produite.",
+      "orgsTitlePre": "Vos",
+      "orgsTitleAccent": "organismes",
+      "orgsBlurb": "Choisissez les organismes avec lesquels vous voulez travailler. Aucune sélection = vous recevez les quarts de tous les organismes du réseau. Modifiable en tout temps dans Disponibilités.",
+      "countOrgs": "{n, plural, one {# organisme sélectionné} other {# organismes sélectionnés}}",
+      "countOrgsAll": "Tous les organismes (par défaut)"
     },
     "availability": {
       "eyebrow": "Disponibilités",
@@ -369,6 +374,11 @@
       "st_filled": "Couvert par {name}",
       "st_unfilled": "Non comblé",
       "st_cancelled": "Annulé"
+    },
+    "organizations": {
+      "title": "Organismes",
+      "hintOpen": "Aucune sélection — vous recevez les quarts de tous les organismes du réseau. Touchez pour vous limiter à certains organismes.",
+      "hintRestricted": "Vous recevez seulement les quarts des organismes sélectionnés. Tout désélectionner = tous les organismes."
     }
   },
   "edge": {

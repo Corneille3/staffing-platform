@@ -26,6 +26,9 @@ from app.schemas.worker import (
     WorkerAvailabilityUpdate,
     WorkerInviteCreate,
     WorkerOnboardCreate,
+    WorkerOrganizationOption,
+    WorkerOrganizationsRead,
+    WorkerOrganizationsUpdate,
     WorkerProfileRead,
     WorkerRead,
     WorkerSmsPreferenceUpdate,
@@ -134,6 +137,54 @@ def update_worker_availability(
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Worker profile not found')
     return WorkerProfileRead.model_validate(profile)
+
+
+@router.get('/{user_id}/organizations', response_model=WorkerOrganizationsRead)
+def list_worker_organizations(
+    user_id: UUID,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> WorkerOrganizationsRead:
+    """The worker's tenant orgs with their opt-in flags (§org-selection).
+    Workers can't use /organizations (scope returns [] for them) — this is
+    their window onto the network's sites."""
+    if not scope.is_admin and scope.user.id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Out of scope.')
+    options, restricted = WorkerService(db).list_organizations(user_id)
+    return WorkerOrganizationsRead(
+        items=[
+            WorkerOrganizationOption(
+                organization_id=org.id, name=org.name, city=org.city, selected=selected,
+            )
+            for org, selected in options
+        ],
+        restricted=restricted,
+    )
+
+
+@router.put('/{user_id}/organizations', response_model=WorkerOrganizationsRead)
+def set_worker_organizations(
+    user_id: UUID,
+    payload: WorkerOrganizationsUpdate,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> WorkerOrganizationsRead:
+    """Full replacement of the worker's org opt-ins. Empty list = open to
+    all orgs (the opt-out default)."""
+    if not scope.is_admin and scope.user.id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Out of scope.')
+    service = WorkerService(db)
+    service.set_organizations(user_id, payload.organization_ids)
+    options, restricted = service.list_organizations(user_id)
+    return WorkerOrganizationsRead(
+        items=[
+            WorkerOrganizationOption(
+                organization_id=org.id, name=org.name, city=org.city, selected=selected,
+            )
+            for org, selected in options
+        ],
+        restricted=restricted,
+    )
 
 
 @router.patch('/{user_id}/sms-preference')

@@ -14,6 +14,7 @@ import {
 import { SlotPeriod } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
 import { Eyebrow, Mono, SaveFlash, useSaveFlash } from "../../../../components/ui";
+import { WorkerOrgPicker } from "../../../../components/worker-org-picker";
 
 const SLOTS: SlotPeriod[] = ["morning", "afternoon", "evening", "overnight"];
 
@@ -553,6 +554,9 @@ export default function WorkerAvailabilityPage() {
           <p style={{ margin: 0, color: "var(--rose)", fontWeight: 600, fontSize: 13 }}>{cityError}</p>
         ) : null}
       </section>
+
+      {/* org opt-ins — hidden by the picker itself when the tenant has <2 orgs */}
+      <WorkerOrgPicker workerId={worker.id} />
 
       {/* preferences */}
       <section>
