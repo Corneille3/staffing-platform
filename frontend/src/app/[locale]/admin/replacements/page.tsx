@@ -1,6 +1,6 @@
 import { Link } from "../../../../i18n/navigation";
 import { Eyebrow, Mono } from "../../../../components/ui";
-import { ReplacementPolicyCard } from "../../../../components/replacement-policy-card";
+import { ReplacementPolicyPanel } from "../../../../components/replacement-policy-panel";
 import { getOrganizations, getReplacementFeed } from "../../../../lib/api";
 import type { ReplacementFeedItem } from "../../../../lib/types";
 
@@ -32,7 +32,6 @@ export default async function AdminReplacementsPage() {
     getReplacementFeed(),
     getOrganizations().catch(() => []),
   ]);
-  const primaryOrg = organizations[0];
 
   return (
     <div style={{ padding: "28px 32px", maxWidth: 1100 }}>
@@ -68,9 +67,9 @@ export default async function AdminReplacementsPage() {
           )}
         </div>
 
-        {primaryOrg ? (
-          <ReplacementPolicyCard organizationId={primaryOrg.id} organizationName={primaryOrg.name} />
-        ) : null}
+        <ReplacementPolicyPanel
+          organizations={organizations.map((o) => ({ id: o.id, name: o.name }))}
+        />
       </div>
     </div>
   );
