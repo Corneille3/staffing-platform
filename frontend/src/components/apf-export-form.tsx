@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createApfExport, getApfExportJob } from "../lib/browser-api";
+import { createApfExport, downloadApfExportCsv, getApfExportJob } from "../lib/browser-api";
 import type { ApfExportJob, Organization } from "../lib/types";
 import { Eyebrow, Mono } from "./ui";
 
@@ -59,7 +59,29 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [job, setJob] = useState<ApfExportJob | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const pollRef = useRef<number | null>(null);
+
+  async function handleDownload() {
+    if (!job) return;
+    setDownloading(true);
+    setError(null);
+    try {
+      const blob = await downloadApfExportCsv(job.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `staffig-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Download failed");
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   function toggleOrg(id: string) {
     setSelectedOrgs((prev) =>
@@ -362,21 +384,25 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
                 The CSV is also being emailed to you.
               </p>
               <div style={{ display: "flex", gap: 10 }}>
-                <a
-                  href={job.download_url}
-                  download
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  disabled={downloading}
                   style={{
                     padding: "10px 18px",
                     borderRadius: 999,
+                    border: "none",
                     background: "var(--terra)",
                     color: "var(--paper)",
                     fontSize: 14,
                     fontWeight: 500,
-                    textDecoration: "none",
+                    cursor: downloading ? "wait" : "pointer",
+                    opacity: downloading ? 0.6 : 1,
+                    fontFamily: "inherit",
                   }}
                 >
-                  Download CSV
-                </a>
+                  {downloading ? "Downloading…" : "Download CSV"}
+                </button>
                 <button
                   type="button"
                   onClick={reset}

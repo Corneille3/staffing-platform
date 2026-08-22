@@ -370,8 +370,9 @@ class ExportService:
             return
         subject = '[Staffig] Your APF export is ready'
         body = (
-            f'Your export of {job.row_count} request(s) is ready.\n\n'
-            f'Download (link expires when the server restarts):\n{download_url}\n\n'
+            f'Your export of {job.row_count} row(s) is ready.\n\n'
+            f'Download it from the export page (jobs are cleared when the '
+            f'server restarts):\n{download_url}\n\n'
             f'— Staffig'
         )
         try:

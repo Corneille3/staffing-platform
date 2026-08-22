@@ -156,6 +156,19 @@ export async function recomputeReliability(): Promise<{ updated: number }> {
   return postJson<{ updated: number }>("/api/v1/apf/substitutes/recompute-reliability");
 }
 
+// Link-style downloads can't carry the Clerk JWT — fetch the CSV with auth
+// and hand back a Blob for an object-URL download.
+export async function downloadApfExportCsv(jobId: string): Promise<Blob> {
+  const response = await fetch(`${BASE}/api/v1/apf/export/${jobId}/download`, {
+    cache: "no-store",
+    headers: await authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessageFromResponse(response, `Download failed (${response.status})`));
+  }
+  return response.blob();
+}
+
 export async function createApfExport(payload: ApfExportRequest): Promise<ApfExportJob> {
   return postJson<ApfExportJob>("/api/v1/apf/export", payload);
 }
