@@ -464,6 +464,19 @@ export type AvailabilityGrid = {
   cells: AvailabilityCell[];
 };
 
+export type WorkerOrganizationOption = {
+  organization_id: string;
+  name: string;
+  city: string;
+  selected: boolean;
+};
+
+export type WorkerOrganizations = {
+  items: WorkerOrganizationOption[];
+  // false = no active selection -> open to every org (the opt-out default)
+  restricted: boolean;
+};
+
 export type WorkerProfile = {
   availability_status: string;
   urgent_alert_opt_in: boolean;
@@ -564,7 +577,7 @@ export type StaffingRequest = {
 };
 
 export type EligibilityReason = {
-  type: "profile" | "availability" | "city" | "language" | "qualification" | "certification";
+  type: "profile" | "organization" | "availability" | "city" | "language" | "qualification" | "certification";
   status: "matched" | "missing";
   label: string;
   code: string | null;

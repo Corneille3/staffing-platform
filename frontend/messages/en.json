@@ -153,7 +153,12 @@
       "continue": "Continue",
       "finish": "Finish setup",
       "saving": "Saving…",
-      "genericError": "Something went wrong."
+      "genericError": "Something went wrong.",
+      "orgsTitlePre": "Your",
+      "orgsTitleAccent": "organizations",
+      "orgsBlurb": "Pick the organizations you want to work with. No selection = you'll receive shifts from every organization in the network. You can change this anytime in Availability.",
+      "countOrgs": "{n, plural, one {# organization selected} other {# organizations selected}}",
+      "countOrgsAll": "All organizations (default)"
     },
     "availability": {
       "eyebrow": "Availability",
@@ -369,6 +374,11 @@
       "st_filled": "Covered by {name}",
       "st_unfilled": "Not covered",
       "st_cancelled": "Cancelled"
+    },
+    "organizations": {
+      "title": "Organizations",
+      "hintOpen": "No selection — you receive shifts from every organization in the network. Tap to limit yourself to specific ones.",
+      "hintRestricted": "You only receive shifts from the selected organizations. Deselect all = every organization."
     }
   },
   "edge": {

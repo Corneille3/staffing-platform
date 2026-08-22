@@ -13,12 +13,14 @@ from app.core.config import settings
 from app.models.assignment import Assignment
 from app.models.enums import AvailabilityStatus, UserRole
 from app.models.request_response import RequestResponse
+from app.models.organization import Organization
 from app.models.tenant import Tenant
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 from app.models.worker_certification import WorkerCertification
 from app.models.worker_profile import WorkerProfile
 from app.models.worker_qualification import WorkerQualification
+from app.models.worker_organization import WorkerOrganization
 from app.models.worker_region import WorkerRegion
 from app.notifications.email_service import EmailMessage, EmailNotificationService
 from app.notifications.i18n import localized, localized_subject
@@ -333,3 +335,89 @@ class WorkerService:
         )
         self.db.commit()
         return saved
+
+    # --- Org selection (worker_organizations opt-in) -----------------------
+
+    def _worker_tenant_id(self, user_id: UUID) -> UUID:
+        tenant_id = self.db.scalar(
+            select(TenantMembership.tenant_id).where(
+                TenantMembership.user_id == user_id,
+                TenantMembership.is_active.is_(True),
+            )
+        )
+        if not tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail='Worker has no tenant membership.',
+            )
+        return tenant_id
+
+    def list_organizations(self, user_id: UUID) -> tuple[list[tuple[Organization, bool]], bool]:
+        """The worker's tenant orgs, each with the current opt-in flag.
+
+        Returns ``(options, restricted)`` — restricted is False when the
+        worker has no active selection (open to all orgs, the default).
+        """
+        tenant_id = self._worker_tenant_id(user_id)
+        orgs = list(self.db.scalars(
+            select(Organization)
+            .where(Organization.tenant_id == tenant_id, Organization.is_active.is_(True))
+            .order_by(Organization.name)
+        ).all())
+        selected_ids = set(self.db.scalars(
+            select(WorkerOrganization.organization_id).where(
+                WorkerOrganization.user_id == user_id,
+                WorkerOrganization.is_active.is_(True),
+            )
+        ).all())
+        options = [(org, org.id in selected_ids) for org in orgs]
+        # Selections pointing at removed orgs don't count as a restriction.
+        live_selected = {org.id for org, sel in options if sel}
+        return options, bool(live_selected)
+
+    def set_organizations(self, user_id: UUID, organization_ids: list[UUID]) -> None:
+        """Full replacement of the worker's org opt-ins.
+
+        Empty list = deactivate everything → back to "open to all orgs".
+        Rows are soft-toggled (is_active) so re-selecting an org keeps one
+        row per (user, org) under the unique constraint.
+        """
+        tenant_id = self._worker_tenant_id(user_id)
+        wanted = set(organization_ids)
+        if wanted:
+            tenant_org_ids = set(self.db.scalars(
+                select(Organization.id).where(
+                    Organization.tenant_id == tenant_id,
+                    Organization.is_active.is_(True),
+                )
+            ).all())
+            if not wanted <= tenant_org_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail='One or more organizations are not in your network.',
+                )
+
+        existing = list(self.db.scalars(
+            select(WorkerOrganization).where(WorkerOrganization.user_id == user_id)
+        ).all())
+        existing_by_org = {row.organization_id: row for row in existing}
+        for org_id in wanted:
+            row = existing_by_org.get(org_id)
+            if row:
+                row.is_active = True
+            else:
+                self.db.add(WorkerOrganization(
+                    id=uuid4(), user_id=user_id, organization_id=org_id, is_active=True,
+                ))
+        for row in existing:
+            if row.organization_id not in wanted:
+                row.is_active = False
+
+        self.audit_service.log(
+            action='worker.organizations_updated',
+            entity_type='user',
+            entity_id=user_id,
+            actor_user_id=user_id,
+            payload={'organization_ids': sorted(str(o) for o in wanted)},
+        )
+        self.db.commit()

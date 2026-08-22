@@ -1,10 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, MapPin, Plus, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "../../../../i18n/navigation";
-import { onboardWorker } from "../../../../lib/browser-api";
+import {
+  fetchWorkerOrganizations,
+  onboardWorker,
+  updateWorkerOrganizations,
+} from "../../../../lib/browser-api";
+import type { WorkerOrganizationOption } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
 import { Eyebrow } from "../../../../components/ui";
 
@@ -16,7 +21,7 @@ const LANGUAGES: { code: "fr" | "en" | "bilingual"; key: string }[] = [
   { code: "bilingual", key: "languageBilingual" },
 ];
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -37,6 +42,24 @@ export default function OnboardingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Org opt-ins (worker_organizations). The step only exists when the tenant
+  // has 2+ orgs — with a single org there is nothing to choose. Nothing
+  // selected = open to all orgs (the opt-out default).
+  const [orgOptions, setOrgOptions] = useState<WorkerOrganizationOption[] | null>(null);
+  const [selectedOrgIds, setSelectedOrgIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!worker) return;
+    let alive = true;
+    fetchWorkerOrganizations(worker.id)
+      .then((data) => alive && setOrgOptions(data.items))
+      .catch(() => alive && setOrgOptions([])); // fetch failure = skip the step
+    return () => { alive = false; };
+  }, [worker]);
+
+  const hasOrgStep = (orgOptions?.length ?? 0) >= 2;
+  const totalSteps = hasOrgStep ? 4 : 3;
+
   const counts = useMemo(
     () => ({ 1: cities.length, 2: quals.length + certs.length, 3: language ? 1 : 0 }),
     [cities.length, quals.length, certs.length, language],
@@ -46,6 +69,7 @@ export default function OnboardingPage() {
     if (step === 1) return cities.length > 0;
     if (step === 2) return true; // optional
     if (step === 3) return !!language;
+    if (step === 4) return true; // optional — empty selection = all orgs
     return false;
   }
 
@@ -62,6 +86,9 @@ export default function OnboardingPage() {
         certifications: certs,
         preferred_language: language,
       });
+      if (hasOrgStep && selectedOrgIds.length > 0) {
+        await updateWorkerOrganizations(worker.id, selectedOrgIds);
+      }
       await refresh();
       router.push("/worker");
     } catch (err) {
@@ -73,7 +100,7 @@ export default function OnboardingPage() {
 
   function next() {
     if (!canAdvance()) return;
-    if (step < 3) setStep((s) => (s + 1) as Step);
+    if (step < totalSteps) setStep((s) => (s + 1) as Step);
     else handleSubmit();
   }
 
@@ -108,12 +135,12 @@ export default function OnboardingPage() {
               <span>{t("back")}</span>
             </button>
           ) : <div />}
-          <Eyebrow>{t("stepLabel", { current: step, total: 3 })}</Eyebrow>
+          <Eyebrow>{t("stepLabel", { current: step, total: totalSteps })}</Eyebrow>
         </div>
 
         {/* Progress bar — moss for done steps, terra for current, line for pending */}
         <div style={{ display: "flex", gap: 6, marginBottom: 26 }}>
-          {[1, 2, 3].map((n) => (
+          {Array.from({ length: totalSteps }, (_, i) => i + 1).map((n) => (
             <div
               key={n}
               style={{
@@ -251,6 +278,55 @@ export default function OnboardingPage() {
           </>
         )}
 
+        {step === 4 && orgOptions && (
+          <>
+            <div style={{ marginBottom: 22 }}>
+              <h2 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 26, lineHeight: 1.1 }}>
+                {t("orgsTitlePre")} <em style={{ fontStyle: "italic" }}>{t("orgsTitleAccent")}</em>
+              </h2>
+              <p style={{ margin: "8px 0 0", fontSize: 14, color: "var(--ink-2)", lineHeight: 1.5 }}>
+                {t("orgsBlurb")}
+              </p>
+            </div>
+
+            <div style={{ display: "grid", gap: 10 }}>
+              {orgOptions.map((org) => {
+                const on = selectedOrgIds.includes(org.organization_id);
+                return (
+                  <button
+                    key={org.organization_id}
+                    type="button"
+                    onClick={() =>
+                      setSelectedOrgIds(
+                        on
+                          ? selectedOrgIds.filter((id) => id !== org.organization_id)
+                          : [...selectedOrgIds, org.organization_id],
+                      )
+                    }
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "16px 18px", borderRadius: 14,
+                      border: on ? "1px solid var(--terra)" : "0.5px solid var(--line)",
+                      background: on ? "var(--terra-soft)" : "var(--card)",
+                      color: "var(--ink)",
+                      cursor: "pointer", fontFamily: "inherit", fontSize: 15, fontWeight: 500,
+                      minHeight: 44, textAlign: "left",
+                    }}
+                  >
+                    <span>
+                      {org.name}
+                      <span style={{ display: "block", fontSize: 12, color: "var(--ink-3)", fontWeight: 400, marginTop: 2 }}>
+                        {org.city}
+                      </span>
+                    </span>
+                    {on && <Check size={16} style={{ color: "var(--terra)" }} />}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+
         {error && (
           <p style={{ marginTop: 16, color: "var(--rose)", fontSize: 14, fontWeight: 600 }}>{error}</p>
         )}
@@ -275,6 +351,7 @@ export default function OnboardingPage() {
             {step === 1 && t("countCities", { n: counts[1] })}
             {step === 2 && t("countCredentials", { n: counts[2] })}
             {step === 3 && (language ? t(LANGUAGES.find((l) => l.code === language)!.key) : t("countLanguagePending"))}
+            {step === 4 && (selectedOrgIds.length > 0 ? t("countOrgs", { n: selectedOrgIds.length }) : t("countOrgsAll"))}
           </span>
           <button
             type="button"
@@ -289,7 +366,7 @@ export default function OnboardingPage() {
               opacity: submitting ? 0.6 : 1, fontFamily: "inherit", minHeight: 44,
             }}
           >
-            {submitting ? t("saving") : step < 3 ? t("continue") : t("finish")}
+            {submitting ? t("saving") : step < totalSteps ? t("continue") : t("finish")}
           </button>
         </div>
       </div>

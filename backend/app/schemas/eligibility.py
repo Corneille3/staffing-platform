@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 EligibilityReasonType = Literal[
     'profile',
+    'organization',
     'availability',
     'city',
     'language',

@@ -9,6 +9,7 @@ from app.models.availability import Availability
 from app.models.enums import SlotPeriod
 from app.models.staffing_request import StaffingRequest
 from app.models.user import User
+from app.models.worker_organization import WorkerOrganization
 from app.repositories.assignment_repository import AssignmentRepository
 from app.schemas.eligibility import EligibilityReason, EligibilityResult
 
@@ -84,6 +85,28 @@ class MatchingService:
                 )
             )
             return EligibilityResult(eligible=False, score=0, reasons=reasons)
+
+        # Org-selection gate: a worker who opted into specific orgs is only
+        # eligible for those orgs' requests. No active selection = open to
+        # all orgs (the opt-out default). Sits ahead of the availability
+        # checks so opted-out workers drop from broadcasts, reach counts and
+        # ranking panels for other orgs' shifts.
+        if self.db is not None:
+            selected_org_ids = set(self.db.scalars(
+                select(WorkerOrganization.organization_id).where(
+                    WorkerOrganization.user_id == worker.id,
+                    WorkerOrganization.is_active.is_(True),
+                )
+            ).all())
+            if selected_org_ids and staffing_request.organization_id not in selected_org_ids:
+                reasons.append(
+                    EligibilityReason(
+                        type='organization',
+                        status='missing',
+                        label='Organization not selected',
+                    )
+                )
+                return EligibilityResult(eligible=False, score=0, reasons=reasons)
 
         # Double-booking guard: a worker already committed to an overlapping
         # shift is ineligible — keeps them out of broadcasts and reach counts,

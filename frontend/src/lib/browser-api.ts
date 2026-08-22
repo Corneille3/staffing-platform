@@ -30,6 +30,7 @@ import {
   TenantAccessGrant,
   TenantProfile,
   Worker,
+  WorkerOrganizations,
   WorkerProfile,
 } from "./types";
 
@@ -95,6 +96,18 @@ async function deleteJson<T>(path: string): Promise<T> {
   });
   if (!response.ok) {
     throw new Error(await errorMessageFromResponse(response, `DELETE ${path} failed (${response.status})`));
+  }
+  return response.json();
+}
+
+async function putJson<T>(path: string, body: object): Promise<T> {
+  const response = await fetch(`${BASE}${path}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessageFromResponse(response, `PUT ${path} failed (${response.status})`));
   }
   return response.json();
 }
@@ -514,6 +527,25 @@ export async function updateWorkerSmsPreference(
 ): Promise<Worker> {
   return patchJson<Worker>(`/api/v1/workers/${workerId}/sms-preference`, {
     sms_opt_out: smsOptOut,
+  });
+}
+
+// ── Org selection (worker_organizations opt-in) ──────────────────────────────
+// Opt-out model: no selection = the worker is open to every org in their
+// tenant; selecting orgs restricts matching + notifications to those only.
+
+export async function fetchWorkerOrganizations(
+  workerId: string,
+): Promise<WorkerOrganizations> {
+  return getJson<WorkerOrganizations>(`/api/v1/workers/${workerId}/organizations`);
+}
+
+export async function updateWorkerOrganizations(
+  workerId: string,
+  organizationIds: string[],
+): Promise<WorkerOrganizations> {
+  return putJson<WorkerOrganizations>(`/api/v1/workers/${workerId}/organizations`, {
+    organization_ids: organizationIds,
   });
 }
 

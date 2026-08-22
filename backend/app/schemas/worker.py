@@ -90,3 +90,24 @@ class WorkerOnboardCreate(BaseModel):
     qualifications: list[str] = Field(default_factory=list)
     certifications: list[str] = Field(default_factory=list)
     preferred_language: str | None = None  # fr | en | bilingual
+
+
+class WorkerOrganizationOption(BaseModel):
+    """One org the worker could opt into, with their current choice."""
+    organization_id: UUID
+    name: str
+    city: str
+    selected: bool
+
+
+class WorkerOrganizationsRead(BaseModel):
+    items: list[WorkerOrganizationOption]
+    # False = no active selection rows → worker is open to every org
+    # (the opt-out default). True = the matching gate is restricting.
+    restricted: bool
+
+
+class WorkerOrganizationsUpdate(BaseModel):
+    # Full replacement of the selection set. Empty list = back to
+    # "open to all orgs".
+    organization_ids: list[UUID] = Field(default_factory=list)
