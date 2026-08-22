@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.auth.scope import AccessScope
 from app.core.config import settings
 from app.core.timeutil import shift_start_utc
-from app.models.enums import RequestStatus, ResponseStatus, UserRole
+from app.models.enums import RequestStatus, ResponseStatus, UserRole, RequestOrigin
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
 from app.models.request_response import RequestResponse
@@ -204,13 +204,16 @@ class ReplacementAdminService:
         actor_user_id: UUID | None = None,
         now: datetime | None = None,
     ) -> dict:
-        """One sweep pass over still-searching self-serve requests — both
-        origins (contractor releases AND permanent-staff absences):
+        """One sweep pass over still-searching requests — every origin:
+        contractor releases, permanent-staff absences, AND coordinator-posted
+        requests (SPEC_NOSHOW §C — before that, a coordinator request nobody
+        claimed got no warning and never expired):
 
           1. **escalate** — the shift starts within the escalation lead and
              nobody has filled it → stamp ``escalated_at`` (one warning per
              request, not per tick), audit ``replacement.escalated``, and email
-             the org's coordinators while they can still act.
+             the org's coordinators while they can still act. Coordinator-
+             origin requests get their own wording (the reader posted it).
           2. **expire** — the shift start has passed unfilled (auto: nobody
              claimed; managed: nobody assigned) → EXPIRED, audit
              ``replacement.unfilled``.
@@ -222,8 +225,10 @@ class ReplacementAdminService:
         now = now or datetime.now(timezone.utc)
         lead = timedelta(minutes=settings.replacement_escalation_lead_minutes)
 
+        # Every origin on purpose: DRAFT is excluded by the status filter,
+        # and ASSIGNED shifts are out of _SEARCHING_STATUSES — only genuinely
+        # uncovered shifts can escalate or expire.
         query = select(StaffingRequest).where(
-            StaffingRequest.origin.in_(SELF_SERVE_ORIGINS),
             StaffingRequest.status.in_(_SEARCHING_STATUSES),
         )
         if org_ids is not None:
@@ -270,8 +275,10 @@ class ReplacementAdminService:
         )
 
     def _email_coordinators(self, request: StaffingRequest, now: datetime) -> None:
-        """Warn the org's coordinators (active org_admins) that a self-serve
-        shift is about to start unfilled — while they can still step in."""
+        """Warn the org's coordinators (active org_admins) that a shift is
+        about to start unfilled — while they can still step in. Self-serve
+        origins explain who released/reported; coordinator origin speaks to
+        the person who posted it (SPEC_NOSHOW §C)."""
         org = self.db.get(Organization, request.organization_id)
         admins = list(self.db.scalars(
             select(User)
@@ -305,19 +312,49 @@ class ReplacementAdminService:
             if settings.allowed_origins else 'http://localhost:3000'
         )
 
-        is_absence = request.origin.value == 'staff_absence'
-        context_fr = (
-            f'Absence signalée par {giver_name}.' if is_absence
-            else f'Quart libéré par {giver_name}.'
-        )
-        context_en = (
-            f'Absence reported by {giver_name}.' if is_absence
-            else f'Shift released by {giver_name}.'
-        )
-        waiting_fr = (
-            f'{accepted} candidature(s) en attente d\'assignation.\n' if accepted else ''
-        )
-        waiting_en = f'{accepted} response(s) awaiting assignment.\n' if accepted else ''
+        start_hm = request.start_time.strftime('%H:%M')
+        role_label = request.role.value if request.role else ''
+        if request.origin == RequestOrigin.COORDINATOR:
+            # The reader posted this shift themselves. Approval-mode nuance
+            # (§C.3): hands raised but nobody picked = a decision overdue,
+            # not a coverage gap — say so.
+            if accepted:
+                context_fr = (
+                    f'{accepted} remplaçant(e)s ont accepté votre quart au {org_name} — '
+                    f'choisissez avant {start_hm}, sinon il expire.'
+                )
+                context_en = (
+                    f'{accepted} substitute(s) accepted your shift at {org_name} — '
+                    f'pick one before {start_hm} or it expires.'
+                )
+            else:
+                context_fr = (
+                    f'Votre quart publié commence dans environ {minutes} minutes et '
+                    f'n\'est toujours pas comblé — {role_label} au {org_name}, '
+                    f'{date_str} {start_hm}. Relancez le bassin ou ajustez-le '
+                    f'pendant qu\'il est temps.'
+                )
+                context_en = (
+                    f'Your posted shift starts in about {minutes} minutes and is '
+                    f'still unfilled — {role_label} at {org_name}, {date_str} '
+                    f'{start_hm}. Re-notify the pool or adjust it while there\'s time.'
+                )
+            waiting_fr = ''
+            waiting_en = ''
+        else:
+            is_absence = request.origin.value == 'staff_absence'
+            context_fr = (
+                f'Absence signalée par {giver_name}.' if is_absence
+                else f'Quart libéré par {giver_name}.'
+            )
+            context_en = (
+                f'Absence reported by {giver_name}.' if is_absence
+                else f'Shift released by {giver_name}.'
+            )
+            waiting_fr = (
+                f'{accepted} candidature(s) en attente d\'assignation.\n' if accepted else ''
+            )
+            waiting_en = f'{accepted} response(s) awaiting assignment.\n' if accepted else ''
 
         email_service = EmailNotificationService()
         for admin in admins:
