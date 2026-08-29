@@ -5,11 +5,14 @@ export function PageFrame({
   eyebrow,
   title,
   description,
+  titleAddon,
   children,
 }: {
   eyebrow: string;
   title: string;
   description: string;
+  /** Rendered inline after the title (e.g. a Live badge). */
+  titleAddon?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -27,6 +30,7 @@ export function PageFrame({
           }}
         >
           {title}
+          {titleAddon ? <span style={{ marginLeft: 14, display: "inline-block" }}>{titleAddon}</span> : null}
         </h1>
         <p
           style={{

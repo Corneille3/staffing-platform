@@ -6,7 +6,7 @@ export function Panel({
   children,
 }: {
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   children: ReactNode;
 }) {
   return (
