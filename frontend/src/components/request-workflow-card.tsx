@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { CheckCircle2 } from "lucide-react";
 import { errorMessageFromResponse } from "../lib/browser-api";
 import { availabilityStatusLabel } from "../lib/status-labels";
+import { LIVE_STATUSES, useRequestLive } from "./request-live";
 import { Eyebrow } from "./ui";
 import { Assignment, RequestResponse, StaffingRequest, User, Worker } from "../lib/types";
 
@@ -15,6 +17,13 @@ type ClerkLike = { session?: { getToken: () => Promise<string | null> } };
 
 function formatStatus(value: string) {
   return value.replace(/_/g, " ");
+}
+
+// "accepted · 6:04" — local wall-clock time of the response.
+function clockTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(11, 16);
+  return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 function workerResponseLabel(status: string): string {
@@ -51,12 +60,18 @@ const ASSIGNMENT_CANCELLATION_REASONS = [
   "Other",
 ];
 
+const STATUS_ORDER = ["accepted", "viewed", "notified", "declined", "no_response", "withdrawn"];
+
+function sortResponses(responses: RequestResponse[]): RequestResponse[] {
+  return [...responses].sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
+}
+
 export function RequestWorkflowCard({
-  request,
-  responses,
+  request: initialRequest,
+  responses: initialResponses,
   users,
   workers,
-  assignment,
+  assignment: initialAssignment,
 }: {
   request: StaffingRequest;
   responses: RequestResponse[];
@@ -65,7 +80,25 @@ export function RequestWorkflowCard({
   assignment: Assignment | null;
 }) {
   const router = useRouter();
+  // Inside a RequestLiveProvider the polled snapshot wins over the
+  // server-rendered props; elsewhere the props are the whole story.
+  const live = useRequestLive();
+  const request = live?.request ?? initialRequest;
+  const responses = sortResponses(live?.responses ?? initialResponses);
+  const assignment = live ? live.assignment : initialAssignment;
+  const t = useTranslations("admin.live");
   const [isPending, startTransition] = useTransition();
+  // Rows present on first render don't animate; anything that shows up on a
+  // later poll fades in. Never reset, so a row only ever animates once.
+  const seenResponseIds = useRef<Set<string> | null>(null);
+  if (seenResponseIds.current === null) seenResponseIds.current = new Set(responses.map((r) => r.id));
+  const newResponseIds = new Set<string>();
+  for (const r of responses) {
+    if (!seenResponseIds.current.has(r.id)) {
+      newResponseIds.add(r.id);
+      seenResponseIds.current.add(r.id);
+    }
+  }
   // Set the moment a button is clicked — the fetch itself is the slow part
   // (the backend fans out email/SMS/push synchronously), and isPending only
   // covers the router.refresh() afterwards. Without this the button looks
@@ -108,6 +141,10 @@ export function RequestWorkflowCard({
         return;
       }
 
+      // Pull the live snapshot right away (the poll would catch it within
+      // one tick anyway); router.refresh() still re-renders the server-side
+      // bits such as the Best-match card.
+      live?.refresh();
       startTransition(() => {
         router.refresh();
       });
@@ -285,7 +322,23 @@ export function RequestWorkflowCard({
 
       <div style={{ display: "grid", gap: 10 }}>
         <Eyebrow>Substitute responses</Eyebrow>
-        {responses.length === 0 ? (
+        {responses.length === 0 && LIVE_STATUSES.has(request.status) ? (
+          <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+            <span
+              aria-hidden
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: 99,
+                border: "1.5px solid var(--line)",
+                borderTopColor: "var(--terra)",
+                animation: "sg-spin 0.9s linear infinite",
+                flexShrink: 0,
+              }}
+            />
+            {t("waiting")}
+          </p>
+        ) : responses.length === 0 ? (
           <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>
             No substitutes have been notified yet.
           </p>
@@ -293,6 +346,7 @@ export function RequestWorkflowCard({
           responses.map((response) => {
             const user = users.find((u) => u.id === response.worker_user_id);
             const palette = RESPONSE_PALETTE[response.status] ?? RESPONSE_PALETTE.notified;
+            const respondedTime = response.responded_at ? clockTime(response.responded_at) : null;
             return (
               <div
                 key={response.id}
@@ -303,6 +357,7 @@ export function RequestWorkflowCard({
                   border: "0.5px solid var(--line)",
                   display: "grid",
                   gap: 8,
+                  animation: newResponseIds.has(response.id) ? "sg-fade-in 280ms ease-out" : undefined,
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
@@ -329,7 +384,15 @@ export function RequestWorkflowCard({
                     {palette.label}
                   </span>
                 </div>
-                {response.viewed_at ? (
+                {response.status === "accepted" && respondedTime ? (
+                  <div style={{ fontSize: 12, color: "var(--moss)", fontWeight: 600 }}>
+                    {t("acceptedAt", { time: respondedTime })}
+                  </div>
+                ) : response.status === "declined" && respondedTime ? (
+                  <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
+                    {t("declinedAt", { time: respondedTime })}
+                  </div>
+                ) : response.viewed_at ? (
                   <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
                     Viewed {response.viewed_at.slice(0, 16).replace("T", " ")}
                   </div>

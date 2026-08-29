@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Eyebrow, Mono } from "../../../components/ui";
 import { ActivityRowCard } from "../../../components/apf-activity-row";
 import { AdminDashboardUrgentCard } from "../../../components/admin-dashboard-urgent";
+import { PollingRefresh } from "../../../components/polling-refresh";
 import { getAdminDashboard, getAdminOrganizations } from "../../../lib/api";
 import type { AdminCoverageForward, AdminRequestSummary } from "../../../lib/types";
 
@@ -71,6 +72,7 @@ export default async function AdminDashboardPage() {
 
   return (
     <div>
+      <PollingRefresh everyMs={30_000} />
       {/* 1 · Hero */}
       <header style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 22 }}>
         <div>

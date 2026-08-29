@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Eyebrow, Mono } from "../../../../components/ui";
+import { PollingRefresh } from "../../../../components/polling-refresh";
 import { AdminRequestsList } from "../../../../components/admin-requests-list";
 import { AdminRequestFilters } from "../../../../components/admin-request-filters";
 import { getAdminOrganizations, getAdminRequestsIndex } from "../../../../lib/api";
@@ -57,6 +58,7 @@ export default async function RequestsPage({
 
   return (
     <div>
+      <PollingRefresh everyMs={60_000} />
       <header style={{ marginBottom: 22 }}>
         <Eyebrow style={{ marginBottom: 6 }}>Dispatch queue</Eyebrow>
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>

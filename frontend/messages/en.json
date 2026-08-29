@@ -405,5 +405,18 @@
       "way2Body": "Send them this address and they'll add you from their Staffig account.",
       "cta": "Try a different account"
     }
+  },
+  "admin": {
+    "live": {
+      "live": "Live",
+      "notified": "notified",
+      "accepted": "accepted",
+      "acceptedAt": "accepted · {time}",
+      "declinedAt": "declined · {time}",
+      "waiting": "Waiting for responses…",
+      "updatedAgo": "Updated {n}s ago",
+      "updatedJustNow": "Updated just now",
+      "offline": "Connection lost — showing the last known state."
+    }
   }
 }

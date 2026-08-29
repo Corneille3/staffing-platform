@@ -405,5 +405,18 @@
       "way2Body": "Transmettez-leur cette adresse et ils vous ajouteront depuis leur compte Staffig.",
       "cta": "Essayer un autre compte"
     }
+  },
+  "admin": {
+    "live": {
+      "live": "En direct",
+      "notified": "avisés",
+      "accepted": "acceptés",
+      "acceptedAt": "accepté · {time}",
+      "declinedAt": "refusé · {time}",
+      "waiting": "En attente de réponses…",
+      "updatedAgo": "Mis à jour il y a {n} s",
+      "updatedJustNow": "Mis à jour à l'instant",
+      "offline": "Connexion perdue — dernier état connu affiché."
+    }
   }
 }

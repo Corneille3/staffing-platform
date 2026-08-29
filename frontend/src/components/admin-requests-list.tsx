@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { MoreVertical } from "lucide-react";
 import { Mono } from "./ui";
@@ -70,6 +70,17 @@ interface Props {
 export function AdminRequestsList({ tab, initialRows, initialCursor, siteNames, siteId, urgency, language }: Props) {
   const [rows, setRows] = useState(initialRows);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
+  // The page polls via router.refresh(), which hands us a fresh first page.
+  // Adopt it as the head and keep whatever older pages were loaded through
+  // the cursor (deduped) so pagination survives a background refresh.
+  const olderIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    setRows((prev) => {
+      const headIds = new Set(initialRows.map((r) => r.id));
+      const older = prev.filter((r) => olderIds.current.has(r.id) && !headIds.has(r.id));
+      return [...initialRows, ...older];
+    });
+  }, [initialRows]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +90,7 @@ export function AdminRequestsList({ tab, initialRows, initialCursor, siteNames, 
     setLoading(true);
     try {
       const page = await fetchAdminRequestsIndex({ tab, cursor, siteId, urgency, language });
+      for (const item of page.items) olderIds.current.add(item.id);
       setRows((prev) => [...prev, ...page.items]);
       setCursor(page.next_cursor);
     } catch (err) {
