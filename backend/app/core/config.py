@@ -77,6 +77,13 @@ class Settings(BaseSettings):
     # Check-out reminder fires this long after scheduled end — right when a
     # forgotten tap is still fixable from the parking lot (SPEC_NOSHOW §B2).
     checkout_reminder_delay_minutes: int = 10
+    # A worker may still tap "Done" this long after the scheduled end — the
+    # reminder above fires at +10, the parking-lot tap lands soon after. Past
+    # it, only the coordinator's hours correction can close the shift. Check-in
+    # gets no such window: arriving after the end is not an arrival (finding
+    # #16, 2026-09-05 — a post-shift Start/Done pair produced a 0 h payroll
+    # row). The worker Horaire mirrors this constant client-side.
+    checkout_cutoff_minutes: int = 60
     # A corrected check-in→check-out window longer than this is a typo, not a
     # shift.
     max_shift_hours: int = 24

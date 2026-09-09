@@ -7,6 +7,7 @@ import { Link } from "../../../../i18n/navigation";
 import { checkInAssignment, checkOutAssignment, fetchAssignments, fetchRequests } from "../../../../lib/browser-api";
 import { formatWorkDate, locationLabel, roleSectorSubtitle } from "../../../../lib/format";
 import { assignmentStatusLabel } from "../../../../lib/status-labels";
+import { attendancePhase } from "../../../../lib/shift-time";
 import { Assignment, StaffingRequest } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
 import { Chip, Eyebrow, Mono } from "../../../../components/ui";
@@ -321,7 +322,7 @@ function HeroCard({
       )}
 
       {showCheckIn && (
-        <CheckInCard assignment={assignment} t={t} onCheckedIn={onCheckedIn} />
+        <CheckInCard assignment={assignment} request={request} t={t} onCheckedIn={onCheckedIn} />
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -396,10 +397,12 @@ function elapsedLabel(sinceIso: string, now: number): string {
 
 function CheckInCard({
   assignment,
+  request,
   t,
   onCheckedIn,
 }: {
   assignment: Assignment;
+  request: StaffingRequest;
   t: ReturnType<typeof useTranslations>;
   onCheckedIn: (updated: Assignment) => void;
 }) {
@@ -409,13 +412,17 @@ function CheckInCard({
   const checkedInAt = assignment.checked_in_at;
   const checkedOutAt = assignment.checked_out_at;
   const onShift = !!checkedInAt && !checkedOutAt;
+  // Which taps the clock still allows (finding #16): Start closes at the
+  // scheduled end, Done closes CHECKOUT_CUTOFF_MINUTES later. The backend
+  // enforces the same rule, so a stale page gets a 409 rather than a stamp.
+  const phase = attendancePhase(request, now);
 
-  // Live elapsed counter while on shift — minute precision is plenty.
+  // Minute ticker: drives the elapsed counter while on shift and flips the
+  // card into its ended/closed state at the boundaries without a reload.
   useEffect(() => {
-    if (!onShift) return;
     const timer = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(timer);
-  }, [onShift]);
+  }, []);
 
   async function stamp(action: (id: string, coords?: { latitude: number; longitude: number }) => Promise<Assignment>) {
     setBusy(true);
@@ -456,6 +463,9 @@ function CheckInCard({
     );
   }
 
+  if (checkedInAt && phase === "closed") {
+    return <AttendanceNotice eyebrow={t("checkOutMissed")} hint={t("checkOutMissedHint")} />;
+  }
   if (checkedInAt) {
     return (
       <div style={{
@@ -509,6 +519,9 @@ function CheckInCard({
     );
   }
 
+  if (phase !== "live") {
+    return <AttendanceNotice eyebrow={t("checkInMissed")} hint={t("checkInMissedHint")} />;
+  }
   return (
     <div style={{
       background: "rgba(246,244,238,.08)",
@@ -552,6 +565,29 @@ function CheckInCard({
         <CheckCircle2 size={15} />
         {busy ? t("checkingIn") : t("checkInCta")}
       </button>
+    </div>
+  );
+}
+
+/** The no-button end state of the attendance card: the clock closed a tap
+ * the worker never made. Same muted surface as the check-in prompt, sand
+ * accent so it reads as "needs a human", not as an error. */
+function AttendanceNotice({ eyebrow, hint }: { eyebrow: string; hint: string }) {
+  return (
+    <div style={{
+      background: "rgba(246,244,238,.08)",
+      border: "0.5px solid rgba(232,201,122,.35)",
+      borderRadius: 14,
+      padding: "14px 16px",
+      display: "grid",
+      gap: 4,
+    }}>
+      <Eyebrow style={{ color: "rgba(232,201,122,.85)", letterSpacing: ".16em" }}>
+        {eyebrow}
+      </Eyebrow>
+      <p style={{ margin: 0, fontSize: 13, color: "rgba(246,244,238,.78)", lineHeight: 1.5 }}>
+        {hint}
+      </p>
     </div>
   );
 }

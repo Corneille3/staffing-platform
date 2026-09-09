@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.geo import site_distance_m
+from app.core.timeutil import shift_end_utc
 from app.models.assignment import Assignment
 from app.models.enums import AssignmentStatus, RequestStatus, ResponseStatus
 from app.models.organization import Organization
@@ -37,6 +38,15 @@ class AssignmentService:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='Cancelled requests cannot be assigned')
         if self.assignment_repository.get_by_request(payload.staffing_request_id) is not None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='Request is already assigned')
+        # Ended-shift guard, same rule as the atomic claim: a shift whose end
+        # has passed can't be staffed after the fact. Keyed on the END so a
+        # shift already underway (the 8h05 no-show covered at 8h30) stays
+        # assignable. After-the-fact attendance is a coordinator hours
+        # correction, not an assignment.
+        if shift_end_utc(
+            staffing_request.work_date, staffing_request.start_time, staffing_request.end_time,
+        ) <= datetime.now(timezone.utc):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='This shift has already ended.')
 
         response = self.response_repository.get_for_request_and_worker(payload.staffing_request_id, payload.worker_user_id)
         if response is None or response.status != ResponseStatus.ACCEPTED:
@@ -142,6 +152,17 @@ class AssignmentService:
             return assignment  # idempotent — first check-in wins
 
         staffing_request = self.request_repository.get(assignment.staffing_request_id)
+        # Arriving after the end is not an arrival: a Start tapped once the
+        # shift is over would only seed a ~0 h payroll row (finding #16).
+        # Late arrivals mid-shift stay legal; the hours correction covers a
+        # forgotten tap. No tolerance here — check-out gets one.
+        if staffing_request is not None and shift_end_utc(
+            staffing_request.work_date, staffing_request.start_time, staffing_request.end_time,
+        ) <= datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='This shift has already ended; check-in is closed. Ask your coordinator to record your hours.',
+            )
         geo = self._geofence(staffing_request, latitude, longitude)
         assignment.checked_in_at = datetime.now(timezone.utc)
         assignment.checked_in_latitude = latitude
@@ -196,6 +217,20 @@ class AssignmentService:
             )
 
         staffing_request = self.request_repository.get(assignment.staffing_request_id)
+        # A forgotten Done is fixable for a while — the reminder push fires at
+        # end + checkout_reminder_delay_minutes, and the parking-lot tap lands
+        # soon after. Past the cutoff the stamp is a guess, so the coordinator
+        # correction (with its mandatory reason) is the only way to close it.
+        if staffing_request is not None and datetime.now(timezone.utc) >= shift_end_utc(
+            staffing_request.work_date, staffing_request.start_time, staffing_request.end_time,
+        ) + timedelta(minutes=settings.checkout_cutoff_minutes):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f'Check-out closed {settings.checkout_cutoff_minutes} minutes after the shift end. '
+                    'Ask your coordinator to correct your hours.'
+                ),
+            )
         geo = self._geofence(staffing_request, latitude, longitude)
         assignment.checked_out_at = datetime.now(timezone.utc)
         assignment.checked_out_latitude = latitude
