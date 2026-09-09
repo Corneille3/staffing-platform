@@ -226,8 +226,14 @@ def _dashboard(client):
 def test_not_checked_in_appears_after_grace_and_clears_on_checkin(
     db_session, seed, org_admin_client, monkeypatch,
 ):
-    # Shift started well past the grace window, worker never stamped.
-    started = (datetime.now() - timedelta(minutes=settings.checkin_grace_minutes + 30)).time()
+    # Shift started well past the grace window, worker never stamped. The
+    # dashboard scopes on today's date, so clamp to 00:00 rather than let the
+    # subtraction roll into yesterday just after midnight (CI runs on UTC).
+    now = datetime.now()
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    started = max(now - timedelta(minutes=settings.checkin_grace_minutes + 30), midnight)
+    if started == midnight:
+        monkeypatch.setattr(settings, 'checkin_grace_minutes', 0)
     req = _request(db_session, seed, start=time(started.hour, started.minute))
     assignment = _assignment(db_session, seed, req)
 
@@ -244,7 +250,10 @@ def test_not_checked_in_appears_after_grace_and_clears_on_checkin(
 
 
 def test_future_shift_is_arriving_not_absent(db_session, seed, org_admin_client):
-    later = (datetime.now() + timedelta(hours=3)).time()
+    # Same clamp on the other side: "three hours from now" must stay on
+    # today's date, so cap it at 23:59 (fails from 21:00 UTC otherwise).
+    now = datetime.now()
+    later = min(now + timedelta(hours=3), now.replace(hour=23, minute=59, second=0, microsecond=0))
     req = _request(db_session, seed, start=time(later.hour, later.minute))
     _assignment(db_session, seed, req)
     dash = _dashboard(org_admin_client)
