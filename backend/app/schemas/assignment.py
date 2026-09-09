@@ -24,6 +24,12 @@ class AssignmentRead(ORMModel):
     checked_out_at: datetime | None = None
     checked_out_latitude: Decimal | None = None
     checked_out_longitude: Decimal | None = None
+    # Attendance sweep stamps (SPEC_NOSHOW §A/§B): when each nudge/alert went
+    # out — null means not yet due, or never sent. Read-only diagnostics for
+    # the coordinator surface; the sweep writes them.
+    checkin_reminder_sent_at: datetime | None = None
+    checkout_reminder_sent_at: datetime | None = None
+    no_show_alerted_at: datetime | None = None
     # Derived on the model — checked_out_at − checked_in_at, never stored.
     worked_hours: float | None = None
     hours_adjusted_by_user_id: UUID | None = None

@@ -279,3 +279,24 @@ def test_b1_then_a_ordering_on_one_assignment(db_session, seed, monkeypatch):
     assert assignment.checkin_reminder_sent_at is not None
     assert assignment.no_show_alerted_at is not None
     assert len(emails) == 1
+
+
+# ── API exposure: the stamps are readable, so a coordinator (or a prod test
+# round) can tell "sent but not delivered" from "never sent" without logs. ──
+
+def test_reminder_stamps_exposed_on_assignment_read(db_session, seed, apf_client, monkeypatch):
+    _capture_pushes(monkeypatch)
+    assignment = _shift(
+        db_session, seed,
+        started_ago=timedelta(hours=8, minutes=15), duration=timedelta(hours=8),
+    )
+    assignment.checked_in_at = datetime.now(timezone.utc) - timedelta(hours=8)
+    db_session.flush()
+    assert AttendanceSweepService(db_session).tick()['checkout_reminders'] == 1
+
+    resp = apf_client.get('/api/v1/assignments')
+    assert resp.status_code == 200
+    row = next(a for a in resp.json()['items'] if a['id'] == str(assignment.id))
+    assert row['checkout_reminder_sent_at'] is not None
+    assert row['checkin_reminder_sent_at'] is None
+    assert row['no_show_alerted_at'] is None
