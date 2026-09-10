@@ -7,7 +7,7 @@ import { Link } from "../../../../i18n/navigation";
 import { checkInAssignment, checkOutAssignment, fetchAssignments, fetchRequests } from "../../../../lib/browser-api";
 import { formatWorkDate, locationLabel, roleSectorSubtitle } from "../../../../lib/format";
 import { assignmentStatusLabel } from "../../../../lib/status-labels";
-import { attendancePhase } from "../../../../lib/shift-time";
+import { attendancePhase, shiftTime } from "../../../../lib/shift-time";
 import { Assignment, StaffingRequest } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
 import { Chip, Eyebrow, Mono } from "../../../../components/ui";
@@ -456,7 +456,7 @@ function CheckInCard({
           <div style={{ fontSize: 13, color: "var(--paper)", marginTop: 2 }}>
             {assignment.worked_hours != null
               ? t("hoursRecorded", { hours: assignment.worked_hours.toLocaleString("fr-CA") })
-              : `${checkedInAt.slice(11, 16)} → ${checkedOutAt.slice(11, 16)}`}
+              : `${shiftTime(checkedInAt)} → ${shiftTime(checkedOutAt)}`}
           </div>
         </div>
       </div>

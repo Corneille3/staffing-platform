@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attendancePhase, CHECKOUT_CUTOFF_MINUTES, shiftClock, shiftDateKey, shiftEndMs } from "./shift-time";
+import { attendancePhase, CHECKOUT_CUTOFF_MINUTES, shiftClock, shiftDateKey, shiftEndMs, shiftTime } from "./shift-time";
 
 const MIN = 60_000;
 const day = { work_date: "2026-09-09", start_time: "09:30:00", end_time: "10:00:00" };
@@ -33,6 +33,25 @@ describe("shiftClock", () => {
   });
   it("reads midnight as hour 0, not 24", () => {
     expect(shiftClock("2026-09-10T04:00:00Z").hour).toBe(0);
+  });
+});
+
+describe("shiftTime", () => {
+  it("prints the Québec wall-clock, not the UTC slice (EDT)", () => {
+    // The activity row bug: 01:09Z showed as "01:09" for a 21:09 event.
+    expect(shiftTime("2026-09-10T01:09:35Z")).toBe("21:09");
+  });
+  it("handles standard time (EST)", () => {
+    expect(shiftTime("2026-01-10T04:05:00Z")).toBe("23:05");
+  });
+  it("zero-pads and reads midnight as 00", () => {
+    expect(shiftTime("2026-09-10T04:00:00Z")).toBe("00:00");
+    expect(shiftTime("2026-09-09T10:04:00Z")).toBe("06:04");
+  });
+  it("accepts a Date or epoch ms and returns empty for junk", () => {
+    expect(shiftTime(new Date("2026-09-10T01:09:35Z"))).toBe("21:09");
+    expect(shiftTime(Date.parse("2026-09-10T01:09:35Z"))).toBe("21:09");
+    expect(shiftTime("not-a-date")).toBe("");
   });
 });
 
