@@ -210,8 +210,11 @@ export async function getAdminActivity(
   return fetchJson<AdminActivity>(`/api/v1/admin/activity${qs ? `?${qs}` : ""}`);
 }
 
-export async function getWorkers(): Promise<Worker[]> {
-  const response = await fetchJson<{ items: Worker[] }>("/api/v1/workers");
+export async function getWorkers(options: { includeInactive?: boolean } = {}): Promise<Worker[]> {
+  // Listings never want removed (tombstoned) workers. Pass includeInactive
+  // only where the list is an id → name lookup over historical rows.
+  const path = options.includeInactive ? "/api/v1/workers?include_inactive=true" : "/api/v1/workers";
+  const response = await fetchJson<{ items: Worker[] }>(path);
   return response.items;
 }
 
