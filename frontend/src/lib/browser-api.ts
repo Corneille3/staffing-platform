@@ -32,6 +32,7 @@ import {
   Worker,
   WorkerOrganizations,
   WorkerProfile,
+  MyProfile,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
@@ -544,6 +545,16 @@ export async function updateWorkerPreferences(
 // Separate endpoint from the preferences above: sms_opt_out lives on the user
 // row, not the worker profile, so it returns the Worker and keeps working for
 // someone who has no profile yet.
+// Self-service phone + SMS preference for the signed-in person (finding #3:
+// coordinators had no way to add a number after the invite, so the no-show
+// SMS never reached them). Omit a field to leave it alone; phone "" clears.
+export async function updateMyProfile(payload: {
+  phone?: string | null;
+  sms_opt_out?: boolean;
+}): Promise<MyProfile> {
+  return patchJson<MyProfile>("/api/v1/auth/profile", payload);
+}
+
 export async function updateWorkerSmsPreference(
   workerId: string,
   smsOptOut: boolean,

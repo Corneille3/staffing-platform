@@ -29,6 +29,7 @@ import {
   TenantProfile,
   User,
   Worker,
+  MyProfile,
 } from "./types";
 
 export type ServerSession = {
@@ -216,6 +217,10 @@ export async function getWorkers(options: { includeInactive?: boolean } = {}): P
   const path = options.includeInactive ? "/api/v1/workers?include_inactive=true" : "/api/v1/workers";
   const response = await fetchJson<{ items: Worker[] }>(path);
   return response.items;
+}
+
+export async function getMyProfile(): Promise<MyProfile> {
+  return fetchJson<MyProfile>("/api/v1/auth/profile");
 }
 
 export async function getUsers(): Promise<User[]> {

@@ -4,12 +4,14 @@ import { redirect } from "next/navigation";
 import { ArrowLeft, Search, Bell, User as UserIcon } from "lucide-react";
 import { AdminNavigation } from "../../../components/admin-navigation";
 import { AdminOrgSwitcher } from "../../../components/admin-org-switcher";
+import { AdminProfileCard } from "../../../components/admin-profile-card";
 import { AdminBreadcrumb } from "../../../components/admin-breadcrumb";
 import { HeaderSignOutButton } from "../../../components/header-sign-out-button";
 import { Eyebrow } from "../../../components/ui";
 import { WorkspaceSuspendedScreen } from "../../../components/workspace-suspended";
 import {
   ApiError,
+  getMyProfile,
   getNetworkOverview,
   getOrganizations,
   getTenantProfile,
@@ -34,12 +36,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     if (err instanceof ApiError && err.status === 403) suspended = true;
     return fallback;
   };
-  const [overview, organizations, tenantProfile] = await Promise.all([
+  const [overview, organizations, tenantProfile, myProfile] = await Promise.all([
     getNetworkOverview().catch(swallow(null)),
     getOrganizations().catch(swallow([] as Awaited<ReturnType<typeof getOrganizations>>)),
     // Only used for the grant-visit chip — a platform operator reading this
     // surface through a §2.2 access grant should see they're in read-only.
     getTenantProfile().catch(() => null),
+    // Own phone + SMS switch for the sidebar card; the card just doesn't
+    // render if this fails, the rest of the surface must not.
+    getMyProfile().catch(() => null),
   ]);
 
   if (CLERK_ENABLED && suspended) {
@@ -169,6 +174,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <AdminNavigation openCount={overview?.unfilled_count ?? 0} />
 
         <div style={{ flex: 1 }} />
+
+        {/* Own phone + SMS preference (finding #3) */}
+        {myProfile ? <AdminProfileCard initial={myProfile} /> : null}
 
         {/* Pinned KPI mini-card */}
         <div

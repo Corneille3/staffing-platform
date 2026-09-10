@@ -421,6 +421,16 @@
       "updatedAgo": "Mis à jour il y a {n} s",
       "updatedJustNow": "Mis à jour à l'instant",
       "offline": "Connexion perdue — dernier état connu affiché."
+    },
+    "profile": {
+      "title": "Mon profil",
+      "phone": "Numéro de cellulaire",
+      "phonePlaceholder": "+1 514 555 0001",
+      "phoneHint": "Sert aux alertes d'absence par SMS.",
+      "noPhone": "Aucun numéro — les alertes SMS ne peuvent pas vous joindre.",
+      "sms": "Alertes SMS",
+      "smsOff": "Alertes par courriel seulement",
+      "error": "Échec de l'enregistrement — réessayez."
     }
   }
 }
