@@ -73,7 +73,9 @@ def list_workers(
     scope: AccessScope = Depends(get_access_scope),
     db: Session = Depends(get_db_session),
 ) -> dict[str, list[WorkerRead]]:
-    workers = WorkerService(db).list_for_scope(scope)
+    # Audit listing (APF network pool renders removed accounts with a
+    # "Removed" badge) — the only place tombstoned workers are meant to show.
+    workers = WorkerService(db).list_for_scope(scope, include_inactive=True)
     return {'items': [_to_worker_read(worker, db) for worker in workers]}
 
 

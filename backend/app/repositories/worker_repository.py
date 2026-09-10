@@ -31,10 +31,10 @@ class WorkerRepository:
         )
 
     def _with_tenant(self, stmt, tenant_id: UUID):
-        # Note: no ``TenantMembership.is_active`` filter — we want soft-deleted
-        # users to remain visible in the listing as "removed" entries. They're
-        # excluded from operational logic (matching, dispatch) elsewhere via
-        # ``User.is_active`` checks.
+        # Note: no ``TenantMembership.is_active`` filter — the APF audit view
+        # (``include_inactive=True``) wants soft-deleted users listed as
+        # "removed" entries. Operational listings take the default and never
+        # see them; matching/dispatch check ``User.is_active`` on their own.
         return stmt.join(TenantMembership, TenantMembership.user_id == User.id).where(
             TenantMembership.tenant_id == tenant_id,
         )
@@ -47,8 +47,14 @@ class WorkerRepository:
             self._with_tenant(self._base_list_stmt(), tenant_id)
         ).unique().all())
 
-    def list_for_scope(self, scope: AccessScope) -> list[User]:
+    def list_for_scope(self, scope: AccessScope, *, include_inactive: bool = False) -> list[User]:
+        """Workers visible to ``scope``. Removed (tombstoned) users are
+        excluded unless ``include_inactive`` — only the APF audit view wants
+        them; the coordinator's substitutes table listed 14 ``+removed-``
+        ghosts with Notify buttons (finding #13, 2026-09-05)."""
         stmt = self._base_list_stmt()
+        if not include_inactive:
+            stmt = stmt.where(User.is_active.is_(True))
         if scope.is_platform_admin or scope.is_network_admin or scope.is_org_admin:
             if not scope.tenant_id:
                 return []
