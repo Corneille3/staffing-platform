@@ -7,12 +7,14 @@ import { Panel } from "../../../../../components/panel";
 import {
   AssignmentPanel,
   HideWhenClosed,
-  isClosedStatus,
   LiveBadge,
   RequestLiveProvider,
   ResponseSummaryPanel,
   WorkflowTracker,
 } from "../../../../../components/request-live";
+// Pure module — request-live is "use client"; a server component may render
+// its components but must never *call* a function it exports.
+import { isClosedStatus } from "../../../../../lib/request-status";
 import { RequestWorkflowCard } from "../../../../../components/request-workflow-card";
 import { Mono } from "../../../../../components/ui";
 import {
