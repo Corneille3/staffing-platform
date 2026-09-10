@@ -6,12 +6,14 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db_session
 from app.auth.clerk import fetch_user_details, primary_email
 from app.auth.current_user import CurrentUserModel, get_current_user
+from app.auth.scope import AccessScope, get_access_scope
 from app.models.enums import TenantStatus, UserRole
 from app.models.platform_operator import PlatformOperator
 from app.models.tenant import Tenant
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
-from app.schemas.user import SyncedUserRead
+from app.schemas.user import MyProfileUpdate, SyncedUserRead
+from app.services.audit_service import AuditService
 
 router = APIRouter()
 
@@ -69,6 +71,54 @@ def _start_onboarding_if_pending(db: Session, user: User) -> None:
 @router.get('/me')
 def read_current_user(current_user: CurrentUserModel = Depends(get_current_user)) -> dict[str, object]:
     return current_user.model_dump()
+
+
+def _operator_row(db: Session, user: User) -> PlatformOperator | None:
+    if user.role != UserRole.PLATFORM_ADMIN:
+        return None
+    return db.scalar(select(PlatformOperator).where(PlatformOperator.user_id == user.id))
+
+
+@router.get('/profile', response_model=SyncedUserRead)
+def read_my_profile(
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> SyncedUserRead:
+    """The signed-in person's own DB row — the same shape /auth/sync returns,
+    without the identity-linking side effects (and without the Clerk MFA
+    round-trip). Feeds the coordinator "My profile" card."""
+    return _synced_read(scope.user, _operator_row(db, scope.user))
+
+
+@router.patch('/profile', response_model=SyncedUserRead)
+def update_my_profile(
+    payload: MyProfileUpdate,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> SyncedUserRead:
+    """Self-service phone + SMS preference (finding #3). Anyone active may
+    edit their own row; nothing else is writable here. Changes are audited
+    as ``user.profile_updated`` with before/after values."""
+    user = scope.user
+    changed: dict[str, dict[str, object]] = {}
+    if 'phone' in payload.model_fields_set and payload.phone != user.phone:
+        changed['phone'] = {'from': user.phone, 'to': payload.phone}
+        user.phone = payload.phone
+    if payload.sms_opt_out is not None and payload.sms_opt_out != user.sms_opt_out:
+        changed['sms_opt_out'] = {'from': user.sms_opt_out, 'to': payload.sms_opt_out}
+        user.sms_opt_out = payload.sms_opt_out
+    if changed:
+        AuditService(db).log(
+            action='user.profile_updated',
+            entity_type='user',
+            entity_id=user.id,
+            actor_user_id=user.id,
+            payload={'fields': changed},
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return _synced_read(user, _operator_row(db, user))
 
 
 @router.post('/sync', response_model=SyncedUserRead)

@@ -598,6 +598,15 @@ export type User = {
   preferred_language: string;
 };
 
+// GET/PATCH /auth/profile — the signed-in person's own row (what /auth/sync
+// returns). `sms_opt_out` is stored negative; the UI shows it as "SMS alerts".
+export type MyProfile = User & {
+  phone: string | null;
+  sms_opt_out: boolean;
+  is_active: boolean;
+  platform_operator_role: string | null;
+};
+
 export type RequestResponse = {
   id: string;
   staffing_request_id: string;
