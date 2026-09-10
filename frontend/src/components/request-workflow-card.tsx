@@ -110,7 +110,6 @@ export function RequestWorkflowCard({
   const [cancelNotes, setCancelNotes] = useState("");
 
   const workerUsers = users.filter((user) => user.role === "worker");
-  const orgAdmin = users.find((user) => user.role === "org_admin");
   const acceptedResponses = responses.filter((response) => response.status === "accepted");
   const assignedWorker = users.find((user) => user.id === request.assigned_worker_user_id || user.id === assignment?.worker_user_id);
   const assignedWorkerProfile = workers.find((worker) => worker.id === assignment?.worker_user_id) || null;
@@ -460,7 +459,7 @@ export function RequestWorkflowCard({
         )}
       </div>
 
-      {request.status !== "assigned" && acceptedResponses.length > 0 && orgAdmin ? (
+      {request.status !== "assigned" && acceptedResponses.length > 0 ? (
         <div style={{ display: "grid", gap: 12 }}>
           <Eyebrow>Review accepted workers</Eyebrow>
           {acceptedResponses.map((response) => {
@@ -476,7 +475,6 @@ export function RequestWorkflowCard({
                   post("/api/v1/assignments", {
                     staffing_request_id: request.id,
                     worker_user_id: worker.id,
-                    assigned_by_user_id: orgAdmin.id,
                     notes: "Assigned after worker profile review",
                   })
                 }

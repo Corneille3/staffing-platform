@@ -91,9 +91,6 @@ export default async function RequestDetailPage({
     });
   const bestMatch = eligibleScoredRows[0] ?? null;
 
-  // First admin in the response set drives the "assigned_by" id when we assign from the card.
-  const orgAdminUser = users.find((u) => u.role === "org_admin") || users.find((u) => u.role === "network_admin") || null;
-
   // Decline-with-reason callout — show the most recent declined response with a reason, if any.
   const declinedWithReason = responses
     .filter((r) => (r.status === "declined" || r.status === "withdrawn") && r.decline_reason)
@@ -268,7 +265,6 @@ export default async function RequestDetailPage({
                 matchScore={bestMatch.match_score}
                 reasons={bestMatch.reasons}
                 requestId={request.id}
-                orgAdminUserId={orgAdminUser?.id ?? null}
               />
             </HideWhenAssigned>
           ) : null}

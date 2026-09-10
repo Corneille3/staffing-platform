@@ -41,8 +41,8 @@ class AssignmentRead(ORMModel):
 class AssignmentCreate(BaseModel):
     staffing_request_id: UUID
     worker_user_id: UUID
-    # Optional — when omitted, the endpoint derives it from the authenticated
-    # caller (the assigner is always the caller).
+    # Accepted for wire compatibility but IGNORED: the endpoint always sets
+    # the authenticated caller. Clients should stop sending it.
     assigned_by_user_id: UUID | None = None
     notes: str | None = None
 

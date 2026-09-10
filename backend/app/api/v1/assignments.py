@@ -35,8 +35,11 @@ def create_assignment(
     scope: AccessScope = Depends(get_access_scope),
     db: Session = Depends(get_db_session),
 ) -> AssignmentRead:
-    if payload.assigned_by_user_id is None:
-        payload.assigned_by_user_id = scope.user.id
+    # The assigner is the authenticated caller, full stop. The client used to
+    # send the first org_admin it could find, which attributed assignments
+    # (and the assignment.confirmed audit row) to whichever coordinator sorted
+    # first in a multi-admin org (finding #11, 2026-09-05).
+    payload.assigned_by_user_id = scope.user.id
     assignment = AssignmentService(db).assign(payload)
     return AssignmentRead.model_validate(assignment)
 

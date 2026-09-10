@@ -17,7 +17,6 @@ interface Props {
   matchScore: number;
   reasons: EligibilityReason[];
   requestId: string;
-  orgAdminUserId: string | null;
 }
 
 function initials(first: string, last: string): string {
@@ -60,16 +59,12 @@ function tagsFromReasons(worker: Worker, reasons: EligibilityReason[]): string[]
   return tags.slice(0, 4);
 }
 
-export function BestMatchCard({ worker, matchScore, reasons, requestId, orgAdminUserId }: Props) {
+export function BestMatchCard({ worker, matchScore, reasons, requestId }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   async function assign() {
-    if (!orgAdminUserId) {
-      setError("No assigning admin in scope.");
-      return;
-    }
     setError(null);
     try {
       let token: string | null = null;
@@ -85,7 +80,6 @@ export function BestMatchCard({ worker, matchScore, reasons, requestId, orgAdmin
         body: JSON.stringify({
           staffing_request_id: requestId,
           worker_user_id: worker.id,
-          assigned_by_user_id: orgAdminUserId,
           notes: "Assigned from Best match card",
         }),
       });
@@ -197,7 +191,7 @@ export function BestMatchCard({ worker, matchScore, reasons, requestId, orgAdmin
       <button
         type="button"
         onClick={assign}
-        disabled={pending || !orgAdminUserId}
+        disabled={pending}
         style={{
           width: "100%",
           background: "var(--terra)",
@@ -207,8 +201,8 @@ export function BestMatchCard({ worker, matchScore, reasons, requestId, orgAdmin
           borderRadius: 10,
           fontSize: 14,
           fontWeight: 500,
-          cursor: pending || !orgAdminUserId ? "not-allowed" : "pointer",
-          opacity: pending || !orgAdminUserId ? 0.6 : 1,
+          cursor: pending ? "not-allowed" : "pointer",
+          opacity: pending ? 0.6 : 1,
           fontFamily: "var(--ui)",
           display: "flex",
           alignItems: "center",
