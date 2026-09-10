@@ -89,7 +89,11 @@
       "checkOutCta": "Done",
       "checkingOut": "Recording…",
       "checkedOut": "Shift complete",
-      "hoursRecorded": "{hours} h recorded"
+      "hoursRecorded": "{hours} h recorded",
+      "checkInMissed": "Check-in not recorded",
+      "checkInMissedHint": "This shift has ended. Your coordinator can enter your hours.",
+      "checkOutMissed": "Check-out not recorded",
+      "checkOutMissedHint": "The check-out window has closed. Your coordinator can correct your hours."
     },
     "notifications": {
       "noAlerts": "No alerts",

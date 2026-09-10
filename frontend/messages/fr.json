@@ -89,7 +89,11 @@
       "checkOutCta": "Terminé",
       "checkingOut": "Enregistrement…",
       "checkedOut": "Quart terminé",
-      "hoursRecorded": "{hours} h enregistrées"
+      "hoursRecorded": "{hours} h enregistrées",
+      "checkInMissed": "Arrivée non enregistrée",
+      "checkInMissedHint": "Ce quart est terminé. Votre coordonnateur peut inscrire vos heures.",
+      "checkOutMissed": "Sortie non enregistrée",
+      "checkOutMissedHint": "Le délai de sortie est écoulé. Votre coordonnateur peut corriger vos heures."
     },
     "notifications": {
       "noAlerts": "Aucune alerte",

@@ -17,6 +17,29 @@ from zoneinfo import ZoneInfo
 from app.core.config import settings
 
 
+def shift_local_date(moment: datetime) -> date:
+    """The calendar date of an aware instant in ``settings.shift_timezone``.
+    The only correct way to compare an instant against ``work_date``: taking
+    ``.date()`` of a UTC datetime is tomorrow's date between 20:00 and
+    midnight in Québec (finding #18, 2026-09-09)."""
+    return moment.astimezone(ZoneInfo(settings.shift_timezone)).date()
+
+
+def shift_today() -> date:
+    """Today's calendar date in ``settings.shift_timezone`` — use this, never
+    ``date.today()`` or ``datetime.now(timezone.utc).date()``, for anything
+    keyed on ``work_date`` (today's roster, coverage windows, same-day rules)."""
+    return shift_local_date(datetime.now(timezone.utc))
+
+
+def shift_midnight_utc(day: date) -> datetime:
+    """Local midnight at the start of ``day`` as an aware UTC datetime — the
+    boundary to use when bucketing UTC timestamps (``created_at``) by
+    Québec calendar day or week."""
+    tz = ZoneInfo(settings.shift_timezone)
+    return datetime.combine(day, time(), tzinfo=tz).astimezone(timezone.utc)
+
+
 def shift_start_utc(work_date: date, start_time: time) -> datetime:
     """The shift's start as an aware UTC datetime, interpreting the stored
     naive wall-clock values in ``settings.shift_timezone``."""

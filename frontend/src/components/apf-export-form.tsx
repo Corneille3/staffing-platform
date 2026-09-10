@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createApfExport, downloadApfExportCsv, getApfExportJob } from "../lib/browser-api";
 import type { ApfExportJob, Organization } from "../lib/types";
 import { Eyebrow, Mono } from "./ui";
+import { shiftDateKey } from "../lib/shift-time";
 
 interface Props {
   orgs: Organization[];
@@ -43,8 +44,8 @@ function defaultRange(): { from: string; to: string } {
   const to = new Date(today);
   to.setDate(today.getDate() + 30);
   return {
-    from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10),
+    from: shiftDateKey(from),
+    to: shiftDateKey(to),
   };
 }
 
@@ -71,7 +72,7 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `staffig-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `staffig-export-${shiftDateKey()}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();

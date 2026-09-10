@@ -4,6 +4,7 @@ import { ActivityRowCard } from "../../../components/apf-activity-row";
 import { AdminDashboardUrgentCard } from "../../../components/admin-dashboard-urgent";
 import { PollingRefresh } from "../../../components/polling-refresh";
 import { getAdminDashboard, getAdminOrganizations } from "../../../lib/api";
+import { shiftClock } from "../../../lib/shift-time";
 import type { AdminCoverageForward, AdminRequestSummary } from "../../../lib/types";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -36,8 +37,7 @@ function fillColor(rate: number): string {
   return "var(--rose)";
 }
 
-function greeting(): string {
-  const h = new Date().getHours();
+function greeting(h: number): string {
   if (h < 12) return "Bonjour";
   if (h < 18) return "Bon après-midi";
   return "Bonsoir";
@@ -48,9 +48,11 @@ export default async function AdminDashboardPage() {
   const siteNames = Object.fromEntries(sites.map((s) => [s.id, s.name]));
   const { coordinator, urgent_now, kpis, live_requests, activity_today, week_fill_rate, roster_today, coverage_forward } = dash;
 
-  const now = new Date();
-  const clock = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  const todayIdx = (now.getDay() + 6) % 7; // Mon=0..Sun=6
+  // Server component: this renders on Vercel in UTC, so take the clock in
+  // the shift timezone (finding #18 — greeting, clock and week highlight
+  // were all a day/4 h off in the evening).
+  const { hour, minute, weekdayIdx: todayIdx } = shiftClock();
+  const clock = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 
   const headline = urgent_now
     ? "You have one urgent to settle."
@@ -76,7 +78,7 @@ export default async function AdminDashboardPage() {
       {/* 1 · Hero */}
       <header style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 22 }}>
         <div>
-          <Eyebrow style={{ marginBottom: 6 }}>{greeting()}, {coordinator.first_name} · {clock}</Eyebrow>
+          <Eyebrow style={{ marginBottom: 6 }}>{greeting(hour)}, {coordinator.first_name} · {clock}</Eyebrow>
           <h1 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: "clamp(2rem, 4vw, 2.9rem)", lineHeight: 1.05, fontWeight: 500, color: "var(--ink)" }}>
             {headline.split(" ")[0]} <em style={{ fontStyle: "italic" }}>{headline.split(" ").slice(1).join(" ")}</em>
           </h1>

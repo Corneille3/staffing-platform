@@ -36,9 +36,25 @@ INSIDE = (45.500400, -73.570000)   # ~44 m north
 OUTSIDE = (45.505000, -73.570000)  # ~556 m north
 
 
-def _request(session, seed, *, work_date=None, start=time(8, 0), end=time(16, 0),
+def _live_window(before=timedelta(hours=4), after=timedelta(hours=4)) -> tuple[time, time]:
+    """A shift window on today's date that contains "now", clamped to the day
+    so it never wraps (CI and the containers run on UTC, and conftest pins
+    shift_timezone to UTC too). Check-in/out refuse ended shifts, so the
+    default fixture has to be live whenever the suite runs — a fixed
+    08:00–16:00 would 409 every evening."""
+    now = datetime.now()
+    start = max(now - before, now.replace(hour=0, minute=0, second=0, microsecond=0))
+    end = min(now + after, now.replace(hour=23, minute=59, second=0, microsecond=0))
+    return time(start.hour, start.minute), time(end.hour, end.minute)
+
+
+def _request(session, seed, *, work_date=None, start=None, end=None,
              status=RequestStatus.ASSIGNED, origin=RequestOrigin.COORDINATOR,
              org=None) -> StaffingRequest:
+    if start is None and end is None:
+        start, end = _live_window()
+    start = start or time(8, 0)
+    end = end or time(16, 0)
     req = StaffingRequest(
         id=uuid4(), organization_id=(org or seed.org).id,
         created_by_user_id=seed.org_admin.id,
@@ -134,6 +150,110 @@ def test_cancellation_clears_both_stamps_audit_retained(db_session, seed, org_ad
     assert assignment.completed_at is None
     assert len(_audit_entries(db_session, 'assignment.checked_in', assignment.id)) == 0  # stamped directly, no event
     assert len(_audit_entries(db_session, 'assignment.cancelled', assignment.id)) == 1
+
+
+# ── ended-shift guards (finding #16) ────────────────────────────────────────
+
+def _shift_ending(session, seed, *, ended_ago: timedelta, length=timedelta(hours=2), **kw):
+    """A shift whose scheduled end is ``ended_ago`` before now (negative =
+    still running). Built from real datetimes so the date/time split never
+    wraps across midnight; the start is clamped to the end's day so the
+    end > start convention (no midnight crossing) holds."""
+    end = datetime.now() - ended_ago
+    if end.hour == 0 and end.minute == 0:
+        end += timedelta(minutes=1)  # a 00:00 end would read as midnight-crossing
+    start = end - length
+    if start.date() != end.date():
+        start = end.replace(hour=0, minute=0, second=0, microsecond=0)
+    return _request(
+        session, seed, work_date=end.date(),
+        start=time(start.hour, start.minute), end=time(end.hour, end.minute), **kw,
+    )
+
+
+def test_checkin_refused_once_shift_has_ended(db_session, seed, worker_a_client):
+    req = _shift_ending(db_session, seed, ended_ago=timedelta(minutes=5))
+    assignment = _assignment(db_session, seed, req)
+    resp = worker_a_client.post(f'/api/v1/assignments/{assignment.id}/check-in', json={})
+    assert resp.status_code == 409
+    assert 'ended' in resp.json()['detail'].lower()
+    db_session.refresh(assignment)
+    assert assignment.checked_in_at is None
+    assert _audit_entries(db_session, 'assignment.checked_in', assignment.id) == []
+
+
+def test_late_checkin_mid_shift_still_allowed(db_session, seed, worker_a_client):
+    # Arriving 90 min into a 2 h shift is late, not absent.
+    req = _shift_ending(db_session, seed, ended_ago=timedelta(minutes=-30))
+    assignment = _assignment(db_session, seed, req)
+    resp = worker_a_client.post(f'/api/v1/assignments/{assignment.id}/check-in', json={})
+    assert resp.status_code == 200
+    assert resp.json()['checked_in_at'] is not None
+
+
+def test_checkout_allowed_within_cutoff(db_session, seed, worker_a_client):
+    req = _shift_ending(db_session, seed, ended_ago=timedelta(minutes=30))
+    assignment = _assignment(
+        db_session, seed, req, checked_in=datetime.now(timezone.utc) - timedelta(hours=2),
+    )
+    resp = worker_a_client.post(f'/api/v1/assignments/{assignment.id}/check-out', json={})
+    assert resp.status_code == 200
+    assert resp.json()['status'] == 'completed'
+
+
+def test_checkout_refused_after_cutoff(db_session, seed, worker_a_client):
+    past_cutoff = timedelta(minutes=settings.checkout_cutoff_minutes + 15)
+    req = _shift_ending(db_session, seed, ended_ago=past_cutoff)
+    assignment = _assignment(
+        db_session, seed, req, checked_in=datetime.now(timezone.utc) - timedelta(hours=3),
+    )
+    resp = worker_a_client.post(f'/api/v1/assignments/{assignment.id}/check-out', json={})
+    assert resp.status_code == 409
+    assert 'coordinator' in resp.json()['detail'].lower()
+    db_session.refresh(assignment)
+    assert assignment.checked_out_at is None
+    assert assignment.status == AssignmentStatus.CONFIRMED
+    assert _audit_entries(db_session, 'assignment.checked_out', assignment.id) == []
+
+
+def _accepted(session, seed, req, worker):
+    session.add(RequestResponse(
+        id=uuid4(), staffing_request_id=req.id, worker_user_id=worker.id,
+        status=ResponseStatus.ACCEPTED,
+    ))
+    session.flush()
+
+
+def test_assign_refused_for_ended_shift(db_session, seed, org_admin_client):
+    req = _shift_ending(
+        db_session, seed, ended_ago=timedelta(minutes=5), status=RequestStatus.RESPONSES_RECEIVED,
+    )
+    _accepted(db_session, seed, req, seed.worker_a)
+    resp = org_admin_client.post('/api/v1/assignments', json={
+        'staffing_request_id': str(req.id),
+        'worker_user_id': str(seed.worker_a.id),
+        'assigned_by_user_id': str(seed.org_admin.id),
+    })
+    assert resp.status_code == 409
+    assert 'ended' in resp.json()['detail'].lower()
+    db_session.refresh(req)
+    assert req.status == RequestStatus.RESPONSES_RECEIVED
+
+
+def test_assign_mid_shift_still_allowed(db_session, seed, org_admin_client):
+    # Covering a shift already underway (the 8h05 no-show taken at 8h30) is
+    # the whole point of urgent replacement — only the END closes the door.
+    req = _shift_ending(
+        db_session, seed, ended_ago=timedelta(minutes=-30), status=RequestStatus.RESPONSES_RECEIVED,
+    )
+    _accepted(db_session, seed, req, seed.worker_a)
+    resp = org_admin_client.post('/api/v1/assignments', json={
+        'staffing_request_id': str(req.id),
+        'worker_user_id': str(seed.worker_a.id),
+        'assigned_by_user_id': str(seed.org_admin.id),
+    })
+    assert resp.status_code == 201
+    assert resp.json()['status'] == 'confirmed'
 
 
 # ── geofence ────────────────────────────────────────────────────────────────
@@ -434,8 +554,9 @@ def _rows(csv_bytes: bytes) -> list[list[str]]:
 
 def test_worked_hours_export_includes_open_shifts_and_flags_corrections(db_session, seed):
     yesterday = date.today() - timedelta(days=1)
-    # Closed, corrected shift.
-    done_req = _request(db_session, seed, work_date=yesterday)
+    # Closed, corrected shift — explicit 8 h window, the CSV's scheduled_hours
+    # is asserted below.
+    done_req = _request(db_session, seed, work_date=yesterday, start=time(8, 0), end=time(16, 0))
     checked_in = datetime.now(timezone.utc) - timedelta(days=1, hours=8)
     done = _assignment(db_session, seed, done_req, checked_in=checked_in,
                        status=AssignmentStatus.COMPLETED)

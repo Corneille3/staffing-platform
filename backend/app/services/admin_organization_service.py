@@ -6,7 +6,7 @@ coordinators, and a today roster. Membership-based scoping — no RBAC change.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -28,6 +28,7 @@ from app.schemas.admin import (
     AdminOrgRosterToday,
 )
 from app.services.audit_service import AuditService
+from app.core.timeutil import shift_today
 
 _FILLED = (RequestStatus.ASSIGNED, RequestStatus.COMPLETED)
 _OPEN = (RequestStatus.OPEN, RequestStatus.NOTIFIED, RequestStatus.RESPONSES_RECEIVED)
@@ -57,7 +58,7 @@ class AdminOrganizationService:
         ).all()
 
         since = datetime.now(timezone.utc) - timedelta(days=30)
-        today = date.today()
+        today = shift_today()  # Québec date, not the container's UTC date
 
         # 30-day request volume + filled, grouped per org
         vol_rows = self.db.execute(

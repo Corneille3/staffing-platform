@@ -1,5 +1,6 @@
 import { Mono } from "./ui";
 import type { ApfActivityRow } from "../lib/types";
+import { shiftDateKey } from "../lib/shift-time";
 
 type ActionMeta = { label: string; accent: string };
 
@@ -117,23 +118,26 @@ export function ActivityRowCard({ row }: { row: ApfActivityRow }) {
   );
 }
 
+// Day groups follow the Québec calendar, not the UTC one: `created_at` is a
+// UTC instant, and slicing its date put every evening action (after 20:00
+// local) under tomorrow's header (finding #18).
 function dayKey(iso: string): string {
-  return iso.slice(0, 10);
+  return shiftDateKey(iso);
 }
 
 function dayLabel(key: string): string {
-  const today = new Date();
-  const todayKey = today.toISOString().slice(0, 10);
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  const yesterdayKey = yesterday.toISOString().slice(0, 10);
-  if (key === todayKey) return "Today";
-  if (key === yesterdayKey) return "Yesterday";
+  const now = Date.now();
+  if (key === shiftDateKey(now)) return "Today";
+  if (key === shiftDateKey(now - 86_400_000)) return "Yesterday";
   try {
+    // The key is a plain date; pin the formatter to UTC so a "YYYY-MM-DD"
+    // parsed as UTC midnight doesn't render as the previous day in a
+    // negative-offset browser.
     return new Date(key).toLocaleDateString(undefined, {
       day: "numeric",
       month: "short",
       year: "numeric",
+      timeZone: "UTC",
     });
   } catch {
     return key;
