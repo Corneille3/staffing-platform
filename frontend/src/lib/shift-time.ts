@@ -49,6 +49,16 @@ export function shiftClock(instant: Instant = Date.now()): { hour: number; minut
   return { hour: Number(p.hour), minute: Number(p.minute), weekdayIdx: WEEKDAY_IDX[p.weekday] ?? 0 };
 }
 
+/** "HH:MM" wall-clock of an instant in the shift timezone — for timestamps
+ * that arrive as UTC ISO strings (`responded_at`, `created_at`,
+ * `checked_in_at`). Never slice the ISO string for this: that prints UTC.
+ * Returns "" for an unparsable value. */
+export function shiftTime(instant: Instant): string {
+  if (Number.isNaN(new Date(instant).getTime())) return "";
+  const p = partsIn(instant);
+  return `${p.hour}:${p.minute}`;
+}
+
 /** Minutes after the scheduled end during which "Done" still stamps a
  * check-out. Mirrors `settings.checkout_cutoff_minutes`; the backend 409s
  * past it regardless, this only decides what the Horaire offers. */

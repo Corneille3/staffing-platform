@@ -6,6 +6,7 @@ import type { AdminActivityFilter, ApfActivityRow } from "../lib/types";
 import { fetchAdminActivity } from "../lib/browser-api";
 import { Mono } from "./ui";
 import { ActivityDateHeader, groupByDate } from "./apf-activity-row";
+import { shiftTime } from "../lib/shift-time";
 
 function requestIdFor(row: ApfActivityRow): string | null {
   if (row.entity_type === "staffing_request" && row.entity_id) return row.entity_id;
@@ -52,8 +53,10 @@ function relativeTime(iso: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+// Wall-clock in the shift timezone — an ISO slice would print UTC
+// ("01:09" for a 21:09 Montréal event).
 function timeOfDay(iso: string): string {
-  return iso.slice(11, 16);
+  return shiftTime(iso);
 }
 
 function Chip({ label, tone, soft }: { label: string; tone: string; soft?: boolean }) {

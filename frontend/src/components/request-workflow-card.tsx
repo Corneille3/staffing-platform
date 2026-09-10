@@ -10,6 +10,7 @@ import { availabilityStatusLabel } from "../lib/status-labels";
 import { LIVE_STATUSES, useRequestLive } from "./request-live";
 import { Eyebrow } from "./ui";
 import { Assignment, RequestResponse, StaffingRequest, User, Worker } from "../lib/types";
+import { shiftTime } from "../lib/shift-time";
 
 const browserApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -17,13 +18,6 @@ type ClerkLike = { session?: { getToken: () => Promise<string | null> } };
 
 function formatStatus(value: string) {
   return value.replace(/_/g, " ");
-}
-
-// "accepted · 6:04" — local wall-clock time of the response.
-function clockTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso.slice(11, 16);
-  return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 function workerResponseLabel(status: string): string {
@@ -345,7 +339,8 @@ export function RequestWorkflowCard({
           responses.map((response) => {
             const user = users.find((u) => u.id === response.worker_user_id);
             const palette = RESPONSE_PALETTE[response.status] ?? RESPONSE_PALETTE.notified;
-            const respondedTime = response.responded_at ? clockTime(response.responded_at) : null;
+            // "accepted · 06:04" — wall-clock in the shift timezone, not the browser's.
+            const respondedTime = response.responded_at ? shiftTime(response.responded_at) || null : null;
             return (
               <div
                 key={response.id}
