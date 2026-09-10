@@ -111,3 +111,31 @@ def test_list_admin_substitutes_403_for_request_outside_scope(apf_client, db_ses
 def test_list_admin_substitutes_forbidden_for_worker(worker_a_client):
     resp = worker_a_client.get('/api/v1/admin/substitutes')
     assert resp.status_code == 403
+
+
+def test_removed_worker_hidden_from_coordinator_table_but_kept_in_apf_audit_list(
+    org_admin_client, apf_client, db_session, seed,
+):
+    """Finding #13: a tombstoned worker must not show up (with a Notify
+    button) in /admin/substitutes; the APF /workers listing keeps it as a
+    "removed" entry for audit."""
+    seed.worker_b.is_active = False
+    seed.worker_b.email = f'josycorneille3+removed-{seed.worker_b.id.hex[:8]}@example.org'
+    db_session.flush()
+
+    table = org_admin_client.get('/api/v1/admin/substitutes').json()['items']
+    names = {row['worker']['first_name'] + ' ' + row['worker']['last_name'] for row in table}
+    assert 'Worker Alpha' in names
+    assert 'Worker Beta' not in names
+
+    # Ranking mode reuses the same listing — the ghost must not be scored either.
+    rid = org_admin_client.post(
+        '/api/v1/requests', json=request_payload(seed.org.id, seed.org_admin.id),
+    ).json()['id']
+    ranked = org_admin_client.get(f'/api/v1/admin/substitutes?rank_against_request_id={rid}').json()
+    assert {row['worker']['id'] for row in ranked['items']} == {str(seed.worker_a.id)}
+
+    audit = apf_client.get('/api/v1/workers').json()['items']
+    beta = next((w for w in audit if w['id'] == str(seed.worker_b.id)), None)
+    assert beta is not None and beta['is_active'] is False
+

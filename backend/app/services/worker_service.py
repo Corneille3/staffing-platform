@@ -79,8 +79,8 @@ class WorkerService:
     def list(self) -> list[User]:
         return self.repository.list()
 
-    def list_for_scope(self, scope: AccessScope) -> list[User]:
-        return self.repository.list_for_scope(scope)
+    def list_for_scope(self, scope: AccessScope, *, include_inactive: bool = False) -> list[User]:
+        return self.repository.list_for_scope(scope, include_inactive=include_inactive)
 
     def get(self, user_id: UUID) -> User | None:
         return self.repository.get(user_id)
