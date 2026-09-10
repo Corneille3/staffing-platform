@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import { CheckCircle2 } from "lucide-react";
 import { errorMessageFromResponse } from "../lib/browser-api";
 import { availabilityStatusLabel } from "../lib/status-labels";
-import { LIVE_STATUSES, useRequestLive } from "./request-live";
+import { isClosedStatus, LIVE_STATUSES, useRequestLive } from "./request-live";
 import { Eyebrow } from "./ui";
 import { Assignment, RequestResponse, StaffingRequest, User, Worker } from "../lib/types";
 import { shiftTime } from "../lib/shift-time";
@@ -107,7 +107,7 @@ export function RequestWorkflowCard({
   const acceptedResponses = responses.filter((response) => response.status === "accepted");
   const assignedWorker = users.find((user) => user.id === request.assigned_worker_user_id || user.id === assignment?.worker_user_id);
   const assignedWorkerProfile = workers.find((worker) => worker.id === assignment?.worker_user_id) || null;
-  const isClosed = request.status === "assigned" || request.status === "cancelled" || request.status === "completed";
+  const isClosed = isClosedStatus(request.status);
 
   const working = busyAction !== null || isPending;
 
@@ -201,6 +201,22 @@ export function RequestWorkflowCard({
           </span>
         ) : null}
       </div>
+
+      {request.status === "expired" ? (
+        <p
+          style={{
+            margin: 0,
+            padding: "10px 14px",
+            borderRadius: 12,
+            background: "var(--sand-soft)",
+            border: "0.5px solid var(--sand)",
+            color: "var(--ink-2)",
+            fontSize: 13,
+          }}
+        >
+          This request expired before it was filled. Create a new request to cover the shift.
+        </p>
+      ) : null}
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         <Link

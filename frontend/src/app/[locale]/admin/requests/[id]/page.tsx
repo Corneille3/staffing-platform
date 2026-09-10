@@ -6,7 +6,8 @@ import { PageFrame } from "../../../../../components/page-frame";
 import { Panel } from "../../../../../components/panel";
 import {
   AssignmentPanel,
-  HideWhenAssigned,
+  HideWhenClosed,
+  isClosedStatus,
   LiveBadge,
   RequestLiveProvider,
   ResponseSummaryPanel,
@@ -56,6 +57,9 @@ export default async function RequestDetailPage({
   const organization = organizations.find((item) => item.id === request.organization_id);
   // Pre-assigned requests can still be edited (mirrors backend EDITABLE_STATUSES).
   const isEditable = ["draft", "open", "notified", "responses_received"].includes(request.status);
+  // Terminal request (assigned / cancelled / completed / expired): no match
+  // or ranking controls — there is nothing left to fill (finding #8).
+  const isClosed = isClosedStatus(request.status);
   // "released" (giver handed the shift off via self-serve replacement) is dead
   // like "cancelled" — it must not surface as the current assignee (Finding #1).
   const assignment = assignments.find(
@@ -152,6 +156,7 @@ export default async function RequestDetailPage({
               Edit request
             </Link>
           ) : null}
+          {!isClosed ? (
           <Link
             href={`/admin/substitutes?rank_against_request_id=${request.id}`}
             style={{
@@ -171,6 +176,7 @@ export default async function RequestDetailPage({
           >
             Rank substitutes →
           </Link>
+          ) : null}
         </div>
       </div>
 
@@ -260,15 +266,15 @@ export default async function RequestDetailPage({
         </div>
 
         <div style={{ display: "grid", gap: 22 }}>
-          {bestMatch && !assignment && bestMatch.match_score !== null ? (
-            <HideWhenAssigned>
+          {bestMatch && !assignment && !isClosed && bestMatch.match_score !== null ? (
+            <HideWhenClosed>
               <BestMatchCard
                 worker={bestMatch.worker}
                 matchScore={bestMatch.match_score}
                 reasons={bestMatch.reasons}
                 requestId={request.id}
               />
-            </HideWhenAssigned>
+            </HideWhenClosed>
           ) : null}
 
           <Panel title="Workflow actions" subtitle="Live controls">

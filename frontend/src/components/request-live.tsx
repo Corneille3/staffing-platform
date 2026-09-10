@@ -9,9 +9,11 @@ import type { Assignment, RequestResponse, StaffingRequest, User } from "../lib/
 import { Panel } from "./panel";
 import { Eyebrow, Mono } from "./ui";
 
-// Statuses during which a broadcast is in flight and responses can land any
-// second — the page ticks fast, shows the Live badge, and the waiting state.
-export const LIVE_STATUSES = new Set(["open", "notified", "responses_received"]);
+import { CLOSED_STATUSES, isClosedStatus, LIVE_STATUSES } from "../lib/request-status";
+
+// Re-exported so existing importers keep one entry point; the sets live in a
+// pure module (lib/request-status.ts) that vitest can load.
+export { CLOSED_STATUSES, isClosedStatus, LIVE_STATUSES };
 
 const ACTIVE_MS = 5_000;
 const IDLE_MS = 30_000;
@@ -412,9 +414,12 @@ export function AssignmentPanel({ users }: { users: User[] }) {
   );
 }
 
-/** Renders `children` only while no live assignment exists (Best-match card). */
-export function HideWhenAssigned({ children }: { children: ReactNode }) {
+/** Renders `children` only while the request can still be filled: no live
+ * assignment and a non-terminal status (Best-match card). A request can
+ * expire while the page is open — the polled status closes the card on the
+ * same tick. Outside a provider the server-rendered decision stands. */
+export function HideWhenClosed({ children }: { children: ReactNode }) {
   const live = useRequestLive();
-  if (live?.assignment) return null;
+  if (live && (live.assignment || isClosedStatus(live.request.status))) return null;
   return <>{children}</>;
 }
