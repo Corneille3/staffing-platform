@@ -470,7 +470,10 @@ export function RequestWorkflowCard({
         )}
       </div>
 
-      {request.status !== "assigned" && acceptedResponses.length > 0 ? (
+      {/* Review + Assign cards and the "opens after someone accepts" hint only
+          while the request can still be filled — an expired request kept an
+          "Assign Eva" card here after #8 hid the Best-match one. */}
+      {!isClosed && acceptedResponses.length > 0 ? (
         <div style={{ display: "grid", gap: 12 }}>
           <Eyebrow>Review accepted workers</Eyebrow>
           {acceptedResponses.map((response) => {
@@ -493,7 +496,7 @@ export function RequestWorkflowCard({
             );
           })}
         </div>
-      ) : request.status !== "assigned" && responses.length > 0 ? (
+      ) : !isClosed && responses.length > 0 ? (
         <div
           style={{
             padding: 14,
