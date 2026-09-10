@@ -1,7 +1,7 @@
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from sqlalchemy import select
@@ -70,12 +70,18 @@ def _to_worker_read(worker, db: Session) -> WorkerRead:
 
 @router.get('')
 def list_workers(
+    include_inactive: bool = Query(
+        False,
+        description=(
+            'Also return removed (tombstoned) workers. Listings never want '
+            'them; the coordinator request detail opts in because it only '
+            'uses this list to resolve ids to names on historical requests.'
+        ),
+    ),
     scope: AccessScope = Depends(get_access_scope),
     db: Session = Depends(get_db_session),
 ) -> dict[str, list[WorkerRead]]:
-    # Audit listing (APF network pool renders removed accounts with a
-    # "Removed" badge) — the only place tombstoned workers are meant to show.
-    workers = WorkerService(db).list_for_scope(scope, include_inactive=True)
+    workers = WorkerService(db).list_for_scope(scope, include_inactive=include_inactive)
     return {'items': [_to_worker_read(worker, db) for worker in workers]}
 
 

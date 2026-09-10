@@ -44,7 +44,9 @@ export default async function RequestDetailPage({
 
   const [users, workers, organizations, assignments, responses, ranked] = await Promise.all([
     getUsers(),
-    getWorkers(),
+    // Lookup only (assigned worker card, accepted-response rows): keep
+    // removed workers so a historical request still resolves its name.
+    getWorkers({ includeInactive: true }),
     getOrganizations(),
     getAssignments(),
     getRequestResponses(id),

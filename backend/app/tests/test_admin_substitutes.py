@@ -113,12 +113,12 @@ def test_list_admin_substitutes_forbidden_for_worker(worker_a_client):
     assert resp.status_code == 403
 
 
-def test_removed_worker_hidden_from_coordinator_table_but_kept_in_apf_audit_list(
+def test_removed_worker_hidden_from_coordinator_table_and_apf_list(
     org_admin_client, apf_client, db_session, seed,
 ):
-    """Finding #13: a tombstoned worker must not show up (with a Notify
-    button) in /admin/substitutes; the APF /workers listing keeps it as a
-    "removed" entry for audit."""
+    """Finding #13 (+ APF follow-up): a tombstoned worker must not show up
+    in /admin/substitutes (with a Notify button) nor in the APF /workers
+    listing. Only the explicit ``include_inactive`` lookup still sees it."""
     seed.worker_b.is_active = False
     seed.worker_b.email = f'josycorneille3+removed-{seed.worker_b.id.hex[:8]}@example.org'
     db_session.flush()
@@ -135,7 +135,13 @@ def test_removed_worker_hidden_from_coordinator_table_but_kept_in_apf_audit_list
     ranked = org_admin_client.get(f'/api/v1/admin/substitutes?rank_against_request_id={rid}').json()
     assert {row['worker']['id'] for row in ranked['items']} == {str(seed.worker_a.id)}
 
-    audit = apf_client.get('/api/v1/workers').json()['items']
-    beta = next((w for w in audit if w['id'] == str(seed.worker_b.id)), None)
+    listing = apf_client.get('/api/v1/workers').json()['items']
+    assert str(seed.worker_b.id) not in {w['id'] for w in listing}
+    assert str(seed.worker_a.id) in {w['id'] for w in listing}
+
+    # The coordinator request detail resolves ids → names on historical
+    # requests and opts in explicitly; the row comes back flagged inactive.
+    lookup = apf_client.get('/api/v1/workers?include_inactive=true').json()['items']
+    beta = next((w for w in lookup if w['id'] == str(seed.worker_b.id)), None)
     assert beta is not None and beta['is_active'] is False
 

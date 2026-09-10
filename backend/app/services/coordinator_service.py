@@ -139,11 +139,12 @@ class CoordinatorService:
         return user, orgs
 
     def list_for_tenant(self, tenant_id: UUID) -> list[tuple[User, list[Organization]]]:
-        # All org_admin users that have ever had a membership in any org under
-        # this tenant — active and inactive. Removed coordinators are kept in
-        # the response with an empty org list so the UI can render them with
-        # an "Inactive" status / "removed" tag for audit visibility. The
-        # frontend sorts/styles by ``User.is_active``.
+        # Active org_admin users holding an active membership in an org under
+        # this tenant. Removed coordinators (soft-deleted: ``User.is_active``
+        # False, memberships deactivated) are left out of the listing — the
+        # trail lives in the audit log (``user.removed``, surfaced by the APF
+        # activity feed's "removals" chip), and a removed account has no
+        # reactivation path (its email is tombstoned with a hash suffix).
         tenant_org_ids = list(self.db.scalars(
             select(Organization.id).where(Organization.tenant_id == tenant_id)
         ).all())
@@ -153,30 +154,24 @@ class CoordinatorService:
         memberships = list(self.db.scalars(
             select(OrganizationMembership).where(
                 OrganizationMembership.organization_id.in_(tenant_org_ids),
+                OrganizationMembership.is_active.is_(True),
             )
         ).all())
 
-        all_user_ids: set[UUID] = set()
-        active_user_org_ids: dict[UUID, list[UUID]] = {}
+        user_org_ids: dict[UUID, list[UUID]] = {}
         for m in memberships:
-            all_user_ids.add(m.user_id)
-            if m.is_active:
-                active_user_org_ids.setdefault(m.user_id, []).append(m.organization_id)
+            user_org_ids.setdefault(m.user_id, []).append(m.organization_id)
 
-        if not all_user_ids:
+        if not user_org_ids:
             return []
 
         users = list(self.db.scalars(
             select(User).where(
-                User.id.in_(list(all_user_ids)),
+                User.id.in_(list(user_org_ids)),
                 User.role == UserRole.ORG_ADMIN,
-            ).order_by(
-                User.is_active.desc(),  # active first
-                User.last_name,
-                User.first_name,
-            )
+                User.is_active.is_(True),
+            ).order_by(User.last_name, User.first_name)
         ).all())
-        user_org_ids = active_user_org_ids
 
         orgs_by_id = {o.id: o for o in self.db.scalars(
             select(Organization).where(Organization.id.in_(tenant_org_ids))
