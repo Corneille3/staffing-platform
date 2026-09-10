@@ -314,6 +314,37 @@ def test_assign_confirmed_worker(apf_client, worker_a_client, seed):
     assert request_data['status'] == 'assigned'
 
 
+def test_assigner_is_always_the_caller(org_admin_client, worker_a_client, db_session, seed):
+    """Finding #11: a client-supplied assigned_by_user_id is ignored — the
+    assignment and its audit row name the coordinator who actually clicked."""
+    from sqlalchemy import select
+    from app.models.audit_log import AuditLog
+
+    request_id = org_admin_client.post(
+        '/api/v1/requests', json=request_payload(seed.org.id, seed.org_admin.id),
+    ).json()['id']
+    org_admin_client.post(f'/api/v1/requests/{request_id}/publish')
+    worker_a_client.post(
+        f'/api/v1/requests/{request_id}/responses/accept',
+        json={'worker_user_id': str(seed.worker_a.id)},
+    )
+
+    resp = org_admin_client.post('/api/v1/assignments', json={
+        'staffing_request_id': request_id,
+        'worker_user_id': str(seed.worker_a.id),
+        'assigned_by_user_id': str(seed.apf.id),  # someone else — must be ignored
+    })
+    assert resp.status_code == 201
+    assert resp.json()['assigned_by_user_id'] == str(seed.org_admin.id)
+
+    from uuid import UUID
+    entry = db_session.scalar(select(AuditLog).where(
+        AuditLog.action == 'assignment.confirmed',
+        AuditLog.entity_id == UUID(resp.json()['id']),
+    ))
+    assert entry is not None and entry.actor_user_id == seed.org_admin.id
+
+
 def test_assign_requires_prior_acceptance(apf_client, seed):
     request_id = apf_client.post(
         '/api/v1/requests', json=request_payload(seed.org.id, seed.apf.id),
