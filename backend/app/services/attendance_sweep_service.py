@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.timeutil import shift_end_utc, shift_start_utc
+from app.core.timeutil import shift_end_utc, shift_local_date, shift_start_utc
 from app.models.assignment import Assignment
 from app.models.enums import AssignmentStatus
 from app.models.organization import Organization
@@ -248,9 +248,11 @@ class AttendanceSweepService:
             .where(
                 Assignment.status == AssignmentStatus.CONFIRMED,
                 # Yesterday covers midnight-crossing shifts and the freshness
-                # window; anything older is out of scope by definition.
-                StaffingRequest.work_date >= (now.date() - timedelta(days=1)),
-                StaffingRequest.work_date <= now.date(),
+                # window; anything older is out of scope by definition. Bound
+                # on the Québec date of `now`, not its UTC date — after 20:00
+                # local the UTC window slides to [today, tomorrow].
+                StaffingRequest.work_date >= (shift_local_date(now) - timedelta(days=1)),
+                StaffingRequest.work_date <= shift_local_date(now),
                 *conditions,
             )
         ).all()

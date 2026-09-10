@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db_session
 from app.auth.permissions import require_network_admin
 from app.core.config import settings
+from app.core.timeutil import shift_local_date
 from app.auth.scope import AccessScope, get_access_scope
 from app.schemas.apf import (
     ActivityFilter,
@@ -271,7 +272,7 @@ def download_export(
             status_code=status.HTTP_409_CONFLICT,
             detail=f'Export job is {job.status}, not ready for download.',
         )
-    filename = f'staffig-export-{job.created_at.date().isoformat()}.csv'
+    filename = f'staffig-export-{shift_local_date(job.created_at).isoformat()}.csv'
     return Response(
         content=job.csv_bytes,
         media_type='text/csv',

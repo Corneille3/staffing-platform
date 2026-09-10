@@ -6,14 +6,14 @@ today roster. Membership-based scoping throughout.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.scope import AccessScope
 from app.core.config import settings
-from app.core.timeutil import shift_start_utc
+from app.core.timeutil import shift_midnight_utc, shift_start_utc, shift_today
 from app.models.assignment import Assignment
 from app.models.enums import (
     AssignmentStatus,
@@ -65,6 +65,9 @@ class AdminDashboardService:
 
     def build(self, scope: AccessScope) -> dict:
         now = datetime.now(timezone.utc)
+        # "Today" is the Québec calendar date, not the UTC one — after 20:00
+        # local the UTC date is already tomorrow and the roster went blank.
+        today = shift_today()
 
         req = self.requests.list_summaries(scope, tab='active', limit=10)
         active = req['items']
@@ -74,7 +77,7 @@ class AdminDashboardService:
         live = active
         if active and active[0]['urgent'] and active[0]['status'] != 'assigned':
             top = active[0]
-            shift_dt = datetime.combine(top['work_date'], top['start_time'], tzinfo=timezone.utc)
+            shift_dt = shift_start_utc(top['work_date'], top['start_time'])
             urgent_now = {
                 **top,
                 'elapsed': _humanize(now - top['created_at'], future=False),
@@ -89,9 +92,9 @@ class AdminDashboardService:
             'kpis': self._kpis(scope, counts['active']),
             'live_requests': live,
             'activity_today': self.reporting.admin_activity(scope, limit=5)['items'],
-            'week_fill_rate': self._week_fill_rate(scope, now),
-            'roster_today': self._roster_today(scope, now.date()),
-            'coverage_forward': self._coverage_forward(scope, now.date()),
+            'week_fill_rate': self._week_fill_rate(scope, today),
+            'roster_today': self._roster_today(scope, today),
+            'coverage_forward': self._coverage_forward(scope, today),
         }
 
     # ── Coverage-risk, next 14 days (SMS spec Feature 2 + CHECKOUT spec §4) ──
@@ -154,10 +157,10 @@ class AdminDashboardService:
             'days': [{'date': day, **counts} for day, counts in sorted(days.items())],
             'uncovered_total': uncovered_total,
             'urgent_48h': urgent_48h,
-            'not_checked_in_today': self._not_checked_in_count(scope),
+            'not_checked_in_today': self._not_checked_in_count(scope, today),
         }
 
-    def _not_checked_in_count(self, scope: AccessScope) -> int:
+    def _not_checked_in_count(self, scope: AccessScope, today: date) -> int:
         """CONFIRMED today, past start + grace, no check-in — the "nobody
         arrived" signal a director wants now, not at payroll time (§4)."""
         org_ids = self.requests._scoped_org_ids(scope)
@@ -170,7 +173,7 @@ class AdminDashboardService:
             .join(StaffingRequest, StaffingRequest.id == Assignment.staffing_request_id)
             .where(
                 StaffingRequest.organization_id.in_(org_ids),
-                StaffingRequest.work_date == now.date(),
+                StaffingRequest.work_date == today,
                 Assignment.status == AssignmentStatus.CONFIRMED,
                 Assignment.checked_in_at.is_(None),
             )
@@ -194,8 +197,10 @@ class AdminDashboardService:
         return round(100 * filled / posted)
 
     def _kpis(self, scope: AccessScope, open_count: int) -> dict:
-        now = datetime.now(timezone.utc)
-        monday = datetime.combine(now.date() - timedelta(days=now.weekday()), time(), tzinfo=timezone.utc)
+        # Week boundaries at local Monday midnight — created_at is UTC, the
+        # week a coordinator means is the Québec one.
+        today = shift_today()
+        monday = shift_midnight_utc(today - timedelta(days=today.weekday()))
         this_week = self._fill_rate_created_between(scope, monday, monday + timedelta(days=7))
         last_week = self._fill_rate_created_between(scope, monday - timedelta(days=7), monday)
 
@@ -237,8 +242,8 @@ class AdminDashboardService:
         }
 
     # ── This-week fill rate by day (Mon..Sun, by shift work_date) ────────────
-    def _week_fill_rate(self, scope: AccessScope, now: datetime) -> list[int]:
-        monday = now.date() - timedelta(days=now.weekday())
+    def _week_fill_rate(self, scope: AccessScope, today: date) -> list[int]:
+        monday = today - timedelta(days=today.weekday())
         out: list[int] = []
         for i in range(7):
             day = monday + timedelta(days=i)

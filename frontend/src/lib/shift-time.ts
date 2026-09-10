@@ -7,6 +7,48 @@
  * `backend/app/core/timeutil.py`).
  */
 
+/** The zone shift wall-clock values live in. Mirrors
+ * `settings.shift_timezone` on the backend (global for now, per-org zones
+ * would move this into the org payload). Server components render on Vercel
+ * in UTC, so every "today", clock or day-grouping computed there must go
+ * through these helpers — `new Date().getHours()` / `toISOString().slice(0, 10)`
+ * are tomorrow's values between 20:00 and midnight in Québec (finding #18). */
+export const SHIFT_TIMEZONE = "America/Toronto";
+
+type Instant = Date | string | number;
+
+function partsIn(instant: Instant): Record<string, string> {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: SHIFT_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    weekday: "short",
+    hourCycle: "h23",
+  });
+  const out: Record<string, string> = {};
+  for (const p of fmt.formatToParts(new Date(instant))) out[p.type] = p.value;
+  return out;
+}
+
+/** "YYYY-MM-DD" of an instant in the shift timezone — the key to group or
+ * compare against `work_date`. Defaults to now. */
+export function shiftDateKey(instant: Instant = Date.now()): string {
+  const p = partsIn(instant);
+  return `${p.year}-${p.month}-${p.day}`;
+}
+
+const WEEKDAY_IDX: Record<string, number> = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+
+/** Wall-clock parts of an instant in the shift timezone. `weekdayIdx` is
+ * Mon=0..Sun=6, matching the dashboard's week strip. Defaults to now. */
+export function shiftClock(instant: Instant = Date.now()): { hour: number; minute: number; weekdayIdx: number } {
+  const p = partsIn(instant);
+  return { hour: Number(p.hour), minute: Number(p.minute), weekdayIdx: WEEKDAY_IDX[p.weekday] ?? 0 };
+}
+
 /** Minutes after the scheduled end during which "Done" still stamps a
  * check-out. Mirrors `settings.checkout_cutoff_minutes`; the backend 409s
  * past it regardless, this only decides what the Horaire offers. */

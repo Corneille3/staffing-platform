@@ -12,6 +12,7 @@ from app.models.user import User
 from app.models.worker_organization import WorkerOrganization
 from app.repositories.assignment_repository import AssignmentRepository
 from app.schemas.eligibility import EligibilityReason, EligibilityResult
+from app.core.timeutil import shift_today
 
 
 def _slot_for_start_time(t: time) -> SlotPeriod:
@@ -53,7 +54,7 @@ class MatchingService:
             # "Urgent alerts — notify me for same-day requests": the system's
             # urgent flag (urgency_level >= 3, see notifications.py) or a
             # literal same-day work date.
-            if staffing_request.urgency_level >= 3 or staffing_request.work_date <= date.today():
+            if staffing_request.urgency_level >= 3 or staffing_request.work_date <= shift_today():
                 return False
         if not profile.notify_weekend_overnight:
             # "Weekend overnights — notify me for overnight shifts on weekends".

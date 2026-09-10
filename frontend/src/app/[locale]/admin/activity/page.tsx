@@ -3,6 +3,7 @@ import { Eyebrow, Mono } from "../../../../components/ui";
 import { AdminActivityList } from "../../../../components/admin-activity-list";
 import { getAdminActivity } from "../../../../lib/api";
 import type { AdminActivityFilter } from "../../../../lib/types";
+import { shiftDateKey } from "../../../../lib/shift-time";
 
 const FILTERS: { key: AdminActivityFilter; label: string }[] = [
   { key: "all", label: "All" },
@@ -48,7 +49,7 @@ export default async function AdminActivityPage({
 
   // Date-range presets (set ?from=ISO). "All" clears it.
   const dayMs = 86400000;
-  const isoDaysAgo = (n: number) => new Date(Date.now() - n * dayMs).toISOString().slice(0, 10);
+  const isoDaysAgo = (n: number) => shiftDateKey(Date.now() - n * dayMs);
   const ranges: { label: string; from?: string }[] = [
     { label: "All" },
     { label: "7 days", from: isoDaysAgo(7) },
