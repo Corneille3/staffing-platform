@@ -213,6 +213,7 @@ export function AdminRequestNewForm({ organizations }: { organizations: Organiza
     draft.coverage_type,
     draft.contact_name,
     draft.contact_phone,
+    draft.auto_assign,
     draft.arrival_instructions,
     draft.required_qualifications.join(","),
     draft.required_certifications.join(","),
