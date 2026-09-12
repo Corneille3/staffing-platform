@@ -119,6 +119,7 @@ function AdminActivityRow({ row }: { row: ApfActivityRow }) {
         <div style={{ fontSize: 14, color: "var(--ink)" }}>
           <strong style={{ fontWeight: 600 }}>{actorName}</strong> {k.verb}
           {row.request_title ? <> · <span style={{ color: "var(--ink-2)" }}>{row.request_title}</span></> : null}
+          {!row.request_title && row.subject ? <> · <span style={{ color: "var(--ink-2)" }}>{row.subject}</span></> : null}
         </div>
         <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
           {actorRole ? `${actorRole} · ` : ""}

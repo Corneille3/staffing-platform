@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attendancePhase, CHECKOUT_CUTOFF_MINUTES, shiftClock, shiftDateKey, shiftEndMs, shiftTime } from "./shift-time";
+import { attendancePhase, CHECKOUT_CUTOFF_MINUTES, shiftClock, shiftDateKey, shiftDateTime, shiftEndMs, shiftTime } from "./shift-time";
 
 const MIN = 60_000;
 const day = { work_date: "2026-09-09", start_time: "09:30:00", end_time: "10:00:00" };
@@ -52,6 +52,17 @@ describe("shiftTime", () => {
     expect(shiftTime(new Date("2026-09-10T01:09:35Z"))).toBe("21:09");
     expect(shiftTime(Date.parse("2026-09-10T01:09:35Z"))).toBe("21:09");
     expect(shiftTime("not-a-date")).toBe("");
+  });
+});
+
+describe("shiftDateTime", () => {
+  it("prints the Québec date and time, not the UTC slice", () => {
+    // The assigned-card bug: 2026-09-10T00:58Z showed as "2026-09-10 00:58" for Sept 9, 20:58.
+    expect(shiftDateTime("2026-09-10T00:58:12Z")).toBe("2026-09-09 20:58");
+    expect(shiftDateTime("2026-01-10T04:05:00Z")).toBe("2026-01-09 23:05");
+  });
+  it("returns empty for junk", () => {
+    expect(shiftDateTime("nope")).toBe("");
   });
 });
 

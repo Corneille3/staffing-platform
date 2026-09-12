@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { PageFrame } from "../../../../../components/page-frame";
 import { Panel } from "../../../../../components/panel";
-import { getAssignments, getOrganizations, getRequests, getUsers } from "../../../../../lib/api";
-import { Assignment, StaffingRequest, User } from "../../../../../lib/types";
+import { getAssignments, getOrganizations, getRequests, getUsers, getWorkers } from "../../../../../lib/api";
+import { Assignment, StaffingRequest } from "../../../../../lib/types";
 
 const CLOSED_STATUSES = new Set(["assigned", "completed", "cancelled", "expired"]);
 
@@ -26,16 +26,18 @@ function timeDiff(from: string, to: string): string {
   return hrs > 0 ? `${days}d ${hrs}h` : `${days}d`;
 }
 
-function workerName(users: User[], userId: string | null | undefined): string | null {
+type Named = { id: string; first_name: string; last_name: string };
+
+function workerName(people: Named[], userId: string | null | undefined): string | null {
   if (!userId) return null;
-  const user = users.find((u) => u.id === userId);
-  return user ? `${user.first_name} ${user.last_name}` : null;
+  const person = people.find((u) => u.id === userId);
+  return person ? `${person.first_name} ${person.last_name}` : null;
 }
 
 function outcomeText(
   request: StaffingRequest,
   assignment: Assignment | undefined,
-  users: User[],
+  users: Named[],
 ): string {
   if (request.status === "cancelled") {
     const duration = request.cancelled_at
@@ -58,12 +60,16 @@ function outcomeText(
 }
 
 export default async function CoverageHistoryPage() {
-  const [requests, assignments, organizations, users] = await Promise.all([
+  const [requests, assignments, organizations, activeUsers, workersIncludingRemoved] = await Promise.all([
     getRequests(),
     getAssignments(),
     getOrganizations(),
     getUsers(),
+    // History must still name a substitute who has since been removed —
+    // `users` only carries active memberships.
+    getWorkers({ includeInactive: true }),
   ]);
+  const users: Named[] = [...activeUsers, ...workersIncludingRemoved];
 
   const closed = [...requests]
     .filter((r) => CLOSED_STATUSES.has(r.status))

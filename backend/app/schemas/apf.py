@@ -78,6 +78,10 @@ class ActivityRow(BaseModel):
     organization: ActivityOrganization | None = None
     payload: dict
     request_title: str | None = None
+    # Who/what the action was done TO, when the payload knows: the removed
+    # person's name (or their pre-removal email for rows written before the
+    # name was recorded), the removed network's name. Null otherwise.
+    subject: str | None = None
 
 
 class ActivityCounts(BaseModel):

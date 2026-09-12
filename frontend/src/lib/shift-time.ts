@@ -59,6 +59,15 @@ export function shiftTime(instant: Instant): string {
   return `${p.hour}:${p.minute}`;
 }
 
+/** "YYYY-MM-DD HH:MM" of an instant in the shift timezone — for stamps that
+ * need the date too (assigned / checked in / checked out / viewed). Never
+ * slice the ISO string for this: that prints the UTC date and time. */
+export function shiftDateTime(instant: Instant): string {
+  if (Number.isNaN(new Date(instant).getTime())) return "";
+  const p = partsIn(instant);
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`;
+}
+
 /** Minutes after the scheduled end during which "Done" still stamps a
  * check-out. Mirrors `settings.checkout_cutoff_minutes`; the backend 409s
  * past it regardless, this only decides what the Horaire offers. */

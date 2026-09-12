@@ -10,7 +10,7 @@ import { availabilityStatusLabel } from "../lib/status-labels";
 import { isClosedStatus, LIVE_STATUSES, useRequestLive } from "./request-live";
 import { Eyebrow } from "./ui";
 import { Assignment, RequestResponse, StaffingRequest, User, Worker } from "../lib/types";
-import { shiftTime } from "../lib/shift-time";
+import { shiftDateTime, shiftTime } from "../lib/shift-time";
 
 const browserApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -105,7 +105,12 @@ export function RequestWorkflowCard({
 
   const workerUsers = users.filter((user) => user.role === "worker");
   const acceptedResponses = responses.filter((response) => response.status === "accepted");
-  const assignedWorker = users.find((user) => user.id === request.assigned_worker_user_id || user.id === assignment?.worker_user_id);
+  // `users` only lists people with an active membership; `workers` comes with
+  // removed accounts included (the page opts in) so a historical request still
+  // names a substitute who has since been removed.
+  const personById = (id: string | null | undefined) =>
+    (id && (users.find((u) => u.id === id) ?? workers.find((w) => w.id === id))) || null;
+  const assignedWorker = personById(request.assigned_worker_user_id) ?? personById(assignment?.worker_user_id);
   const assignedWorkerProfile = workers.find((worker) => worker.id === assignment?.worker_user_id) || null;
   const isClosed = isClosedStatus(request.status);
 
@@ -353,7 +358,7 @@ export function RequestWorkflowCard({
           </p>
         ) : (
           responses.map((response) => {
-            const user = users.find((u) => u.id === response.worker_user_id);
+            const user = personById(response.worker_user_id);
             const palette = RESPONSE_PALETTE[response.status] ?? RESPONSE_PALETTE.notified;
             // "accepted · 06:04" — wall-clock in the shift timezone, not the browser's.
             const respondedTime = response.responded_at ? shiftTime(response.responded_at) || null : null;
@@ -404,7 +409,7 @@ export function RequestWorkflowCard({
                   </div>
                 ) : response.viewed_at ? (
                   <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
-                    Viewed {response.viewed_at.slice(0, 16).replace("T", " ")}
+                    Viewed {shiftDateTime(response.viewed_at)}
                   </div>
                 ) : null}
                 {response.decline_reason ? (
@@ -626,11 +631,11 @@ function AssignedWorkerCard({
         <span><strong style={{ color: "var(--ink)" }}>Cities:</strong> {profile?.supported_cities.join(", ") || "none"}</span>
         <span><strong style={{ color: "var(--ink)" }}>Qualifications:</strong> {profile?.qualifications.join(", ") || "none"}</span>
         <span><strong style={{ color: "var(--ink)" }}>Certifications:</strong> {profile?.certifications.join(", ") || "none"}</span>
-        <span><strong style={{ color: "var(--ink)" }}>Assigned at:</strong> {assignment.assigned_at.slice(0, 16).replace("T", " ")}</span>
+        <span><strong style={{ color: "var(--ink)" }}>Assigned at:</strong> {shiftDateTime(assignment.assigned_at)}</span>
         {assignment.checked_in_at ? (
           <span style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--moss)", fontWeight: 600 }}>
             <CheckCircle2 size={14} strokeWidth={2.5} />
-            Checked in at {assignment.checked_in_at.slice(0, 16).replace("T", " ")}
+            Checked in at {shiftDateTime(assignment.checked_in_at)}
             {assignment.checked_in_latitude && assignment.checked_in_longitude ? " · location recorded" : ""}
           </span>
         ) : missed ? (
@@ -649,7 +654,7 @@ function AssignedWorkerCard({
           assignment.checked_out_at ? (
             <span style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--moss)", fontWeight: 600 }}>
               <CheckCircle2 size={14} strokeWidth={2.5} />
-              Checked out at {assignment.checked_out_at.slice(0, 16).replace("T", " ")}
+              Checked out at {shiftDateTime(assignment.checked_out_at)}
             </span>
           ) : (
             <span style={{ color: "#8C6B14", fontWeight: 600 }}>Check-out: not recorded yet</span>
