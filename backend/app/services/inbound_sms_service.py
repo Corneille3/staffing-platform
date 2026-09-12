@@ -23,6 +23,7 @@ from app.core.phone import normalize_e164
 from app.core.timeutil import shift_start_utc
 from app.models.enums import (
     ReplacementPolicy,
+    UserRole,
     RequestStatus,
     ResponseStatus,
 )
@@ -228,9 +229,17 @@ class InboundSmsService:
         if len(matches) == 1:
             return matches[0]
         if len(matches) > 1:
+            # A coordinator sharing a phone with a substitute (the test fleet
+            # does, and a small daycare might) must not block the substitute's
+            # reply: only substitutes are ever texted a claimable shift, so the
+            # worker is the only plausible sender. Two substitutes on one number
+            # is still a guess we refuse to make.
+            workers = [u for u in matches if u.role == UserRole.WORKER]
+            if len(workers) == 1:
+                return workers[0]
             logger.warning(
-                'Inbound SMS from %s matches %d active users — refusing to guess',
-                normalized, len(matches),
+                'Inbound SMS from %s matches %d active users (%d substitutes) — refusing to guess',
+                normalized, len(matches), len(workers),
             )
         return None
 

@@ -300,3 +300,32 @@ def test_every_inbound_leaves_a_receipt(db_session, seed, texter):
     assert receipt.staffing_request_id == request.id
     assert receipt.body == '1'
     assert receipt.message_sid == 'SM123'
+
+
+# ── duplicate phone across roles (2026-09-12) ─────────────────────────────────
+
+def test_reply_from_a_number_shared_with_a_coordinator_goes_to_the_worker(db_session, seed, texter):
+    """Eden (coordinator) got the test phone's number in their profile; the
+    worker's "1" from the same phone must still claim — only substitutes are
+    texted claimable shifts, so the worker is the only plausible sender."""
+    seed.org_admin.phone = PHONE  # same number as `texter` (worker_b)
+    db_session.flush()
+    request = _open_replacement(db_session, seed, seed.worker_a)
+    _notify(db_session, request, texter)
+
+    reply = InboundSmsService(db_session).handle(PHONE, '1')
+
+    assert "You're in" in reply or "C'est a toi" in reply
+    assert db_session.get(StaffingRequest, request.id).assigned_worker_user_id == texter.id
+
+
+def test_reply_from_a_number_shared_by_two_workers_is_still_refused(db_session, seed, texter):
+    seed.worker_a.phone = PHONE  # two substitutes, one phone → no guessing
+    db_session.flush()
+    request = _open_replacement(db_session, seed, seed.worker_a)
+    _notify(db_session, request, texter)
+
+    reply = InboundSmsService(db_session).handle(PHONE, '1')
+
+    assert 'not recognized' in reply or 'non reconnu' in reply
+    assert db_session.get(StaffingRequest, request.id).status == RequestStatus.OPEN
