@@ -7,7 +7,7 @@ import { Link } from "../../../../i18n/navigation";
 import { checkInAssignment, checkOutAssignment, fetchAssignments, fetchRequests } from "../../../../lib/browser-api";
 import { formatWorkDate, locationLabel, roleSectorSubtitle } from "../../../../lib/format";
 import { assignmentStatusLabel } from "../../../../lib/status-labels";
-import { attendancePhase, shiftTime } from "../../../../lib/shift-time";
+import { attendancePhase } from "../../../../lib/shift-time";
 import { splitSchedule } from "../../../../lib/schedule-hero";
 import { Assignment, StaffingRequest } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
@@ -435,11 +435,13 @@ function CheckInCard({
           <Eyebrow style={{ color: "rgba(168,217,184,.7)", letterSpacing: ".16em" }}>
             {t("checkedOut")}
           </Eyebrow>
-          <div style={{ fontSize: 13, color: "var(--paper)", marginTop: 2 }}>
-            {assignment.worked_hours != null
-              ? t("hoursRecorded", { hours: assignment.worked_hours.toLocaleString("fr-CA") })
-              : `${shiftTime(checkedInAt)} → ${shiftTime(checkedOutAt)}`}
-          </div>
+          {/* worked_hours is derived from the two stamps on the backend, so it
+              is always set once both exist — no fallback line needed. */}
+          {assignment.worked_hours != null && (
+            <div style={{ fontSize: 13, color: "var(--paper)", marginTop: 2 }}>
+              {t("hoursRecorded", { hours: assignment.worked_hours.toLocaleString("fr-CA") })}
+            </div>
+          )}
         </div>
       </div>
     );

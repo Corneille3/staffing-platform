@@ -64,8 +64,8 @@ export default async function SubstitutePoolPage() {
             color: "var(--ink)",
           }}
         >
-          {kpis.total} <em style={{ fontStyle: "italic" }}>substitutes</em>{" "}
-          cover the network.
+          {kpis.total} <em style={{ fontStyle: "italic" }}>{kpis.total === 1 ? "substitute" : "substitutes"}</em>{" "}
+          {kpis.total === 1 ? "covers" : "cover"} the network.
         </h1>
         <div
           style={{
@@ -260,7 +260,7 @@ export default async function SubstitutePoolPage() {
             All substitutes
           </h2>
           <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
-            <Mono>{enriched.length}</Mono> records
+            <Mono>{enriched.length}</Mono> {enriched.length === 1 ? "record" : "records"}
           </span>
         </div>
 

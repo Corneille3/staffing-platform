@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Mono } from "./ui";
 import { notifyWorkers } from "../lib/browser-api";
+import { reasonChips } from "../lib/eligibility-chips";
 import type { AdminSubstituteRow } from "../lib/types";
 
 const LANG_LABEL: Record<string, string> = { fr: "FR", en: "EN", bilingual: "Bilingual" };
@@ -124,6 +125,7 @@ export function AdminSubstitutesTable({ rows, ranked, requestId }: Props) {
           const score = row.match_score;
           const isTop = ranked && i === 0 && (score ?? 0) >= 90;
           const cities = profile?.supported_cities ?? [];
+          const chips = ranked ? reasonChips(row.reasons) : [];
           return (
             <div
               key={row.worker.id}
@@ -299,6 +301,39 @@ export function AdminSubstitutesTable({ rows, ranked, requestId }: Props) {
                   </button>
                 );
               })()}
+
+              {chips.length > 0 && (
+                <div
+                  style={{
+                    gridColumn: "1 / -1",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 4,
+                    marginTop: 8,
+                    paddingLeft: 46,
+                  }}
+                  aria-label={`Why ${row.worker.first_name} scores ${score ?? "—"}`}
+                >
+                  {chips.map((c) => (
+                    <span
+                      key={c.key}
+                      style={{
+                        padding: "2px 7px",
+                        borderRadius: 999,
+                        fontSize: 10,
+                        fontWeight: 500,
+                        letterSpacing: ".02em",
+                        background: c.missing ? "var(--rose-soft)" : "var(--moss-soft)",
+                        color: c.missing ? "var(--rose)" : "var(--moss)",
+                        border: `0.5px solid ${c.missing ? "var(--rose)" : "#C8DCC1"}`,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {c.text}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })
