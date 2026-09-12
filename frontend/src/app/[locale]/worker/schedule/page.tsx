@@ -8,6 +8,7 @@ import { checkInAssignment, checkOutAssignment, fetchAssignments, fetchRequests 
 import { formatWorkDate, locationLabel, roleSectorSubtitle } from "../../../../lib/format";
 import { assignmentStatusLabel } from "../../../../lib/status-labels";
 import { attendancePhase, shiftTime } from "../../../../lib/shift-time";
+import { splitSchedule } from "../../../../lib/schedule-hero";
 import { Assignment, StaffingRequest } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
 import { Chip, Eyebrow, Mono } from "../../../../components/ui";
@@ -24,6 +25,13 @@ export default function WorkerSchedulePage() {
   const tCommon = useTranslations("common");
   const [items, setItems] = useState<EnrichedAssignment[]>([]);
   const [loading, setLoading] = useState(true);
+  // Minute ticker so the hero hands over at the boundaries (a missed shift
+  // yielding to the next one, a check-out window closing) without a reload.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!worker) return;
@@ -40,11 +48,6 @@ export default function WorkerSchedulePage() {
         assignment,
         request: allRequests.find((r) => r.id === assignment.staffing_request_id) || null,
       }));
-      enriched.sort((a, b) => {
-        const aDate = a.request?.work_date || "";
-        const bDate = b.request?.work_date || "";
-        return aDate.localeCompare(bDate);
-      });
       setItems(enriched);
       setLoading(false);
     })();
@@ -56,30 +59,9 @@ export default function WorkerSchedulePage() {
   // work_date is an ISO "YYYY-MM-DD" string, so string compare is date compare.
   const today = new Date();
   const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  const isLive = (i: EnrichedAssignment) =>
-    i.assignment.status === "pending_confirmation" || i.assignment.status === "confirmed";
-  // Date-aware: a confirmed shift whose date has passed belongs in History, not
-  // the "upcoming" hero — the backend never marks past assignments completed,
-  // so status alone would keep a 2-days-ago shift as the current one.
-  const isPastDate = (i: EnrichedAssignment) => (i.request?.work_date ?? "") < todayIso;
-
-  // A shift completed by today's check-out stays in the hero until midnight so
-  // the worker sees their recorded hours, instead of the card vanishing the
-  // instant they tap "Done".
-  const isDoneToday = (i: EnrichedAssignment) =>
-    i.assignment.status === "completed" && i.request?.work_date === todayIso;
-
-  // Upcoming: today or later, soonest first (base sort is ascending). Past:
-  // done/cancelled OR a live shift whose date has passed, most recent first.
-  const upcoming = items.filter((i) => (isLive(i) && !isPastDate(i)) || isDoneToday(i));
-  const past = items
-    .filter(
-      (i) =>
-        (i.assignment.status === "completed" && !isDoneToday(i)) ||
-        i.assignment.status === "cancelled" ||
-        (isLive(i) && isPastDate(i)),
-    )
-    .sort((a, b) => (b.request?.work_date || "").localeCompare(a.request?.work_date || ""));
+  // Hero = the next shift that still matters; a shift finished today keeps the
+  // hero only while nothing else is left today (see lib/schedule-hero.ts).
+  const { upcoming, past } = splitSchedule(items, todayIso, now);
 
   const hero = upcoming[0];
   const rest = upcoming.slice(1);
