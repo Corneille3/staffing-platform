@@ -20,6 +20,19 @@ function formatStatus(value: string) {
   return value.replace(/_/g, " ");
 }
 
+// What actually happened on the shift, when the clock knows better than the
+// raw status ("confirmed" forever on a missed shift).
+function attendanceLabel(assignment: Assignment): string {
+  switch (assignment.attendance) {
+    case "missed": return "no-show";
+    case "unclosed": return "check-out missing";
+    case "on_shift": return "on shift";
+    case "due": return "not checked in yet";
+    case "completed": return "completed";
+    default: return formatStatus(assignment.status);
+  }
+}
+
 function workerResponseLabel(status: string): string {
   switch (status) {
     case "notified": return "Notified — awaiting reply";
@@ -205,7 +218,7 @@ export function RequestWorkflowCard({
         {assignedWorker ? (
           <span>
             Assigned to: <strong style={{ color: "var(--ink)" }}>{assignedWorker.first_name} {assignedWorker.last_name}</strong>
-            {assignment ? ` · ${formatStatus(assignment.status)}` : ""}
+            {assignment ? ` · ${attendanceLabel(assignment)}` : ""}
           </span>
         ) : null}
       </div>
@@ -224,6 +237,23 @@ export function RequestWorkflowCard({
         >
           First come, first served — the first eligible substitute to claim this shift is assigned on the spot.
           Nothing to pick here; you'll see the name the moment it's taken.
+        </p>
+      ) : null}
+
+      {request.status === "cancelled" ? (
+        <p
+          style={{
+            margin: 0,
+            padding: "10px 14px",
+            borderRadius: 12,
+            background: "var(--sand-soft)",
+            border: "0.5px solid var(--sand)",
+            color: "var(--ink-2)",
+            fontSize: 13,
+          }}
+        >
+          This request was cancelled{request.cancelled_at ? ` on ${shiftDateTime(request.cancelled_at)}` : ""}.
+          Notified substitutes were told; nothing is left to do here.
         </p>
       ) : null}
 

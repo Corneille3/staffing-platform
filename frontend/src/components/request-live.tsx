@@ -1,8 +1,9 @@
 "use client";
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Check, Circle } from "lucide-react";
+import { Check, Circle, Pencil } from "lucide-react";
 import { usePolling } from "../hooks/use-polling";
 import { fetchAssignments, fetchRequest, fetchRequestResponses } from "../lib/browser-api";
 import type { Assignment, RequestResponse, StaffingRequest, User } from "../lib/types";
@@ -10,7 +11,7 @@ import { shiftDateTime } from "../lib/shift-time";
 import { Panel } from "./panel";
 import { Eyebrow, Mono } from "./ui";
 
-import { CLOSED_STATUSES, isClosedStatus, LIVE_STATUSES } from "../lib/request-status";
+import { CLOSED_STATUSES, isClosedStatus, isEditableStatus, LIVE_STATUSES } from "../lib/request-status";
 
 // Re-exported so existing importers keep one entry point; the sets live in a
 // pure module (lib/request-status.ts) that vitest can load.
@@ -423,4 +424,43 @@ export function HideWhenClosed({ children }: { children: ReactNode }) {
   const live = useRequestLive();
   if (live && (live.assignment || isClosedStatus(live.request.status))) return null;
   return <>{children}</>;
+}
+
+const PILL_STYLE: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "7px 14px",
+  borderRadius: 999,
+  background: "transparent",
+  border: "0.5px solid var(--line)",
+  color: "var(--ink)",
+  fontSize: 13,
+  fontWeight: 500,
+  textDecoration: "none",
+  whiteSpace: "nowrap",
+};
+
+/** Header pills ("Edit request", "Rank substitutes →") that follow the
+ * polled status: on a page left open they used to stay until a reload after
+ * the request expired or got assigned. Outside a provider the server-rendered
+ * status decides. */
+export function RequestHeaderPills({ requestId, initialStatus }: { requestId: string; initialStatus: string }) {
+  const live = useRequestLive();
+  const status = live?.request.status ?? initialStatus;
+  return (
+    <>
+      {isEditableStatus(status) ? (
+        <Link href={`/admin/requests/${requestId}/edit`} style={PILL_STYLE}>
+          <Pencil size={13} strokeWidth={1.8} />
+          Edit request
+        </Link>
+      ) : null}
+      {!isClosedStatus(status) ? (
+        <Link href={`/admin/substitutes?rank_against_request_id=${requestId}`} style={PILL_STYLE}>
+          Rank substitutes →
+        </Link>
+      ) : null}
+    </>
+  );
 }

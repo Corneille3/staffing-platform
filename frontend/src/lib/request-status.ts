@@ -15,3 +15,11 @@ export const CLOSED_STATUSES = new Set(["assigned", "cancelled", "completed", "e
 export function isClosedStatus(status: string): boolean {
   return CLOSED_STATUSES.has(status);
 }
+
+// Pre-assignment statuses a coordinator may still edit (mirrors the backend's
+// EDITABLE_STATUSES in StaffingRequestService.update_draft).
+export const EDITABLE_STATUSES = new Set(["draft", "open", "notified", "responses_received"]);
+
+export function isEditableStatus(status: string): boolean {
+  return EDITABLE_STATUSES.has(status);
+}
