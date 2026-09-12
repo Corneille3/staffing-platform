@@ -109,3 +109,22 @@ Then: #4 UTC timestamps on admin surface, #10 attendance events not audited, #14
 - 12:10: 'Pointage' (B1, 16:07:31Z) ET 'Vous êtes confirmé·e pour Éducatrice · test F' vus dans le panneau de notifications de Mael ✔ — B1 fonctionne pour Mael dès que l'endpoint lui appartient. Reste 'Terminé?' au tick ~16:17:30Z.
 - ~12:17: 'Terminé au CPE Les Petites Étoiles? Touche Terminé pour enregistrer tes heures.' REÇU sur le téléphone de Mael ✔ → B2 VALIDÉ en run propre. #15 définitivement clos: artefact multi-comptes (endpoint push unique par navigateur, upsert par le dernier compte à activer les alertes).
 - 12:19: F checkout_reminder_sent_at = 16:17:31Z → envoyé au tick prévu, reçu. SPEC_NOSHOW §B2 PASS (run propre). Round terminé.
+
+## Follow-ups shipped (2026-09-09 → 2026-09-12)
+
+| Finding | Fix | PR |
+|---|---|---|
+| #16 ended shift still tappable / no time guard | check-in 409 at end, check-out 409 at end + 60 min, assign 409 on ended shift; Horaire notices | #73 |
+| #18 dashboard "today" in UTC | today derived in `shift_timezone` everywhere | #74 |
+| #11 assigner = wrong coordinator | `assigned_by` = caller, always | #75 |
+| #13 ghost (removed) rows in `/admin/substitutes` | `User.is_active` filter (+ APF lists in #77) | #76, #77 |
+| #4 activity times in UTC | `shiftTime()` / `shiftDateTime()` | #78, #85 |
+| #8 Best-match + controls on expired requests | closed-status gating + notice | #79, #80 (hotfix), #81 |
+| #3 coordinator phone only at invite | `GET/PATCH /auth/profile` + "Mon profil" card | #82 |
+| (new) missed shift hides a later same-day shift on Horaire | hero = next shift that still matters | #83 |
+| (new) missed shift reads "confirmed" everywhere | derived attendance state | #84 |
+| (new) "Unknown substitute", unnamed removal rows | name lookups incl. removed; `ActivityRow.subject` | #85 |
+| (new) urgent coordinator SMS had no "Reply 1" | first-come-first-served checkbox | #86, #87 (hotfix), #88 |
+
+Still parked: #10 attendance events not audited (the no-show alert writes no activity row), #14 eligibility reasons in the ranking table, #9 stale server-rendered bits on a live page.
+
