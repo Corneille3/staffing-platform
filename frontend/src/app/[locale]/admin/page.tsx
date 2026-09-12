@@ -74,7 +74,8 @@ export default async function AdminDashboardPage() {
 
   return (
     <div>
-      <PollingRefresh everyMs={30_000} />
+      {/* 5 s while a request is in flight (matches the request detail), 30 s otherwise. */}
+      <PollingRefresh everyMs={30_000} activeMs={5_000} active={urgent_now !== null || live_requests.length > 0} />
       {/* 1 · Hero */}
       <header style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 22 }}>
         <div>

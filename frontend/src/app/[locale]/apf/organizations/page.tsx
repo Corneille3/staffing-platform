@@ -88,7 +88,7 @@ export default async function OrganizationsPage() {
             All organizations
           </h2>
           <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
-            <Mono>{organizations.length}</Mono> records
+            <Mono>{organizations.length}</Mono> {organizations.length === 1 ? "record" : "records"}
           </span>
         </div>
 

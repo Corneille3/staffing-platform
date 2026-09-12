@@ -81,7 +81,7 @@ export default async function CoordinatorsPage() {
             All coordinators
           </h2>
           <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
-            <Mono>{coordinators.length}</Mono> records
+            <Mono>{coordinators.length}</Mono> {coordinators.length === 1 ? "record" : "records"}
           </span>
         </div>
 
