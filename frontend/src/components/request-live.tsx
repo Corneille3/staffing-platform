@@ -6,6 +6,7 @@ import { Check, Circle } from "lucide-react";
 import { usePolling } from "../hooks/use-polling";
 import { fetchAssignments, fetchRequest, fetchRequestResponses } from "../lib/browser-api";
 import type { Assignment, RequestResponse, StaffingRequest, User } from "../lib/types";
+import { shiftDateTime } from "../lib/shift-time";
 import { Panel } from "./panel";
 import { Eyebrow, Mono } from "./ui";
 
@@ -394,7 +395,7 @@ export function AssignmentPanel({ users }: { users: User[] }) {
             <strong style={{ color: "var(--ink)" }}>Status:</strong> {formatStatus(assignment.status)}
           </span>
           <span>
-            <strong style={{ color: "var(--ink)" }}>Assigned at:</strong> {assignment.assigned_at.slice(0, 16).replace("T", " ")}
+            <strong style={{ color: "var(--ink)" }}>Assigned at:</strong> {shiftDateTime(assignment.assigned_at)}
           </span>
           <span>
             <strong style={{ color: "var(--ink)" }}>Notes:</strong> {assignment.notes || "None"}

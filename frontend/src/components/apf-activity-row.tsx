@@ -99,9 +99,9 @@ export function ActivityRowCard({ row }: { row: ApfActivityRow }) {
           )}
         </div>
 
-        {row.request_title && (
+        {(row.request_title || row.subject) && (
           <div style={{ marginTop: 4, fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>
-            {row.request_title}
+            {row.request_title ?? row.subject}
           </div>
         )}
 

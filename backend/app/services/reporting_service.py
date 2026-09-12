@@ -61,6 +61,21 @@ def _admin_buckets_for(action: str) -> set[str]:
     return _ADMIN_ACTION_BUCKETS.get(action, set())
 
 
+def _activity_subject(action: str, payload) -> str | None:
+    """The target of a removal, read from the audit payload so the feed can
+    say who was removed now that removed accounts are hidden everywhere else.
+    Rows written before the name was recorded fall back to the original
+    email (always present); anything else has no subject."""
+    if not isinstance(payload, dict):
+        return None
+    if action == 'user.removed':
+        name = f"{payload.get('first_name') or ''} {payload.get('last_name') or ''}".strip()
+        return name or payload.get('email') or None
+    if action == 'tenant.removed':
+        return payload.get('tenant_name') or payload.get('tenant_slug') or None
+    return None
+
+
 class ReportingService:
     def __init__(self, db: Session) -> None:
         self.db = db
@@ -464,6 +479,7 @@ class ReportingService:
                 'organization': orgs_by_id.get(r.organization_id) if r.organization_id else None,
                 'payload': r.payload if isinstance(r.payload, dict) else {},
                 'request_title': titles_by_id.get(sr_id) if sr_id else None,
+                'subject': _activity_subject(r.action, r.payload),
             })
 
         return {
@@ -537,6 +553,7 @@ class ReportingService:
                 'organization': orgs_by_id.get(r.organization_id) if r.organization_id else None,
                 'payload': r.payload if isinstance(r.payload, dict) else {},
                 'request_title': titles_by_id.get(sr_id) if sr_id else None,
+                'subject': _activity_subject(r.action, r.payload),
             })
         return items
 

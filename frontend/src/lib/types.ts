@@ -92,6 +92,8 @@ export type ApfActivityRow = {
   organization: ApfActivityOrganization | null;
   payload: Record<string, unknown>;
   request_title: string | null;
+  // Target of a removal (person's name / network name), null otherwise.
+  subject?: string | null;
 };
 
 export type ApfActivityCounts = {

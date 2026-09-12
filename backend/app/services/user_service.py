@@ -124,6 +124,10 @@ class UserService:
             actor_user_id=scope.user.id,
             payload={
                 'email': original_email,
+                # Name kept here on purpose: since removed accounts left every
+                # listing (PR #77), this row is the only place that says WHO.
+                'first_name': target.first_name,
+                'last_name': target.last_name,
                 'role': target.role.value,
                 'clerk_user_id': clerk_user_id,
                 'clerk_deleted': clerk_deleted,
