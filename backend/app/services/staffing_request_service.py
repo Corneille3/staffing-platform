@@ -165,6 +165,7 @@ class StaffingRequestService:
             'start_time', 'end_time', 'urgency_level', 'language_requirement',
             'coverage_type', 'role', 'hourly_rate', 'contact_name',
             'contact_phone', 'contact_email', 'arrival_instructions',
+            'auto_assign',
         }
         touched = {}
         for field in scalar_fields:
@@ -272,7 +273,12 @@ class StaffingRequestService:
             if self.matching_service.wants_notification(staffing_request, worker)
         ]
 
-        staffing_request.status = RequestStatus.NOTIFIED
+        # First come, first served: stay OPEN so the atomic claim (which keys
+        # on status='open') can win — the same shape as an AUTO release.
+        # Otherwise NOTIFIED: workers accept, the coordinator picks.
+        staffing_request.status = (
+            RequestStatus.OPEN if staffing_request.auto_assign else RequestStatus.NOTIFIED
+        )
         self.repository.save(staffing_request)
 
         for worker in recipients:
@@ -306,6 +312,7 @@ class StaffingRequestService:
                 'eligible_worker_count': len(eligible_workers),
                 'notified_worker_count': len(recipients),
                 'preference_opt_out_count': len(eligible_workers) - len(recipients),
+                'auto_assign': bool(staffing_request.auto_assign),
             },
         )
         self.db.commit()

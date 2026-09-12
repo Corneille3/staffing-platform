@@ -82,6 +82,11 @@ class StaffingRequestDraftUpdate(BaseModel):
     arrival_instructions: str | None = None
     required_qualifications: list[dict] | list[str] | None = None
     required_certifications: list[dict] | list[str] | None = None
+    # First come, first served (2026-09-12): publish keeps the request OPEN and
+    # the first eligible substitute to claim — in-app or "Reply 1" — is
+    # assigned on the spot, no coordinator pick. Off = the classic
+    # accept → coordinator assigns flow.
+    auto_assign: bool | None = None
 
 
 class StaffingRequestStatusUpdate(BaseModel):

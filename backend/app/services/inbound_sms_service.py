@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -118,7 +118,16 @@ class InboundSmsService:
                 "No open shift for you right now. We'll text you the next one.",
             )
 
-        if self._policy_for(request) == ReplacementPolicy.MANAGED:
+        # Self-serve releases/absences follow the org policy at reply time (as
+        # before). A coordinator request is only ever here with its "first
+        # come, first served" flag on (the query above requires it), so it is
+        # claimed whatever the org's release policy says.
+        managed = (
+            self._policy_for(request) == ReplacementPolicy.MANAGED
+            if request.origin in SELF_SERVE_ORIGINS
+            else not request.auto_assign
+        )
+        if managed:
             return self._accept_for_approval(from_number, body, message_sid, user, request)
 
         return self._claim(from_number, body, message_sid, user, request, tenant_id)
@@ -244,7 +253,10 @@ class InboundSmsService:
                 RequestResponse.status == ResponseStatus.NOTIFIED,
                 RequestResponse.created_at >= cutoff,
                 StaffingRequest.status == RequestStatus.OPEN,
-                StaffingRequest.origin.in_(SELF_SERVE_ORIGINS),
+                or_(
+                    StaffingRequest.origin.in_(SELF_SERVE_ORIGINS),
+                    StaffingRequest.auto_assign.is_(True),
+                ),
             )
             .order_by(RequestResponse.created_at.desc())
             .limit(5)

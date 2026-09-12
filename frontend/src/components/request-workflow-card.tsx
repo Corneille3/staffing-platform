@@ -113,6 +113,9 @@ export function RequestWorkflowCard({
   const assignedWorker = personById(request.assigned_worker_user_id) ?? personById(assignment?.worker_user_id);
   const assignedWorkerProfile = workers.find((worker) => worker.id === assignment?.worker_user_id) || null;
   const isClosed = isClosedStatus(request.status);
+  // First come, first served: the first eligible claim wins on its own, so
+  // accept/decline and the review-and-assign cards would only mislead.
+  const firstClaim = request.auto_assign === true;
 
   const working = busyAction !== null || isPending;
 
@@ -206,6 +209,23 @@ export function RequestWorkflowCard({
           </span>
         ) : null}
       </div>
+
+      {firstClaim && !isClosed ? (
+        <p
+          style={{
+            margin: 0,
+            padding: "10px 14px",
+            borderRadius: 12,
+            background: "var(--moss-soft)",
+            border: "0.5px solid #C8DCC1",
+            color: "var(--ink-2)",
+            fontSize: 13,
+          }}
+        >
+          First come, first served — the first eligible substitute to claim this shift is assigned on the spot.
+          Nothing to pick here; you'll see the name the moment it's taken.
+        </p>
+      ) : null}
 
       {request.status === "expired" ? (
         <p
@@ -417,7 +437,7 @@ export function RequestWorkflowCard({
                     Reason: {response.decline_reason}
                   </div>
                 ) : null}
-                {!isClosed ? (
+                {!isClosed && !firstClaim ? (
                   <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                     <button
                       type="button"
@@ -478,7 +498,7 @@ export function RequestWorkflowCard({
       {/* Review + Assign cards and the "opens after someone accepts" hint only
           while the request can still be filled — an expired request kept an
           "Assign Eva" card here after #8 hid the Best-match one. */}
-      {!isClosed && acceptedResponses.length > 0 ? (
+      {!isClosed && !firstClaim && acceptedResponses.length > 0 ? (
         <div style={{ display: "grid", gap: 12 }}>
           <Eyebrow>Review accepted workers</Eyebrow>
           {acceptedResponses.map((response) => {
@@ -501,7 +521,7 @@ export function RequestWorkflowCard({
             );
           })}
         </div>
-      ) : !isClosed && responses.length > 0 ? (
+      ) : !isClosed && !firstClaim && responses.length > 0 ? (
         <div
           style={{
             padding: 14,
