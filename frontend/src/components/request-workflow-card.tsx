@@ -584,6 +584,10 @@ function AssignedWorkerCard({
     startedMinutesAgo > CHECKIN_GRACE_MINUTES;
   const scheduledHours = scheduledHoursOf(request);
   const canAdjust = !!assignment.checked_in_at && assignment.status !== "cancelled";
+  // Derived by the backend; a confirmed row never changes status on its own,
+  // so this is the only honest "what happened" signal once the shift is over.
+  const missed = assignment.attendance === "missed";
+  const finished = ["missed", "unclosed", "completed"].includes(assignment.attendance ?? "");
 
   function openAdjust() {
     setAdjustIn(toLocalInput(assignment.checked_in_at));
@@ -613,7 +617,7 @@ function AssignedWorkerCard({
             {worker.email}
           </span>
         </div>
-        <StatusChip label={formatStatus(assignment.status)} tone="good" />
+        <StatusChip label={missed ? "no-show" : formatStatus(assignment.status)} tone={missed ? "warn" : "good"} />
       </div>
 
       <div style={{ display: "grid", gap: 6, color: "var(--ink-2)", fontSize: 13 }}>
@@ -628,6 +632,11 @@ function AssignedWorkerCard({
             <CheckCircle2 size={14} strokeWidth={2.5} />
             Checked in at {assignment.checked_in_at.slice(0, 16).replace("T", " ")}
             {assignment.checked_in_latitude && assignment.checked_in_longitude ? " · location recorded" : ""}
+          </span>
+        ) : missed ? (
+          <span style={{ color: "var(--rose)", fontWeight: 700 }}>
+            No-show — never checked in
+            {assignment.no_show_alerted_at ? ` · alert sent ${shiftTime(assignment.no_show_alerted_at)}` : ""}
           </span>
         ) : notCheckedIn ? (
           <span style={{ color: "var(--rose)", fontWeight: 700 }}>
@@ -777,6 +786,9 @@ function AssignedWorkerCard({
         </div>
       )}
 
+      {/* Nothing left to cancel once the shift is over — hours are the
+          coordinator's remaining lever (Adjust recorded times above). */}
+      {!finished && (
       <button
         type="button"
         disabled={disabled}
@@ -796,6 +808,7 @@ function AssignedWorkerCard({
       >
         Cancel assignment
       </button>
+      )}
     </article>
   );
 }

@@ -4,7 +4,7 @@ from datetime import date, time, timedelta
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.auth.scope import AccessScope
 from app.core.timeutil import shift_end_utc, shift_start_utc
@@ -25,11 +25,17 @@ class AssignmentRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
+    # `Assignment.attendance` reads the request's window; load it with the
+    # rows so a list of 90 assignments is two queries, not ninety-one.
+    _WITH_REQUEST = selectinload(Assignment.staffing_request)
+
     def list(self) -> list[Assignment]:
-        return list(self.db.scalars(select(Assignment).order_by(Assignment.assigned_at.desc())).all())
+        return list(self.db.scalars(
+            select(Assignment).options(self._WITH_REQUEST).order_by(Assignment.assigned_at.desc())
+        ).all())
 
     def list_for_scope(self, scope: AccessScope) -> list[Assignment]:
-        stmt = select(Assignment).order_by(Assignment.assigned_at.desc())
+        stmt = select(Assignment).options(self._WITH_REQUEST).order_by(Assignment.assigned_at.desc())
         if scope.is_platform_admin or scope.is_network_admin:
             if not scope.tenant_id:
                 return []

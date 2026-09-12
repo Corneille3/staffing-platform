@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
@@ -52,6 +52,15 @@ class Assignment(Base):
         if self.checked_in_at is None or self.checked_out_at is None:
             return None
         return round((self.checked_out_at - self.checked_in_at).total_seconds() / 3600, 2)
+
+    @property
+    def attendance(self) -> str | None:
+        """Derived presence state (see app.core.attendance) — upcoming / due /
+        on_shift / unclosed / completed / missed, None once cancelled or
+        released. Read by every surface instead of guessing from `status`."""
+        from app.core.attendance import attendance_state
+
+        return attendance_state(self, datetime.now(timezone.utc))
 
     # foreign_keys pinned: staffing_requests.replaces_assignment_id adds a second
     # path between the tables, so the join column must be stated explicitly.
