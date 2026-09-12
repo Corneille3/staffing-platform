@@ -463,13 +463,20 @@ class StaffingRequestService:
         staffing_request.status = RequestStatus.CANCELLED
         staffing_request.cancelled_at = datetime.utcnow()
         self.repository.save(staffing_request)
-        self.audit_service.log(
+        entry = self.audit_service.log(
             action='staffing_request.cancelled',
             entity_type='staffing_request',
             entity_id=staffing_request.id,
             actor_user_id=staffing_request.created_by_user_id,
             organization_id=staffing_request.organization_id,
         )
+        self.db.commit()
+        # Everyone still holding an open offer learns it's off — push for
+        # all, closure SMS for those who had accepted (same courtesy as a
+        # fill). After the commit, so a notification failure can't undo the
+        # cancel; the count lands on the audit row for the record.
+        pinged = self.dispatcher.notify_request_cancelled(staffing_request)
+        entry.payload = {'notified_worker_count': pinged}
         self.db.commit()
         return staffing_request
 

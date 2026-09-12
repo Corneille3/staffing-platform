@@ -181,6 +181,21 @@ def _push_request_filled(worker: User, request: StaffingRequest) -> dict:
     }
 
 
+def _push_request_cancelled(worker: User, request: StaffingRequest) -> dict:
+    """Sent to everyone still holding an open offer when the coordinator
+    cancels the request. Same `tag` as the offer push, so a phone that still
+    shows "New coverage" swaps it in place instead of stacking a second notice.
+    """
+    lang = _push_lang(worker)
+    start = _fmt_time(request.start_time)
+    return {
+        'title': 'Demande annulée' if lang == 'fr' else 'Request cancelled',
+        'body': f'{request.title} · {request.work_date} {start} · {request.city}',
+        'url': f'/{lang}/worker',
+        'tag': f'request-{request.id}',
+    }
+
+
 def _push_assignment_confirmed(worker: User, request: StaffingRequest) -> dict:
     lang = _push_lang(worker)
     start = _fmt_time(request.start_time)
@@ -348,16 +363,58 @@ class NotificationDispatcher:
         Returns how many workers were pinged, so callers can record it. Never
         raises — a claim must not fail because a notification did.
         """
+        return self._fan_out_closure(
+            request,
+            exclude_user_id=winner_user_id,
+            push_builder=_push_request_filled,
+            sms_fr="Ce quart est alle a quelqu'un d'autre cette fois - merci d'avoir offert.",
+            sms_en='That shift went to someone else this time - thanks for offering.',
+            log_label='Filled',
+        )
+
+    def notify_request_cancelled(self, request: StaffingRequest) -> int:
+        """Tell everyone still holding an open offer that the coordinator
+        cancelled the request.
+
+        Same policy as `notify_request_filled`: push for everyone who was
+        offered the shift and hadn't walked away, one closure SMS only for
+        workers who had ACCEPTED. Before this, a cancel wrote an audit row and
+        nothing else — the pool found out by opening the app.
+
+        Returns how many workers were pinged. Never raises.
+        """
+        return self._fan_out_closure(
+            request,
+            exclude_user_id=None,
+            push_builder=_push_request_cancelled,
+            sms_fr="Ce quart a ete annule par l'organisation - merci d'avoir offert.",
+            sms_en='That shift was cancelled by the organization - thanks for offering.',
+            log_label='Cancelled',
+        )
+
+    def _fan_out_closure(
+        self,
+        request: StaffingRequest,
+        *,
+        exclude_user_id,
+        push_builder,
+        sms_fr: str,
+        sms_en: str,
+        log_label: str,
+    ) -> int:
+        """Shared "this shift is off the table" fan-out (filled / cancelled)."""
+        conditions = [
+            RequestResponse.staffing_request_id == request.id,
+            # DECLINED and WITHDRAWN already opted out of this shift;
+            # telling them it's gone is noise about a thing they left.
+            RequestResponse.status.in_(
+                (ResponseStatus.NOTIFIED, ResponseStatus.VIEWED, ResponseStatus.ACCEPTED)
+            ),
+        ]
+        if exclude_user_id is not None:
+            conditions.append(RequestResponse.worker_user_id != exclude_user_id)
         recipients = self.db.execute(
-            select(RequestResponse.worker_user_id, RequestResponse.status).where(
-                RequestResponse.staffing_request_id == request.id,
-                RequestResponse.worker_user_id != winner_user_id,
-                # DECLINED and WITHDRAWN already opted out of this shift;
-                # telling them it's filled is noise about a thing they left.
-                RequestResponse.status.in_(
-                    (ResponseStatus.NOTIFIED, ResponseStatus.VIEWED, ResponseStatus.ACCEPTED)
-                ),
-            )
+            select(RequestResponse.worker_user_id, RequestResponse.status).where(*conditions)
         ).all()
 
         pinged = 0
@@ -366,10 +423,10 @@ class NotificationDispatcher:
             if worker is None or not worker.is_active:
                 continue
             try:
-                self.push.send_to_user(self.db, worker.id, _push_request_filled(worker, request))
+                self.push.send_to_user(self.db, worker.id, push_builder(worker, request))
                 pinged += 1
             except Exception:
-                logger.exception('Filled push failed for worker %s', worker.id)
+                logger.exception('%s push failed for worker %s', log_label, worker.id)
             if response_status is not ResponseStatus.ACCEPTED:
                 continue
             # ACCEPTED means they raised a hand — by tapping accept or by
@@ -380,11 +437,7 @@ class NotificationDispatcher:
             if not worker.phone or worker.sms_opt_out:
                 continue
             try:
-                self.sms.send(worker.phone, localized(
-                    worker.preferred_language,
-                    "Ce quart est alle a quelqu'un d'autre cette fois - merci d'avoir offert.",
-                    'That shift went to someone else this time - thanks for offering.',
-                ))
+                self.sms.send(worker.phone, localized(worker.preferred_language, sms_fr, sms_en))
             except Exception:
-                logger.exception('Not-selected SMS failed for worker %s', worker.id)
+                logger.exception('%s closure SMS failed for worker %s', log_label, worker.id)
         return pinged
