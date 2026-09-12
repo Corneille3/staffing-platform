@@ -263,15 +263,22 @@ class NotificationDispatcher:
         """
         if not settings.twilio_account_sid:
             return ''
-        if request.origin not in SELF_SERVE_ORIGINS:
+        if request.origin not in SELF_SERVE_ORIGINS and not request.auto_assign:
             return ''
 
-        policy = self.db.scalar(
-            select(Organization.replacement_policy).where(
-                Organization.id == request.organization_id
+        # Self-serve releases/absences follow the org policy at send time (as
+        # before); a coordinator request carries its own "first come, first
+        # served" checkbox. Managed/off: the reply only records an offer.
+        if request.origin in SELF_SERVE_ORIGINS:
+            policy = self.db.scalar(
+                select(Organization.replacement_policy).where(
+                    Organization.id == request.organization_id
+                )
             )
-        )
-        if policy == ReplacementPolicy.MANAGED:
+            managed = policy == ReplacementPolicy.MANAGED
+        else:
+            managed = not request.auto_assign
+        if managed:
             return 'Réponds 1 pour te proposer / Reply 1 to offer.'
         return 'Réponds 1 pour le prendre / Reply 1 to take it.'
 

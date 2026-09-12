@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, update
+from sqlalchemy import select, update, or_
 from sqlalchemy.orm import Session
 
 from app.auth.scope import AccessScope
@@ -455,7 +455,12 @@ class ReplacementService:
             .where(
                 StaffingRequest.id == request_id,
                 StaffingRequest.status == RequestStatus.OPEN,
-                StaffingRequest.origin.in_(SELF_SERVE_ORIGINS),
+                # Self-serve releases/absences, or a coordinator request
+                # published "first come, first served" (auto_assign).
+                or_(
+                    StaffingRequest.origin.in_(SELF_SERVE_ORIGINS),
+                    StaffingRequest.auto_assign.is_(True),
+                ),
                 StaffingRequest.organization_id.in_(org_in_tenant),
             )
             .values(

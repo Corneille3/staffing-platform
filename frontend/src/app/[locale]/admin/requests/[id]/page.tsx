@@ -268,7 +268,7 @@ export default async function RequestDetailPage({
         </div>
 
         <div style={{ display: "grid", gap: 22 }}>
-          {bestMatch && !assignment && !isClosed && bestMatch.match_score !== null ? (
+          {bestMatch && !assignment && !isClosed && !request.auto_assign && bestMatch.match_score !== null ? (
             <HideWhenClosed>
               <BestMatchCard
                 worker={bestMatch.worker}

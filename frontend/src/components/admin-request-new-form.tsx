@@ -39,6 +39,9 @@ interface DraftState {
   contact_name: string;
   contact_phone: string;
   arrival_instructions: string;
+  // First come, first served: the first eligible substitute to claim gets the
+  // shift (in-app or "Reply 1"), no coordinator pick.
+  auto_assign: boolean;
 }
 
 function todayIso(): string {
@@ -68,6 +71,7 @@ function emptyDraft(firstOrg: Organization | undefined): DraftState {
     work_date: todayIso(),
     start_time: "08:00",
     end_time: "12:00",
+    auto_assign: false,
     role: "educator",
     language_requirement: "fr",
     required_qualifications: [],
@@ -182,6 +186,7 @@ export function AdminRequestNewForm({ organizations }: { organizations: Organiza
         arrival_instructions: draft.arrival_instructions.trim() || null,
         required_qualifications: draft.required_qualifications,
         required_certifications: draft.required_certifications,
+        auto_assign: draft.auto_assign,
       })
         .then(() => setSaveState("saved"))
         .catch((err) => {
@@ -671,6 +676,37 @@ function StepNotify({
             );
           })}
         </div>
+      </Field>
+
+      <Field label="Dispatch">
+        <label
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 12,
+            padding: "14px 16px",
+            borderRadius: 14,
+            background: draft.auto_assign ? "var(--card)" : "var(--paper-2)",
+            border: `0.5px solid ${draft.auto_assign ? "var(--terra)" : "var(--line)"}`,
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={draft.auto_assign}
+            onChange={(e) => update("auto_assign", e.target.checked)}
+            style={{ marginTop: 3, width: 16, height: 16, accentColor: "var(--terra)" }}
+          />
+          <span>
+            <span style={{ display: "block", fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>
+              First come, first served
+            </span>
+            <span style={{ display: "block", fontSize: 12, color: "var(--ink-3)", marginTop: 2, lineHeight: 1.45 }}>
+              The first eligible substitute to claim gets the shift, in the app or by texting 1 back. You don't pick.
+              Leave it off to review who accepted and choose.
+            </span>
+          </span>
+        </label>
       </Field>
 
       <Field label="Urgency level (matching weight)">
