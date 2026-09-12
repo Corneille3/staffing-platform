@@ -12,6 +12,7 @@ import app.services.attendance_sweep_service as sweep_mod
 from app.models.assignment import Assignment
 from app.models.enums import AssignmentStatus, RequestOrigin, RequestRole, RequestStatus, RequestType
 from app.models.staffing_request import StaffingRequest
+from app.models.audit_log import AuditLog
 from app.services.attendance_sweep_service import AttendanceSweepService
 
 
@@ -69,6 +70,10 @@ def test_checkin_reminder_fires_once(db_session, seed, monkeypatch):
     # Second tick: the stamp holds.
     assert service.tick()['checkin_reminders'] == 0
     assert len(sent) == 1
+    assert db_session.query(AuditLog).filter_by(
+        action='assignment.checkin_reminder_sent', entity_id=assignment.staffing_request_id,
+    ).count() == 1
+
 
 
 def test_no_reminder_before_start(db_session, seed, monkeypatch):
@@ -217,6 +222,16 @@ def test_no_show_alert_fires_once_after_grace(db_session, seed, monkeypatch):
     # Stamp holds on the second pass.
     assert service.tick()['no_show_alerts'] == 0
     assert len(emails) == 1 and len(texts) == 1
+
+    # The alert is an activity-feed event, keyed on the request (title
+    # resolves), actor-less ("System"), with the assignment in the payload.
+    rows = db_session.query(AuditLog).filter_by(
+        action='assignment.no_show_alerted', entity_id=assignment.staffing_request_id,
+    ).all()
+    assert len(rows) == 1
+    assert rows[0].actor_user_id is None
+    assert rows[0].payload['assignment_id'] == str(assignment.id)
+    assert rows[0].payload['admins_alerted'] == 1
 
 
 def test_no_alert_inside_grace_or_after_checkin(db_session, seed, monkeypatch):

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil, TriangleAlert } from "lucide-react";
+import { ArrowLeft, TriangleAlert } from "lucide-react";
 import { BestMatchCard } from "../../../../../components/best-match-card";
 import { PageFrame } from "../../../../../components/page-frame";
 import { Panel } from "../../../../../components/panel";
 import {
   AssignmentPanel,
   HideWhenClosed,
+  RequestHeaderPills,
   LiveBadge,
   RequestLiveProvider,
   ResponseSummaryPanel,
@@ -136,49 +137,7 @@ export default async function RequestDetailPage({
           Back to request queue
         </Link>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          {isEditable ? (
-            <Link
-              href={`/admin/requests/${request.id}/edit`}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "7px 14px",
-                borderRadius: 999,
-                background: "transparent",
-                border: "0.5px solid var(--line)",
-                color: "var(--ink)",
-                fontSize: 13,
-                fontWeight: 500,
-                textDecoration: "none",
-                whiteSpace: "nowrap",
-              }}
-            >
-              <Pencil size={13} strokeWidth={1.8} />
-              Edit request
-            </Link>
-          ) : null}
-          {!isClosed ? (
-          <Link
-            href={`/admin/substitutes?rank_against_request_id=${request.id}`}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "7px 14px",
-              borderRadius: 999,
-              background: "transparent",
-              border: "0.5px solid var(--line)",
-              color: "var(--ink)",
-              fontSize: 13,
-              fontWeight: 500,
-              textDecoration: "none",
-              whiteSpace: "nowrap",
-            }}
-          >
-            Rank substitutes →
-          </Link>
-          ) : null}
+          <RequestHeaderPills requestId={request.id} initialStatus={request.status} />
         </div>
       </div>
 

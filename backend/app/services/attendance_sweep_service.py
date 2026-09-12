@@ -29,6 +29,7 @@ from app.notifications.i18n import localized, localized_subject
 from app.notifications.sms_service import SmsNotificationService
 from app.notifications.web_push_service import WebPushService
 from app.repositories.organization_repository import OrganizationRepository
+from app.services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +117,7 @@ class AttendanceSweepService:
                 self.db, worker.id, _push_checkin_reminder(worker, org_name),
             )
             assignment.checkin_reminder_sent_at = now
+            self._audit('assignment.checkin_reminder_sent', request, assignment, worker)
             sent += 1
         if sent:
             self.db.commit()
@@ -140,10 +142,28 @@ class AttendanceSweepService:
                 self.db, worker.id, _push_checkout_reminder(worker, org_name),
             )
             assignment.checkout_reminder_sent_at = now
+            self._audit('assignment.checkout_reminder_sent', request, assignment, worker)
             sent += 1
         if sent:
             self.db.commit()
         return sent
+
+    def _audit(self, action: str, request: StaffingRequest, assignment: Assignment,
+               worker: User, extra: dict | None = None) -> None:
+        """One activity row per sweep event, keyed on the request so both
+        feeds resolve the title. Actor None → the feeds print "System"."""
+        AuditService(self.db).log(
+            action=action,
+            entity_type='staffing_request',
+            entity_id=request.id,
+            actor_user_id=None,
+            organization_id=request.organization_id,
+            payload={
+                'assignment_id': str(assignment.id),
+                'worker_user_id': str(worker.id),
+                **(extra or {}),
+            },
+        )
 
     # ── A: coordinator no-show alert — start + grace, worker still absent ────
 
@@ -165,8 +185,15 @@ class AttendanceSweepService:
             due = shift_start_utc(request.work_date, request.start_time) + grace
             if not (due <= now <= due + self._freshness):
                 continue
-            self._alert_admins(request, worker, org_name, now)
+            admins_alerted = self._alert_admins(request, worker, org_name, now)
             assignment.no_show_alerted_at = now
+            # The alert used to leave no trace but a stamp on the assignment;
+            # the activity feeds are where a coordinator looks for "what
+            # happened", so it gets a row like every other lifecycle event.
+            self._audit(
+                'assignment.no_show_alerted', request, assignment, worker,
+                extra={'admins_alerted': admins_alerted},
+            )
             alerted += 1
         if alerted:
             self.db.commit()
@@ -177,7 +204,7 @@ class AttendanceSweepService:
         admins = OrganizationRepository(self.db).active_admins(request.organization_id)
         if not admins:
             logger.warning('No active coordinator to alert for request %s', request.id)
-            return
+            return 0
 
         worker_name = f'{worker.first_name} {worker.last_name}'.strip()
         role_label = request.role.value if request.role else ''
@@ -230,6 +257,7 @@ class AttendanceSweepService:
                 logger.exception('No-show email failed for admin %s', admin.id)
 
     # ── shared candidate query ───────────────────────────────────────────────
+        return len(admins)
 
     def _candidates(self, now: datetime, *conditions):
         """CONFIRMED assignments on recent shifts, with request/worker/org.

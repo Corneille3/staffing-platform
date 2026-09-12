@@ -58,3 +58,12 @@ def test_admin_activity_403_for_site_outside_scope(org_admin_client, db_session)
 
     resp = org_admin_client.get(f'/api/v1/admin/activity?site_id={other_org.id}')
     assert resp.status_code == 403
+
+
+def test_expired_bucket_counts_sweep_expiries():
+    """The sweep expires unfilled requests under 'replacement.unfilled'; the
+    coordinator feed's Expired chip counted 0 while the KPI counted them."""
+    from app.services.reporting_service import _admin_buckets_for
+
+    assert _admin_buckets_for('replacement.unfilled') == {'expired'}
+    assert _admin_buckets_for('assignment.no_show_alerted') == set()  # Event, not a lifecycle bucket

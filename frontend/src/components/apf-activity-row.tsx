@@ -24,6 +24,11 @@ const ACTION_META: Record<string, ActionMeta> = {
   "tenant.created":                { label: "Network created",      accent: "var(--terra)" },
   "tenant.removed":                { label: "Network removed",      accent: "var(--rose)" },
   "user.removed":                  { label: "User removed",         accent: "var(--rose)" },
+  "replacement.unfilled":          { label: "Expired unfilled",     accent: "var(--rose)" },
+  "replacement.escalated":         { label: "Escalated",            accent: "var(--sand)" },
+  "assignment.no_show_alerted":    { label: "No-show alert sent",   accent: "var(--rose)" },
+  "assignment.checkin_reminder_sent":  { label: "Check-in reminder", accent: "var(--ink-3)" },
+  "assignment.checkout_reminder_sent": { label: "Check-out reminder", accent: "var(--ink-3)" },
 };
 
 const ROLE_LABEL: Record<string, string> = {

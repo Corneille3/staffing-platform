@@ -51,6 +51,10 @@ _ADMIN_ACTION_BUCKETS: dict[str, set[str]] = {
     'staffing_request.completed':  {'completed'},
     'staffing_request.cancelled':  {'cancelled'},
     'assignment.cancelled':        {'cancelled'},
+    # The sweep expires unfilled requests (coordinator ones too) under this
+    # action; without the mapping the Expired chip read 0 while the KPI
+    # counted them.
+    'replacement.unfilled':        {'expired'},
     'worker.invited':              {'invited'},
     'coordinator.invited':         {'invited'},
 }
