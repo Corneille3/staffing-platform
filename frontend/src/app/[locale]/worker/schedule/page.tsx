@@ -638,6 +638,11 @@ function PastCard({
   request: StaffingRequest;
   locale: "en" | "fr";
 }) {
+  const t = useTranslations("worker.schedule");
+  // A shift that ended without a check-in stayed "Confirmé" forever (the
+  // backend never moves it); the derived attendance state says what happened.
+  const missed = assignment.attendance === "missed";
+  const unclosed = assignment.attendance === "unclosed";
   return (
     <Link
       href={`/worker/requests/${request.id}/accepted`}
@@ -674,11 +679,11 @@ function PastCard({
         </div>
       </div>
       <Chip
-        variant={assignment.status === "cancelled" ? "urgent" : "default"}
+        variant={assignment.status === "cancelled" || missed ? "urgent" : "default"}
         dot
         style={{ flexShrink: 0 }}
       >
-        {assignmentStatusLabel(assignment.status, locale)}
+        {missed ? t("checkInMissed") : unclosed ? t("checkOutMissed") : assignmentStatusLabel(assignment.status, locale)}
       </Chip>
     </Link>
   );

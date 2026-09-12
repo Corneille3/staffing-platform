@@ -650,6 +650,8 @@ export type Coordinator = {
   organizations: Organization[];
 };
 
+export type AttendanceState = "upcoming" | "due" | "on_shift" | "unclosed" | "completed" | "missed";
+
 export type Assignment = {
   id: string;
   staffing_request_id: string;
@@ -667,6 +669,13 @@ export type Assignment = {
   checked_out_latitude: string | null;
   checked_out_longitude: string | null;
   worked_hours: number | null;
+  // Derived by the backend from the stamps + the clock — upcoming / due /
+  // on_shift / unclosed / completed / missed, null once cancelled or released.
+  attendance?: AttendanceState | null;
+  // Attendance sweep stamps (SPEC_NOSHOW) — when the nudge / alert went out.
+  checkin_reminder_sent_at?: string | null;
+  checkout_reminder_sent_at?: string | null;
+  no_show_alerted_at?: string | null;
   hours_adjusted_by_user_id: string | null;
   hours_adjusted_at: string | null;
   hours_adjustment_reason: string | null;

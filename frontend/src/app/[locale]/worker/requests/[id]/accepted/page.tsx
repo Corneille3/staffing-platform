@@ -17,7 +17,7 @@ import {
   type ReplacementStatus,
 } from "../../../../../../lib/browser-api";
 import { formatWorkDate, locationLabel, roleSectorSubtitle } from "../../../../../../lib/format";
-import { RequestResponse, StaffingRequest } from "../../../../../../lib/types";
+import { Assignment, RequestResponse, StaffingRequest } from "../../../../../../lib/types";
 import { useWorkerSession } from "../../../../../../lib/worker-session";
 import { Eyebrow, Mono } from "../../../../../../components/ui";
 
@@ -46,6 +46,9 @@ export default function WorkerRequestAcceptedPage() {
   // handed it off and someone took it (vs a plain response withdrawal). Drives
   // release-specific copy on the terminal notice.
   const [handedOff, setHandedOff] = useState(false);
+  // The caller's own assignment row — its derived `attendance` decides the
+  // terminal notice once the shift is over (missed / unclosed / completed).
+  const [myAssignment, setMyAssignment] = useState<Assignment | null>(null);
 
   useEffect(() => {
     if (!worker || !requestId) return;
@@ -76,6 +79,7 @@ export default function WorkerRequestAcceptedPage() {
           (a) => a.staffing_request_id === requestId && a.worker_user_id === worker.id,
         );
         setHandedOff(mine?.status === "released");
+        setMyAssignment(mine ?? null);
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : "Failed to load");
       } finally {
@@ -123,6 +127,9 @@ export default function WorkerRequestAcceptedPage() {
     !withdrawn;
   const isClosed = ["cancelled", "completed", "expired"].includes(request.status);
   const isShiftStarted = new Date(`${request.work_date}T${request.start_time}`).getTime() <= Date.now();
+  // Over = the derived attendance says so (missed / unclosed / completed); the
+  // "confirmed, withdraw no longer available" line makes no sense after that.
+  const shiftOver = ["missed", "unclosed", "completed"].includes(myAssignment?.attendance ?? "");
   const canWithdraw =
     myResponse?.status === "accepted" &&
     !isAssignedToMe &&
@@ -290,7 +297,17 @@ export default function WorkerRequestAcceptedPage() {
         <Notice tone="muted">{handedOff ? t("handedOff") : t("withdrawn")}</Notice>
       )}
       {isAssignedToMe && !canWithdraw && !withdrawn && (
-        <Notice tone="moss">{t("alreadyAssigned")}</Notice>
+        shiftOver ? (
+          <Notice tone="muted">
+            {myAssignment?.attendance === "missed"
+              ? t("endedMissed")
+              : myAssignment?.attendance === "unclosed"
+                ? t("endedUnclosed")
+                : t("endedCompleted")}
+          </Notice>
+        ) : (
+          <Notice tone="moss">{t("alreadyAssigned")}</Notice>
+        )
       )}
 
       {error && (
