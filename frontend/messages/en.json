@@ -201,6 +201,11 @@
       "copyLastWeek": "Copy last week",
       "prevWeek": "Previous week",
       "nextWeek": "Next week",
+      "slotsAvailable": "{n, plural, =0 {No slot available} one {# slot available} other {# slots available}}",
+      "legendAvailable": "Available",
+      "legendFree": "Open",
+      "legendPast": "Past",
+      "autoSave": "Saves automatically",
       "dow": {
         "0": "Mon",
         "1": "Tue",

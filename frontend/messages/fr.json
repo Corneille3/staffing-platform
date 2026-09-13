@@ -201,6 +201,11 @@
       "copyLastWeek": "Copier la semaine dernière",
       "prevWeek": "Semaine précédente",
       "nextWeek": "Semaine suivante",
+      "slotsAvailable": "{n, plural, =0 {Aucun créneau disponible} one {# créneau disponible} other {# créneaux disponibles}}",
+      "legendAvailable": "Disponible",
+      "legendFree": "Libre",
+      "legendPast": "Passé",
+      "autoSave": "Enregistrement automatique",
       "dow": {
         "0": "Lun",
         "1": "Mar",

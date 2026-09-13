@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Copy, MapPin, X } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { Check, ChevronLeft, ChevronRight, Copy, MapPin, X } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import {
   copyPreviousAvailabilityWeek,
   fetchAvailabilityGrid,
@@ -13,29 +13,19 @@ import {
 } from "../../../../lib/browser-api";
 import { SlotPeriod } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
+import { shiftDateKey } from "../../../../lib/shift-time";
+import {
+  addDaysIso,
+  dayOfMonth,
+  isPastDay,
+  mondayOfIso,
+  weekRangeLabel,
+} from "../../../../lib/availability-week";
 import { Eyebrow, Mono, SaveFlash, useSaveFlash } from "../../../../components/ui";
 import { WorkerOrgPicker } from "../../../../components/worker-org-picker";
 
 const SLOTS: SlotPeriod[] = ["morning", "afternoon", "evening", "overnight"];
-
-function mondayOf(d: Date): Date {
-  const out = new Date(d);
-  const dow = out.getDay(); // 0=Sun
-  const diff = dow === 0 ? -6 : 1 - dow;
-  out.setDate(out.getDate() + diff);
-  out.setHours(0, 0, 0, 0);
-  return out;
-}
-
-function isoDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function addDays(d: Date, n: number): Date {
-  const out = new Date(d);
-  out.setDate(out.getDate() + n);
-  return out;
-}
+const STATUS_OPTIONS = ["available", "unavailable"] as const;
 
 function cellKey(dateIso: string, slot: SlotPeriod): string {
   return `${dateIso}|${slot}`;
@@ -45,13 +35,17 @@ export default function WorkerAvailabilityPage() {
   const { worker, refresh } = useWorkerSession();
   const t = useTranslations("worker.availability");
   const tCommon = useTranslations("common");
+  const locale = useLocale() as "fr" | "en";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cityInput, setCityInput] = useState("");
   const [cityBusy, setCityBusy] = useState(false);
   const [cityError, setCityError] = useState<string | null>(null);
 
-  const [weekStart, setWeekStart] = useState<Date>(() => mondayOf(new Date()));
+  // Étape 4: "today" and the week both come from the shift timezone, like
+  // the Boîte and the Horaire — not from the browser clock.
+  const todayIso = shiftDateKey();
+  const [weekStartIso, setWeekStartIso] = useState<string>(() => mondayOfIso(shiftDateKey()));
   const [gridCells, setGridCells] = useState<Set<string>>(new Set());
   const [gridLoading, setGridLoading] = useState(false);
   const [gridBusy, setGridBusy] = useState(false);
@@ -62,7 +56,6 @@ export default function WorkerAvailabilityPage() {
   const [prefError, setPrefError] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const workerId = worker?.id;
-  const weekStartIso = isoDate(weekStart);
 
   useEffect(() => {
     if (!workerId) return;
@@ -113,6 +106,7 @@ export default function WorkerAvailabilityPage() {
   );
 
   function toggleCell(dateIso: string, slot: SlotPeriod) {
+    if (isPastDay(dateIso, todayIso)) return;
     const key = cellKey(dateIso, slot);
     setGridCells((prev) => {
       const next = new Set(prev);
@@ -274,48 +268,55 @@ export default function WorkerAvailabilityPage() {
         }} />
       </div>
 
-      {/* available / unavailable toggles */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => setStatus("available")}
-          style={{
-            border: status === "available" ? "none" : "0.5px solid var(--line)",
-            borderRadius: 14,
-            padding: "18px",
-            background: status === "available" ? "var(--moss)" : "var(--card)",
-            color: status === "available" ? "#fff" : "var(--ink-2)",
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: busy ? "wait" : "pointer",
-            opacity: busy ? 0.6 : 1,
-            minHeight: 44,
-            fontFamily: "inherit",
-          }}
-        >
-          {t("available")}
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => setStatus("unavailable")}
-          style={{
-            border: status === "unavailable" ? "none" : "0.5px solid var(--line)",
-            borderRadius: 14,
-            padding: "18px",
-            background: status === "unavailable" ? "var(--ink)" : "var(--card)",
-            color: status === "unavailable" ? "var(--paper)" : "var(--ink-2)",
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: busy ? "wait" : "pointer",
-            opacity: busy ? 0.6 : 1,
-            minHeight: 44,
-            fontFamily: "inherit",
-          }}
-        >
-          {t("unavailable")}
-        </button>
+      {/* status segment control — the active option sits on moss with a
+          white dot, the track is paper-2 (worker-screens plan, étape 4) */}
+      <div
+        role="radiogroup"
+        aria-label={t("currentStatus")}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 4,
+          padding: 4,
+          background: "var(--paper-2)",
+          borderRadius: 12,
+        }}
+      >
+        {STATUS_OPTIONS.map((option) => {
+          const active = status === option;
+          return (
+            <button
+              key={option}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              disabled={busy}
+              onClick={() => setStatus(option)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                minHeight: 44,
+                border: "none",
+                borderRadius: 9,
+                background: active ? "var(--moss)" : "transparent",
+                color: active ? "#fff" : "var(--ink-2)",
+                fontSize: 14,
+                fontWeight: 600,
+                fontFamily: "inherit",
+                cursor: busy ? "wait" : "pointer",
+                opacity: busy ? 0.6 : 1,
+                transition: "background .15s, color .15s",
+              }}
+            >
+              {active ? (
+                <span aria-hidden style={{ width: 8, height: 8, borderRadius: 99, background: "#fff" }} />
+              ) : null}
+              {t(option)}
+            </button>
+          );
+        })}
       </div>
 
       {error ? (
@@ -324,53 +325,53 @@ export default function WorkerAvailabilityPage() {
 
       {/* weekly grid */}
       <section>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <Eyebrow>{t("weeklyGrid")}</Eyebrow>
-            <SaveFlash state={gridFlash.state} savingLabel={tCommon("saving")} savedLabel={tCommon("saved")} />
-          </div>
-          <button
-            type="button"
-            disabled={gridBusy}
-            onClick={copyLastWeek}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              border: "0.5px solid var(--line)",
-              background: "var(--card)",
-              color: "var(--ink-2)",
-              borderRadius: 999,
-              padding: "6px 12px",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: gridBusy ? "wait" : "pointer",
-              fontFamily: "inherit",
-            }}
-          >
-            <Copy size={12} />
-            {t("copyLastWeek")}
-          </button>
-        </div>
+        <Eyebrow style={{ marginBottom: 10 }}>{t("weeklyGrid")}</Eyebrow>
 
         <div style={{ background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: 16, padding: 14 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
             <button
               type="button"
               aria-label={t("prevWeek")}
-              onClick={() => setWeekStart((d) => addDays(d, -7))}
-              style={{ border: "none", background: "none", padding: 6, color: "var(--ink-2)", cursor: "pointer" }}
+              onClick={() => setWeekStartIso((d) => addDaysIso(d, -7))}
+              style={{
+                border: "none",
+                background: "none",
+                padding: 0,
+                minWidth: 44,
+                minHeight: 44,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--ink-2)",
+                cursor: "pointer",
+              }}
             >
               <ChevronLeft size={18} />
             </button>
-            <Mono style={{ fontSize: 13, color: "var(--ink-2)" }}>
-              {`${weekStartIso} → ${isoDate(addDays(weekStart, 6))}`}
-            </Mono>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)", lineHeight: 1.2 }}>
+                {weekRangeLabel(weekStartIso, locale)}
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 500, color: "var(--moss)", marginTop: 2, minHeight: 16 }}>
+                {gridLoading ? null : t("slotsAvailable", { n: gridCells.size })}
+              </div>
+            </div>
             <button
               type="button"
               aria-label={t("nextWeek")}
-              onClick={() => setWeekStart((d) => addDays(d, 7))}
-              style={{ border: "none", background: "none", padding: 6, color: "var(--ink-2)", cursor: "pointer" }}
+              onClick={() => setWeekStartIso((d) => addDaysIso(d, 7))}
+              style={{
+                border: "none",
+                background: "none",
+                padding: 0,
+                minWidth: 44,
+                minHeight: 44,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--ink-2)",
+                cursor: "pointer",
+              }}
             >
               <ChevronRight size={18} />
             </button>
@@ -384,39 +385,73 @@ export default function WorkerAvailabilityPage() {
             <div style={{ display: "grid", gridTemplateColumns: "auto repeat(7, 1fr)", gap: 4 }}>
               <div />
               {Array.from({ length: 7 }, (_, i) => {
-                const day = addDays(weekStart, i);
+                const iso = addDaysIso(weekStartIso, i);
+                const isToday = iso === todayIso;
+                const past = isPastDay(iso, todayIso);
                 return (
-                  <div key={i} style={{ textAlign: "center", fontSize: 11, color: "var(--ink-3)" }}>
+                  <div
+                    key={i}
+                    aria-current={isToday ? "date" : undefined}
+                    style={{
+                      display: "grid",
+                      justifyItems: "center",
+                      gap: 2,
+                      fontSize: 11,
+                      color: past ? "var(--ink-4)" : "var(--ink-3)",
+                    }}
+                  >
                     <div style={{ fontWeight: 600 }}>{t(`dow.${i}`)}</div>
-                    <Mono style={{ fontSize: 11 }}>{String(day.getDate()).padStart(2, "0")}</Mono>
+                    <Mono
+                      style={{
+                        fontSize: 11,
+                        width: 22,
+                        height: 22,
+                        lineHeight: "22px",
+                        borderRadius: 99,
+                        textAlign: "center",
+                        background: isToday ? "var(--terra)" : "transparent",
+                        color: isToday ? "#fff" : "inherit",
+                        fontWeight: isToday ? 600 : 400,
+                      }}
+                    >
+                      {dayOfMonth(iso)}
+                    </Mono>
                   </div>
                 );
               })}
 
               {SLOTS.map((slot) => (
                 <div key={slot} style={{ display: "contents" }}>
-                  <div style={{ fontSize: 11, color: "var(--ink-3)", alignSelf: "center", paddingRight: 6, textTransform: "capitalize" }}>
+                  <div style={{ fontSize: 11, color: "var(--ink-3)", alignSelf: "center", paddingRight: 6 }}>
                     {t(`slot.${slot}`)}
                   </div>
                   {Array.from({ length: 7 }, (_, i) => {
-                    const day = addDays(weekStart, i);
-                    const iso = isoDate(day);
+                    const iso = addDaysIso(weekStartIso, i);
+                    const past = isPastDay(iso, todayIso);
                     const on = gridCells.has(cellKey(iso, slot));
                     return (
                       <button
                         key={`${slot}-${i}`}
                         type="button"
                         aria-pressed={on}
+                        aria-label={`${t(`dow.${i}`)} ${dayOfMonth(iso)} · ${t(`slot.${slot}`)}`}
+                        disabled={past}
                         onClick={() => toggleCell(iso, slot)}
                         style={{
-                          minHeight: 38,
-                          border: on ? "none" : "0.5px solid var(--line)",
-                          borderRadius: 8,
-                          background: on ? "var(--moss)" : "#fff",
-                          cursor: "pointer",
+                          minHeight: 44,
                           padding: 0,
+                          border: on || past ? "none" : "0.5px solid var(--line)",
+                          borderRadius: 8,
+                          background: past ? "var(--paper-2)" : on ? "var(--moss)" : "#fff",
+                          color: past ? "var(--ink-4)" : "#fff",
+                          cursor: past ? "default" : "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
                         }}
-                      />
+                      >
+                        {on ? <Check size={16} strokeWidth={2.5} /> : null}
+                      </button>
                     );
                   })}
                 </div>
@@ -427,6 +462,49 @@ export default function WorkerAvailabilityPage() {
           {gridError ? (
             <p style={{ margin: "10px 0 0", color: "var(--rose)", fontSize: 12, fontWeight: 600 }}>{gridError}</p>
           ) : null}
+
+          {/* legend */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: 12 }}>
+            <LegendItem label={t("legendAvailable")} swatch={{ background: "var(--moss)" }} />
+            <LegendItem label={t("legendFree")} swatch={{ background: "#fff", border: "0.5px solid var(--line)" }} />
+            <LegendItem label={t("legendPast")} swatch={{ background: "var(--paper-2)" }} />
+          </div>
+        </div>
+
+        {/* copy last week + save indicator — the grid autosaves, so there is
+            no Save button; the muted "autosave" note holds the spot while idle */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 10 }}>
+          <button
+            type="button"
+            disabled={gridBusy}
+            onClick={copyLastWeek}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              border: "0.5px solid var(--line)",
+              background: "var(--card)",
+              color: "var(--ink)",
+              borderRadius: 12,
+              padding: "0 16px",
+              minHeight: 44,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: gridBusy ? "wait" : "pointer",
+              opacity: gridBusy ? 0.6 : 1,
+              fontFamily: "inherit",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+          >
+            <Copy size={14} />
+            {t("copyLastWeek")}
+          </button>
+          {gridFlash.state === "idle" ? (
+            <span style={{ fontSize: 12, color: "var(--ink-4)", textAlign: "right", lineHeight: 1.3 }}>{t("autoSave")}</span>
+          ) : (
+            <SaveFlash state={gridFlash.state} savingLabel={tCommon("saving")} savedLabel={tCommon("saved")} />
+          )}
         </div>
       </section>
 
@@ -517,6 +595,11 @@ export default function WorkerAvailabilityPage() {
             disabled={cityBusy}
             style={{
               flex: 1,
+              // An <input> keeps its intrinsic width (size=20) in the row's
+              // min-content, which pushed the whole page to 402 px on a 375 px
+              // phone. width: 0 + flex: 1 lets the row size the field instead.
+              width: 0,
+              minWidth: 0,
               border: "0.5px solid var(--line)",
               borderRadius: 10,
               padding: "11px 14px",
@@ -666,5 +749,14 @@ function ToggleRow({
         }} />
       </button>
     </div>
+  );
+}
+
+function LegendItem({ label, swatch }: { label: string; swatch: React.CSSProperties }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--ink-3)" }}>
+      <span aria-hidden style={{ width: 12, height: 12, borderRadius: 4, flexShrink: 0, ...swatch }} />
+      {label}
+    </span>
   );
 }
