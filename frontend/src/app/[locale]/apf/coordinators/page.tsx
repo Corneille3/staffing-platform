@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Eyebrow, Mono } from "../../../../components/ui";
 import { getCoordinators } from "../../../../lib/api";
 import { RemoveUserButton } from "../../../../components/remove-user-button";
+import { CoordinatorPhoneCell } from "../../../../components/coordinator-phone-cell";
 
 const LANG_LABEL: Record<string, string> = { fr: "FR", en: "EN", bilingual: "Bilingual" };
 
@@ -88,7 +89,7 @@ export default async function CoordinatorsPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1.8fr 0.6fr 2.4fr 0.8fr 0.7fr",
+            gridTemplateColumns: "1.8fr 0.6fr 1.4fr 2fr 0.8fr 0.7fr",
             gap: 12,
             padding: "8px 14px",
             fontSize: 10,
@@ -101,6 +102,7 @@ export default async function CoordinatorsPage() {
         >
           <span>Name</span>
           <span>Lang</span>
+          <span>Phone</span>
           <span>Assigned organizations</span>
           <span>Status</span>
           <span></span>
@@ -112,7 +114,7 @@ export default async function CoordinatorsPage() {
               key={coord.id}
               style={{
                 display: "grid",
-                gridTemplateColumns: "1.8fr 0.6fr 2.4fr 0.8fr 0.7fr",
+                gridTemplateColumns: "1.8fr 0.6fr 1.4fr 2fr 0.8fr 0.7fr",
                 gap: 12,
                 padding: "14px",
                 alignItems: "center",
@@ -142,6 +144,8 @@ export default async function CoordinatorsPage() {
               >
                 {LANG_LABEL[coord.preferred_language] ?? coord.preferred_language.toUpperCase()}
               </span>
+
+              <CoordinatorPhoneCell coordinatorId={coord.id} initialPhone={coord.phone} />
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {coord.organizations.length > 0 ? (

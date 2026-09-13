@@ -138,6 +138,51 @@ class CoordinatorService:
             pass
         return user, orgs
 
+    def get_for_tenant(self, coordinator_id: UUID, tenant_id: UUID) -> tuple[User, list[Organization]]:
+        """One coordinator as ``list_for_tenant`` would show them: an active
+        org_admin holding at least one active membership in an org of this
+        tenant. Anyone else — removed, a worker, a coordinator of another
+        network — is a 404, so the route never confirms a foreign id exists."""
+        orgs = list(self.db.scalars(
+            select(Organization)
+            .join(OrganizationMembership, OrganizationMembership.organization_id == Organization.id)
+            .where(
+                OrganizationMembership.user_id == coordinator_id,
+                OrganizationMembership.is_active.is_(True),
+                Organization.tenant_id == tenant_id,
+            )
+            .order_by(Organization.name)
+        ).all())
+        user = self.db.get(User, coordinator_id) if orgs else None
+        if user is None or user.role != UserRole.ORG_ADMIN or not user.is_active:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Coordinator not found.')
+        return user, orgs
+
+    def update_phone(
+        self, coordinator_id: UUID, phone: str | None, scope: AccessScope,
+    ) -> tuple[User, list[Organization]]:
+        """APF-side edit of a coordinator's mobile number (parked #7). The
+        self-service path (PATCH /auth/profile) stays; this exists because the
+        network admin is usually the one who notices a no-show SMS went
+        nowhere. Same audit action as self-service — the actor says who did it.
+        A no-op (same number) writes nothing."""
+        if not scope.tenant_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='No tenant context.')
+        user, orgs = self.get_for_tenant(coordinator_id, scope.tenant_id)
+        if phone != user.phone:
+            self.audit_service.log(
+                action='user.profile_updated',
+                entity_type='user',
+                entity_id=user.id,
+                actor_user_id=scope.user.id,
+                payload={'fields': {'phone': {'from': user.phone, 'to': phone}}},
+            )
+            user.phone = phone
+            self.db.add(user)
+            self.db.commit()
+            self.db.refresh(user)
+        return user, orgs
+
     def list_for_tenant(self, tenant_id: UUID) -> list[tuple[User, list[Organization]]]:
         # Active org_admin users holding an active membership in an org under
         # this tenant. Removed coordinators (soft-deleted: ``User.is_active``
