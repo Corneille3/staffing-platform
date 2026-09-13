@@ -719,6 +719,13 @@ export async function inviteCoordinator(payload: {
   return postJson<Coordinator>("/api/v1/coordinators/invite", payload);
 }
 
+// APF-side phone edit (parked #7). Self-service exists (updateMyProfile), but
+// the network admin is usually the one who notices a no-show SMS went nowhere.
+// Only the number is writable here; "" clears it.
+export async function updateCoordinatorPhone(coordinatorId: string, phone: string): Promise<Coordinator> {
+  return patchJson<Coordinator>(`/api/v1/coordinators/${coordinatorId}`, { phone });
+}
+
 export async function checkInAssignment(
   assignmentId: string,
   coords?: { latitude: number; longitude: number },

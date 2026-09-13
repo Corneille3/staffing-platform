@@ -1,10 +1,12 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
 from app.auth.permissions import require_network_admin
 from app.auth.scope import AccessScope, get_access_scope
-from app.schemas.coordinator import CoordinatorInviteCreate, CoordinatorRead
+from app.schemas.coordinator import CoordinatorInviteCreate, CoordinatorPhoneUpdate, CoordinatorRead
 from app.schemas.organization import OrganizationRead
 from app.services.coordinator_service import CoordinatorService
 
@@ -42,4 +44,18 @@ def invite_coordinator(
     db: Session = Depends(get_db_session),
 ) -> CoordinatorRead:
     user, orgs = CoordinatorService(db).invite(payload, scope)
+    return _to_coordinator_read(user, orgs)
+
+
+@router.patch('/{coordinator_id}', dependencies=[Depends(require_network_admin)])
+def update_coordinator_phone(
+    coordinator_id: UUID,
+    payload: CoordinatorPhoneUpdate,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> CoordinatorRead:
+    """APF-side phone edit (parked #7): the inline cell on /apf/coordinators.
+    Only ``phone`` is writable; a coordinator outside the caller's tenant,
+    a removed account or a non-coordinator id is a 404."""
+    user, orgs = CoordinatorService(db).update_phone(coordinator_id, payload.phone, scope)
     return _to_coordinator_read(user, orgs)
