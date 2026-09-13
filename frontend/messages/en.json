@@ -350,6 +350,21 @@
       "certifications": "Certifications",
       "urgentAlerts": "Urgent alerts"
     },
+    "credentials": {
+      "ECE_LEVEL_1": "ECE Level 1",
+      "ECE_LEVEL_2": "ECE Level 2",
+      "ECE_LEVEL_3": "ECE Level 3",
+      "RSG": "RSG (home childcare provider)",
+      "TES": "TES (special education technician)",
+      "AEC_PETITE_ENFANCE": "AEC Early childhood",
+      "DEC_TEE": "DEC Early childhood education",
+      "PSW": "Personal support worker",
+      "NURSE": "Nurse",
+      "FIRST_AID": "First aid",
+      "CPR": "CPR",
+      "FOOD_SAFETY": "Food safety",
+      "FOOD_HANDLER": "Food handler"
+    },
     "absence": {
       "back": "Back",
       "title": "Report an absence",

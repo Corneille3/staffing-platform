@@ -17,6 +17,7 @@ import {
   locationLabel,
   roleSectorSubtitle,
 } from "../../../lib/format";
+import { avatarTone } from "../../../lib/avatar-tone";
 import { modifiedSinceReview } from "../../../lib/request-modified";
 import { Assignment, RequestResponse, StaffingRequest, Worker } from "../../../lib/types";
 import { useWorkerSession } from "../../../lib/worker-session";
@@ -197,7 +198,7 @@ export default function WorkerHome() {
         </div>
         <Avatar
           initials={`${worker.first_name[0]}${worker.last_name[0]}`}
-          tone="terra"
+          tone={avatarTone(`${worker.first_name} ${worker.last_name}`)}
           size={38}
         />
       </div>

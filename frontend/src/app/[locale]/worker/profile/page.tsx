@@ -3,6 +3,7 @@
 import { useClerk } from "@clerk/nextjs";
 import { LogOut, MapPin } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { avatarTone } from "../../../../lib/avatar-tone";
 import { useWorkerSession } from "../../../../lib/worker-session";
 import { Avatar, Eyebrow, LanguageSwitcher } from "../../../../components/ui";
 
@@ -12,16 +13,22 @@ export default function WorkerProfilePage() {
   const { worker } = useWorkerSession();
   const t = useTranslations("worker.profile");
   const tCommon = useTranslations("common");
+  const tCredentials = useTranslations("worker.credentials");
 
   if (!worker) return null;
 
   const initials = `${worker.first_name[0]}${worker.last_name[0]}`.toUpperCase();
+  // Codes come from onboarding: suggested chips (ECE_LEVEL_1, FIRST_AID, …)
+  // or anything the worker typed, upper-cased. Known codes get a readable
+  // FR/EN label; an unknown one shows as typed rather than blank.
+  const credentialLabel = (code: string) =>
+    tCredentials.has(code) ? tCredentials(code) : code;
 
   return (
     <div style={{ display: "grid", gap: 24, paddingTop: 16 }}>
       {/* identity header */}
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <Avatar initials={initials} tone="terra" size={56} />
+        <Avatar initials={initials} tone={avatarTone(`${worker.first_name} ${worker.last_name}`)} size={56} />
         <div>
           <div style={{ fontFamily: "var(--serif)", fontSize: 24, lineHeight: 1.1 }}>
             {worker.first_name}{" "}
@@ -82,13 +89,13 @@ export default function WorkerProfilePage() {
           label={t("cities")}
           value={worker.profile?.supported_cities.join(", ") || "—"}
         />
-        <Field
+        <BadgeField
           label={t("qualifications")}
-          value={worker.profile?.qualifications.join(", ") || "—"}
+          items={(worker.profile?.qualifications ?? []).map(credentialLabel)}
         />
-        <Field
+        <BadgeField
           label={t("certifications")}
-          value={worker.profile?.certifications.join(", ") || "—"}
+          items={(worker.profile?.certifications ?? []).map(credentialLabel)}
         />
         <Field
           label={t("urgentAlerts")}
@@ -155,6 +162,41 @@ function Field({ label, value }: { label: string; value: string }) {
     <div>
       <Eyebrow style={{ fontSize: 9, marginBottom: 4 }}>{label}</Eyebrow>
       <p style={{ margin: 0, fontSize: 15, color: "var(--ink)", fontWeight: 500 }}>{value}</p>
+    </div>
+  );
+}
+
+// Credentials as pill badges (worker-screens plan, étape 5) — one per code,
+// wrapping; "—" when the worker has none, like the text fields.
+function BadgeField({ label, items }: { label: string; items: string[] }) {
+  return (
+    <div>
+      <Eyebrow style={{ fontSize: 9, marginBottom: 6 }}>{label}</Eyebrow>
+      {items.length === 0 ? (
+        <p style={{ margin: 0, fontSize: 15, color: "var(--ink)", fontWeight: 500 }}>—</p>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {items.map((item) => (
+            <span
+              key={item}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                padding: "5px 11px",
+                borderRadius: 999,
+                background: "var(--paper-2)",
+                border: "0.5px solid var(--line)",
+                fontSize: 13,
+                fontWeight: 500,
+                color: "var(--ink)",
+                lineHeight: 1.3,
+              }}
+            >
+              {item}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

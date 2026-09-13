@@ -350,6 +350,21 @@
       "certifications": "Certifications",
       "urgentAlerts": "Alertes urgentes"
     },
+    "credentials": {
+      "ECE_LEVEL_1": "Éducateur·trice niveau 1",
+      "ECE_LEVEL_2": "Éducateur·trice niveau 2",
+      "ECE_LEVEL_3": "Éducateur·trice niveau 3",
+      "RSG": "RSG (responsable de service de garde)",
+      "TES": "TES (technique d'éducation spécialisée)",
+      "AEC_PETITE_ENFANCE": "AEC Petite enfance",
+      "DEC_TEE": "DEC Techniques d'éducation à l'enfance",
+      "PSW": "Préposé·e aux bénéficiaires",
+      "NURSE": "Infirmier·ère",
+      "FIRST_AID": "Premiers soins",
+      "CPR": "RCR",
+      "FOOD_SAFETY": "Hygiène et salubrité alimentaires",
+      "FOOD_HANDLER": "Manipulation des aliments"
+    },
     "absence": {
       "back": "Retour",
       "title": "Signaler une absence",
