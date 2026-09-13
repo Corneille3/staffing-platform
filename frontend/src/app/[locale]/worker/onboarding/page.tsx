@@ -478,7 +478,9 @@ function AddInput({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onAdd(); } }}
         style={{
-          flex: 1, borderRadius: 10, padding: "11px 14px",
+          // width: 0 + flex: 1 — an <input>'s intrinsic width otherwise widens
+          // the whole page past 375 px (same fix as Disponibilités, étape 4)
+          flex: 1, width: 0, minWidth: 0, borderRadius: 10, padding: "11px 14px",
           border: "0.5px solid var(--line)", background: "#fff",
           color: "var(--ink)", fontSize: 14, font: "inherit", outline: "none", minHeight: 44,
         }}

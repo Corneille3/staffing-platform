@@ -22,7 +22,7 @@ import { completedCount, nextShift, weekHours } from "../../../lib/inbox-stats";
 import { modifiedSinceReview } from "../../../lib/request-modified";
 import { Assignment, RequestResponse, StaffingRequest, Worker } from "../../../lib/types";
 import { useWorkerSession } from "../../../lib/worker-session";
-import { Avatar, Chip, Meta, Mono, SectionLine } from "../../../components/ui";
+import { Avatar, Chip, Meta, SectionLine } from "../../../components/ui";
 
 // "filled" used to cover five unrelated outcomes at once — you won it, someone
 // else won it, it was cancelled, it expired unfilled, it ran to completion —
@@ -619,7 +619,7 @@ function RequestCard({
           {status === "expired"   && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{t("chipExpired")}</Chip>}
           {status === "released"  && <Chip variant="default" style={{ color: "var(--ink-3)" }}>{t("chipReleased")}</Chip>}
         </div>
-        <Mono style={{ fontSize: 10, color: "var(--ink-3)" }}>{timeAgo}</Mono>
+        <span style={{ fontSize: 11, color: "var(--ink-3)", whiteSpace: "nowrap" }}>{timeAgo}</span>
       </div>
 
       {/* Org name */}
