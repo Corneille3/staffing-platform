@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Calendar, ChevronDown, ChevronRight, MapPin, RefreshCw } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "../../../i18n/navigation";
@@ -22,7 +22,7 @@ import { completedCount, nextShift, weekHours } from "../../../lib/inbox-stats";
 import { modifiedSinceReview } from "../../../lib/request-modified";
 import { Assignment, RequestResponse, StaffingRequest, Worker } from "../../../lib/types";
 import { useWorkerSession } from "../../../lib/worker-session";
-import { Avatar, Chip, Meta, Mono } from "../../../components/ui";
+import { Avatar, Chip, Meta, Mono, SectionLine } from "../../../components/ui";
 
 // "filled" used to cover five unrelated outcomes at once — you won it, someone
 // else won it, it was cancelled, it expired unfilled, it ran to completion —
@@ -462,43 +462,6 @@ function NextShiftCard({
 // Local calendar date as "YYYY-MM-DD" (same shape as the API's work_date).
 function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function SectionLine({
-  label,
-  count,
-  style,
-}: {
-  label: string;
-  count: string;
-  style?: CSSProperties;
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "baseline",
-        justifyContent: "space-between",
-        paddingBottom: 8,
-        marginBottom: 12,
-        borderBottom: "0.5px solid var(--line)",
-        ...style,
-      }}
-    >
-      <span
-        style={{
-          fontSize: 11,
-          letterSpacing: ".1em",
-          textTransform: "uppercase",
-          color: "var(--ink-3)",
-          fontWeight: 500,
-        }}
-      >
-        {label}
-      </span>
-      <span style={{ fontSize: 12, color: "var(--ink-3)" }}>{count}</span>
-    </div>
-  );
 }
 
 function EmptyInbox({ t }: { t: ReturnType<typeof useTranslations> }) {

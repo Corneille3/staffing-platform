@@ -5,6 +5,7 @@ export { Eyebrow, Display, Mono } from "./typography";
 export { Avatar } from "./avatar";
 export { BottomNav } from "./bottom-nav";
 export { Meta } from "./meta";
+export { SectionLine } from "./section-line";
 export { LanguageSwitcher } from "./language-switcher";
 export { EdgeLanguageToggle } from "./edge-language-toggle";
 export { SaveFlash, useSaveFlash } from "./save-flash";

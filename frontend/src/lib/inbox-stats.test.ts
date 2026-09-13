@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { completedCount, isoWeekBounds, nextShift, scheduledHours, weekHours } from "./inbox-stats";
+import {
+  completedCount,
+  formatHours,
+  isoWeekBounds,
+  itemHours,
+  monthBounds,
+  monthHours,
+  nextShift,
+  scheduledHours,
+  weekHours,
+} from "./inbox-stats";
 
 // 2026-09-13 is a Sunday; the ISO week runs Mon 09-07 → Sun 09-13.
 const TODAY = "2026-09-13";
@@ -89,5 +99,36 @@ describe("nextShift", () => {
   it("is null when nothing is left", () => {
     expect(nextShift([shift("2026-09-13", "08:00:00", "10:00:00")], NOW)).toBeNull();
     expect(nextShift([], NOW)).toBeNull();
+  });
+});
+
+describe("monthBounds / monthHours", () => {
+  it("spans the calendar month, February included", () => {
+    expect(monthBounds("2026-09-13")).toEqual({ start: "2026-09-01", end: "2026-09-30" });
+    expect(monthBounds("2028-02-10")).toEqual({ start: "2028-02-01", end: "2028-02-29" });
+  });
+  it("sums the month like the week, other months left out", () => {
+    const items = [
+      shift("2026-09-01", "08:00:00", "16:00:00", { attendance: "completed", worked_hours: 7.5 }),
+      shift("2026-09-25", "08:00:00", "12:00:00", { attendance: "upcoming" }),
+      shift("2026-08-31", "08:00:00", "16:00:00", { attendance: "completed", worked_hours: 8 }),
+      shift("2026-10-01", "08:00:00", "12:00:00", { attendance: "upcoming" }),
+    ];
+    expect(monthHours(items, TODAY, NOW)).toBe(11.5);
+  });
+});
+
+describe("itemHours", () => {
+  it("recorded hours win, a cancelled shift is worth nothing", () => {
+    expect(itemHours(shift("2026-09-08", "08:00:00", "16:00:00", { attendance: "completed", worked_hours: 0.1 }), NOW)).toBe(0.1);
+    expect(itemHours(shift("2026-09-20", "08:00:00", "16:00:00", { status: "cancelled" }), NOW)).toBe(0);
+  });
+});
+
+describe("formatHours", () => {
+  it("uses the locale's decimal separator and always one decimal", () => {
+    expect(formatHours(4, "fr")).toBe("4,0 h");
+    expect(formatHours(4, "en")).toBe("4.0 h");
+    expect(formatHours(0.083, "fr")).toBe("0,1 h");
   });
 });
