@@ -81,6 +81,11 @@ function localDateTime(isoDate: string, hhmm: string): Date {
   return new Date(y, m - 1, d, hh, mm, 0, 0);
 }
 
+/** Epoch ms of the scheduled start (local wall clock, see header). */
+export function shiftStartMs(shift: ShiftWindow): number {
+  return localDateTime(shift.work_date, shift.start_time.slice(0, 5)).getTime();
+}
+
 /** Epoch ms of the scheduled end. `end_time <= start_time` means the shift
  * crosses midnight and ends the next day — the same convention the backend
  * and the duration display use. */

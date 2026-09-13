@@ -69,7 +69,10 @@
       "iCanTakeIt": "I can take it",
       "waitingForConfirmation": "Waiting for confirmation",
       "modifiedBanner": "Updated — please review",
-      "reportAbsence": "Report an absence"
+      "reportAbsence": "Report an absence",
+      "statHoursWeek": "Hours this week",
+      "statCompleted": "Shifts completed",
+      "nextShift": "Next shift"
     },
     "schedule": {
       "noShifts": "No shifts",

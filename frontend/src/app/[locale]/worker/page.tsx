@@ -1,7 +1,7 @@
 "use client";
 
 import { type CSSProperties, useEffect, useState } from "react";
-import { Calendar, ChevronDown, MapPin, RefreshCw } from "lucide-react";
+import { Calendar, ChevronDown, ChevronRight, MapPin, RefreshCw } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "../../../i18n/navigation";
 import {
@@ -18,6 +18,7 @@ import {
   roleSectorSubtitle,
 } from "../../../lib/format";
 import { avatarTone } from "../../../lib/avatar-tone";
+import { completedCount, nextShift, weekHours } from "../../../lib/inbox-stats";
 import { modifiedSinceReview } from "../../../lib/request-modified";
 import { Assignment, RequestResponse, StaffingRequest, Worker } from "../../../lib/types";
 import { useWorkerSession } from "../../../lib/worker-session";
@@ -46,7 +47,7 @@ export default function WorkerHome() {
   const tCommon = useTranslations("common");
   const tTime = useTranslations("time");
   const [requests, setRequests] = useState<StaffingRequest[]>([]);
-  const [, setAssignments] = useState<Assignment[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [responses, setResponses] = useState<RequestResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -67,7 +68,7 @@ export default function WorkerHome() {
       );
       if (!alive) return;
       setRequests(allRequests);
-      setAssignments(allAssignments);
+      setAssignments(allAssignments.filter((a) => a.worker_user_id === worker.id));
       setResponses(responseLists.flat().filter((r) => r.worker_user_id === worker.id));
       setLoading(false);
     })();
@@ -148,6 +149,16 @@ export default function WorkerHome() {
     ...settled.filter(isPast).sort(byWorkDate(-1)),
     ...settled.filter((i) => !isPast(i)).sort(byWorkDate(1)),
   ];
+
+  // At-a-glance numbers + next shift, from the assignments already loaded
+  // (the Horaire's data) — no endpoint, no extra request (étape 2).
+  const scheduleItems = assignments.map((assignment) => ({
+    assignment,
+    request: requests.find((r) => r.id === assignment.staffing_request_id) ?? null,
+  }));
+  const hoursThisWeek = weekHours(scheduleItems, todayIso, now.getTime());
+  const completedShifts = completedCount(scheduleItems);
+  const next = nextShift(scheduleItems, now.getTime());
 
   const renderCard = ({ request, status, modified }: InboxItem) => (
     <RequestCard
@@ -239,6 +250,29 @@ export default function WorkerHome() {
 
       {preferenceError && (
         <p style={{ margin: "-12px 0 16px", fontSize: 12, color: "var(--rose)" }}>{preferenceError}</p>
+      )}
+
+      {/* Stat tiles + next shift — rendered once the data is in, so the
+          numbers never flash from 0. Reliability is deliberately absent: it
+          exists on the profile but is only recomputed by hand. */}
+      {!loading && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+            <StatTile
+              value={`${hoursThisWeek.toLocaleString(locale === "fr" ? "fr-CA" : "en-CA", { maximumFractionDigits: 1 })} h`}
+              label={t("statHoursWeek")}
+              tone={hoursThisWeek > 0 ? "moss" : "ink"}
+            />
+            <StatTile value={String(completedShifts)} label={t("statCompleted")} tone="ink" />
+          </div>
+          {next?.request && (
+            <NextShiftCard
+              request={next.request}
+              dateLine={`${formatWorkDate(next.request.work_date, locale)} · ${next.request.start_time.slice(0, 5)} – ${next.request.end_time.slice(0, 5)} · ${locationLabel(next.request)}`}
+              label={t("nextShift")}
+            />
+          )}
+        </>
       )}
 
       {/* Permanent staff: report an absence (their schedule lives outside StaffiG,
@@ -342,6 +376,88 @@ export default function WorkerHome() {
 }
 
 const HISTORY_WINDOW_DAYS = 30;
+
+function StatTile({ value, label, tone }: { value: string; label: string; tone: "moss" | "ink" }) {
+  return (
+    <div
+      style={{
+        background: "var(--card)",
+        border: "0.5px solid var(--line)",
+        borderRadius: "var(--r-md, 14px)",
+        padding: "12px 14px",
+      }}
+    >
+      <div
+        style={{
+          fontFamily: "var(--serif)",
+          fontSize: 26,
+          lineHeight: 1.1,
+          color: tone === "moss" ? "var(--moss)" : "var(--ink)",
+        }}
+      >
+        {value}
+      </div>
+      <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 3, letterSpacing: ".02em" }}>{label}</div>
+    </div>
+  );
+}
+
+// First confirmed shift still to come — one tap to the Horaire. Hidden when
+// there is none (the page checks before rendering).
+function NextShiftCard({
+  request,
+  dateLine,
+  label,
+}: {
+  request: StaffingRequest;
+  dateLine: string;
+  label: string;
+}) {
+  return (
+    <Link
+      href="/worker/schedule"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        minHeight: 44,
+        padding: "12px 14px",
+        marginBottom: 20,
+        background: "var(--card)",
+        border: "0.5px solid var(--line)",
+        borderRadius: 18,
+        textDecoration: "none",
+        color: "var(--ink)",
+      }}
+    >
+      <div
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 12,
+          background: "var(--sand-soft)",
+          color: "#7C5C12",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <Calendar size={18} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink-3)", fontWeight: 500 }}>
+          {label}
+        </div>
+        <div style={{ fontSize: 15, fontWeight: 500, marginTop: 2 }}>
+          {request.organization?.name ?? request.title}
+        </div>
+        <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 2 }}>{dateLine}</div>
+      </div>
+      <ChevronRight size={16} style={{ color: "var(--ink-3)", flexShrink: 0 }} />
+    </Link>
+  );
+}
 
 // Local calendar date as "YYYY-MM-DD" (same shape as the API's work_date).
 function isoDate(d: Date): string {
