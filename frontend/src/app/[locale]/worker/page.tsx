@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Calendar, MapPin, RefreshCw } from "lucide-react";
+import { type CSSProperties, useEffect, useState } from "react";
+import { Calendar, ChevronDown, MapPin, RefreshCw } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "../../../i18n/navigation";
 import {
@@ -48,7 +48,7 @@ export default function WorkerHome() {
   const [, setAssignments] = useState<Assignment[]>([]);
   const [responses, setResponses] = useState<RequestResponse[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"active" | "history">("active");
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [preferenceBusy, setPreferenceBusy] = useState(false);
   const [preferenceError, setPreferenceError] = useState<string | null>(null);
 
@@ -80,7 +80,10 @@ export default function WorkerHome() {
 
   // work_date is an ISO "YYYY-MM-DD" string, so string compare is date compare.
   const now = new Date();
-  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const todayIso = isoDate(now);
+  // History keeps the last 30 days only — older outcomes stop mattering to
+  // the worker (Claude Design, étape 1).
+  const historyCutoffIso = isoDate(new Date(now.getTime() - HISTORY_WINDOW_DAYS * 86_400_000));
 
   // Returns null for a shift this worker WON: it belongs to the Schedule tab,
   // which owns "what am I working?". Keeping it here too is what buried a
@@ -119,25 +122,45 @@ export default function WorkerHome() {
     })
     .filter((i): i is InboxItem => i !== null);
 
-  // Active: soonest shift first (act on the nearest). Without this the inbox
-  // rendered in raw API order — "no order".
+  // Soonest shift first (act on the nearest). Without this the inbox rendered
+  // in raw API order — "no order".
   const byWorkDate = (dir: 1 | -1) => (a: InboxItem, b: InboxItem) =>
     dir * (a.request.work_date || "").localeCompare(b.request.work_date || "");
-  const activeItems = inboxItems
-    .filter((i) => i.status === "new" || i.status === "sent")
-    .sort(byWorkDate(1));
+
+  // "À décider": the only thing the inbox is for — requests waiting on me.
+  const toDecide = inboxItems.filter((i) => i.status === "new").sort(byWorkDate(1));
+
+  // "En attente": I said yes, the coordinator hasn't settled it. Not mine to
+  // act on, but nowhere else shows it (Schedule only lists shifts I hold), so
+  // it keeps a section of its own below the decisions instead of vanishing.
+  const waiting = inboxItems.filter((i) => i.status === "sent").sort(byWorkDate(1));
 
   // History opens on what just happened. Settled shifts still in the future (a
   // shift I declined for next month) are real history for me — they stay, but
   // below the past ones rather than sorting to the very top, which is what a
   // plain work_date-descending sort did.
-  const settled = inboxItems.filter((i) => !["new", "sent"].includes(i.status));
+  const settled = inboxItems.filter(
+    (i) => !["new", "sent"].includes(i.status) && (i.request.work_date || "") >= historyCutoffIso,
+  );
   const isPast = (i: InboxItem) => (i.request.work_date || "") < todayIso;
   const historyItems = [
     ...settled.filter(isPast).sort(byWorkDate(-1)),
     ...settled.filter((i) => !isPast(i)).sort(byWorkDate(1)),
   ];
-  const displayed = tab === "active" ? activeItems : historyItems;
+
+  const renderCard = ({ request, status, modified }: InboxItem) => (
+    <RequestCard
+      key={request.id}
+      request={request}
+      status={status}
+      modified={modified}
+      worker={worker}
+      locale={locale}
+      t={t}
+      tCommon={tCommon}
+      tTime={tTime}
+    />
+  );
 
   const firstName = worker.first_name;
   const hour = new Date().getHours();
@@ -242,65 +265,178 @@ export default function WorkerHome() {
         </Link>
       )}
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 0, marginBottom: 12, borderBottom: "0.5px solid var(--line)" }}>
-        {(["active", "history"] as const).map((tabKey) => {
-          const count = tabKey === "active" ? activeItems.length : historyItems.length;
-          return (
-            <button
-              key={tabKey}
-              onClick={() => setTab(tabKey)}
-              style={{
-                border: "none",
-                background: "transparent",
-                padding: "8px 0",
-                marginRight: 20,
-                fontFamily: "var(--ui)",
-                fontSize: 14,
-                fontWeight: tab === tabKey ? 600 : 400,
-                color: tab === tabKey ? "var(--ink)" : "var(--ink-3)",
-                borderBottom: tab === tabKey ? "1.5px solid var(--ink)" : "1.5px solid transparent",
-                marginBottom: -1,
-                cursor: "pointer",
-              }}
-            >
-              {tabKey === "active" ? t("tabActive") : t("tabHistory")}
-              {" "}
-              <span style={{ color: "var(--ink-3)", fontWeight: 400 }}>{count}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Request list */}
+      {/* À décider — the inbox proper */}
+      <SectionLine label={t("sectionToDecide")} count={t("requestCount", { n: toDecide.length })} />
       {loading ? (
         <div style={{ padding: "32px 0", textAlign: "center", color: "var(--ink-3)", fontSize: 14 }}>
           {tCommon("loading")}
         </div>
-      ) : displayed.length === 0 ? (
-        <div style={{ padding: "32px 0", textAlign: "center", color: "var(--ink-3)", fontSize: 14 }}>
-          {tab === "active" ? t("noActive") : t("noHistory")}
-        </div>
+      ) : toDecide.length === 0 ? (
+        <EmptyInbox t={t} />
       ) : (
-        displayed.map(({ request, status, modified }) => (
-          <RequestCard
-            key={request.id}
-            request={request}
-            status={status}
-            modified={modified}
-            worker={worker}
-            locale={locale}
-            t={t}
-            tCommon={tCommon}
-            tTime={tTime}
-          />
-        ))
+        toDecide.map((item) => renderCard(item))
       )}
 
-      <div style={{ textAlign: "center", padding: "20px 0 8px", color: "var(--ink-4)", fontSize: 12 }}>
-        {t("thatsAll")}
-      </div>
+      {/* En attente — accepted, coordinator hasn't settled it */}
+      {!loading && waiting.length > 0 && (
+        <>
+          <SectionLine
+            label={t("sectionWaiting")}
+            count={t("requestCount", { n: waiting.length })}
+            style={{ marginTop: 28 }}
+          />
+          {waiting.map((item) => renderCard(item))}
+        </>
+      )}
+
+      {/* Historique — collapsed by default, last 30 days. The only place a
+          declined / lost / cancelled / expired / released request stays
+          visible (the Alerts feed covers just a subset), so the trace stays
+          one tap away rather than getting its own tab. */}
+      {!loading && historyItems.length > 0 ? (
+        <div style={{ marginTop: 20 }}>
+          <button
+            onClick={() => setHistoryOpen((open) => !open)}
+            aria-expanded={historyOpen}
+            style={{
+              width: "100%",
+              minHeight: 44,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              background: "transparent",
+              border: "none",
+              color: "var(--ink-3)",
+              fontFamily: "var(--ui)",
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: "pointer",
+            }}
+          >
+            {t("history")} · {historyItems.length}
+            <ChevronDown
+              size={14}
+              style={{ transform: historyOpen ? "rotate(180deg)" : "none", transition: "transform .15s" }}
+            />
+          </button>
+          {historyOpen && (
+            <>
+              <div style={{ textAlign: "center", fontSize: 11, color: "var(--ink-4)", marginBottom: 10 }}>
+                {t("historyWindow")}
+              </div>
+              {historyItems.map((item) => renderCard(item))}
+            </>
+          )}
+        </div>
+      ) : (
+        !loading && (
+          <div style={{ textAlign: "center", padding: "20px 0 8px", color: "var(--ink-4)", fontSize: 12 }}>
+            {t("thatsAll")}
+          </div>
+        )
+      )}
     </div>
+  );
+}
+
+const HISTORY_WINDOW_DAYS = 30;
+
+// Local calendar date as "YYYY-MM-DD" (same shape as the API's work_date).
+function isoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function SectionLine({
+  label,
+  count,
+  style,
+}: {
+  label: string;
+  count: string;
+  style?: CSSProperties;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "baseline",
+        justifyContent: "space-between",
+        paddingBottom: 8,
+        marginBottom: 12,
+        borderBottom: "0.5px solid var(--line)",
+        ...style,
+      }}
+    >
+      <span
+        style={{
+          fontSize: 11,
+          letterSpacing: ".1em",
+          textTransform: "uppercase",
+          color: "var(--ink-3)",
+          fontWeight: 500,
+        }}
+      >
+        {label}
+      </span>
+      <span style={{ fontSize: 12, color: "var(--ink-3)" }}>{count}</span>
+    </div>
+  );
+}
+
+function EmptyInbox({ t }: { t: ReturnType<typeof useTranslations> }) {
+  return (
+    <div style={{ padding: "28px 8px 8px", textAlign: "center" }}>
+      <EmptyInboxIllustration />
+      <h2
+        style={{
+          fontFamily: "var(--serif)",
+          fontSize: 22,
+          lineHeight: 1.15,
+          fontWeight: 400,
+          margin: "16px 0 8px",
+        }}
+      >
+        {t.rich("emptyTitle", {
+          em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em>,
+        })}
+      </h2>
+      <p style={{ fontSize: 14, color: "var(--ink-2)", lineHeight: 1.45, margin: "0 0 20px" }}>
+        {t("emptyBody")}
+      </p>
+      <Link
+        href="/worker/availability"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: 44,
+          padding: "0 18px",
+          borderRadius: 12,
+          background: "var(--moss)",
+          color: "#fff",
+          fontSize: 14,
+          fontWeight: 500,
+          fontFamily: "var(--ui)",
+          textDecoration: "none",
+        }}
+      >
+        {t("emptyCta")}
+      </Link>
+    </div>
+  );
+}
+
+// Envelope with a moss check badge — inline SVG, stroke on the 24 px grid
+// convention (no emoji, no image asset).
+function EmptyInboxIllustration() {
+  return (
+    <svg width="88" height="72" viewBox="0 0 88 72" fill="none" aria-hidden="true" style={{ display: "block", margin: "0 auto" }}>
+      <rect x="6" y="14" width="62" height="44" rx="7" fill="#fff" stroke="var(--ink-3)" strokeWidth="1.5" />
+      <path d="M9 20 L37 40 L65 20" stroke="var(--ink-3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="67" cy="52" r="15" fill="var(--moss)" stroke="var(--paper)" strokeWidth="3" />
+      <path d="M60 52 L65 57 L74 47" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
