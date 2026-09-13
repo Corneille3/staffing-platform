@@ -1,11 +1,12 @@
 import React from "react";
 
-type AvatarTone = "paper" | "terra" | "moss";
+type AvatarTone = "paper" | "terra" | "moss" | "sand";
 
 const toneStyles: Record<AvatarTone, React.CSSProperties> = {
   paper: { background: "var(--paper-2)", color: "var(--ink)" },
   terra: { background: "var(--terra-soft)", color: "var(--terra-ink)" },
   moss:  { background: "var(--moss-soft)", color: "var(--moss)" },
+  sand:  { background: "var(--sand-soft)", color: "#7C5C12" },
 };
 
 interface AvatarProps {
