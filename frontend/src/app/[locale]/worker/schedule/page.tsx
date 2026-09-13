@@ -101,18 +101,10 @@ export default function WorkerSchedulePage() {
       {loading ? (
         <p style={{ color: "var(--ink-3)", fontSize: 14 }}>{tCommon("loading")}</p>
       ) : upcoming.length === 0 ? (
-        <div style={{
-          padding: 24,
-          borderRadius: 18,
-          background: "var(--card)",
-          border: "0.5px dashed var(--line)",
-          color: "var(--ink-3)",
-          textAlign: "center",
-          fontSize: 14,
-          lineHeight: 1.5,
-        }}>
-          {t("noUpcoming")}
-        </div>
+        <>
+          <SectionLine label={t("comingUp")} style={{ marginBottom: -8 }} />
+          <EmptyHero t={t} />
+        </>
       ) : (
         <>
           <SectionLine
@@ -196,6 +188,44 @@ export default function WorkerSchedulePage() {
 }
 
 const PAST_PREVIEW = 5;
+
+// No shift ahead: keep the black hero's presence (same shape as HeroCard)
+// instead of a dashed box — the user likes the black frame and wants it
+// there even when nothing is planned (2026-09-13). Points at Disponibilités,
+// the one thing that brings shifts in.
+function EmptyHero({ t }: { t: ReturnType<typeof useTranslations> }) {
+  return (
+    <div style={{ background: "var(--ink)", color: "var(--paper)", borderRadius: 22, padding: 22 }}>
+      <Eyebrow style={{ color: "rgba(246,244,238,.55)", marginBottom: 10 }}>{t("nextShift")}</Eyebrow>
+      <h2 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 28, lineHeight: 1.1, fontWeight: 400 }}>
+        {t.rich("emptyTitle", {
+          em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em>,
+        })}
+      </h2>
+      <p style={{ margin: "8px 0 18px", fontSize: 14, lineHeight: 1.45, color: "rgba(246,244,238,.7)" }}>
+        {t("emptyBody")}
+      </p>
+      <Link
+        href="/worker/availability"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: 44,
+          borderRadius: 12,
+          background: "var(--moss)",
+          color: "#fff",
+          fontSize: 14,
+          fontWeight: 500,
+          fontFamily: "var(--ui)",
+          textDecoration: "none",
+        }}
+      >
+        {t("emptyCta")}
+      </Link>
+    </div>
+  );
+}
 
 /** "sam." over a serif "12" — the date block of the étape 3 cards. */
 function DateBlock({ isoDate, locale, tone }: { isoDate: string; locale: "en" | "fr"; tone: "upcoming" | "past" }) {
