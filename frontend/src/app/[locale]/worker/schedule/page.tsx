@@ -7,11 +7,12 @@ import { Link } from "../../../../i18n/navigation";
 import { checkInAssignment, checkOutAssignment, fetchAssignments, fetchRequests } from "../../../../lib/browser-api";
 import { formatWorkDate, locationLabel, roleSectorSubtitle } from "../../../../lib/format";
 import { assignmentStatusLabel } from "../../../../lib/status-labels";
-import { attendancePhase } from "../../../../lib/shift-time";
+import { formatHours, itemHours, monthHours } from "../../../../lib/inbox-stats";
+import { attendancePhase, shiftTime } from "../../../../lib/shift-time";
 import { splitSchedule } from "../../../../lib/schedule-hero";
 import { Assignment, StaffingRequest } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
-import { Chip, Eyebrow, Mono } from "../../../../components/ui";
+import { Chip, Eyebrow, Mono, SectionLine } from "../../../../components/ui";
 
 type EnrichedAssignment = {
   assignment: Assignment;
@@ -25,6 +26,8 @@ export default function WorkerSchedulePage() {
   const tCommon = useTranslations("common");
   const [items, setItems] = useState<EnrichedAssignment[]>([]);
   const [loading, setLoading] = useState(true);
+  // "Terminés" shows the 5 most recent until the worker asks for the rest.
+  const [showAllPast, setShowAllPast] = useState(false);
   // Minute ticker so the hero hands over at the boundaries (a missed shift
   // yielding to the next one, a check-out window closing) without a reload.
   const [now, setNow] = useState(() => Date.now());
@@ -66,15 +69,33 @@ export default function WorkerSchedulePage() {
   const hero = upcoming[0];
   const rest = upcoming.slice(1);
 
+  // Étape 3: the month in the header (with its hours), the upcoming tally on
+  // the section line, the finished list capped at 5.
+  const monthLabel = new Intl.DateTimeFormat(locale === "fr" ? "fr-CA" : "en-CA", {
+    month: "long",
+    year: "numeric",
+  }).format(today);
+  const hoursThisMonth = monthHours(items, todayIso, now);
+  const upcomingHours = upcoming.reduce((sum, i) => sum + itemHours(i, now), 0);
+  const visiblePast = showAllPast ? past : past.slice(0, PAST_PREVIEW);
+
   return (
     <div style={{ display: "grid", gap: 24, paddingTop: 16 }}>
-      <header>
-        <Eyebrow style={{ marginBottom: 4 }}>
-          {upcoming.length === 0 ? t("noShifts") : t("upcomingCount", { n: upcoming.length })}
-        </Eyebrow>
-        <h1 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 30, lineHeight: 1.05 }}>
-          {t("headlinePre")} <em style={{ fontStyle: "italic" }}>{t("headlineAccent")}</em>
-        </h1>
+      <header style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16 }}>
+        <div>
+          <Eyebrow style={{ marginBottom: 4 }}>{monthLabel}</Eyebrow>
+          <h1 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 30, lineHeight: 1.05 }}>
+            {t("headlinePre")} <em style={{ fontStyle: "italic" }}>{t("headlineAccent")}</em>
+          </h1>
+        </div>
+        {!loading && (
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ fontFamily: "var(--serif)", fontSize: 26, lineHeight: 1.1, color: hoursThisMonth > 0 ? "var(--moss)" : "var(--ink)" }}>
+              {formatHours(hoursThisMonth, locale)}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>{t("thisMonth")}</div>
+          </div>
+        )}
       </header>
 
       {loading ? (
@@ -94,6 +115,11 @@ export default function WorkerSchedulePage() {
         </div>
       ) : (
         <>
+          <SectionLine
+            label={t("comingUp")}
+            count={t("upcomingSummary", { n: upcoming.length, hours: formatHours(upcomingHours, locale) })}
+            style={{ marginBottom: -8 }}
+          />
           {hero && hero.request && (
             <HeroCard
               assignment={hero.assignment}
@@ -109,43 +135,88 @@ export default function WorkerSchedulePage() {
           )}
 
           {rest.length > 0 && (
-            <section>
-              <Eyebrow style={{ marginBottom: 10 }}>{t("comingUp")}</Eyebrow>
-              <div style={{
-                background: "var(--card)",
-                border: "0.5px solid var(--line)",
-                borderRadius: 18,
-                overflow: "hidden",
-              }}>
-                {rest.map(({ assignment, request }, i) =>
-                  request ? (
-                    <UpcomingRow
-                      key={assignment.id}
-                      assignment={assignment}
-                      request={request}
-                      locale={locale}
-                      last={i === rest.length - 1}
-                    />
-                  ) : null
-                )}
-              </div>
-            </section>
+            <div style={{ display: "grid", gap: 8 }}>
+              {rest.map((item) =>
+                item.request ? (
+                  <UpcomingCard
+                    key={item.assignment.id}
+                    assignment={item.assignment}
+                    request={item.request}
+                    hours={formatHours(itemHours(item, now), locale)}
+                    locale={locale}
+                  />
+                ) : null
+              )}
+            </div>
           )}
         </>
       )}
 
-      {past.length > 0 && (
+      {!loading && past.length > 0 && (
         <section>
-          <Eyebrow style={{ marginBottom: 10 }}>{t("history")}</Eyebrow>
+          <SectionLine label={t("finished")} count={t("finishedCount", { n: past.length })} />
           <div style={{ display: "grid", gap: 8 }}>
-            {past.map(({ assignment, request }) =>
-              request ? (
-                <PastCard key={assignment.id} assignment={assignment} request={request} locale={locale} />
+            {visiblePast.map((item) =>
+              item.request ? (
+                <PastCard
+                  key={item.assignment.id}
+                  assignment={item.assignment}
+                  request={item.request}
+                  hours={item.assignment.worked_hours != null ? formatHours(item.assignment.worked_hours, locale) : null}
+                  locale={locale}
+                />
               ) : null
             )}
           </div>
+          {past.length > PAST_PREVIEW && !showAllPast && (
+            <button
+              type="button"
+              onClick={() => setShowAllPast(true)}
+              style={{
+                width: "100%",
+                minHeight: 44,
+                marginTop: 8,
+                border: "0.5px solid var(--line)",
+                borderRadius: 14,
+                background: "var(--card)",
+                color: "var(--ink)",
+                fontFamily: "var(--ui)",
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: "pointer",
+              }}
+            >
+              {t("seeAll")} <span style={{ color: "var(--ink-3)", fontWeight: 400 }}>· {past.length - PAST_PREVIEW}</span>
+            </button>
+          )}
         </section>
       )}
+    </div>
+  );
+}
+
+const PAST_PREVIEW = 5;
+
+/** "sam." over a serif "12" — the date block of the étape 3 cards. */
+function DateBlock({ isoDate, locale, tone }: { isoDate: string; locale: "en" | "fr"; tone: "upcoming" | "past" }) {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const weekday = new Intl.DateTimeFormat(locale === "fr" ? "fr-CA" : "en-CA", { weekday: "short" }).format(
+    new Date(y, m - 1, d),
+  );
+  return (
+    <div
+      style={{
+        width: 48,
+        flexShrink: 0,
+        borderRadius: 12,
+        padding: "6px 0",
+        textAlign: "center",
+        background: "var(--paper-2)",
+        color: tone === "past" ? "var(--ink-3)" : "var(--ink)",
+      }}
+    >
+      <div style={{ fontSize: 11, color: "var(--ink-3)", textTransform: "lowercase" }}>{weekday}</div>
+      <div style={{ fontFamily: "var(--serif)", fontSize: 22, lineHeight: 1.05 }}>{d}</div>
     </div>
   );
 }
@@ -586,16 +657,16 @@ function buildDirectionsUrl(request: StaffingRequest): string {
   return `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
 }
 
-function UpcomingRow({
+function UpcomingCard({
   assignment,
   request,
+  hours,
   locale,
-  last,
 }: {
   assignment: Assignment;
   request: StaffingRequest;
+  hours: string;
   locale: "en" | "fr";
-  last: boolean;
 }) {
   return (
     <Link
@@ -603,30 +674,30 @@ function UpcomingRow({
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 14,
-        padding: "14px 16px",
-        borderBottom: last ? "none" : "0.5px solid var(--line-soft)",
+        gap: 12,
+        padding: "12px 14px",
+        background: "var(--card)",
+        border: "0.5px solid var(--line)",
+        borderRadius: 16,
         textDecoration: "none",
         color: "inherit",
       }}
     >
-      <div style={{ fontFamily: "var(--serif)", fontSize: 18, width: 48, color: "var(--ink)", flexShrink: 0 }}>
-        {request.work_date.slice(5)}
-      </div>
-      <div style={{ flex: 1, lineHeight: 1.25, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 500 }}>{request.organization?.name ?? request.title}</div>
-        <Mono style={{ fontSize: 11, color: "var(--ink-3)", display: "block", marginTop: 2 }}>
-          {request.start_time.slice(0, 5)}–{request.end_time.slice(0, 5)}
+      <DateBlock isoDate={request.work_date} locale={locale} tone="upcoming" />
+      {/* Badge on the name row, no chevron: at 375 px a trailing chip +
+          chevron squeezed the hours line onto two lines. */}
+      <div style={{ flex: 1, lineHeight: 1.3, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, minWidth: 0 }}>{request.organization?.name ?? request.title}</div>
+          <Chip variant={assignment.status === "confirmed" ? "moss" : "sand"} dot style={{ flexShrink: 0 }}>
+            {assignmentStatusLabel(assignment.status, locale)}
+          </Chip>
+        </div>
+        <Mono style={{ fontSize: 12, color: "var(--ink-2)", display: "block", marginTop: 3 }}>
+          {request.start_time.slice(0, 5)} – {request.end_time.slice(0, 5)} · {hours}
         </Mono>
+        <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>{locationLabel(request)}</div>
       </div>
-      <Chip
-        variant={assignment.status === "confirmed" ? "moss" : "sand"}
-        dot
-        style={{ flexShrink: 0 }}
-      >
-        {assignmentStatusLabel(assignment.status, locale)}
-      </Chip>
-      <ChevronRight size={16} style={{ color: "var(--ink-3)", flexShrink: 0 }} />
     </Link>
   );
 }
@@ -634,10 +705,12 @@ function UpcomingRow({
 function PastCard({
   assignment,
   request,
+  hours,
   locale,
 }: {
   assignment: Assignment;
   request: StaffingRequest;
+  hours: string | null;
   locale: "en" | "fr";
 }) {
   const t = useTranslations("worker.schedule");
@@ -645,6 +718,13 @@ function PastCard({
   // backend never moves it); the derived attendance state says what happened.
   const missed = assignment.attendance === "missed";
   const unclosed = assignment.attendance === "unclosed";
+  const completed = assignment.attendance === "completed" || assignment.status === "completed";
+  const cancelled = assignment.status === "cancelled";
+  // Real stamps once both exist ("21:06 – 21:12"), the plan otherwise.
+  const window =
+    assignment.checked_in_at && assignment.checked_out_at
+      ? `${shiftTime(assignment.checked_in_at)} – ${shiftTime(assignment.checked_out_at)}`
+      : `${request.start_time.slice(0, 5)} – ${request.end_time.slice(0, 5)}`;
   return (
     <Link
       href={`/worker/requests/${request.id}/accepted`}
@@ -652,41 +732,34 @@ function PastCard({
         background: "var(--card)",
         border: "0.5px solid var(--line)",
         borderRadius: 14,
-        padding: "14px 16px",
+        padding: "10px 14px",
         display: "flex",
         alignItems: "center",
-        gap: 14,
+        gap: 12,
         opacity: 0.7,
         textDecoration: "none",
         color: "inherit",
       }}
     >
+      <DateBlock isoDate={request.work_date} locale={locale} tone="past" />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 500 }}>{request.organization?.name ?? request.title}</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, color: "var(--ink-3)", fontSize: 12 }}>
-          <Calendar size={12} />
-          <span>{formatWorkDate(request.work_date, locale)}</span>
-          <span>·</span>
-          <Mono style={{ fontSize: 11 }}>
-            {request.start_time.slice(0, 5)}–{request.end_time.slice(0, 5)}
-          </Mono>
-          {assignment.worked_hours != null && (
-            <>
-              <span>·</span>
-              <Mono style={{ fontSize: 11 }}>
-                {assignment.worked_hours.toLocaleString(locale === "fr" ? "fr-CA" : "en-CA")} h
-              </Mono>
-            </>
-          )}
-        </div>
+        <Mono style={{ fontSize: 11, color: "var(--ink-3)", display: "block", marginTop: 3 }}>
+          {window}
+          {hours && ` · ${hours}`}
+        </Mono>
       </div>
-      <Chip
-        variant={assignment.status === "cancelled" || missed ? "urgent" : "default"}
-        dot
-        style={{ flexShrink: 0 }}
-      >
-        {missed ? t("checkInMissed") : unclosed ? t("checkOutMissed") : assignmentStatusLabel(assignment.status, locale)}
-      </Chip>
+      {completed ? (
+        <CheckCircle2 size={20} style={{ color: "var(--moss)", flexShrink: 0 }} aria-label={t("checkedOut")} />
+      ) : (
+        <Chip
+          variant={cancelled || missed ? "urgent" : unclosed ? "sand" : "default"}
+          dot
+          style={{ flexShrink: 0 }}
+        >
+          {missed ? t("checkInMissed") : unclosed ? t("checkOutMissed") : assignmentStatusLabel(assignment.status, locale)}
+        </Chip>
+      )}
     </Link>
   );
 }

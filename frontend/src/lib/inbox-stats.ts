@@ -57,25 +57,54 @@ function isCompleted(i: StatsItem): boolean {
   return i.assignment.attendance === "completed" || i.assignment.status === "completed";
 }
 
-export function weekHours(items: StatsItem[], todayIso: string, nowMs: number): number {
-  const { start, end } = isoWeekBounds(todayIso);
+/** First and last day of the calendar month containing `todayIso`. */
+export function monthBounds(todayIso: string): { start: string; end: string } {
+  const [y, m] = todayIso.split("-").map(Number);
+  return { start: toIso(new Date(y, m - 1, 1)), end: toIso(new Date(y, m, 0)) };
+}
+
+/** Hours one assignment is worth: recorded hours once there are any;
+ * otherwise the scheduled span while the shift is still to come or under
+ * way; 0 once it's over without recorded hours (missed / unclosed, or a
+ * completed row whose hours were never derived). Without a derived
+ * attendance state (tests, older payloads) "over" means the scheduled end
+ * passed. Cancelled / released are worth nothing. */
+export function itemHours(i: StatsItem, nowMs: number): number {
+  if (!counts(i) || !i.request) return 0;
+  const { worked_hours, attendance } = i.assignment;
+  if (worked_hours != null) return worked_hours;
+  const over = attendance ? NO_HOURS.has(attendance) || attendance === "completed" : shiftEndMs(i.request) <= nowMs;
+  return over ? 0 : scheduledHours(i.request);
+}
+
+/** Sum of `itemHours` over the shifts dated within [start, end] (ISO dates,
+ * inclusive). */
+export function hoursInRange(items: StatsItem[], start: string, end: string, nowMs: number): number {
   let total = 0;
   for (const i of items) {
-    if (!counts(i) || !i.request) continue;
-    if (i.request.work_date < start || i.request.work_date > end) continue;
-    const { worked_hours, attendance } = i.assignment;
-    if (worked_hours != null) {
-      total += worked_hours;
-    } else if (attendance ? NO_HOURS.has(attendance) || attendance === "completed" : shiftEndMs(i.request) <= nowMs) {
-      // Over without recorded hours: nothing to add (missed / unclosed, or a
-      // completed row whose hours were never derived). Without a derived
-      // state (tests, older payloads) "over" means the scheduled end passed.
-      continue;
-    } else {
-      total += scheduledHours(i.request);
-    }
+    if (!i.request || i.request.work_date < start || i.request.work_date > end) continue;
+    total += itemHours(i, nowMs);
   }
   return total;
+}
+
+export function weekHours(items: StatsItem[], todayIso: string, nowMs: number): number {
+  const { start, end } = isoWeekBounds(todayIso);
+  return hoursInRange(items, start, end, nowMs);
+}
+
+export function monthHours(items: StatsItem[], todayIso: string, nowMs: number): number {
+  const { start, end } = monthBounds(todayIso);
+  return hoursInRange(items, start, end, nowMs);
+}
+
+/** "4,0 h" in French, "4.0 h" in English — one decimal, always shown
+ * (worker-screens plan, étape 3). */
+export function formatHours(hours: number, locale: "fr" | "en"): string {
+  return `${hours.toLocaleString(locale === "fr" ? "fr-CA" : "en-CA", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })} h`;
 }
 
 export function completedCount(items: StatsItem[]): number {
