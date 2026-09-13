@@ -69,7 +69,10 @@
       "iCanTakeIt": "Je peux le prendre",
       "waitingForConfirmation": "En attente de confirmation",
       "modifiedBanner": "Modifié — à revoir",
-      "reportAbsence": "Signaler une absence"
+      "reportAbsence": "Signaler une absence",
+      "statHoursWeek": "Heures cette semaine",
+      "statCompleted": "Quarts complétés",
+      "nextShift": "Prochain quart"
     },
     "schedule": {
       "noShifts": "Aucun quart",
