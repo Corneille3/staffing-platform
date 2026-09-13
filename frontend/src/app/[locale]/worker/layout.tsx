@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Inbox, CalendarCheck, Bell, Clock3, User } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter, usePathname } from "../../../i18n/navigation";
@@ -11,16 +11,68 @@ import {
   WorkerSessionProvider,
 } from "../../../lib/worker-session";
 import { registerServiceWorker } from "../../../lib/push";
+import { fetchNotificationFeed } from "../../../lib/browser-api";
+import {
+  badgeLabel,
+  browserStorage,
+  countNewAlerts,
+  readAlertsSeenAt,
+  writeAlertsSeenAt,
+} from "../../../lib/alerts-seen";
 
-function useNavItems() {
+const ALERTS_PATH = "/worker/notifications";
+
+function useNavItems(alertsBadge: string | null) {
   const t = useTranslations("worker.nav");
   return [
     { href: "/worker",               label: t("inbox"),        Icon: Inbox },
     { href: "/worker/schedule",      label: t("schedule"),     Icon: CalendarCheck },
-    { href: "/worker/notifications", label: t("alerts"),       Icon: Bell },
+    { href: ALERTS_PATH,             label: t("alerts"),       Icon: Bell, badge: alertsBadge },
     { href: "/worker/availability",  label: t("availability"), Icon: Clock3 },
     { href: "/worker/profile",       label: t("profile"),      Icon: User },
   ];
+}
+
+/** Terra pill on the Alertes tab: notifications created since this device
+ * last opened the Alertes page (the feed has no read state — étape 6 of the
+ * worker-screens plan). Fetched on mount and whenever the tab comes back to
+ * the front; opening the Alertes page moves the marker and clears the pill. */
+function useNewAlertsBadge(workerId: string | undefined, pathname: string): string | null {
+  const [items, setItems] = useState<{ created_at: string }[]>([]);
+  const [seenAt, setSeenAt] = useState<string | null>(null);
+  const onAlerts = pathname === ALERTS_PATH;
+
+  useEffect(() => {
+    if (!workerId) return;
+    let alive = true;
+    const load = () => {
+      if (document.visibilityState === "hidden") return;
+      fetchNotificationFeed(workerId)
+        .then((feed) => { if (alive) setItems(feed); })
+        .catch(() => { /* keep the last count — the pill is a hint, not a record */ });
+    };
+    load();
+    window.addEventListener("focus", load);
+    document.addEventListener("visibilitychange", load);
+    return () => {
+      alive = false;
+      window.removeEventListener("focus", load);
+      document.removeEventListener("visibilitychange", load);
+    };
+  }, [workerId]);
+
+  useEffect(() => {
+    const storage = browserStorage();
+    if (onAlerts) {
+      const now = new Date().toISOString();
+      writeAlertsSeenAt(storage, now);
+      setSeenAt(now);
+    } else {
+      setSeenAt(readAlertsSeenAt(storage));
+    }
+  }, [onAlerts]);
+
+  return onAlerts ? null : badgeLabel(countNewAlerts(items, seenAt));
 }
 
 export default function WorkerLayout({ children }: { children: React.ReactNode }) {
@@ -36,7 +88,8 @@ function WorkerShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const showWorkerPicker = canUseWorkerOverride();
-  const navItems = useNavItems();
+  const alertsBadge = useNewAlertsBadge(worker?.id, pathname);
+  const navItems = useNavItems(alertsBadge);
   const tShell = useTranslations("worker.shell");
   const tCommon = useTranslations("common");
 

@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { fetchNotificationFeed } from "../../../../lib/browser-api";
 import { NotificationFeedItem } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
-import { Eyebrow, Mono } from "../../../../components/ui";
+import { Eyebrow } from "../../../../components/ui";
 import { PushNotificationsCard } from "../../../../components/push-notifications-card";
 
 type NotifType = NotificationFeedItem["type"];
@@ -144,7 +144,8 @@ export default function WorkerNotificationsPage() {
                       <Calendar size={12} />
                       <span>{item.request_date}</span>
                       <span style={{ margin: "0 2px" }}>·</span>
-                      <Mono style={{ fontSize: 11 }}>{formatRelative(item.created_at, tTime)}</Mono>
+                      {/* UI font on purpose: in the mono face "il y a" read as "11 y a" (étape 6) */}
+                      <span style={{ fontSize: 11 }}>{formatRelative(item.created_at, tTime)}</span>
                     </div>
                   </article>
                 ))}
