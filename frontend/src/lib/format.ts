@@ -96,6 +96,17 @@ export function roleSectorSubtitle(
   return [role, sector].filter(Boolean).join(" · ");
 }
 
+// Second line of a card once the request title holds the header: where
+// (the organisation), then what (role · sector).
+export function orgRoleSubtitle(
+  request: StaffingRequest,
+  locale: "en" | "fr",
+): string {
+  return [request.organization?.name ?? null, roleSectorSubtitle(request, locale) || null]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 export function locationLabel(request: StaffingRequest): string {
   const neighbourhood = request.organization?.neighbourhood;
   if (neighbourhood) return `${request.city} · ${neighbourhood}`;

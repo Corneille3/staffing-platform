@@ -377,6 +377,15 @@ export async function fetchRequestResponses(requestId: string): Promise<RequestR
   return data.items;
 }
 
+// One round-trip for every response row of a worker — the Boîte's replacement
+// for calling fetchRequestResponses once per listed request.
+export async function fetchWorkerResponses(workerUserId: string): Promise<RequestResponse[]> {
+  const data = await getJson<{ items: RequestResponse[] }>(
+    `/api/v1/workers/${workerUserId}/responses`,
+  );
+  return data.items;
+}
+
 export async function fetchRequestEligibility(
   requestId: string,
   workerUserId: string,

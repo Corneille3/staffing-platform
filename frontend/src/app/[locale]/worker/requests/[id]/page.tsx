@@ -19,7 +19,7 @@ import {
   formatDistance,
   formatWorkDate,
   locationLabel,
-  roleSectorSubtitle,
+  orgRoleSubtitle,
 } from "../../../../../lib/format";
 import { modifiedSinceReview } from "../../../../../lib/request-modified";
 import { EligibilityResult, RequestResponse, StaffingRequest } from "../../../../../lib/types";
@@ -104,7 +104,7 @@ export default function WorkerRequestDetailPage() {
   const canClaim = isAutoReplacement && !isFilled && !lost;
   const showCtas = !isAutoReplacement && !isFilled && !alreadyAccepted && !alreadyDeclined;
 
-  const subtitle = roleSectorSubtitle(request, locale);
+  const subtitle = orgRoleSubtitle(request, locale);
   const dateLabel = formatWorkDate(request.work_date, locale);
   const timeRange = `${request.start_time.slice(0, 5)} → ${request.end_time.slice(0, 5)}`;
   const distanceKm = distanceFromWorker(request, worker.profile);
@@ -219,7 +219,7 @@ export default function WorkerRequestDetailPage() {
       {/* Title block */}
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 28, lineHeight: 1.1 }}>
-          {request.organization?.name ?? request.title}
+          {request.title || request.organization?.name}
         </h1>
         {subtitle && (
           <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 4 }}>{subtitle}</div>

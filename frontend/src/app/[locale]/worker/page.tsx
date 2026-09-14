@@ -6,8 +6,8 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "../../../i18n/navigation";
 import {
   fetchAssignments,
-  fetchRequestResponses,
   fetchRequests,
+  fetchWorkerResponses,
   updateWorkerPreferences,
 } from "../../../lib/browser-api";
 import {
@@ -15,7 +15,7 @@ import {
   formatDistance,
   formatWorkDate,
   locationLabel,
-  roleSectorSubtitle,
+  orgRoleSubtitle,
 } from "../../../lib/format";
 import { avatarTone } from "../../../lib/avatar-tone";
 import { completedCount, nextShift, weekHours } from "../../../lib/inbox-stats";
@@ -59,17 +59,19 @@ export default function WorkerHome() {
     let alive = true;
     (async () => {
       setLoading(true);
-      const [allRequests, allAssignments] = await Promise.all([
+      // Three fixed round-trips. The worker's request list is already "the
+      // requests I was notified for", and the responses endpoint returns every
+      // row of theirs at once — the old per-request responses fetch made the
+      // page crawl as the network's request count grew.
+      const [allRequests, allAssignments, myResponses] = await Promise.all([
         fetchRequests(),
         fetchAssignments(),
+        fetchWorkerResponses(worker.id),
       ]);
-      const responseLists = await Promise.all(
-        allRequests.map((r) => fetchRequestResponses(r.id)),
-      );
       if (!alive) return;
       setRequests(allRequests);
       setAssignments(allAssignments.filter((a) => a.worker_user_id === worker.id));
-      setResponses(responseLists.flat().filter((r) => r.worker_user_id === worker.id));
+      setResponses(myResponses);
       setLoading(false);
     })();
     return () => { alive = false; };
@@ -268,7 +270,11 @@ export default function WorkerHome() {
           {next?.request && (
             <NextShiftCard
               request={next.request}
-              dateLine={`${formatWorkDate(next.request.work_date, locale)} · ${next.request.start_time.slice(0, 5)} – ${next.request.end_time.slice(0, 5)} · ${locationLabel(next.request)}`}
+              dateLine={[
+                next.request.organization?.name,
+                `${formatWorkDate(next.request.work_date, locale)} · ${next.request.start_time.slice(0, 5)} – ${next.request.end_time.slice(0, 5)}`,
+                locationLabel(next.request),
+              ].filter(Boolean).join(" · ")}
               label={t("nextShift")}
             />
           )}
@@ -450,7 +456,7 @@ function NextShiftCard({
           {label}
         </div>
         <div style={{ fontSize: 15, fontWeight: 500, marginTop: 2 }}>
-          {request.organization?.name ?? request.title}
+          {request.title || request.organization?.name}
         </div>
         <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 2 }}>{dateLine}</div>
       </div>
@@ -542,7 +548,7 @@ function RequestCard({
   const router = useRouter();
   const urgent = request.urgency_level >= 3;
   const timeAgo = formatTimeAgo(request.created_at, tTime);
-  const subtitle = roleSectorSubtitle(request, locale);
+  const subtitle = orgRoleSubtitle(request, locale);
   const distanceKm = distanceFromWorker(request, worker.profile);
   const distanceLabel = formatDistance(distanceKm);
   const dateLabel = formatWorkDate(request.work_date, locale);
@@ -622,9 +628,9 @@ function RequestCard({
         <span style={{ fontSize: 11, color: "var(--ink-3)", whiteSpace: "nowrap" }}>{timeAgo}</span>
       </div>
 
-      {/* Org name */}
+      {/* Request title — the coordinator's words; org · role · sector under it */}
       <div style={{ fontFamily: "var(--serif)", fontSize: 22, lineHeight: 1.15, marginBottom: 2 }}>
-        {request.organization?.name ?? request.title}
+        {request.title || request.organization?.name}
       </div>
       {subtitle && (
         <div style={{ fontSize: 12, color: "var(--ink-2)", marginBottom: 10 }}>{subtitle}</div>
