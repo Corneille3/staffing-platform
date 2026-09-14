@@ -22,6 +22,8 @@ from app.schemas.push import (
     PushSubscriptionCreate,
     PushSubscriptionDelete,
 )
+from app.repositories.response_repository import ResponseRepository
+from app.schemas.request_response import RequestResponseRead
 from app.schemas.worker import (
     WorkerAvailabilityUpdate,
     WorkerInviteCreate,
@@ -193,6 +195,22 @@ def set_worker_organizations(
         ],
         restricted=restricted,
     )
+
+
+@router.get('/{user_id}/responses')
+def list_worker_responses(
+    user_id: UUID,
+    scope: AccessScope = Depends(get_access_scope),
+    db: Session = Depends(get_db_session),
+) -> dict[str, list[RequestResponseRead]]:
+    """Every response row of one worker in a single round-trip. The Boîte
+    used to call GET /requests/{id}/responses once per listed request just to
+    find its own row (N+1 — the page crawled as the network's request count
+    grew). Workers read their own; admins may read anyone's."""
+    if not scope.is_admin and scope.user.id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Out of scope.')
+    responses = ResponseRepository(db).list_for_worker(user_id)
+    return {'items': [RequestResponseRead.model_validate(item) for item in responses]}
 
 
 @router.patch('/{user_id}/sms-preference')

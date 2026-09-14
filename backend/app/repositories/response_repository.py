@@ -18,6 +18,14 @@ class ResponseRepository:
         )
         return list(self.db.scalars(stmt).all())
 
+    def list_for_worker(self, worker_user_id: UUID) -> list[RequestResponse]:
+        stmt = (
+            select(RequestResponse)
+            .where(RequestResponse.worker_user_id == worker_user_id)
+            .order_by(RequestResponse.created_at.desc())
+        )
+        return list(self.db.scalars(stmt).all())
+
     def get_for_request_and_worker(self, request_id: UUID, worker_user_id: UUID) -> RequestResponse | None:
         stmt = select(RequestResponse).where(
             RequestResponse.staffing_request_id == request_id,
