@@ -361,7 +361,12 @@
       "cities": "Cities",
       "qualifications": "Qualifications",
       "certifications": "Certifications",
-      "urgentAlerts": "Urgent alerts"
+      "urgentAlerts": "Urgent alerts",
+      "phone": "Mobile number",
+      "phonePlaceholder": "+1 514 555 0001",
+      "phoneHint": "Used for texts: urgent offers and shift reminders.",
+      "noPhone": "No number yet — texts can't reach you. Add one to enable “Text me” under Availability.",
+      "phoneError": "Number rejected — check the format (e.g. +1 514 555 0001)."
     },
     "credentials": {
       "ECE_LEVEL_1": "ECE Level 1",

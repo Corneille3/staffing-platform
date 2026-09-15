@@ -361,7 +361,12 @@
       "cities": "Villes",
       "qualifications": "Qualifications",
       "certifications": "Certifications",
-      "urgentAlerts": "Alertes urgentes"
+      "urgentAlerts": "Alertes urgentes",
+      "phone": "Numéro de cellulaire",
+      "phonePlaceholder": "+1 514 555 0001",
+      "phoneHint": "Sert aux textos : offres urgentes et rappels de quart.",
+      "noPhone": "Aucun numéro — les textos ne peuvent pas vous joindre. Ajoutez-le pour activer « M'envoyer des textos » dans Disponibilités.",
+      "phoneError": "Numéro refusé — vérifiez le format (ex. +1 514 555 0001)."
     },
     "credentials": {
       "ECE_LEVEL_1": "Éducateur·trice niveau 1",
