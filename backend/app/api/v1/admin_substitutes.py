@@ -14,29 +14,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
+from app.api.v1.workers import _to_worker_read
 from app.auth.permissions import require_admin
 from app.auth.scope import AccessScope, get_access_scope
 from app.repositories.staffing_request_repository import StaffingRequestRepository
 from app.schemas.admin import AdminSubstitutesResponse
-from app.schemas.worker import WorkerRead
 from app.services.matching_service import MatchingService
 from app.services.worker_service import WorkerService
 
 router = APIRouter(dependencies=[Depends(require_admin)])
-
-
-def _worker_to_read(worker) -> WorkerRead:
-    return WorkerRead.model_validate({
-        'id': worker.id,
-        'clerk_user_id': worker.clerk_user_id,
-        'first_name': worker.first_name,
-        'last_name': worker.last_name,
-        'email': worker.email,
-        'phone': worker.phone,
-        'preferred_language': worker.preferred_language,
-        'is_active': worker.is_active,
-        'profile': worker.worker_profile,
-    })
 
 
 @router.get('', response_model=AdminSubstitutesResponse)
@@ -51,7 +37,7 @@ def list_admin_substitutes(
     request_id = rank_against_request_id or rank_against_draft_id
     if request_id is None:
         items = [
-            {'worker': _worker_to_read(w), 'match_score': None, 'eligible': None, 'reasons': []}
+            {'worker': _to_worker_read(w, db), 'match_score': None, 'eligible': None, 'reasons': []}
             for w in workers
         ]
         items.sort(key=lambda r: (r['worker'].first_name, r['worker'].last_name))
@@ -69,7 +55,7 @@ def list_admin_substitutes(
     for worker in workers:
         result = matcher.eligibility_result(staffing_request, worker)
         scored.append({
-            'worker': _worker_to_read(worker),
+            'worker': _to_worker_read(worker, db),
             'match_score': result.score,
             'eligible': result.eligible,
             'would_notify': result.eligible and matcher.wants_notification(staffing_request, worker),

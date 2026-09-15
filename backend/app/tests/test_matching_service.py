@@ -13,12 +13,14 @@ def profile(
     cities: list[str] | None = None,
     qualifications: list[str] | None = None,
     certifications: list[str] | None = None,
+    notify_far: bool = False,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         availability_status=availability(status),
         supported_cities=cities or ['Montreal'],
         qualifications=qualifications or ['ECE_LEVEL_1'],
         certifications=certifications or ['FIRST_AID'],
+        notify_far=notify_far,
     )
 
 
@@ -69,6 +71,33 @@ def test_eligibility_result_marks_city_mismatch() -> None:
 
     assert result.eligible is False
     assert 'Missing: Quebec City' in labels_for_missing(result)
+
+
+def test_far_shift_opt_in_lifts_the_city_rule() -> None:
+    # « Quarts éloignés » ON: a request outside the worker's cities is still a
+    # match, flagged so the coordinator can tell it from a local one.
+    result = MatchingService().eligibility_result(
+        request(city='Quebec City'),
+        worker(worker_profile=profile(cities=['Montreal'], notify_far=True)),
+    )
+
+    assert result.eligible is True
+    assert labels_for_missing(result) == []
+    city = next(reason for reason in result.reasons if reason.type == 'city')
+    assert city.status == 'matched'
+    assert city.label == 'Far shift accepted: Quebec City'
+    assert city.code is None
+
+
+def test_far_shift_opt_in_keeps_local_match_label() -> None:
+    result = MatchingService().eligibility_result(
+        request(city='Montreal'),
+        worker(worker_profile=profile(cities=['Montreal'], notify_far=True)),
+    )
+
+    city = next(reason for reason in result.reasons if reason.type == 'city')
+    assert city.label == 'City match'
+    assert city.code == 'Montreal'
 
 
 def test_eligibility_result_marks_language_mismatch() -> None:

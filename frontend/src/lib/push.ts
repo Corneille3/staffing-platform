@@ -78,6 +78,26 @@ export async function enablePush(workerId: string): Promise<PushEnableResult> {
   return "enabled";
 }
 
+/**
+ * Re-post the device's existing subscription for the signed-in worker. A
+ * shared phone keeps ONE browser subscription, registered under whichever
+ * account last enabled alerts; signing in as someone else never moved it, so
+ * the phone kept getting the previous person's offers (« Out of scope. » on
+ * tap). The server upserts by endpoint, so this hands the endpoint to the
+ * current account. No-op when the device never opted in.
+ */
+export async function reattachPush(workerId: string): Promise<boolean> {
+  const subscription = await currentSubscription();
+  if (!subscription) return false;
+  const json = subscription.toJSON();
+  await savePushSubscription(workerId, {
+    endpoint: subscription.endpoint,
+    keys: { p256dh: json.keys?.p256dh ?? "", auth: json.keys?.auth ?? "" },
+    user_agent: navigator.userAgent,
+  });
+  return true;
+}
+
 export async function disablePush(workerId: string): Promise<void> {
   const subscription = await currentSubscription();
   if (!subscription) return;
