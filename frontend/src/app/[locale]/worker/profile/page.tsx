@@ -6,11 +6,12 @@ import { useLocale, useTranslations } from "next-intl";
 import { avatarTone } from "../../../../lib/avatar-tone";
 import { useWorkerSession } from "../../../../lib/worker-session";
 import { Avatar, Eyebrow, LanguageSwitcher } from "../../../../components/ui";
+import { WorkerPhoneField } from "../../../../components/worker-phone-field";
 
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 export default function WorkerProfilePage() {
-  const { worker } = useWorkerSession();
+  const { worker, refresh } = useWorkerSession();
   const t = useTranslations("worker.profile");
   const tCommon = useTranslations("common");
   const tCredentials = useTranslations("worker.credentials");
@@ -66,6 +67,7 @@ export default function WorkerProfilePage() {
         <Field label={t("firstName")} value={worker.first_name} />
         <Field label={t("lastName")} value={worker.last_name} />
         <Field label={t("email")} value={worker.email} />
+        <WorkerPhoneField key={worker.id} initial={worker.phone} onSaved={refresh} />
         <Field
           label={t("languageField")}
           value={worker.preferred_language === "fr" ? "Français" : "English"}
