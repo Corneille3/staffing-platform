@@ -19,6 +19,21 @@ def test_list_admin_substitutes_unranked(apf_client, seed):
     assert all(r['match_score'] is None for r in data['items'])
 
 
+def test_rows_carry_sms_opt_out_and_employment_type(apf_client, db_session, seed):
+    # The ranking table used to serialise the worker without these two fields,
+    # so it always showed « textos ON » (2026-09-13 preferences round).
+    seed.worker_a.sms_opt_out = True
+    db_session.flush()
+
+    resp = apf_client.get('/api/v1/admin/substitutes')
+
+    assert resp.status_code == 200
+    by_id = {r['worker']['id']: r['worker'] for r in resp.json()['items']}
+    assert by_id[str(seed.worker_a.id)]['sms_opt_out'] is True
+    assert by_id[str(seed.worker_b.id)]['sms_opt_out'] is False
+    assert by_id[str(seed.worker_a.id)]['employment_type'] in ('contractor', 'permanent')
+
+
 def test_list_admin_substitutes_ranked_against_request(apf_client, seed):
     rid = apf_client.post(
         '/api/v1/requests', json=request_payload(seed.org.id, seed.apf.id),

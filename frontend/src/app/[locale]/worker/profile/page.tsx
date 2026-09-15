@@ -4,6 +4,7 @@ import { useClerk } from "@clerk/nextjs";
 import { LogOut, MapPin } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { avatarTone } from "../../../../lib/avatar-tone";
+import { disablePush } from "../../../../lib/push";
 import { useWorkerSession } from "../../../../lib/worker-session";
 import { Avatar, Eyebrow, LanguageSwitcher } from "../../../../components/ui";
 import { WorkerPhoneField } from "../../../../components/worker-phone-field";
@@ -105,16 +106,19 @@ export default function WorkerProfilePage() {
         />
       </section>
 
-      {CLERK_ENABLED ? <ClerkSignOutButton label={tCommon("signOut")} /> : <DevSignOutButton label={tCommon("signOut")} />}
+      {CLERK_ENABLED ? <ClerkSignOutButton label={tCommon("signOut")} workerId={worker.id} /> : <DevSignOutButton label={tCommon("signOut")} />}
     </div>
   );
 }
 
-function ClerkSignOutButton({ label }: { label: string }) {
+function ClerkSignOutButton({ label, workerId }: { label: string; workerId: string }) {
   const { signOut } = useClerk();
   const locale = useLocale();
 
   async function handleSignOut() {
+    // Drop this device's push subscription so the next person to sign in
+    // here does not inherit this account's offers (shared-phone finding).
+    await disablePush(workerId).catch(() => undefined);
     window.localStorage.removeItem("apf.workerId");
     window.localStorage.removeItem("apf.devRole");
     await signOut({ redirectUrl: `/${locale}/sign-in` });

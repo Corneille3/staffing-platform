@@ -161,6 +161,20 @@ class MatchingService:
                     code=staffing_request.city,
                 )
             )
+        elif getattr(profile, 'notify_far', False):
+            # « Quarts éloignés » — the worker asked to hear about shifts
+            # outside their usual area, so a city mismatch no longer blocks.
+            # Stored since HANDOFF #12 but never read until 2026-09-14 (the
+            # toggle was a no-op). No `code` on purpose: the ranking chips
+            # and the best-match card then show the label instead of the
+            # bare city, so a coordinator can tell a far match from a local one.
+            reasons.append(
+                EligibilityReason(
+                    type='city',
+                    status='matched',
+                    label=f'Far shift accepted: {staffing_request.city}',
+                )
+            )
         else:
             reasons.append(
                 EligibilityReason(

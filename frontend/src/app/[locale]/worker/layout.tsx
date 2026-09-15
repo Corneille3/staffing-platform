@@ -10,7 +10,7 @@ import {
   useWorkerSession,
   WorkerSessionProvider,
 } from "../../../lib/worker-session";
-import { registerServiceWorker } from "../../../lib/push";
+import { reattachPush, registerServiceWorker } from "../../../lib/push";
 import { fetchNotificationFeed } from "../../../lib/browser-api";
 import {
   badgeLabel,
@@ -104,6 +104,13 @@ function WorkerShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     registerServiceWorker();
   }, []);
+
+  // The push endpoint follows the signed-in account (see reattachPush): on a
+  // shared device the subscription otherwise stays with whoever enabled it.
+  useEffect(() => {
+    if (!worker?.id) return;
+    reattachPush(worker.id).catch(() => undefined);
+  }, [worker?.id]);
 
   if (pathname === "/worker/onboarding") {
     return <>{children}</>;
