@@ -13,6 +13,8 @@ import {
 } from "../lib/request-form-options";
 import type { StaffingRequest } from "../lib/types";
 import { Eyebrow } from "./ui";
+import { ShiftDurationNote } from "./shift-duration-note";
+import { shiftDuration } from "../lib/shift-duration";
 
 interface EditState {
   title: string;
@@ -89,6 +91,8 @@ export function AdminRequestEditForm({
       return { ...prev, [key]: has ? list.filter((c) => c !== code) : [...list, code] };
     });
   }
+
+  const tooLong = shiftDuration(form.start_time, form.end_time)?.tooLong ?? false;
 
   async function handleSave() {
     if (!form.title.trim() || !form.city.trim() || !form.work_date || !form.start_time || !form.end_time) {
@@ -204,6 +208,7 @@ export function AdminRequestEditForm({
             <input type="time" value={form.end_time} onChange={(e) => update("end_time", e.target.value)} style={inputStyle} />
           </Field>
         </div>
+        <ShiftDurationNote start={form.start_time} end={form.end_time} />
 
         <Field label="Role">
           <ChipRow>
@@ -337,8 +342,8 @@ export function AdminRequestEditForm({
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving}
-            style={{ ...primaryBtn, opacity: saving ? 0.6 : 1, cursor: saving ? "not-allowed" : "pointer" }}
+            disabled={saving || tooLong}
+            style={{ ...primaryBtn, opacity: saving || tooLong ? 0.6 : 1, cursor: saving || tooLong ? "not-allowed" : "pointer" }}
           >
             {saving ? "Saving…" : "Save changes"} <Check size={14} strokeWidth={2.2} />
           </button>

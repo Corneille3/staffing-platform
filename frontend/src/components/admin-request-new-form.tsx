@@ -18,6 +18,8 @@ import {
   ROLES,
 } from "../lib/request-form-options";
 import { Eyebrow, Mono } from "./ui";
+import { ShiftDurationNote } from "./shift-duration-note";
+import { shiftDuration } from "../lib/shift-duration";
 
 const STEPS = ["Where & when", "Who you need", "Notify"] as const;
 
@@ -248,6 +250,9 @@ export function AdminRequestNewForm({ organizations }: { organizations: Organiza
     draft.required_certifications.join(","),
   ]);
 
+  const tooLong = shiftDuration(draft.start_time, draft.end_time)?.tooLong ?? false;
+  const publishBlocked = publishing || !draftId || shiftEnded(draft) || tooLong;
+
   async function handlePublish() {
     if (!draftId) {
       setError("Draft is not saved yet — wait a moment.");
@@ -343,14 +348,19 @@ export function AdminRequestNewForm({ organizations }: { organizations: Organiza
                     This shift has already ended — adjust the date to publish.
                   </span>
                 )}
+                {tooLong && (
+                  <span style={{ fontSize: 12.5, color: "var(--rose)" }}>
+                    This shift is longer than 16 hours — fix the times in step 1.
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={handlePublish}
-                  disabled={publishing || !draftId || shiftEnded(draft)}
+                  disabled={publishBlocked}
                   style={{
                     ...primaryBtn,
-                    opacity: publishing || !draftId || shiftEnded(draft) ? 0.6 : 1,
-                    cursor: publishing || !draftId || shiftEnded(draft) ? "not-allowed" : "pointer",
+                    opacity: publishBlocked ? 0.6 : 1,
+                    cursor: publishBlocked ? "not-allowed" : "pointer",
                   }}
                 >
                   {publishing ? "Publishing…" : "Publish request"} <Check size={14} strokeWidth={2.2} />
@@ -536,6 +546,7 @@ function StepWhere({
           <input type="time" value={draft.end_time} onChange={(e) => update("end_time", e.target.value)} style={inputStyle} />
         </Field>
       </div>
+      <ShiftDurationNote start={draft.start_time} end={draft.end_time} />
     </div>
   );
 }
