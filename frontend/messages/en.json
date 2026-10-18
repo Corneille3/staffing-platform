@@ -72,7 +72,10 @@
       "reportAbsence": "Report an absence",
       "statHoursWeek": "Hours this week",
       "statCompleted": "Shifts completed",
-      "nextShift": "Next shift"
+      "nextShift": "Next shift",
+      "loadErrorTitle": "Couldn't load your <em>requests</em>",
+      "loadErrorBody": "Check your connection, then try again.",
+      "loadErrorRetry": "Try again"
     },
     "schedule": {
       "thisMonth": "this month",
