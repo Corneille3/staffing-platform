@@ -134,6 +134,7 @@
         "enableSub": "Get notified the moment a shift goes out — even when the app is closed.",
         "denied": "Notifications are blocked for Staffig in your browser settings.",
         "error": "Couldn't enable notifications. Please try again.",
+        "permissionPending": "Your browser is waiting for your answer: allow notifications from the address bar (bell or padlock icon), then try again.",
         "iosTitle": "Install the app to get alerts",
         "iosBody": "On iPhone: tap Share, then “Add to Home Screen”. Open Staffig from your home screen and turn alerts on here."
       }
