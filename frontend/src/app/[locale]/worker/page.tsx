@@ -22,6 +22,7 @@ import { completedCount, nextShift, weekHours } from "../../../lib/inbox-stats";
 import { modifiedSinceReview } from "../../../lib/request-modified";
 import { Assignment, RequestResponse, StaffingRequest, Worker } from "../../../lib/types";
 import { useWorkerSession } from "../../../lib/worker-session";
+import { TIMED_OUT, withTimeout } from "../../../lib/with-timeout";
 import { Avatar, Chip, Meta, SectionLine } from "../../../components/ui";
 
 // "filled" used to cover five unrelated outcomes at once — you won it, someone
@@ -50,6 +51,8 @@ export default function WorkerHome() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [responses, setResponses] = useState<RequestResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [preferenceBusy, setPreferenceBusy] = useState(false);
   const [preferenceError, setPreferenceError] = useState<string | null>(null);
@@ -59,23 +62,38 @@ export default function WorkerHome() {
     let alive = true;
     (async () => {
       setLoading(true);
+      setLoadError(false);
       // Three fixed round-trips. The worker's request list is already "the
       // requests I was notified for", and the responses endpoint returns every
       // row of theirs at once — the old per-request responses fetch made the
       // page crawl as the network's request count grew.
-      const [allRequests, allAssignments, myResponses] = await Promise.all([
-        fetchRequests(),
-        fetchAssignments(),
-        fetchWorkerResponses(worker.id),
-      ]);
-      if (!alive) return;
-      setRequests(allRequests);
-      setAssignments(allAssignments.filter((a) => a.worker_user_id === worker.id));
-      setResponses(myResponses);
-      setLoading(false);
+      // A failed or stalled call used to leave « Chargement… » up forever
+      // (PR #104 deploy-order slip): it now ends on an error card with a retry.
+      try {
+        const loaded = await withTimeout(
+          Promise.all([
+            fetchRequests(),
+            fetchAssignments(),
+            fetchWorkerResponses(worker.id),
+          ]),
+          LOAD_TIMEOUT_MS,
+        );
+        if (!alive) return;
+        if (loaded === TIMED_OUT) {
+          setLoadError(true);
+        } else {
+          const [allRequests, allAssignments, myResponses] = loaded;
+          setRequests(allRequests);
+          setAssignments(allAssignments.filter((a) => a.worker_user_id === worker.id));
+          setResponses(myResponses);
+        }
+      } catch {
+        if (alive) setLoadError(true);
+      }
+      if (alive) setLoading(false);
     })();
     return () => { alive = false; };
-  }, [worker]);
+  }, [worker, reloadKey]);
 
   if (!worker) return null;
 
@@ -257,7 +275,7 @@ export default function WorkerHome() {
       {/* Stat tiles + next shift — rendered once the data is in, so the
           numbers never flash from 0. Reliability is deliberately absent: it
           exists on the profile but is only recomputed by hand. */}
-      {!loading && (
+      {!loading && !loadError && (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
             <StatTile
@@ -312,6 +330,8 @@ export default function WorkerHome() {
         <div style={{ padding: "32px 0", textAlign: "center", color: "var(--ink-3)", fontSize: 14 }}>
           {tCommon("loading")}
         </div>
+      ) : loadError ? (
+        <LoadErrorCard t={t} onRetry={() => setReloadKey((k) => k + 1)} />
       ) : toDecide.length === 0 ? (
         <EmptyInbox t={t} />
       ) : (
@@ -371,7 +391,7 @@ export default function WorkerHome() {
           )}
         </div>
       ) : (
-        !loading && (
+        !loading && !loadError && (
           <div style={{ textAlign: "center", padding: "20px 0 8px", color: "var(--ink-4)", fontSize: 12 }}>
             {t("thatsAll")}
           </div>
@@ -382,6 +402,9 @@ export default function WorkerHome() {
 }
 
 const HISTORY_WINDOW_DAYS = 30;
+// The three Boîte calls normally answer in well under a second; past this the
+// page stops waiting and offers a retry instead of « Chargement… » forever.
+const LOAD_TIMEOUT_MS = 20_000;
 
 function StatTile({ value, label, tone }: { value: string; label: string; tone: "moss" | "ink" }) {
   return (
@@ -468,6 +491,61 @@ function NextShiftCard({
 // Local calendar date as "YYYY-MM-DD" (same shape as the API's work_date).
 function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function LoadErrorCard({ t, onRetry }: { t: ReturnType<typeof useTranslations>; onRetry: () => void }) {
+  return (
+    <div
+      role="alert"
+      style={{
+        padding: "22px 18px",
+        textAlign: "center",
+        background: "var(--card)",
+        border: "0.5px solid var(--terra)",
+        borderRadius: 16,
+      }}
+    >
+      <h2
+        style={{
+          fontFamily: "var(--serif)",
+          fontSize: 22,
+          lineHeight: 1.15,
+          fontWeight: 400,
+          margin: "0 0 8px",
+        }}
+      >
+        {t.rich("loadErrorTitle", {
+          em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em>,
+        })}
+      </h2>
+      <p style={{ fontSize: 14, color: "var(--ink-2)", lineHeight: 1.45, margin: "0 0 18px" }}>
+        {t("loadErrorBody")}
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          minHeight: 44,
+          padding: "0 22px",
+          borderRadius: 12,
+          border: "none",
+          background: "var(--terra)",
+          color: "#fff",
+          fontSize: 14,
+          fontWeight: 500,
+          fontFamily: "var(--ui)",
+          cursor: "pointer",
+        }}
+      >
+        <RefreshCw size={15} strokeWidth={1.8} />
+        {t("loadErrorRetry")}
+      </button>
+    </div>
+  );
 }
 
 function EmptyInbox({ t }: { t: ReturnType<typeof useTranslations> }) {

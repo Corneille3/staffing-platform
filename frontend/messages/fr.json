@@ -72,7 +72,10 @@
       "reportAbsence": "Signaler une absence",
       "statHoursWeek": "Heures cette semaine",
       "statCompleted": "Quarts complétés",
-      "nextShift": "Prochain quart"
+      "nextShift": "Prochain quart",
+      "loadErrorTitle": "Impossible de charger vos <em>demandes</em>",
+      "loadErrorBody": "Vérifiez votre connexion, puis réessayez.",
+      "loadErrorRetry": "Réessayer"
     },
     "schedule": {
       "thisMonth": "ce mois-ci",
