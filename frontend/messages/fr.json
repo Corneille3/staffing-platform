@@ -134,6 +134,7 @@
         "enableSub": "Soyez averti·e dès qu’un remplacement est diffusé — même si l’app est fermée.",
         "denied": "Les notifications sont bloquées pour Staffig dans les réglages de votre navigateur.",
         "error": "Impossible d’activer les notifications. Réessayez.",
+        "permissionPending": "Votre navigateur attend votre réponse : autorisez les notifications dans la barre d’adresse (icône de cloche ou de cadenas), puis réessayez.",
         "iosTitle": "Installez l’app pour recevoir les alertes",
         "iosBody": "Sur iPhone : touchez Partager, puis « Ajouter à l’écran d’accueil ». Ouvrez Staffig depuis votre écran d’accueil et activez les alertes ici."
       }

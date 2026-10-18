@@ -82,7 +82,11 @@ export function PushNotificationsCard({ workerId }: { workerId: string }) {
           flash.succeed();
         } else {
           flash.fail();
-          setNotice(result === "denied" ? t("denied") : t("error"));
+          setNotice(
+            result === "denied" ? t("denied")
+              : result === "permission_pending" ? t("permissionPending")
+                : t("error"),
+          );
         }
       }
     } catch {

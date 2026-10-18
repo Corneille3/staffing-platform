@@ -5,8 +5,23 @@
 // per device and pushes via VAPID — see lib/browser-api.ts for the endpoints.
 
 import { fetchPushPublicKey, removePushSubscription, savePushSubscription } from "./browser-api";
+import { TIMED_OUT, withTimeout } from "./with-timeout";
 
-export type PushEnableResult = "enabled" | "denied" | "unsupported" | "unavailable";
+export type PushEnableResult =
+  | "enabled"
+  | "denied"
+  | "unsupported"
+  | "unavailable"
+  // The permission prompt is still unanswered — desktop Chrome often shows it
+  // as a quiet bell in the address bar, and requestPermission() waits forever.
+  | "permission_pending"
+  // The service worker or the browser's push service never answered.
+  | "timeout";
+
+// How long the switch waits on each browser step before giving up. The
+// permission prompt gets longer: a person may be reading it.
+const PERMISSION_TIMEOUT_MS = 20_000;
+const STEP_TIMEOUT_MS = 15_000;
 
 export function isPushSupported(): boolean {
   return (
@@ -57,17 +72,22 @@ export async function enablePush(workerId: string): Promise<PushEnableResult> {
 
   const registration = await registerServiceWorker();
   if (!registration) return "unsupported";
-  await navigator.serviceWorker.ready;
+  if ((await withTimeout(navigator.serviceWorker.ready, STEP_TIMEOUT_MS)) === TIMED_OUT) return "timeout";
 
-  const permission = await Notification.requestPermission();
+  const permission = await withTimeout(Notification.requestPermission(), PERMISSION_TIMEOUT_MS);
+  if (permission === TIMED_OUT) return "permission_pending";
   if (permission !== "granted") return "denied";
 
-  const subscription =
-    (await registration.pushManager.getSubscription()) ??
-    (await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey),
-    }));
+  const subscription = await withTimeout(
+    (async () =>
+      (await registration.pushManager.getSubscription()) ??
+      (await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      })))(),
+    STEP_TIMEOUT_MS,
+  );
+  if (subscription === TIMED_OUT) return "timeout";
 
   const json = subscription.toJSON();
   await savePushSubscription(workerId, {
@@ -102,7 +122,9 @@ export async function disablePush(workerId: string): Promise<void> {
   const subscription = await currentSubscription();
   if (!subscription) return;
   const endpoint = subscription.endpoint;
-  await subscription.unsubscribe();
+  if ((await withTimeout(subscription.unsubscribe(), STEP_TIMEOUT_MS)) === TIMED_OUT) {
+    throw new Error("Push unsubscribe timed out");
+  }
   // Best effort — a dead row also gets pruned server-side on next 410.
   try {
     await removePushSubscription(workerId, endpoint);
