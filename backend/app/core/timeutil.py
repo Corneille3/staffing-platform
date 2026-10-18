@@ -54,3 +54,18 @@ def shift_end_utc(work_date: date, start_time: time, end_time: time) -> datetime
     tz = ZoneInfo(settings.shift_timezone)
     end_date = work_date if end_time > start_time else work_date + timedelta(days=1)
     return datetime.combine(end_date, end_time, tzinfo=tz).astimezone(timezone.utc)
+
+
+# A shift longer than this is a typo, not a real shift — 15:30 → 12:00 reads
+# as 20h30 under the midnight-crossing convention (2026-10-18 prod finding).
+MAX_SHIFT_DURATION = timedelta(hours=16)
+
+
+def shift_duration(start_time: time, end_time: time) -> timedelta:
+    """Length of a shift under the midnight-crossing convention: ``end_time <=
+    start_time`` ends the next day, so equal times read as 24 h."""
+    start = timedelta(hours=start_time.hour, minutes=start_time.minute, seconds=start_time.second)
+    end = timedelta(hours=end_time.hour, minutes=end_time.minute, seconds=end_time.second)
+    if end <= start:
+        end += timedelta(days=1)
+    return end - start

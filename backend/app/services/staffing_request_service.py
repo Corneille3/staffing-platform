@@ -27,7 +27,7 @@ def _json_safe(value):
     return str(value)
 
 from app.auth.scope import AccessScope
-from app.core.timeutil import shift_end_utc
+from app.core.timeutil import MAX_SHIFT_DURATION, shift_duration, shift_end_utc
 from app.models.enums import NotificationChannel, RequestStatus, ResponseStatus
 from app.models.enums import RequestRequirementType
 from app.models.request_notification import RequestNotification
@@ -66,6 +66,7 @@ class StaffingRequestService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Organization not found')
         if not self._can_create_for_organization(organization, scope):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Out of scope.')
+        self._reject_bad_duration(payload.start_time, payload.end_time)
 
         staffing_request = StaffingRequest(
             id=uuid4(),
@@ -158,6 +159,16 @@ class StaffingRequestService:
         was_draft = staffing_request.status == RequestStatus.DRAFT
 
         data = payload.model_dump(exclude_unset=True)
+
+        # Draft autosave PATCHes one field per keystroke, so a draft may pass
+        # through a transient 15:30 → 12:00 while the coordinator types; it is
+        # checked at publish instead. A published request is checked here,
+        # before anything is mutated.
+        if not was_draft:
+            self._reject_bad_duration(
+                data['start_time'] if data.get('start_time') is not None else staffing_request.start_time,
+                data['end_time'] if data.get('end_time') is not None else staffing_request.end_time,
+            )
 
         # Scalar fields map 1:1 onto the column names.
         scalar_fields = {
@@ -258,10 +269,26 @@ class StaffingRequestService:
                 detail='This shift has already ended — adjust the date before notifying.',
             )
 
+    @staticmethod
+    def _reject_bad_duration(start_time: time, end_time: time) -> None:
+        """End before start is legal — it is an overnight shift — but past
+        MAX_SHIFT_DURATION it is a typo (15:30 → 12:00 = 20h30). Equal times
+        read as 24 h and are rejected too."""
+        if shift_duration(start_time, end_time) > MAX_SHIFT_DURATION:
+            hours = int(MAX_SHIFT_DURATION.total_seconds() // 3600)
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f'A shift cannot last more than {hours} hours — check the '
+                    'start and end times (an end before the start means the next day).'
+                ),
+            )
+
     def publish(self, request_id: UUID) -> StaffingRequest:
         staffing_request = self._get_required(request_id)
         if staffing_request.status not in {RequestStatus.DRAFT, RequestStatus.OPEN}:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='Request cannot be published')
+        self._reject_bad_duration(staffing_request.start_time, staffing_request.end_time)
         self._reject_ended_shift(staffing_request)
 
         workers = self._workers_for_request(staffing_request)
