@@ -224,3 +224,19 @@ def test_resend_invite_audit_row_is_committed(platform_admin_client, db_session,
         )
     )
     assert row is not None, 'tenant.invite_resent must survive the session'
+
+
+# ── P6 — the platform-wide grants list follows the operator-list policy ───────
+
+def test_access_grants_list_hidden_from_support(platform_admin_client, db_session, seed):
+    """GET /platform/access-grants carries operator emails + visit reasons, so
+    `support` must not read it — same policy as the operators list and the
+    orphan scan. Owner/operator keep it."""
+    from app.tests.conftest import _make_test_client
+
+    assert platform_admin_client.get('/api/v1/platform/access-grants').status_code == 200
+
+    support_user, _ = _make_operator(db_session, role=PlatformOperatorRole.SUPPORT)
+    support_client = _make_test_client(db_session, support_user.clerk_user_id, 'platform_admin')
+    resp = support_client.get('/api/v1/platform/access-grants')
+    assert resp.status_code == 403, resp.text

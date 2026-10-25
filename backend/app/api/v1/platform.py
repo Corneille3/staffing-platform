@@ -169,7 +169,14 @@ def request_tenant_access(
 
 
 @router.get('/access-grants', response_model=TenantAccessGrantsResponse)
-def list_access_grants(db: Session = Depends(get_db_session)) -> TenantAccessGrantsResponse:
+def list_access_grants(
+    scope: AccessScope = Depends(require_platform_operator),
+    db: Session = Depends(get_db_session),
+) -> TenantAccessGrantsResponse:
+    """Every grant, platform-wide — operator emails + visit reasons, so it
+    follows the operator-list visibility policy (owner/operator, not support;
+    P6 of the 2026-10-25 review). `support` still sees their own requests on
+    the tenant rows, and release stays open to every role."""
     grants, active = TenantAccessService(db).list_for_platform()
     return TenantAccessGrantsResponse(
         grants=[TenantAccessGrantRead.from_row(g, u, t) for g, u, t in grants],

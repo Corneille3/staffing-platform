@@ -150,6 +150,7 @@ function TenantRow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accessOpen, setAccessOpen] = useState(false);
+  const [suspendOpen, setSuspendOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
   const s = STATUS_META[t.status] ?? STATUS_META.active;
   // Own workspace (not a §2.2 visit) can never be removed — backend refuses too.
@@ -252,7 +253,7 @@ function TenantRow({
               </button>
             )}
             {!readOnlyOperator && (
-              <button type="button" disabled={busy} onClick={() => run("suspend")} style={rowBtn}>Suspend</button>
+              <button type="button" disabled={busy} onClick={() => setSuspendOpen(true)} style={rowBtn}>Suspend</button>
             )}
             {canRemove && (
               <button type="button" disabled={busy} onClick={() => setRemoveOpen(true)} style={dangerBtn}>
@@ -282,6 +283,17 @@ function TenantRow({
           }}
         />
       )}
+      {suspendOpen && (
+        <SuspendTenantModal
+          tenant={t}
+          busy={busy}
+          onClose={() => setSuspendOpen(false)}
+          onConfirm={async () => {
+            await run("suspend");
+            setSuspendOpen(false);
+          }}
+        />
+      )}
       {removeOpen && (
         <RemoveTenantModal
           tenant={t}
@@ -292,6 +304,52 @@ function TenantRow({
           }}
         />
       )}
+    </div>
+  );
+}
+
+function SuspendTenantModal({
+  tenant,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  tenant: PlatformTenantRow;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(21,20,15,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 20 }} onClick={() => !busy && onClose()}>
+      <div style={{ ...card, width: 460, maxWidth: "100%", padding: "28px 30px", background: "#fff", boxShadow: "0 30px 80px -20px rgba(0,0,0,.4)" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+          <div>
+            <div className="stf-h-eyebrow" style={{ ...eyebrow, color: "var(--terra)" }}>Reversible — but immediate</div>
+            <h2 style={{ fontFamily: "var(--serif)", fontSize: 26, lineHeight: 1.05, margin: "4px 0 0" }}>
+              Suspend <em style={{ fontStyle: "italic" }}>{tenant.name}</em>?
+            </h2>
+          </div>
+          <button type="button" onClick={onClose} style={{ ...rowBtn, width: 32, height: 32, borderRadius: 99, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            <X size={15} />
+          </button>
+        </div>
+        <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
+          Every member — admin, coordinators, substitutes — is locked out <strong>immediately</strong> and
+          sees a &quot;workspace suspended&quot; screen. Nothing is deleted: Reactivate restores
+          the workspace exactly as it was.
+        </p>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button type="button" onClick={onClose} disabled={busy} style={rowBtn}>Cancel</button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}
+          >
+            {busy ? "Suspending…" : "Suspend network"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
