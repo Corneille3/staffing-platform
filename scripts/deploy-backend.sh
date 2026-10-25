@@ -24,10 +24,24 @@ trap 'echo "[deploy-backend] FAILED at line $LINENO" >&2' ERR
 REGION="ca-central-1"
 ACCOUNT="515275664907"
 REPO="apf-staffing-platform-prod-backend"
-INSTANCE_ID="i-04a60b0aaf80c1528"
-DIRECT_IP="99.79.127.227"
 ECR_HOST="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com"
 ECR_REPO="${ECR_HOST}/${REPO}"
+
+# Resolve the prod instance + its (Elastic) IP by tag instead of hardcoding
+# them — the instance is replaceable, the tag is set by the app-runtime
+# module (${name_prefix}-app). Works without a local Terraform state.
+read -r INSTANCE_ID DIRECT_IP < <(aws ec2 describe-instances \
+  --region "${REGION}" \
+  --filters "Name=tag:Name,Values=apf-staffing-platform-prod-app" \
+            "Name=instance-state-name,Values=running" \
+  --query "Reservations[0].Instances[0].[InstanceId,PublicIpAddress]" \
+  --output text)
+
+if [ -z "${INSTANCE_ID:-}" ] || [ "${INSTANCE_ID}" = "None" ]; then
+  echo "[deploy-backend] could not resolve prod instance by tag" >&2
+  exit 1
+fi
+echo "==> resolved instance ${INSTANCE_ID} at ${DIRECT_IP}"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 COMMIT="${1:-$(git -C "${REPO_ROOT}" rev-parse --short=7 HEAD)}"

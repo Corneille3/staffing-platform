@@ -167,7 +167,7 @@ Normalized tables for anything driving matching, compliance, reporting, or permi
 **Frontend:** `git push origin main` → Vercel auto-deploys.
 
 **Backend:** `make deploy-backend`
-- Builds + pushes to ECR, reboots EC2, polls direct IP `99.79.127.227` (not Cloudflare — it caches stale 5xx), verifies new image via `/openapi.json`.
+- Builds + pushes to ECR, reboots EC2, polls the direct IP (not Cloudflare — it caches stale 5xx), verifies new image via `/openapi.json`. The instance id + IP are resolved automatically by tag (`Name=apf-staffing-platform-prod-app`), never hardcoded; the public address is an **Elastic IP** (`terraform output app_public_ip`) and survives instance replacement.
 
 ```bash
 # Rollback to a prior image
@@ -178,7 +178,7 @@ aws ec2 reboot-instances --region ca-central-1 --instance-ids i-04a60b0aaf80c152
 ```
 
 Infrastructure IDs:
-- EC2: `i-04a60b0aaf80c1528`
+- EC2: `i-04a60b0aaf80c1528` (replaceable — the API's public address is an EIP, re-attached on recreation)
 - RDS: `apf-staffing-platform-prod-postgres.cbeimeeggn80.ca-central-1.rds.amazonaws.com`
 - ECR: `515275664907.dkr.ecr.ca-central-1.amazonaws.com/apf-staffing-platform-prod-backend`
 
