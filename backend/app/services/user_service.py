@@ -8,6 +8,7 @@ from app.auth.clerk import delete_clerk_user
 from app.auth.scope import AccessScope
 from app.models.enums import UserRole
 from app.models.organization_membership import OrganizationMembership
+from app.models.platform_operator import PlatformOperator
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 from app.services.audit_service import AuditService
@@ -69,6 +70,23 @@ class UserService:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail='Only a platform admin can remove a platform admin.',
+            )
+
+        # A tier-0 operator can only be removed through /platform/operators —
+        # PlatformOperatorService enforces the last-owner lock-out, deletes the
+        # operator row (this path would leave it dangling) and writes the
+        # platform audit trail. Without this guard the generic route bypasses
+        # all three. A platform_admin USER with no operator row (a db orphan)
+        # stays removable here.
+        if self.db.scalar(
+            select(PlatformOperator.id)
+            .where(PlatformOperator.user_id == target.id)
+            .limit(1)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='This user is a platform operator — remove them from the '
+                       'platform Operators screen instead.',
             )
 
         if scope.is_network_admin:
