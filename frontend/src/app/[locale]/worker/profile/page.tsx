@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { avatarTone } from "../../../../lib/avatar-tone";
 import { disablePush } from "../../../../lib/push";
 import { useWorkerSession } from "../../../../lib/worker-session";
+import { useCredentialLabel } from "../../../../hooks/use-credential-label";
 import { Avatar, Eyebrow, LanguageSwitcher } from "../../../../components/ui";
 import { WorkerPhoneField } from "../../../../components/worker-phone-field";
 
@@ -15,16 +16,11 @@ export default function WorkerProfilePage() {
   const { worker, refresh } = useWorkerSession();
   const t = useTranslations("worker.profile");
   const tCommon = useTranslations("common");
-  const tCredentials = useTranslations("worker.credentials");
+  const credentialLabel = useCredentialLabel();
 
   if (!worker) return null;
 
   const initials = `${worker.first_name[0]}${worker.last_name[0]}`.toUpperCase();
-  // Codes come from onboarding: suggested chips (ECE_LEVEL_1, FIRST_AID, …)
-  // or anything the worker typed, upper-cased. Known codes get a readable
-  // FR/EN label; an unknown one shows as typed rather than blank.
-  const credentialLabel = (code: string) =>
-    tCredentials.has(code) ? tCredentials(code) : code;
 
   return (
     <div style={{ display: "grid", gap: 24, paddingTop: 16 }}>

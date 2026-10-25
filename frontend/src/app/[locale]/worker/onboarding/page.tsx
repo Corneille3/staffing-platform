@@ -11,6 +11,7 @@ import {
 } from "../../../../lib/browser-api";
 import type { WorkerOrganizationOption } from "../../../../lib/types";
 import { useWorkerSession } from "../../../../lib/worker-session";
+import { useCredentialLabel } from "../../../../hooks/use-credential-label";
 import { Eyebrow } from "../../../../components/ui";
 
 const COMMON_QUALS = ["ECE_LEVEL_1", "ECE_LEVEL_2", "ECE_LEVEL_3", "RSG", "TES"];
@@ -27,6 +28,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const { worker, refresh } = useWorkerSession();
   const t = useTranslations("worker.onboarding");
+  const credentialLabel = useCredentialLabel();
   const tCommon = useTranslations("common");
 
   const [step, setStep] = useState<Step>(1);
@@ -202,8 +204,13 @@ export default function OnboardingPage() {
               <SuggestRow
                 suggestions={COMMON_QUALS.filter((s) => !quals.includes(s))}
                 onPick={(s) => setQuals([...quals, s])}
+                label={credentialLabel}
               />
-              <Tags values={quals} onRemove={(v) => setQuals(quals.filter((x) => x !== v))} />
+              <Tags
+                values={quals}
+                onRemove={(v) => setQuals(quals.filter((x) => x !== v))}
+                label={credentialLabel}
+              />
               <AddInput
                 placeholder={t("qualificationPlaceholder")}
                 value={qualInput}
@@ -223,8 +230,13 @@ export default function OnboardingPage() {
               <SuggestRow
                 suggestions={COMMON_CERTS.filter((s) => !certs.includes(s))}
                 onPick={(s) => setCerts([...certs, s])}
+                label={credentialLabel}
               />
-              <Tags values={certs} onRemove={(v) => setCerts(certs.filter((x) => x !== v))} />
+              <Tags
+                values={certs}
+                onRemove={(v) => setCerts(certs.filter((x) => x !== v))}
+                label={credentialLabel}
+              />
               <AddInput
                 placeholder={t("certificationPlaceholder")}
                 value={certInput}
@@ -402,7 +414,15 @@ function Section({
   );
 }
 
-function Tags({ values, onRemove }: { values: string[]; onRemove: (v: string) => void }) {
+function Tags({
+  values,
+  onRemove,
+  label = (v) => v,
+}: {
+  values: string[];
+  onRemove: (v: string) => void;
+  label?: (v: string) => string;
+}) {
   if (values.length === 0) return null;
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -416,11 +436,11 @@ function Tags({ values, onRemove }: { values: string[]; onRemove: (v: string) =>
             fontSize: 13, fontWeight: 500, border: "0.5px solid #F2C7B0",
           }}
         >
-          {v}
+          {label(v)}
           <button
             type="button"
             onClick={() => onRemove(v)}
-            aria-label={`Remove ${v}`}
+            aria-label={`Remove ${label(v)}`}
             style={{ border: 0, background: "none", color: "var(--terra)", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", opacity: 0.65 }}
           >
             <X size={12} />
@@ -431,7 +451,15 @@ function Tags({ values, onRemove }: { values: string[]; onRemove: (v: string) =>
   );
 }
 
-function SuggestRow({ suggestions, onPick }: { suggestions: string[]; onPick: (s: string) => void }) {
+function SuggestRow({
+  suggestions,
+  onPick,
+  label = (s) => s,
+}: {
+  suggestions: string[];
+  onPick: (s: string) => void;
+  label?: (s: string) => string;
+}) {
   if (suggestions.length === 0) return null;
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -449,7 +477,7 @@ function SuggestRow({ suggestions, onPick }: { suggestions: string[]; onPick: (s
           }}
         >
           <Plus size={11} />
-          {s}
+          {label(s)}
         </button>
       ))}
     </div>
