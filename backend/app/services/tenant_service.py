@@ -29,9 +29,10 @@ from sqlalchemy.orm import Session
 from app.auth.clerk import delete_clerk_user
 from app.auth.scope import AccessScope
 from app.core.config import settings
-from app.models.enums import TenantStatus, UserRole
+from app.models.enums import TenantAccessGrantStatus, TenantStatus, UserRole
 from app.models.organization_membership import OrganizationMembership
 from app.models.tenant import Tenant
+from app.models.tenant_access_grant import TenantAccessGrant
 from app.models.tenant_membership import TenantMembership
 from app.models.user import User
 from app.notifications.email_service import EmailMessage, EmailNotificationService
@@ -176,7 +177,11 @@ class TenantService:
 
     def _get_tenant_or_404(self, tenant_id: UUID) -> Tenant:
         tenant = self.db.get(Tenant, tenant_id)
-        if tenant is None:
+        # REMOVED is terminal: the console forgets those rows (status filter),
+        # so the lifecycle endpoints must too — without this, suspend() on a
+        # removed tenant resurrected it as "suspended" with every member
+        # tombstoned, and reactivate() made it a memberless "active" zombie.
+        if tenant is None or tenant.status == TenantStatus.REMOVED:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Network not found')
         return tenant
 
@@ -220,6 +225,12 @@ class TenantService:
     def suspend(self, tenant_id: UUID, scope: AccessScope) -> Tenant:
         """Operator pauses an active tenant (non-payment, ToS). Data preserved."""
         tenant = self._get_tenant_or_404(tenant_id)
+        if tenant.status not in (TenantStatus.ACTIVE, TenantStatus.ONBOARDING):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='Only an active network can be suspended. '
+                       'Revoke a pending invite instead.',
+            )
         tenant.status = TenantStatus.SUSPENDED
         tenant.is_active = False
         self.audit_service.log(
@@ -236,6 +247,11 @@ class TenantService:
 
     def reactivate(self, tenant_id: UUID, scope: AccessScope) -> Tenant:
         tenant = self._get_tenant_or_404(tenant_id)
+        if tenant.status != TenantStatus.SUSPENDED:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='Only a suspended network can be reactivated.',
+            )
         tenant.status = TenantStatus.ACTIVE
         tenant.is_active = True
         if tenant.activated_at is None:
@@ -275,6 +291,7 @@ class TenantService:
             action='tenant.invite_resent', entity_type='tenant', entity_id=tenant.id,
             actor_user_id=scope.user.id, payload={'tenant_slug': tenant.slug},
         )
+        self.db.commit()
         return tenant
 
     def revoke_invite(self, tenant_id: UUID, scope: AccessScope) -> Tenant:
@@ -296,7 +313,7 @@ class TenantService:
         primary tenant).
         """
         tenant = self.db.get(Tenant, tenant_id)
-        if tenant is None:
+        if tenant is None or tenant.status == TenantStatus.REMOVED:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Network not found')
 
         actor_membership = self.db.scalar(
@@ -364,6 +381,26 @@ class TenantService:
                 .where(TenantMembership.tenant_id == tenant_id)
             ))
             .values(is_active=False)
+        )
+
+        # Close the §2.2 access grants: an ACTIVE visit ends now (it would
+        # otherwise keep authorizing reads on the tombstoned data until it
+        # expired), and a pending request can no longer be consented to.
+        self.db.execute(
+            update(TenantAccessGrant)
+            .where(
+                TenantAccessGrant.tenant_id == tenant_id,
+                TenantAccessGrant.status == TenantAccessGrantStatus.ACTIVE,
+            )
+            .values(status=TenantAccessGrantStatus.EXPIRED, expires_at=datetime.now(timezone.utc))
+        )
+        self.db.execute(
+            update(TenantAccessGrant)
+            .where(
+                TenantAccessGrant.tenant_id == tenant_id,
+                TenantAccessGrant.status == TenantAccessGrantStatus.REQUESTED,
+            )
+            .values(status=TenantAccessGrantStatus.DENIED)
         )
 
         tenant.is_active = False

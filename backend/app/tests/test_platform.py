@@ -2,6 +2,8 @@
 lifecycle, and the privacy/permission boundary."""
 from uuid import uuid4
 
+from app.models.enums import TenantStatus
+
 
 def test_platform_tenants_overview_shape_and_counts(platform_admin_client, seed):
     resp = platform_admin_client.get('/api/v1/platform/tenants')
@@ -49,6 +51,12 @@ def test_platform_invite_then_lifecycle(platform_admin_client, seed, db_session)
         'admin_first_name': 'Sam', 'admin_last_name': 'Lead',
         'admin_email': f'sam-{suffix2}@net.example',
     }).json()['id']
+    # Suspension targets a LIVE tenant (a pending one gets revoked, not
+    # suspended — guarded since the 2026-10-25 lifecycle review), so walk it
+    # through onboarding first.
+    tenant2 = db_session.scalar(select(Tenant).where(Tenant.id == tid2))
+    tenant2.status = TenantStatus.ACTIVE
+    db_session.flush()
     # Can't suspend-then-revoke (revoke only for pending).
     assert platform_admin_client.post(f'/api/v1/platform/tenants/{tid2}/suspend').json()['status'] == 'suspended'
     assert platform_admin_client.post(f'/api/v1/platform/tenants/{tid2}/reactivate').json()['status'] == 'active'
@@ -56,16 +64,23 @@ def test_platform_invite_then_lifecycle(platform_admin_client, seed, db_session)
     assert platform_admin_client.post(f'/api/v1/platform/tenants/{tid2}/revoke').status_code == 409
 
 
-def test_console_lists_suspended_but_not_removed(platform_admin_client, seed):
+def test_console_lists_suspended_but_not_removed(platform_admin_client, seed, db_session):
     """Suspension must stay visible — its Reactivate button lives in that list
     (2026-08-06 regression: filtering on is_active hid suspended tenants).
     REMOVED is the only state the console forgets."""
+    from sqlalchemy import select
+    from app.models.tenant import Tenant
+
     suffix = uuid4().hex[:8]
     tid = platform_admin_client.post('/api/v1/platform/tenants', json={
         'name': f'Vis {suffix}', 'slug': f'vis-{suffix}',
         'admin_first_name': 'Vi', 'admin_last_name': 'Sible',
         'admin_email': f'vi-{suffix}@net.example',
     }).json()['id']
+    # Only a live tenant can be suspended (2026-10-25 lifecycle guards) —
+    # walk the invite through onboarding first.
+    db_session.scalar(select(Tenant).where(Tenant.id == tid)).status = TenantStatus.ACTIVE
+    db_session.flush()
 
     platform_admin_client.post(f'/api/v1/platform/tenants/{tid}/suspend')
     listed = platform_admin_client.get('/api/v1/platform/tenants').json()['tenants']
