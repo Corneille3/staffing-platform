@@ -40,7 +40,10 @@
       "chooseAccount": "Choose your",
       "chooseAccountAccent": "account",
       "pickWorker": "Pick which worker you are previewing locally.",
-      "noWorkersSeeded": "No workers exist yet. Seed the database first."
+      "noWorkersSeeded": "No workers exist yet. Seed the database first.",
+      "loadErrorTitle": "We couldn't load your <em>account</em>",
+      "loadErrorBody": "The connection to the server failed. Check your network, then try again.",
+      "loadErrorRetry": "Try again"
     },
     "home": {
       "greetingMorning": "Good morning",

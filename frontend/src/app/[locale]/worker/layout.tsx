@@ -5,6 +5,7 @@ import { Inbox, CalendarCheck, Bell, Clock3, User } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter, usePathname } from "../../../i18n/navigation";
 import { BottomNav } from "../../../components/ui";
+import { WorkerLoadError } from "../../../components/worker-load-error";
 import {
   canUseWorkerOverride,
   useWorkerSession,
@@ -84,7 +85,7 @@ export default function WorkerLayout({ children }: { children: React.ReactNode }
 }
 
 function WorkerShell({ children }: { children: React.ReactNode }) {
-  const { worker, workers, loading, error, selectWorker } = useWorkerSession();
+  const { worker, workers, loading, error, refresh, selectWorker } = useWorkerSession();
   const pathname = usePathname();
   const router = useRouter();
   const showWorkerPicker = canUseWorkerOverride();
@@ -126,11 +127,23 @@ function WorkerShell({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // A failed session fetch blocks every worker screen at once, so it gets the
+  // same card the Boîte uses one level down rather than the browser's own
+  // "Failed to fetch" centred on an empty page.
   if (error) {
     return (
       <Screen>
         <Centered>
-          <p style={{ color: "var(--rose)", fontSize: 14 }}>{error}</p>
+          <div style={{ width: "100%", maxWidth: 380, padding: "0 20px" }}>
+            <WorkerLoadError
+              title={tShell.rich("loadErrorTitle", {
+                em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em>,
+              })}
+              body={tShell("loadErrorBody")}
+              retryLabel={tShell("loadErrorRetry")}
+              onRetry={() => { refresh(); }}
+            />
+          </div>
         </Centered>
       </Screen>
     );

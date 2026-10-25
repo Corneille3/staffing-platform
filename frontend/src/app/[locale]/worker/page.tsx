@@ -24,6 +24,7 @@ import { Assignment, RequestResponse, StaffingRequest, Worker } from "../../../l
 import { useWorkerSession } from "../../../lib/worker-session";
 import { TIMED_OUT, withTimeout } from "../../../lib/with-timeout";
 import { Avatar, Chip, Meta, SectionLine } from "../../../components/ui";
+import { WorkerLoadError } from "../../../components/worker-load-error";
 
 // "filled" used to cover five unrelated outcomes at once — you won it, someone
 // else won it, it was cancelled, it expired unfilled, it ran to completion —
@@ -331,7 +332,14 @@ export default function WorkerHome() {
           {tCommon("loading")}
         </div>
       ) : loadError ? (
-        <LoadErrorCard t={t} onRetry={() => setReloadKey((k) => k + 1)} />
+        <WorkerLoadError
+          title={t.rich("loadErrorTitle", {
+            em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em>,
+          })}
+          body={t("loadErrorBody")}
+          retryLabel={t("loadErrorRetry")}
+          onRetry={() => setReloadKey((k) => k + 1)}
+        />
       ) : toDecide.length === 0 ? (
         <EmptyInbox t={t} />
       ) : (
@@ -491,61 +499,6 @@ function NextShiftCard({
 // Local calendar date as "YYYY-MM-DD" (same shape as the API's work_date).
 function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function LoadErrorCard({ t, onRetry }: { t: ReturnType<typeof useTranslations>; onRetry: () => void }) {
-  return (
-    <div
-      role="alert"
-      style={{
-        padding: "22px 18px",
-        textAlign: "center",
-        background: "var(--card)",
-        border: "0.5px solid var(--terra)",
-        borderRadius: 16,
-      }}
-    >
-      <h2
-        style={{
-          fontFamily: "var(--serif)",
-          fontSize: 22,
-          lineHeight: 1.15,
-          fontWeight: 400,
-          margin: "0 0 8px",
-        }}
-      >
-        {t.rich("loadErrorTitle", {
-          em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em>,
-        })}
-      </h2>
-      <p style={{ fontSize: 14, color: "var(--ink-2)", lineHeight: 1.45, margin: "0 0 18px" }}>
-        {t("loadErrorBody")}
-      </p>
-      <button
-        type="button"
-        onClick={onRetry}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8,
-          minHeight: 44,
-          padding: "0 22px",
-          borderRadius: 12,
-          border: "none",
-          background: "var(--terra)",
-          color: "#fff",
-          fontSize: 14,
-          fontWeight: 500,
-          fontFamily: "var(--ui)",
-          cursor: "pointer",
-        }}
-      >
-        <RefreshCw size={15} strokeWidth={1.8} />
-        {t("loadErrorRetry")}
-      </button>
-    </div>
-  );
 }
 
 function EmptyInbox({ t }: { t: ReturnType<typeof useTranslations> }) {

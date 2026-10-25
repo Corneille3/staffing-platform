@@ -40,7 +40,10 @@
       "chooseAccount": "Choisissez votre",
       "chooseAccountAccent": "compte",
       "pickWorker": "Sélectionnez le remplaçant que vous voulez prévisualiser localement.",
-      "noWorkersSeeded": "Aucun remplaçant n'existe encore. Initialisez la base de données."
+      "noWorkersSeeded": "Aucun remplaçant n'existe encore. Initialisez la base de données.",
+      "loadErrorTitle": "Impossible de charger votre <em>compte</em>",
+      "loadErrorBody": "La connexion au serveur a échoué. Vérifiez votre réseau, puis réessayez.",
+      "loadErrorRetry": "Réessayer"
     },
     "home": {
       "greetingMorning": "Bonjour",
