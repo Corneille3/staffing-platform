@@ -3,9 +3,15 @@
 import { useAuth, useUser } from "@clerk/nextjs";
 import { createContext, ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { fetchWorkers } from "./browser-api";
+import { TIMED_OUT, withTimeout } from "./with-timeout";
 import { Worker } from "./types";
 
 const STORAGE_KEY = "apf.workerId";
+/** A backend that refuses the connection rejects straight away; one that hangs
+ * (asleep, saturated) never answers, and `loading` would hold the whole worker
+ * surface on « Chargement… » forever. Bound the wait and fall through to the
+ * error card instead. */
+const LOAD_TIMEOUT_MS = 20_000;
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 const DEV_WORKER_OVERRIDE_ENABLED = process.env.NODE_ENV !== "production";
 
@@ -47,11 +53,15 @@ function useSharedState(enabled: boolean): SharedState {
     // unmounting the page (and any transient UI state like save flashes).
     if (!hasLoadedRef.current) setLoading(true);
     try {
-      const list = await fetchWorkers();
+      const list = await withTimeout(fetchWorkers(), LOAD_TIMEOUT_MS);
+      if (list === TIMED_OUT) throw new Error("Worker session fetch timed out");
       setWorkers(list);
       setError(null);
       hasLoadedRef.current = true;
     } catch (err) {
+      // The raw message ("Failed to fetch") is for the console, not the
+      // worker — the layout shows a translated card keyed on `error`.
+      console.error("Worker session load failed", err);
       setError(err instanceof Error ? err.message : "Failed to load workers");
     } finally {
       setLoading(false);
