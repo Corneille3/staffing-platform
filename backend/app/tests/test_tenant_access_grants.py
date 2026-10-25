@@ -123,13 +123,17 @@ def test_request_approve_readonly_then_block_writes(db_session, seed):
 
     with _client_for(db_session, ctx.operator.clerk_user_id) as op_client:
         assert op_client.get('/api/v1/tenant/profile').status_code == 404
-        # the platform list reflects the lazy sweep + a zero active count
-        grants_resp = op_client.get('/api/v1/platform/access-grants')
-        assert grants_resp.status_code == 200
-        body = grants_resp.json()
-        assert body['active_count'] == 0
-        mine = next(g for g in body['grants'] if g['id'] == grant_id)
-        assert mine['status'] == 'expired'
+        # The platform-wide list carries operator emails + reasons, so a
+        # `support` operator no longer reads it (2026-10-25 review, P6) —
+        # same policy as the operators list and the orphan scan.
+        assert op_client.get('/api/v1/platform/access-grants').status_code == 403
+
+    # the lazy sweep flips the overdue row + the active count drops to zero
+    from app.services.tenant_access_service import TenantAccessService
+    grants, active = TenantAccessService(db_session).list_for_platform()
+    assert active == 0
+    mine = next(g for g, _, _ in grants if str(g.id) == str(grant_id))
+    assert mine.status == TenantAccessGrantStatus.EXPIRED
 
 
 # ── request guards ────────────────────────────────────────────────────────────
