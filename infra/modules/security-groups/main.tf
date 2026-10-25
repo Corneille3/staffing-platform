@@ -19,12 +19,17 @@ resource "aws_security_group" "app" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  ingress {
-    description = "Optional SSH admin access"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = var.admin_cidr_blocks
+  # Only declared when admin CIDRs are set: AWS won't store a rule with an
+  # empty source list, so an unconditional block shows as permanent drift.
+  dynamic "ingress" {
+    for_each = length(var.admin_cidr_blocks) > 0 ? [1] : []
+    content {
+      description = "Optional SSH admin access"
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = var.admin_cidr_blocks
+    }
   }
 
   egress {

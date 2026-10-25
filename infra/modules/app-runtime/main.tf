@@ -83,8 +83,9 @@ resource "aws_instance" "this" {
   # The data.aws_ami.amazon_linux data source resolves to "most_recent",
   # which drifts as AWS publishes new Amazon Linux 2023 images.
   # Without this lifecycle rule, every terraform apply would replace the
-  # instance just to pick up the new AMI — losing the public IP that's
-  # wired into Cloudflare DNS. The running instance still gets OS
+  # instance just to pick up the new AMI. (The public address is an EIP
+  # and survives replacement, but a rebuild still means downtime and a
+  # fresh disk.) The running instance still gets OS
   # security updates via the dnf auto-update in user_data + systemd.
   # When you want to rebuild on a fresh AMI, do it deliberately:
   # remove the ignore_changes line, run apply, restore it.
@@ -95,4 +96,20 @@ resource "aws_instance" "this" {
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-app"
   })
+}
+
+# Stable public address. The instance's auto-assigned IP dies with the
+# instance (user_data_replace_on_change = true recreates it on any
+# user_data edit); the EIP is what Cloudflare's A record for
+# api.kouamvision.com points at, so the instance becomes disposable.
+resource "aws_eip" "app" {
+  domain = "vpc"
+  tags = merge(var.tags, {
+    Name = "${var.name_prefix}-app-eip"
+  })
+}
+
+resource "aws_eip_association" "app" {
+  instance_id   = aws_instance.this.id
+  allocation_id = aws_eip.app.id
 }
