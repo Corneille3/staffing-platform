@@ -1,3 +1,4 @@
+import { HideOnReadOnlyVisit } from "../../../../components/read-only-visit";
 import Link from "next/link";
 import { RemoveOrganizationButton } from "../../../../components/remove-organization-button";
 import { Eyebrow, Mono } from "../../../../components/ui";
@@ -49,6 +50,7 @@ export default async function OrganizationsPage() {
           <p style={{ margin: 0, maxWidth: 640, color: "var(--ink-2)", lineHeight: 1.55, fontSize: 15 }}>
             Member organizations registered under this network. Each organization can have one or more coordinators.
           </p>
+          <HideOnReadOnlyVisit>
           <Link
             href="/apf/organizations/new"
             style={{
@@ -66,6 +68,7 @@ export default async function OrganizationsPage() {
           >
             + New organization
           </Link>
+          </HideOnReadOnlyVisit>
         </div>
       </section>
 
@@ -174,7 +177,9 @@ export default async function OrganizationsPage() {
               >
                 {org.is_active ? "Active" : "Inactive"}
               </span>
-              <RemoveOrganizationButton organizationId={org.id} organizationName={org.name} />
+              <HideOnReadOnlyVisit fallback={<span />}>
+                <RemoveOrganizationButton organizationId={org.id} organizationName={org.name} />
+              </HideOnReadOnlyVisit>
             </div>
           ))}
           {organizations.length === 0 && (

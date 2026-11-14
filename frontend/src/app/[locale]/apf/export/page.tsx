@@ -1,4 +1,5 @@
 import { Eyebrow } from "../../../../components/ui";
+import { HideOnReadOnlyVisit, ReadOnlyVisitNotice } from "../../../../components/read-only-visit";
 import { ApfExportForm } from "../../../../components/apf-export-form";
 import { getOrganizations } from "../../../../lib/api";
 
@@ -38,7 +39,9 @@ export default async function ApfExportPage({
         </p>
       </section>
 
-      <ApfExportForm orgs={orgs} initialOrgId={initialOrgId} />
+      <HideOnReadOnlyVisit fallback={<ReadOnlyVisitNotice />}>
+        <ApfExportForm orgs={orgs} initialOrgId={initialOrgId} />
+      </HideOnReadOnlyVisit>
     </>
   );
 }

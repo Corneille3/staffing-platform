@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Pencil, Phone } from "lucide-react";
 import { updateCoordinatorPhone } from "../lib/browser-api";
+import { useReadOnlyVisit } from "./read-only-visit";
 import { Mono, SaveFlash, useSaveFlash } from "./ui";
 
 const AMBER = "#8C6B14";
@@ -13,7 +14,8 @@ const AMBER = "#8C6B14";
  * Read mode shows the number, or an amber "No number" hint — that's a
  * coordinator the no-show SMS can't reach. Click → input; Enter or blur
  * saves, Escape cancels, with the shared Saved flash. Keeps its own state
- * after a save so the server row needs no refresh.
+ * after a save so the server row needs no refresh. During a read-only
+ * access-grant visit the number is plain text — no pencil, no click.
  */
 export function CoordinatorPhoneCell({
   coordinatorId,
@@ -75,6 +77,16 @@ export function CoordinatorPhoneCell({
   }
 
   const hasPhone = saved.trim().length > 0;
+  const readOnlyVisit = useReadOnlyVisit();
+
+  if (readOnlyVisit) {
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, minHeight: 32, minWidth: 0, color: hasPhone ? "var(--ink)" : AMBER }}>
+        <Phone size={12} style={{ color: hasPhone ? "var(--ink-3)" : AMBER, flexShrink: 0 }} />
+        {hasPhone ? <Mono style={{ fontSize: 12 }}>{saved}</Mono> : <span style={{ fontStyle: "italic" }}>No number</span>}
+      </span>
+    );
+  }
 
   return (
     <div style={{ display: "grid", gap: 4, minWidth: 0 }}>

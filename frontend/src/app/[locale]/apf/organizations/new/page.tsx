@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Eyebrow } from "../../../../../components/ui";
+import { HideOnReadOnlyVisit, ReadOnlyVisitNotice } from "../../../../../components/read-only-visit";
 import { createOrganization } from "../../../../../lib/browser-api";
 import { Organization } from "../../../../../lib/types";
 
@@ -62,6 +63,14 @@ const SECONDARY_BTN: React.CSSProperties = {
 };
 
 export default function NewOrganizationPage() {
+  return (
+    <HideOnReadOnlyVisit fallback={<ReadOnlyVisitNotice />}>
+      <NewOrganizationPageForm />
+    </HideOnReadOnlyVisit>
+  );
+}
+
+function NewOrganizationPageForm() {
   const router = useRouter();
   const [form, setForm] = useState({
     name: "",

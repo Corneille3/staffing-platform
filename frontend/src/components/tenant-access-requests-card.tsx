@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { approveTenantAccessGrant, denyTenantAccessGrant } from "../lib/browser-api";
 import type { TenantAccessGrant } from "../lib/types";
+import { useReadOnlyVisit } from "./read-only-visit";
 
 function fmtExpiry(value: string | null): string {
   if (!value) return "";
@@ -51,6 +52,8 @@ export function TenantAccessRequestsCard({ grants }: { grants: TenantAccessGrant
 function GrantRow({ grant, onChanged }: { grant: TenantAccessGrant; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A visiting operator can see the request but never rule on it.
+  const readOnlyVisit = useReadOnlyVisit();
 
   async function run(action: "approve" | "deny") {
     setBusy(true);
@@ -85,6 +88,7 @@ function GrantRow({ grant, onChanged }: { grant: TenantAccessGrant; onChanged: (
       </div>
       {error ? <span style={{ fontSize: 11, color: "var(--rose)" }}>{error}</span> : null}
       {grant.status === "requested" ? (
+        readOnlyVisit ? null : (
         <div style={{ display: "flex", gap: 8 }}>
           <button
             type="button"
@@ -103,6 +107,7 @@ function GrantRow({ grant, onChanged }: { grant: TenantAccessGrant; onChanged: (
             {busy ? "…" : "Approve"}
           </button>
         </div>
+        )
       ) : (
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--moss)", fontWeight: 500 }}>
           <ShieldCheck size={13} /> Active until {fmtExpiry(grant.expires_at)}

@@ -1,3 +1,4 @@
+import { HideOnReadOnlyVisit } from "../../../../components/read-only-visit";
 import Link from "next/link";
 import { Eyebrow, Mono } from "../../../../components/ui";
 import { ApfBulkInviteButton } from "../../../../components/apf-bulk-invite-button";
@@ -81,6 +82,7 @@ export default async function SubstitutePoolPage() {
             Distribution by city, top contributors over the last 30 days, and bulk invitations into the network pool.
             Per-org assignment and removal still live in the detail table below.
           </p>
+          <HideOnReadOnlyVisit>
           <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
             <Link
               href="/apf/workers/new"
@@ -101,6 +103,7 @@ export default async function SubstitutePoolPage() {
             </Link>
             <ApfBulkInviteButton />
           </div>
+          </HideOnReadOnlyVisit>
         </div>
       </section>
 
@@ -391,11 +394,13 @@ export default async function SubstitutePoolPage() {
                 </div>
 
                 <div style={{ justifySelf: "end" }}>
-                  <RemoveUserButton
-                    userId={worker.id}
-                    userName={`${worker.first_name} ${worker.last_name}`}
-                    isActive={worker.is_active}
-                  />
+                  <HideOnReadOnlyVisit>
+                    <RemoveUserButton
+                      userId={worker.id}
+                      userName={`${worker.first_name} ${worker.last_name}`}
+                      isActive={worker.is_active}
+                    />
+                  </HideOnReadOnlyVisit>
                 </div>
               </div>
             );
