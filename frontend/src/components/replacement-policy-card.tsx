@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { fetchReplacementPolicy, updateReplacementPolicy } from "../lib/browser-api";
 import type { ReplacementPolicy } from "../lib/types";
+import { useReadOnlyVisit } from "./read-only-visit";
 import { SaveFlash, useSaveFlash } from "./ui";
 
 const ROLES: { value: string; label: string }[] = [
@@ -26,6 +27,8 @@ export function ReplacementPolicyCard({
   const [policy, setPolicy] = useState<ReplacementPolicy | null>(null);
   const [error, setError] = useState<string | null>(null);
   const flash = useSaveFlash();
+  // The policy stays visible to a read-only visitor; the switches are inert.
+  const readOnlyVisit = useReadOnlyVisit();
 
   useEffect(() => {
     let alive = true;
@@ -81,6 +84,7 @@ export function ReplacementPolicyCard({
             <button
               key={mode}
               type="button"
+              disabled={readOnlyVisit}
               onClick={() => !active && save({ policy: mode })}
               style={{
                 flex: 1,
@@ -88,7 +92,7 @@ export function ReplacementPolicyCard({
                 borderRadius: 12,
                 border: `0.5px solid ${active ? "var(--terra)" : "var(--line)"}`,
                 background: active ? "var(--terra-soft)" : "#fff",
-                cursor: "pointer",
+                cursor: readOnlyVisit ? "default" : "pointer",
                 textAlign: "left",
                 fontFamily: "inherit",
               }}
@@ -117,6 +121,7 @@ export function ReplacementPolicyCard({
             <button
               key={r.value}
               type="button"
+              disabled={readOnlyVisit}
               onClick={() => toggleRole(r.value)}
               style={{
                 padding: "7px 13px",
@@ -125,7 +130,7 @@ export function ReplacementPolicyCard({
                 background: active ? "var(--ink)" : "#fff",
                 color: active ? "var(--paper)" : "var(--ink)",
                 fontSize: 12.5,
-                cursor: "pointer",
+                cursor: readOnlyVisit ? "default" : "pointer",
                 fontFamily: "inherit",
               }}
             >

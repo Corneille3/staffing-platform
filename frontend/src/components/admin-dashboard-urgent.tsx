@@ -1,5 +1,6 @@
 "use client";
 
+import { useReadOnlyVisit } from "./read-only-visit";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -35,6 +36,7 @@ export function AdminDashboardUrgentCard({
   siteName: string;
 }) {
   const router = useRouter();
+  const readOnlyVisit = useReadOnlyVisit();
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +101,7 @@ export function AdminDashboardUrgentCard({
       ) : (
         <>
           <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
-            {urgent.top_match && (
+            {urgent.top_match && !readOnlyVisit && (
               <button
                 onClick={assign}
                 disabled={busy}

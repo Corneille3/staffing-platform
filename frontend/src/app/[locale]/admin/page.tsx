@@ -3,6 +3,7 @@ import { Eyebrow, Mono } from "../../../components/ui";
 import { ActivityRowCard } from "../../../components/apf-activity-row";
 import { AdminDashboardUrgentCard } from "../../../components/admin-dashboard-urgent";
 import { PollingRefresh } from "../../../components/polling-refresh";
+import { HideOnReadOnlyVisit } from "../../../components/read-only-visit";
 import { getAdminDashboard, getAdminOrganizations } from "../../../lib/api";
 import { shiftClock } from "../../../lib/shift-time";
 import type { AdminCoverageForward, AdminRequestSummary } from "../../../lib/types";
@@ -84,9 +85,11 @@ export default async function AdminDashboardPage() {
             {headline.split(" ")[0]} <em style={{ fontStyle: "italic" }}>{headline.split(" ").slice(1).join(" ")}</em>
           </h1>
         </div>
-        <Link href="/admin/requests/new" style={{ padding: "10px 18px", borderRadius: 999, background: "var(--ink)", color: "var(--paper)", fontSize: 14, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap" }}>
-          + New request
-        </Link>
+        <HideOnReadOnlyVisit>
+          <Link href="/admin/requests/new" style={{ padding: "10px 18px", borderRadius: 999, background: "var(--ink)", color: "var(--paper)", fontSize: 14, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap" }}>
+            + New request
+          </Link>
+        </HideOnReadOnlyVisit>
       </header>
 
       {/* 2 · Urgent now */}
@@ -277,21 +280,17 @@ function LiveRequestsEmptyState({ assignedCount }: { assignedCount: number }) {
           ? "Nothing needs your attention right now."
           : "No active requests yet."}
       </p>
-      <Link
-        href={allHandled ? "/admin/requests?tab=assigned" : "/admin/requests/new"}
-        style={{
-          display: "inline-block",
-          marginTop: 8,
-          fontSize: 13,
-          fontWeight: 500,
-          color: "var(--terra)",
-          textDecoration: "none",
-        }}
-      >
-        {allHandled
-          ? `View ${assignedCount} assigned shift${assignedCount === 1 ? "" : "s"} →`
-          : "+ Create a request to start dispatching"}
-      </Link>
+      {allHandled ? (
+        <Link href="/admin/requests?tab=assigned" style={EMPTY_CTA_STYLE}>
+          {`View ${assignedCount} assigned shift${assignedCount === 1 ? "" : "s"} →`}
+        </Link>
+      ) : (
+        <HideOnReadOnlyVisit>
+          <Link href="/admin/requests/new" style={EMPTY_CTA_STYLE}>
+            + Create a request to start dispatching
+          </Link>
+        </HideOnReadOnlyVisit>
+      )}
     </div>
   );
 }
@@ -336,3 +335,12 @@ function PanelHeader({ title, href, linkLabel }: { title: string; href: string; 
     </div>
   );
 }
+
+const EMPTY_CTA_STYLE: React.CSSProperties = {
+  display: "inline-block",
+  marginTop: 8,
+  fontSize: 13,
+  fontWeight: 500,
+  color: "var(--terra)",
+  textDecoration: "none",
+};
