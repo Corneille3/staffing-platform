@@ -1,5 +1,6 @@
 "use client";
 
+import { useReadOnlyVisit } from "./read-only-visit";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Check, Sparkles } from "lucide-react";
@@ -61,6 +62,7 @@ function tagsFromReasons(worker: Worker, reasons: EligibilityReason[]): string[]
 
 export function BestMatchCard({ worker, matchScore, reasons, requestId }: Props) {
   const router = useRouter();
+  const readOnlyVisit = useReadOnlyVisit();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -94,6 +96,9 @@ export function BestMatchCard({ worker, matchScore, reasons, requestId }: Props)
 
   const tags = tagsFromReasons(worker, reasons);
   const fullName = `${worker.first_name} ${worker.last_name}`;
+
+  // The card exists to assign — nothing to offer a read-only visitor.
+  if (readOnlyVisit) return null;
 
   return (
     <div

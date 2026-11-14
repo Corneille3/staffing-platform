@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
+import { HideOnReadOnlyVisit } from "./read-only-visit";
 import { Eyebrow, Mono } from "./ui";
 import { ActivityRowCard } from "./apf-activity-row";
 import { fetchAdminActivity, patchAdminOrganization } from "../lib/browser-api";
@@ -229,12 +230,14 @@ function SiteDetail({
               {[site.address_line1, site.neighbourhood, site.city].filter(Boolean).join(" · ")}
             </div>
           </div>
+          <HideOnReadOnlyVisit>
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
             <ActionButton onClick={onEdit} variant="ghost">Edit</ActionButton>
             {site.is_active && (
               <ActionButton onClick={onNewRequest} variant="terra">+ New request</ActionButton>
             )}
           </div>
+          </HideOnReadOnlyVisit>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
           <KpiTile label="Fill rate" value={`${m.fill_rate_30d}%`} color={fillColor(m.fill_rate_30d)} />

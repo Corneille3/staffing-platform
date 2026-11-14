@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { MoreVertical } from "lucide-react";
+import { useReadOnlyVisit } from "./read-only-visit";
 import { Mono } from "./ui";
 import { assignWorker, cancelRequest, fetchAdminRequestsIndex, renotifyRequest } from "../lib/browser-api";
 import type { AdminRequestSummary, AdminRequestTab } from "../lib/types";
@@ -214,7 +215,9 @@ function RequestRow({
   onNotifyMore: () => void;
 }) {
   const statusTone = STATUS_TONE[row.status] ?? "var(--ink-3)";
-  const canAssign = row.top_match && row.status !== "assigned";
+  // A read-only visitor gets the View link and no overflow menu.
+  const readOnlyVisit = useReadOnlyVisit();
+  const canAssign = row.top_match && row.status !== "assigned" && !readOnlyVisit;
 
   return (
     <div
@@ -326,7 +329,7 @@ function RequestRow({
             View
           </Link>
         )}
-        {row.status !== "assigned" && (
+        {row.status !== "assigned" && !readOnlyVisit && (
           <OverflowMenu busy={busy} onCancel={onCancel} onNotifyMore={onNotifyMore} />
         )}
       </div>

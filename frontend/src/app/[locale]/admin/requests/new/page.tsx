@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { AdminRequestNewForm } from "../../../../../components/admin-request-new-form";
+import { HideOnReadOnlyVisit, ReadOnlyVisitNotice } from "../../../../../components/read-only-visit";
 import { Eyebrow, Mono } from "../../../../../components/ui";
 import { getOrganizations } from "../../../../../lib/api";
 
@@ -51,7 +52,9 @@ export default async function NewRequestPage() {
         </div>
       </div>
 
-      <AdminRequestNewForm organizations={organizations} />
+      <HideOnReadOnlyVisit fallback={<ReadOnlyVisitNotice />}>
+        <AdminRequestNewForm organizations={organizations} />
+      </HideOnReadOnlyVisit>
     </>
   );
 }

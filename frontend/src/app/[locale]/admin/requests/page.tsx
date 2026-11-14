@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Eyebrow, Mono } from "../../../../components/ui";
 import { PollingRefresh } from "../../../../components/polling-refresh";
+import { HideOnReadOnlyVisit } from "../../../../components/read-only-visit";
 import { AdminRequestsList } from "../../../../components/admin-requests-list";
 import { AdminRequestFilters } from "../../../../components/admin-request-filters";
 import { getAdminOrganizations, getAdminRequestsIndex } from "../../../../lib/api";
@@ -70,12 +71,14 @@ export default async function RequestsPage({
               {urgentCount > 0 ? `${urgentCount} urgent and unassigned · ` : ""}sorted by soonest shift.
             </p>
           </div>
-          <Link
-            href="/admin/requests/new"
-            style={{ padding: "10px 18px", borderRadius: 999, background: "var(--ink)", color: "var(--paper)", fontSize: 14, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap" }}
-          >
-            + New request
-          </Link>
+          <HideOnReadOnlyVisit>
+            <Link
+              href="/admin/requests/new"
+              style={{ padding: "10px 18px", borderRadius: 999, background: "var(--ink)", color: "var(--paper)", fontSize: 14, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap" }}
+            >
+              + New request
+            </Link>
+          </HideOnReadOnlyVisit>
         </div>
       </header>
 

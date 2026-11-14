@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { AdminRequestEditForm } from "../../../../../../components/admin-request-edit-form";
+import { HideOnReadOnlyVisit, ReadOnlyVisitNotice } from "../../../../../../components/read-only-visit";
 import { Eyebrow } from "../../../../../../components/ui";
 import { getOrganizations, getRequest, getRequestResponses } from "../../../../../../lib/api";
 
@@ -75,7 +76,9 @@ export default async function EditRequestPage({
         </p>
       </div>
 
-      <AdminRequestEditForm request={request} orgName={orgName} hasAccepted={hasAccepted} />
+      <HideOnReadOnlyVisit fallback={<ReadOnlyVisitNotice />}>
+        <AdminRequestEditForm request={request} orgName={orgName} hasAccepted={hasAccepted} />
+      </HideOnReadOnlyVisit>
     </>
   );
 }

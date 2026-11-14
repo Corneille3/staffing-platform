@@ -5,6 +5,7 @@ import { ArrowLeft, Search, Bell, User as UserIcon } from "lucide-react";
 import { AdminNavigation } from "../../../components/admin-navigation";
 import { AdminOrgSwitcher } from "../../../components/admin-org-switcher";
 import { AdminProfileCard } from "../../../components/admin-profile-card";
+import { ReadOnlyVisitProvider } from "../../../components/read-only-visit";
 import { AdminBreadcrumb } from "../../../components/admin-breadcrumb";
 import { HeaderSignOutButton } from "../../../components/header-sign-out-button";
 import { Eyebrow } from "../../../components/ui";
@@ -267,7 +268,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
         </div>
         <div style={{ flex: 1, padding: "32px 32px 64px", maxWidth: 1280, width: "100%" }}>
-          {children}
+          <ReadOnlyVisitProvider readOnly={viaGrant}>{children}</ReadOnlyVisitProvider>
         </div>
       </main>
     </div>

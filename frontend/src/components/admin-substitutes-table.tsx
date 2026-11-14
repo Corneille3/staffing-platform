@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useReadOnlyVisit } from "./read-only-visit";
 import { Mono } from "./ui";
 import { notifyWorkers } from "../lib/browser-api";
 import { reasonChips } from "../lib/eligibility-chips";
@@ -35,6 +36,7 @@ function availabilityLabel(row: AdminSubstituteRow): string {
 
 export function AdminSubstitutesTable({ rows, ranked, requestId }: Props) {
   const [notified, setNotified] = useState<Record<string, "busy" | "done">>({});
+  const readOnlyVisit = useReadOnlyVisit();
 
   async function notify(workerId: string) {
     if (!requestId) return;
@@ -277,6 +279,8 @@ export function AdminSubstitutesTable({ rows, ranked, requestId }: Props) {
               {(() => {
                 const state = notified[row.worker.id];
                 const disabled = !requestId || state === "busy" || state === "done";
+                // Keep the grid cell so the row stays aligned.
+                if (readOnlyVisit) return <span />;
                 return (
                   <button
                     type="button"

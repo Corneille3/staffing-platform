@@ -1,5 +1,6 @@
 "use client";
 
+import { useReadOnlyVisit } from "./read-only-visit";
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -448,9 +449,10 @@ const PILL_STYLE: React.CSSProperties = {
 export function RequestHeaderPills({ requestId, initialStatus }: { requestId: string; initialStatus: string }) {
   const live = useRequestLive();
   const status = live?.request.status ?? initialStatus;
+  const readOnlyVisit = useReadOnlyVisit();
   return (
     <>
-      {isEditableStatus(status) ? (
+      {isEditableStatus(status) && !readOnlyVisit ? (
         <Link href={`/admin/requests/${requestId}/edit`} style={PILL_STYLE}>
           <Pencil size={13} strokeWidth={1.8} />
           Edit request

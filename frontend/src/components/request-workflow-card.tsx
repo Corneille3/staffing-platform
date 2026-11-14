@@ -8,6 +8,7 @@ import { CheckCircle2 } from "lucide-react";
 import { errorMessageFromResponse } from "../lib/browser-api";
 import { availabilityStatusLabel } from "../lib/status-labels";
 import { isClosedStatus, LIVE_STATUSES, useRequestLive } from "./request-live";
+import { useReadOnlyVisit } from "./read-only-visit";
 import { Eyebrow } from "./ui";
 import { Assignment, RequestResponse, StaffingRequest, User, Worker } from "../lib/types";
 import { shiftDateTime, shiftTime } from "../lib/shift-time";
@@ -90,6 +91,8 @@ export function RequestWorkflowCard({
   // Inside a RequestLiveProvider the polled snapshot wins over the
   // server-rendered props; elsewhere the props are the whole story.
   const live = useRequestLive();
+  // Read-only access-grant visit: everything stays readable, no action buttons.
+  const readOnlyVisit = useReadOnlyVisit();
   const request = live?.request ?? initialRequest;
   const responses = sortResponses(live?.responses ?? initialResponses);
   const assignment = live ? live.assignment : initialAssignment;
@@ -292,7 +295,7 @@ export function RequestWorkflowCard({
         >
           Open detail
         </Link>
-        {request.status === "draft" ? (
+        {request.status === "draft" && !readOnlyVisit ? (
           <button
             type="button"
             disabled={working}
@@ -319,7 +322,7 @@ export function RequestWorkflowCard({
             backend allows it for notified too — hide it only once someone
             accepted (the next move there is assigning). */}
         {(request.status === "notified" || request.status === "responses_received") &&
-        acceptedResponses.length === 0 ? (
+        acceptedResponses.length === 0 && !readOnlyVisit ? (
           <button
             type="button"
             disabled={working}
@@ -341,7 +344,7 @@ export function RequestWorkflowCard({
             {busyAction?.endsWith("/renotify") ? "Re-notifying…" : "Re-notify workers"}
           </button>
         ) : null}
-        {!isClosed ? (
+        {!isClosed && !readOnlyVisit ? (
           <button
             type="button"
             disabled={working}
@@ -467,7 +470,7 @@ export function RequestWorkflowCard({
                     Reason: {response.decline_reason}
                   </div>
                 ) : null}
-                {!isClosed && !firstClaim ? (
+                {!isClosed && !firstClaim && !readOnlyVisit ? (
                   <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                     <button
                       type="button"
@@ -638,7 +641,8 @@ function AssignedWorkerCard({
     assignment.status === "confirmed" &&
     startedMinutesAgo > CHECKIN_GRACE_MINUTES;
   const scheduledHours = scheduledHoursOf(request);
-  const canAdjust = !!assignment.checked_in_at && assignment.status !== "cancelled";
+  const readOnlyVisit = useReadOnlyVisit();
+  const canAdjust = !!assignment.checked_in_at && assignment.status !== "cancelled" && !readOnlyVisit;
   // Derived by the backend; a confirmed row never changes status on its own,
   // so this is the only honest "what happened" signal once the shift is over.
   const missed = assignment.attendance === "missed";
@@ -843,7 +847,7 @@ function AssignedWorkerCard({
 
       {/* Nothing left to cancel once the shift is over — hours are the
           coordinator's remaining lever (Adjust recorded times above). */}
-      {!finished && (
+      {!finished && !readOnlyVisit && (
       <button
         type="button"
         disabled={disabled}
@@ -1027,6 +1031,7 @@ function WorkerReviewCard({
   const missingCertification = missingItems(request.required_certifications || [], profile?.certifications || []);
   const languageMatches = !request.language_requirement || worker.preferred_language === request.language_requirement || worker.preferred_language === "bilingual";
   const cityMatches = Boolean(profile?.supported_cities.includes(request.city));
+  const readOnlyVisit = useReadOnlyVisit();
 
   return (
     <article
@@ -1076,6 +1081,7 @@ function WorkerReviewCard({
         )}
       </div>
 
+      {readOnlyVisit ? null : (
       <button
         type="button"
         disabled={disabled}
@@ -1095,6 +1101,7 @@ function WorkerReviewCard({
       >
         {disabled ? "Assigning…" : `Assign ${worker.first_name}`}
       </button>
+      )}
     </article>
   );
 }
