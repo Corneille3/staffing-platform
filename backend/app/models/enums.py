@@ -25,6 +25,23 @@ class PlatformOperatorRole(str, Enum):
     OWNER = 'owner'        # everything: operators, billing, tenants, access
     OPERATOR = 'operator'  # invite/suspend tenants + request access; no operator/billing edits
     SUPPORT = 'support'    # read-only; can request tenant access only
+    # Sales pipeline only (SPEC_PLATFORM_LEADS): /platform/leads and nothing
+    # else — no tenant console, no settings, no tenant access requests.
+    MARKETING = 'marketing'
+
+
+class LeadStatus(str, Enum):
+    """Sales pipeline stages (SPEC_PLATFORM_LEADS §4). The only lead field
+    stored as a Postgres enum — it carries the state machine. Segment, source,
+    kind and ban phase are validated strings (schemas/platform_leads.py) so a
+    new segment never needs a migration."""
+    NEW = 'new'
+    CONTACTED = 'contacted'
+    DEMO_BOOKED = 'demo_booked'
+    PILOT = 'pilot'
+    INVITED = 'invited'   # set by the invite flow (or by hand)
+    WON = 'won'           # set by the system when the linked tenant goes active
+    LOST = 'lost'         # needs a reason; reopens to `contacted` only
 
 
 class TenantAccessGrantStatus(str, Enum):

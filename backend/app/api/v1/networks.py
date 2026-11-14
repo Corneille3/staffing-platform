@@ -49,7 +49,9 @@ def list_networks(
 @router.post('', status_code=201)
 def create_network(
     payload: TenantNetworkCreate,
-    scope: AccessScope = Depends(require_platform_admin),
+    # Same gate as POST /platform/tenants — this legacy twin used to accept
+    # any platform_admin, `support` included.
+    scope: AccessScope = Depends(require_platform_operator_mfa),
     db: Session = Depends(get_db_session),
 ) -> TenantNetworkRead:
     tenant, admin = TenantService(db).create_network(payload, scope)

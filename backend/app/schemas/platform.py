@@ -65,7 +65,7 @@ class PlatformOperatorRead(BaseModel):
     first_name: str
     last_name: str
     email: str
-    role: str  # owner | operator | support
+    role: str  # owner | operator | support | marketing
     mfa_enabled: bool
     status: str  # pending (invite not yet accepted) | active
     invited_at: datetime | None = None
@@ -80,14 +80,14 @@ class PlatformOperatorsResponse(BaseModel):
 
 class PlatformOperatorInvite(BaseModel):
     email: NormalizedEmail
-    role: str = Field(pattern=r'^(owner|operator|support)$')
+    role: str = Field(pattern=r'^(owner|operator|support|marketing)$')
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
     preferred_language: str = Field(default='fr', pattern=r'^(fr|en|bilingual)$')
 
 
 class PlatformOperatorRoleUpdate(BaseModel):
-    role: str = Field(pattern=r'^(owner|operator|support)$')
+    role: str = Field(pattern=r'^(owner|operator|support|marketing)$')
 
 
 class PlatformSettingsRead(BaseModel):
