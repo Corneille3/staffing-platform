@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 
 from app.api.deps import get_db_session
-from app.auth.permissions import require_admin, require_network_admin, require_platform_admin
+from app.auth.permissions import require_admin, require_network_admin, require_platform_operator_mfa
 from app.auth.scope import AccessScope, get_access_scope
 from app.models.enums import UserRole
 from app.models.organization_membership import OrganizationMembership
@@ -57,7 +57,8 @@ class RemoveByEmailPayload(BaseModel):
 @router.post('/remove-by-email')
 def remove_user_by_email(
     payload: RemoveByEmailPayload,
-    scope: AccessScope = Depends(require_platform_admin),
+    # A removal — owner/operator with 2FA, like the housekeeping orphan remove.
+    scope: AccessScope = Depends(require_platform_operator_mfa),
     db: Session = Depends(get_db_session),
 ) -> UserRead:
     """Platform-admin cleanup tool for orphan users whose email is in

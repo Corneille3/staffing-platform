@@ -25,6 +25,9 @@ class PlatformOperatorRole(str, Enum):
     OWNER = 'owner'        # everything: operators, billing, tenants, access
     OPERATOR = 'operator'  # invite/suspend tenants + request access; no operator/billing edits
     SUPPORT = 'support'    # read-only; can request tenant access only
+    # Sales pipeline only (SPEC_PLATFORM_LEADS): /platform/leads and nothing
+    # else — no tenant console, no settings, no tenant access requests.
+    MARKETING = 'marketing'
 
 
 class TenantAccessGrantStatus(str, Enum):

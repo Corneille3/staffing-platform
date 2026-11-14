@@ -98,6 +98,13 @@ def _active_grant_tenant_id(db: Session, user_id: UUID) -> UUID | None:
 # callable so the operator can sign in at all.
 _GRANT_WRITE_EXEMPT_PREFIXES = ('/api/v1/platform', '/api/v1/auth')
 
+# A `marketing` operator (SPEC_PLATFORM_LEADS) is a platform_admin USER — that
+# is how every tier-0 account is modelled — but owns the sales pipeline only.
+# Deny by default at the one choke point every request passes through, so a
+# route added later is closed to marketing without anyone thinking about it:
+# the pipeline itself, plus /auth so the account can sign in and read itself.
+_MARKETING_ALLOWED_PREFIXES = ('/api/v1/platform/leads', '/api/v1/auth')
+
 
 def _tenant_suspended(db: Session, tenant_id: UUID | None) -> bool:
     """Suspension must bite at scope resolution — the single choke point every
@@ -166,6 +173,13 @@ def get_access_scope(
             )
             operator_role = op_row.role.value if op_row else None
             operator_mfa = op_row.mfa_enabled if op_row else False
+            if operator_role == 'marketing' and not request.url.path.startswith(
+                _MARKETING_ALLOWED_PREFIXES
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail='You do not have permission to perform this action.',
+                )
             # §2.2: a membership-less operator with an ACTIVE grant gets that
             # tenant in scope, read-only. A real membership always wins.
             if membership is None and op_row is not None:

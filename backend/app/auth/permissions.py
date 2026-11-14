@@ -94,5 +94,28 @@ def require_platform_operator_mfa(
     _require_operator_mfa(scope)
     return scope
 
+
+def require_platform_leads(scope: AccessScope = Depends(get_access_scope)) -> AccessScope:
+    """Tier-0 `owner` or `marketing` — the sales pipeline (SPEC_PLATFORM_LEADS).
+    `operator` and `support` never qualify: prospects are not their business."""
+    if (
+        scope.user.role.value != ROLE_PLATFORM_ADMIN
+        or scope.platform_operator_role not in ('owner', 'marketing')
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='You do not have permission to perform this action.',
+        )
+    return scope
+
+
+def require_platform_leads_mfa(
+    scope: AccessScope = Depends(require_platform_leads),
+) -> AccessScope:
+    """`owner` or `marketing` with 2FA — every write on the pipeline."""
+    _require_operator_mfa(scope)
+    return scope
+
+
 # Backward-compat alias used by audit_logs route.
 require_apf = require_network_admin
