@@ -33,6 +33,12 @@ import {
   WorkerOrganizations,
   WorkerProfile,
   MyProfile,
+  Lead,
+  LeadDetail,
+  LeadEvent,
+  LeadImportResult,
+  LeadListResponse,
+  LeadPatch,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
@@ -790,4 +796,43 @@ export async function onboardWorker(
   },
 ): Promise<WorkerProfile> {
   return postJson<WorkerProfile>(`/api/v1/workers/${workerId}/onboard`, payload);
+}
+
+// ── Sales pipeline (/platform/leads) ─────────────────────────────────────────
+
+export async function createLead(payload: LeadPatch & { org_name: string; segment: string; province: string }): Promise<Lead> {
+  return postJson<Lead>("/api/v1/platform/leads", payload);
+}
+
+export async function updateLead(id: string, patch: LeadPatch): Promise<Lead> {
+  return patchJson<Lead>(`/api/v1/platform/leads/${id}`, patch);
+}
+
+export async function fetchLead(id: string): Promise<LeadDetail> {
+  return getJson<LeadDetail>(`/api/v1/platform/leads/${id}`);
+}
+
+export async function addLeadEvent(id: string, type: string, body: string): Promise<LeadEvent> {
+  return postJson<LeadEvent>(`/api/v1/platform/leads/${id}/events`, { type, body });
+}
+
+/** One page of the list — used by the CSV export, which walks every page of
+ * the current filters. `query` comes from leadsQuery(). */
+export async function fetchLeadsPage(query: string): Promise<LeadListResponse> {
+  return getJson<LeadListResponse>(`/api/v1/platform/leads${query}`);
+}
+
+export async function importLeads(file: File): Promise<LeadImportResult> {
+  const form = new FormData();
+  form.append("file", file);
+  // No Content-Type header: the browser sets the multipart boundary itself.
+  const response = await fetch(`${BASE}/api/v1/platform/leads/import`, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: form,
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessageFromResponse(response, `Import failed (${response.status})`));
+  }
+  return response.json();
 }

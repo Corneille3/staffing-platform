@@ -38,6 +38,12 @@ const ROLE_LEGEND: { role: string; title: string; blurb: string; tone: string }[
     blurb: "Read-only. Can request time-boxed tenant access with approval.",
     tone: "var(--ink-3)",
   },
+  {
+    role: "marketing",
+    title: "Marketing",
+    blurb: "The sales pipeline only — leads, nothing else. No tenants, no settings, no tenant access.",
+    tone: "#8C6B14",
+  },
 ];
 
 const GRID = "2.2fr 1fr 1fr 1fr 1.6fr";
@@ -97,7 +103,7 @@ export function PlatformSettingsView({
         }
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14, marginBottom: 16 }}>
         {ROLE_LEGEND.map((r) => (
           <div key={r.role} style={{ ...card, padding: "16px 18px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -271,6 +277,7 @@ function OperatorRow({
               <option value="owner">Owner</option>
               <option value="operator">Operator</option>
               <option value="support">Support</option>
+              <option value="marketing">Marketing</option>
             </select>
             <SaveFlash state={roleFlash.state} style={{ fontSize: 10.5 }} />
           </div>
@@ -650,7 +657,7 @@ function InviteOperatorModal({ onClose, onCreated }: { onClose: () => void; onCr
   const [email, setEmail] = useState("");
   const [first, setFirst] = useState("");
   const [last, setLast] = useState("");
-  const [role, setRole] = useState<"owner" | "operator" | "support">("operator");
+  const [role, setRole] = useState<"owner" | "operator" | "support" | "marketing">("operator");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -706,7 +713,7 @@ function InviteOperatorModal({ onClose, onCreated }: { onClose: () => void; onCr
         </ModalField>
         <ModalField label="Role">
           <div style={{ display: "flex", gap: 8 }}>
-            {(["owner", "operator", "support"] as const).map((code) => {
+            {(["owner", "operator", "support", "marketing"] as const).map((code) => {
               const active = role === code;
               return (
                 <button

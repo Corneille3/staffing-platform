@@ -49,7 +49,7 @@ export function PlatformTenantsView({
   callerWorkspace?: TenantProfile | null;
   // Tier-0 role: `support` sees a read-only table (no invite, no lifecycle
   // buttons — the backend 403s those anyway). null (dev mode) = full UI.
-  callerOperatorRole?: "owner" | "operator" | "support" | null;
+  callerOperatorRole?: "owner" | "operator" | "support" | "marketing" | null;
 }) {
   const router = useRouter();
   const [inviteOpen, setInviteOpen] = useState(false);

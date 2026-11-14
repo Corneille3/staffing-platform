@@ -1,0 +1,562 @@
+"use client";
+
+import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { ArrowLeft, ArrowUpRight, Check, ExternalLink } from "lucide-react";
+import { Link } from "../i18n/navigation";
+import { addLeadEvent, fetchLead, updateLead } from "../lib/browser-api";
+import {
+  LEAD_BAN_PHASES,
+  LEAD_EVENT_TYPES,
+  LEAD_KINDS,
+  LEAD_SEGMENTS,
+  LEAD_SOURCES,
+  LEAD_STATUSES,
+  LEAD_WAVES,
+  canMoveLead,
+  daysBetween,
+  formatDay,
+  isLeadOverdue,
+} from "../lib/leads";
+import { shiftDateKey, shiftDateTime } from "../lib/shift-time";
+import type { Lead, LeadDetail, LeadEvent, LeadPatch, LeadStatus } from "../lib/types";
+import {
+  LEAD_STATUS_TONE,
+  LeadFieldLabel,
+  LeadKindBadge,
+  LeadStatusChip,
+  leadCard,
+  leadEyebrow,
+  leadInput,
+  leadPrimaryBtn,
+  leadRowBtn,
+} from "./platform-leads-shared";
+import { SaveFlash, useSaveFlash } from "./ui";
+
+type Option = readonly [value: string, label: string];
+type FieldKey = keyof LeadPatch;
+
+export function PlatformLeadDetail({
+  initial,
+  todayKey,
+  canSeeTenants,
+}: {
+  initial: LeadDetail;
+  todayKey: string;
+  // Only an owner can open the tenants console; marketing cannot.
+  canSeeTenants: boolean;
+}) {
+  const t = useTranslations("platform.leads");
+  const locale = useLocale();
+  const [lead, setLead] = useState<Lead>(initial);
+  const [events, setEvents] = useState<LeadEvent[]>(initial.events);
+
+  /** One PATCH; the row state follows the server's answer. Throws on refusal
+   * so the calling field can show the message and roll its draft back. */
+  async function patch(change: LeadPatch): Promise<void> {
+    const updated = await updateLead(lead.id, change);
+    setLead(updated);
+    if (change.status) {
+      // A transition wrote an event — pull the feed rather than guess it.
+      try {
+        setEvents((await fetchLead(lead.id)).events);
+      } catch {
+        // The lead itself is saved; a stale feed is not worth an error.
+      }
+    }
+  }
+
+  const overdue = isLeadOverdue(lead, todayKey);
+  const field = (key: string) => t(`field.${key}`);
+  const text = (key: FieldKey, extra: Partial<FieldProps> = {}) => (
+    <Field key={key} label={field(key)} value={lead[key] as string | number | null} onSave={(v) => patch({ [key]: v })} {...extra} />
+  );
+  const select = (key: FieldKey, options: Option[], extra: Partial<FieldProps> = {}) => (
+    <Field key={key} label={field(key)} value={lead[key] as string | null} options={options} onSave={(v) => patch({ [key]: v })} {...extra} />
+  );
+
+  return (
+    <div style={{ padding: "28px 36px 64px", maxWidth: 1280 }}>
+      <Link href="/platform/leads" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--ink-2)", fontSize: 13, textDecoration: "none", marginBottom: 16 }}>
+        <ArrowLeft size={14} /> {t("detail.back")}
+      </Link>
+
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ ...leadEyebrow, display: "flex", alignItems: "center", gap: 8 }}>
+            {t(`segment.${lead.segment}`)}
+            {lead.external_ref ? <span style={{ fontFamily: "var(--mono)", letterSpacing: 0 }}>· {lead.external_ref}</span> : null}
+          </div>
+          <h1 style={{ fontFamily: "var(--serif)", fontSize: "clamp(1.9rem, 3.6vw, 2.6rem)", lineHeight: 1.05, margin: "6px 0 8px", letterSpacing: "-0.02em", fontWeight: 400 }}>
+            {lead.org_name}
+          </h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 12, color: "var(--ink-3)" }}>
+            <LeadStatusChip status={lead.status} />
+            <LeadKindBadge kind={lead.kind} />
+            <span>{[lead.city, lead.province].filter(Boolean).join(", ")}</span>
+            <span>· {t("detail.created", { date: formatDay(shiftDateKey(lead.created_at), locale) })}</span>
+          </div>
+        </div>
+      </div>
+
+      <StatusBar lead={lead} onMove={(status, reason) => patch(reason ? { status, lost_reason: reason } : { status })} />
+
+      {lead.tenant_id ? (
+        <div style={{ ...leadCard, padding: "16px 20px", marginBottom: 18, background: "var(--moss-soft)", borderColor: "transparent", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          <Check size={18} style={{ color: "var(--moss)", flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--moss)" }}>{t("detail.convertedTitle")}</div>
+            <div style={{ fontSize: 13, color: "var(--ink)", marginTop: 2 }}>
+              {lead.converted_at
+                ? t("detail.convertedBody", {
+                    date: formatDay(shiftDateKey(lead.converted_at), locale),
+                    days: daysBetween(lead.created_at, lead.converted_at),
+                  })
+                : t("detail.invitedBody")}
+            </div>
+          </div>
+          {canSeeTenants ? (
+            <Link href="/platform/tenants" style={{ ...leadRowBtn, textDecoration: "none", background: "#fff" }}>
+              {t("detail.viewTenants")} <ArrowUpRight size={13} />
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.5fr) minmax(300px, 1fr)", gap: 18, alignItems: "start" }}>
+        {/* Left — every field edits in place and saves on blur */}
+        <div style={{ display: "grid", gap: 18, minWidth: 0 }}>
+          <Section title={t("detail.secTracking")} accent={overdue}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(150px, 1fr)", gap: 14 }}>
+              {text("next_action")}
+              <Field
+                label={overdue ? `${field("next_action_at")} · ${t("list.overdue")}` : field("next_action_at")}
+                value={lead.next_action_at}
+                type="date"
+                danger={overdue}
+                onSave={(v) => patch({ next_action_at: v as string | null })}
+              />
+            </div>
+            {text("notes", { multiline: true })}
+          </Section>
+
+          <Section title={t("detail.secOrganization")}>
+            <Grid>
+              {text("org_name", { required: true })}
+              {select("segment", LEAD_SEGMENTS.map((s) => [s, t(`segment.${s}`)]), { required: true })}
+              {text("subtype")}
+              {select("kind", LEAD_KINDS.map((k) => [k, t(`kind.${k}`)]), { required: true })}
+              {text("site_count", { type: "number", min: 0 })}
+              {text("capacity_note")}
+              {text("city")}
+              {text("province", { required: true, upper: true, maxLength: 2 })}
+            </Grid>
+            {text("regions")}
+          </Section>
+
+          <Section title={t("detail.secContact")}>
+            <Grid>
+              {text("contact_name")}
+              {text("contact_title")}
+              {text("email", { type: "email" })}
+              {text("phone", { type: "tel" })}
+              {text("website", { link: true })}
+              {select("language", [["fr", t("language.fr")], ["en", t("language.en")]], { required: true })}
+            </Grid>
+          </Section>
+
+          <Section title={t("detail.secQualification")}>
+            <Grid>
+              {text("score", { type: "number", min: 0, max: 10 })}
+              {select("wave", LEAD_WAVES.map((w) => [w, t("list.wave", { wave: w })]))}
+              {select("agency_ban_phase", LEAD_BAN_PHASES.map((p) => [p, t(`phaseLong.${p}`)]), { required: true })}
+              <Field
+                label={field("hiring_signal")}
+                value={lead.hiring_signal === null ? null : lead.hiring_signal ? "yes" : "no"}
+                options={[["yes", t("hiring.yes")], ["no", t("hiring.no")]]}
+                emptyLabel={t("hiring.unknown")}
+                onSave={(v) => patch({ hiring_signal: v === null ? null : v === "yes" })}
+              />
+            </Grid>
+          </Section>
+
+          <Section title={t("detail.secOrigin")}>
+            <Grid>
+              {select("source", LEAD_SOURCES.map((s) => [s, t(`source.${s}`)]), { required: true })}
+              {text("source_detail")}
+              {text("external_ref")}
+              {text("source_url", { link: true })}
+            </Grid>
+          </Section>
+        </div>
+
+        {/* Right — the activity feed */}
+        <ActivityFeed leadId={lead.id} events={events} onAdded={(event) => setEvents((prev) => [event, ...prev])} />
+      </div>
+    </div>
+  );
+}
+
+// ── Stage bar ────────────────────────────────────────────────────────────────
+
+function StatusBar({
+  lead,
+  onMove,
+}: {
+  lead: Lead;
+  onMove: (status: LeadStatus, lostReason?: string) => Promise<void>;
+}) {
+  const t = useTranslations("platform.leads");
+  const [busy, setBusy] = useState<LeadStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [losing, setLosing] = useState(false);
+  const [reason, setReason] = useState("");
+
+  async function move(status: LeadStatus, lostReason?: string) {
+    setBusy(status);
+    setError(null);
+    try {
+      await onMove(status, lostReason);
+      setLosing(false);
+      setReason("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div style={{ ...leadCard, padding: "16px 18px", marginBottom: 18 }}>
+      <div style={{ ...leadEyebrow, marginBottom: 10 }}>{t("detail.statusTitle")}</div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {LEAD_STATUSES.map((status) => {
+          const current = lead.status === status;
+          const allowed = canMoveLead(lead.status, status);
+          const tone = LEAD_STATUS_TONE[status];
+          return (
+            <button
+              key={status}
+              type="button"
+              disabled={!allowed || busy !== null}
+              aria-pressed={current}
+              title={status === "won" && !current ? t("detail.wonHint") : undefined}
+              onClick={() => (status === "lost" ? setLosing(true) : move(status))}
+              style={{
+                flex: "1 1 110px",
+                padding: "10px 8px",
+                borderRadius: 10,
+                fontFamily: "var(--ui)",
+                fontSize: 12.5,
+                fontWeight: current ? 600 : 400,
+                cursor: allowed && busy === null ? "pointer" : "default",
+                background: current ? tone.bg : "#fff",
+                color: current ? tone.c : allowed ? "var(--ink)" : "var(--ink-4)",
+                border: `0.5px solid ${current ? tone.c : "var(--line)"}`,
+                opacity: busy === status ? 0.6 : 1,
+                minHeight: 40,
+              }}
+            >
+              {t(`status.${status}`)}
+            </button>
+          );
+        })}
+      </div>
+
+      {losing ? (
+        <div style={{ marginTop: 14, padding: "14px 16px", borderRadius: 10, background: "var(--rose-soft)" }}>
+          <LeadFieldLabel>{t("detail.lostReasonLabel")}</LeadFieldLabel>
+          <input
+            autoFocus
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && reason.trim()) void move("lost", reason.trim());
+              if (e.key === "Escape") setLosing(false);
+            }}
+            placeholder={t("detail.lostReasonPlaceholder")}
+            maxLength={1000}
+            style={{ ...leadInput, background: "#fff" }}
+          />
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
+            <button type="button" onClick={() => setLosing(false)} style={{ ...leadRowBtn, background: "#fff" }}>{t("detail.cancel")}</button>
+            <button
+              type="button"
+              disabled={!reason.trim() || busy !== null}
+              onClick={() => move("lost", reason.trim())}
+              style={{ ...leadPrimaryBtn, padding: "8px 14px", fontSize: 12, background: "var(--rose)", opacity: !reason.trim() || busy !== null ? 0.5 : 1 }}
+            >
+              {t("detail.confirmLost")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {lead.status === "lost" ? (
+        <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "var(--rose)" }}>
+          {t("detail.lostBecause", { reason: lead.lost_reason ?? "—" })}
+          <span style={{ color: "var(--ink-3)" }}> · {t("detail.reopenHint")}</span>
+        </p>
+      ) : null}
+      {lead.status === "won" ? (
+        <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "var(--moss)" }}>{t("detail.closedWon")}</p>
+      ) : null}
+      {error ? <p role="alert" style={{ margin: "10px 0 0", color: "var(--rose)", fontSize: 12 }}>{error}</p> : null}
+    </div>
+  );
+}
+
+// ── Editable field ───────────────────────────────────────────────────────────
+
+type FieldProps = {
+  label: string;
+  value: string | number | null;
+  onSave: (value: string | number | null) => Promise<void>;
+  type?: "text" | "number" | "date" | "email" | "tel";
+  options?: Option[];
+  emptyLabel?: string;
+  multiline?: boolean;
+  required?: boolean;
+  upper?: boolean;
+  link?: boolean;
+  danger?: boolean;
+  min?: number;
+  max?: number;
+  maxLength?: number;
+};
+
+/** One column of the lead, edited in place: a select saves on change, any
+ * other input on blur (Enter blurs a single-line input). On refusal the draft
+ * snaps back to the stored value and the server's message shows underneath. */
+function Field({
+  label, value, onSave, type = "text", options, emptyLabel, multiline, required, upper, link, danger, min, max, maxLength,
+}: FieldProps) {
+  const tCommon = useTranslations("common");
+  const stored = value === null || value === undefined ? "" : String(value);
+  const [draft, setDraft] = useState(stored);
+  const [lastStored, setLastStored] = useState(stored);
+  const [error, setError] = useState<string | null>(null);
+  const flash = useSaveFlash();
+
+  // The stored value moved under us (a save elsewhere, e.g. the import's
+  // normalisation or a reopened lead clearing its reason): follow it.
+  if (stored !== lastStored) {
+    setLastStored(stored);
+    setDraft(stored);
+  }
+
+  async function commit(raw: string) {
+    const next = upper ? raw.trim().toUpperCase() : raw.trim();
+    if (next === stored) {
+      setDraft(stored);
+      return;
+    }
+    if (required && !next) {
+      setDraft(stored);
+      return;
+    }
+    let payload: string | number | null = next || null;
+    if (type === "number" && next) {
+      const parsed = Number(next);
+      if (!Number.isInteger(parsed)) {
+        setDraft(stored);
+        return;
+      }
+      payload = parsed;
+    }
+    setError(null);
+    flash.start();
+    try {
+      await onSave(payload);
+      flash.succeed();
+    } catch (err) {
+      flash.fail();
+      setDraft(stored);
+      setError(err instanceof Error ? err.message : "Failed");
+    }
+  }
+
+  const style = {
+    ...leadInput,
+    background: "#fff",
+    fontSize: 13.5,
+    ...(danger ? { borderColor: "var(--rose)", color: "var(--rose)" } : {}),
+  };
+  const href = link && stored ? (/^https?:\/\//i.test(stored) ? stored : `https://${stored}`) : null;
+
+  return (
+    <label style={{ display: "block", minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+        <LeadFieldLabel>{label}</LeadFieldLabel>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <SaveFlash state={flash.state} savingLabel={tCommon("saving")} savedLabel={tCommon("saved")} style={{ fontSize: 10.5 }} />
+          {href ? (
+            <a href={href} target="_blank" rel="noreferrer noopener" aria-label={label} style={{ color: "var(--ink-3)", display: "inline-flex" }} onClick={(e) => e.stopPropagation()}>
+              <ExternalLink size={12} />
+            </a>
+          ) : null}
+        </span>
+      </div>
+      {options ? (
+        <select
+          value={draft}
+          onChange={(e) => { setDraft(e.target.value); void commit(e.target.value); }}
+          style={style}
+        >
+          {required && draft ? null : <option value="">{emptyLabel ?? "—"}</option>}
+          {options.map(([code, text]) => <option key={code} value={code}>{text}</option>)}
+        </select>
+      ) : multiline ? (
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={(e) => void commit(e.target.value)}
+          rows={4}
+          maxLength={10000}
+          style={{ ...style, resize: "vertical", lineHeight: 1.5, marginTop: 0 }}
+        />
+      ) : (
+        <input
+          type={type}
+          value={draft}
+          min={min}
+          max={max}
+          maxLength={maxLength}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={(e) => void commit(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            if (e.key === "Escape") setDraft(stored);
+          }}
+          style={type === "number" || type === "date" ? { ...style, fontFamily: "var(--mono)" } : style}
+        />
+      )}
+      {error ? <span role="alert" style={{ display: "block", marginTop: 4, fontSize: 11, color: "var(--rose)", fontWeight: 600 }}>{error}</span> : null}
+    </label>
+  );
+}
+
+function Section({ title, accent, children }: { title: string; accent?: boolean; children: React.ReactNode }) {
+  return (
+    <section style={{ ...leadCard, padding: "18px 20px", borderColor: accent ? "var(--rose)" : "var(--line)" }}>
+      <div style={{ ...leadEyebrow, marginBottom: 14 }}>{title}</div>
+      <div style={{ display: "grid", gap: 14 }}>{children}</div>
+    </section>
+  );
+}
+
+function Grid({ children }: { children: React.ReactNode }) {
+  return <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>{children}</div>;
+}
+
+// ── Activity feed ────────────────────────────────────────────────────────────
+
+function ActivityFeed({
+  leadId,
+  events,
+  onAdded,
+}: {
+  leadId: string;
+  events: LeadEvent[];
+  onAdded: (event: LeadEvent) => void;
+}) {
+  const t = useTranslations("platform.leads");
+  const [type, setType] = useState<(typeof LEAD_EVENT_TYPES)[number]>("note");
+  const [body, setBody] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function add() {
+    if (!body.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      onAdded(await addLeadEvent(leadId, type, body.trim()));
+      setBody("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section style={{ ...leadCard, padding: "18px 20px", position: "sticky", top: 70 }}>
+      <div style={{ ...leadEyebrow, marginBottom: 14 }}>{t("detail.activityTitle")}</div>
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+        {LEAD_EVENT_TYPES.map((code) => {
+          const active = type === code;
+          return (
+            <button
+              key={code}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setType(code)}
+              style={{
+                padding: "6px 11px",
+                borderRadius: 999,
+                fontFamily: "var(--ui)",
+                fontSize: 12,
+                cursor: "pointer",
+                background: active ? "var(--ink)" : "#fff",
+                color: active ? "var(--paper)" : "var(--ink)",
+                border: `0.5px solid ${active ? "transparent" : "var(--line)"}`,
+              }}
+            >
+              {t(`event.${code}`)}
+            </button>
+          );
+        })}
+      </div>
+      <textarea
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void add();
+        }}
+        placeholder={t("detail.addPlaceholder")}
+        aria-label={t("detail.addPlaceholder")}
+        rows={3}
+        maxLength={5000}
+        style={{ ...leadInput, background: "#fff", fontSize: 13.5, resize: "vertical", lineHeight: 1.5 }}
+      />
+      {error ? <p role="alert" style={{ margin: "6px 0 0", color: "var(--rose)", fontSize: 12 }}>{error}</p> : null}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+        <button type="button" onClick={add} disabled={busy || !body.trim()} style={{ ...leadPrimaryBtn, padding: "8px 14px", fontSize: 12, opacity: busy || !body.trim() ? 0.5 : 1 }}>
+          {busy ? t("detail.adding") : t("detail.add")}
+        </button>
+      </div>
+
+      <div style={{ marginTop: 16, borderTop: "0.5px solid var(--line)", maxHeight: 520, overflowY: "auto" }}>
+        {events.length === 0 ? (
+          <p style={{ margin: "14px 0 0", fontSize: 13, color: "var(--ink-3)" }}>{t("detail.activityEmpty")}</p>
+        ) : (
+          events.map((event) => (
+            <div key={event.id} style={{ padding: "12px 0", borderBottom: "0.5px solid var(--line)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600 }}>
+                  {t.has(`event.${event.type}`) ? t(`event.${event.type}`) : event.type}
+                </span>
+                <span style={{ fontSize: 11, color: "var(--ink-3)", fontFamily: "var(--mono)", whiteSpace: "nowrap" }}>
+                  {shiftDateTime(event.created_at)}
+                </span>
+              </div>
+              {event.type === "status_changed" && event.from_status && event.to_status ? (
+                <div style={{ fontSize: 12.5, color: "var(--ink-2)", marginTop: 3 }}>
+                  {t("detail.transition", { from: t(`status.${event.from_status}`), to: t(`status.${event.to_status}`) })}
+                </div>
+              ) : null}
+              {event.body ? (
+                <div style={{ fontSize: 13, color: "var(--ink)", marginTop: 4, lineHeight: 1.5, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+                  {event.body}
+                </div>
+              ) : null}
+              <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 4 }}>{event.actor_name ?? t("detail.system")}</div>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}

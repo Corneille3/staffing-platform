@@ -26,6 +26,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (CLERK_ENABLED) {
     const session = await requireServerSession(["org_admin", "network_admin", "platform_admin"]);
     sessionRole = session.role;
+    // A marketing operator owns the sales pipeline only — the API refuses
+    // every workspace call, which would otherwise read as "suspended" below.
+    if (session.platform_operator_role === "marketing") redirect("/platform/leads");
   }
 
   // Sidebar data — both calls are tenant-scoped via AccessScope and reused across
