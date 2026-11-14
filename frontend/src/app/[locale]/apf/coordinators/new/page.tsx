@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Eyebrow } from "../../../../../components/ui";
+import { HideOnReadOnlyVisit, ReadOnlyVisitNotice } from "../../../../../components/read-only-visit";
 import { fetchOrganizationsForTenant, inviteCoordinator } from "../../../../../lib/browser-api";
 import { Coordinator, Organization } from "../../../../../lib/types";
 
@@ -53,6 +54,14 @@ const SECONDARY_BTN: React.CSSProperties = {
 };
 
 export default function InviteCoordinatorPage() {
+  return (
+    <HideOnReadOnlyVisit fallback={<ReadOnlyVisitNotice />}>
+      <InviteCoordinatorPageForm />
+    </HideOnReadOnlyVisit>
+  );
+}
+
+function InviteCoordinatorPageForm() {
   const router = useRouter();
   const [form, setForm] = useState({
     first_name: "",

@@ -1,3 +1,4 @@
+import { HideOnReadOnlyVisit } from "../../../../components/read-only-visit";
 import Link from "next/link";
 import { Eyebrow, Mono } from "../../../../components/ui";
 import { ApfActivityList } from "../../../../components/apf-activity-list";
@@ -70,6 +71,7 @@ export default async function ActivityPage({
           >
             Network-wide audit <em style={{ fontStyle: "italic" }}>feed</em>.
           </h1>
+          <HideOnReadOnlyVisit>
           <Link
             href={orgId ? `/apf/export?org_id=${orgId}` : "/apf/export"}
             style={{
@@ -86,6 +88,7 @@ export default async function ActivityPage({
           >
             Export →
           </Link>
+          </HideOnReadOnlyVisit>
         </div>
         <p style={{ margin: "12px 0 0", maxWidth: 720, color: "var(--ink-2)", lineHeight: 1.55, fontSize: 15 }}>
           Every significant action across the network — requests created, workers notified, responses

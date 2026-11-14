@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Eyebrow } from "../../../../../components/ui";
+import { HideOnReadOnlyVisit, ReadOnlyVisitNotice } from "../../../../../components/read-only-visit";
 import { inviteWorker } from "../../../../../lib/browser-api";
 import { Worker } from "../../../../../lib/types";
 
@@ -53,6 +54,14 @@ const SECONDARY_BTN: React.CSSProperties = {
 };
 
 export default function InviteWorkerPage() {
+  return (
+    <HideOnReadOnlyVisit fallback={<ReadOnlyVisitNotice />}>
+      <InviteWorkerPageForm />
+    </HideOnReadOnlyVisit>
+  );
+}
+
+function InviteWorkerPageForm() {
   const router = useRouter();
   const [form, setForm] = useState({
     first_name: "",

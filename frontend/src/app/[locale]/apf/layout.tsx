@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { ArrowLeft, ClipboardList, Eye } from "lucide-react";
 import { ApfNavigation } from "../../../components/apf-navigation";
 import { HeaderSignOutButton } from "../../../components/header-sign-out-button";
+import { ReadOnlyVisitProvider } from "../../../components/read-only-visit";
 import { Eyebrow } from "../../../components/ui";
 import { WorkspaceSuspendedScreen } from "../../../components/workspace-suspended";
 import { ApiError, getOrganizations, getTenantProfile, requireServerSession } from "../../../lib/api";
@@ -231,7 +232,7 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
           {CLERK_ENABLED ? <HeaderSignOutButton /> : null}
         </div>
         <div style={{ flex: 1, padding: "32px 32px 64px", maxWidth: 1280, width: "100%" }}>
-          {children}
+          <ReadOnlyVisitProvider readOnly={tenant?.via_grant === true}>{children}</ReadOnlyVisitProvider>
         </div>
       </main>
     </div>

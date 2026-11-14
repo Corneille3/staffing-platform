@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Eyebrow, Mono } from "../../../../components/ui";
 import { getCoordinators } from "../../../../lib/api";
 import { RemoveUserButton } from "../../../../components/remove-user-button";
+import { HideOnReadOnlyVisit } from "../../../../components/read-only-visit";
 import { CoordinatorPhoneCell } from "../../../../components/coordinator-phone-cell";
 
 const LANG_LABEL: Record<string, string> = { fr: "FR", en: "EN", bilingual: "Bilingual" };
@@ -43,6 +44,7 @@ export default async function CoordinatorsPage() {
           <p style={{ margin: 0, maxWidth: 640, color: "var(--ink-2)", lineHeight: 1.55, fontSize: 15 }}>
             Coordinators manage coverage requests for their assigned organizations. A coordinator can be assigned to multiple organizations.
           </p>
+          <HideOnReadOnlyVisit>
           <Link
             href="/apf/coordinators/new"
             style={{
@@ -60,6 +62,7 @@ export default async function CoordinatorsPage() {
           >
             + Invite coordinator
           </Link>
+          </HideOnReadOnlyVisit>
         </div>
       </section>
 
@@ -188,11 +191,13 @@ export default async function CoordinatorsPage() {
               </span>
 
               <div style={{ justifySelf: "end" }}>
-                <RemoveUserButton
-                  userId={coord.id}
-                  userName={`${coord.first_name} ${coord.last_name}`}
-                  isActive={coord.is_active}
-                />
+                <HideOnReadOnlyVisit>
+                  <RemoveUserButton
+                    userId={coord.id}
+                    userName={`${coord.first_name} ${coord.last_name}`}
+                    isActive={coord.is_active}
+                  />
+                </HideOnReadOnlyVisit>
               </div>
             </div>
           ))}
