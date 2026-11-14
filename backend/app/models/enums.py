@@ -30,6 +30,20 @@ class PlatformOperatorRole(str, Enum):
     MARKETING = 'marketing'
 
 
+class LeadStatus(str, Enum):
+    """Sales pipeline stages (SPEC_PLATFORM_LEADS §4). The only lead field
+    stored as a Postgres enum — it carries the state machine. Segment, source,
+    kind and ban phase are validated strings (schemas/platform_leads.py) so a
+    new segment never needs a migration."""
+    NEW = 'new'
+    CONTACTED = 'contacted'
+    DEMO_BOOKED = 'demo_booked'
+    PILOT = 'pilot'
+    INVITED = 'invited'   # set by the invite flow (or by hand)
+    WON = 'won'           # set by the system when the linked tenant goes active
+    LOST = 'lost'         # needs a reason; reopens to `contacted` only
+
+
 class TenantAccessGrantStatus(str, Enum):
     """Lifecycle of a logged, consented, time-boxed look inside a tenant
     (PLATFORM_HANDOFF §2.2)."""
