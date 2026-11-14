@@ -19,6 +19,9 @@ import {
   NetworkSummary,
   Organization,
   OrgSnapshot,
+  LeadDetail,
+  LeadListResponse,
+  LeadStats,
   PlatformOperatorsResponse,
   PlatformSettings,
   PlatformTenantsResponse,
@@ -31,6 +34,7 @@ import {
   Worker,
   MyProfile,
 } from "./types";
+import { leadsQuery, type LeadFilters } from "./leads";
 
 export type ServerSession = {
   id: string;
@@ -42,7 +46,7 @@ export type ServerSession = {
   preferred_language: string;
   /** Tier-0 operator role — null for everyone who isn't a platform operator.
    * The UI hides owner/operator-only controls from `support`. */
-  platform_operator_role: "owner" | "operator" | "support" | null;
+  platform_operator_role: "owner" | "operator" | "support" | "marketing" | null;
 };
 
 /** Error thrown by fetchJson — carries the HTTP status so layouts can
@@ -263,6 +267,26 @@ export async function getPlatformOperators(): Promise<PlatformOperatorsResponse 
     return await fetchJson<PlatformOperatorsResponse>("/api/v1/platform/operators");
   } catch {
     return null;
+  }
+}
+
+// ── Sales pipeline (owner + marketing) ───────────────────────────────────────
+
+export async function getPlatformLeads(filters: LeadFilters): Promise<LeadListResponse> {
+  return fetchJson<LeadListResponse>(`/api/v1/platform/leads${leadsQuery(filters, true)}`);
+}
+
+export async function getPlatformLeadStats(): Promise<LeadStats> {
+  return fetchJson<LeadStats>("/api/v1/platform/leads/stats");
+}
+
+/** null when the id is unknown (404) — the page turns that into notFound(). */
+export async function getPlatformLead(id: string): Promise<LeadDetail | null> {
+  try {
+    return await fetchJson<LeadDetail>(`/api/v1/platform/leads/${encodeURIComponent(id)}`);
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 404 || err.status === 422)) return null;
+    throw err;
   }
 }
 

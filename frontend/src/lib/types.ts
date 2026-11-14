@@ -712,7 +712,7 @@ export type PlatformTenantsResponse = {
 };
 
 // ── Platform Settings (PLATFORM_HANDOFF §2) ───────────────────────────────────
-export type PlatformOperatorRole = "owner" | "operator" | "support";
+export type PlatformOperatorRole = "owner" | "operator" | "support" | "marketing";
 
 export type PlatformOperator = {
   id: string;
@@ -832,3 +832,93 @@ export type TenantProfile = {
    * (read-only visit) rather than a membership. */
   via_grant?: boolean;
 };
+
+// ── Operator-level sales pipeline (/platform/leads — SPEC_PLATFORM_LEADS) ────
+
+export type LeadStatus =
+  | "new"
+  | "contacted"
+  | "demo_booked"
+  | "pilot"
+  | "invited"
+  | "won"
+  | "lost";
+
+export type Lead = {
+  id: string;
+  external_ref: string | null;
+  org_name: string;
+  segment: string;
+  subtype: string | null;
+  kind: string;
+  site_count: number | null;
+  capacity_note: string | null;
+  city: string | null;
+  province: string;
+  regions: string | null;
+  agency_ban_phase: string;
+  language: string;
+  website: string | null;
+  phone: string | null;
+  email: string | null;
+  contact_name: string | null;
+  contact_title: string | null;
+  hiring_signal: boolean | null;
+  score: number | null;
+  wave: string | null;
+  status: LeadStatus;
+  lost_reason: string | null;
+  source: string;
+  source_detail: string | null;
+  next_action: string | null;
+  next_action_at: string | null; // YYYY-MM-DD
+  notes: string | null;
+  source_url: string | null;
+  tenant_id: string | null;
+  converted_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LeadEvent = {
+  id: string;
+  type: string;
+  from_status: LeadStatus | null;
+  to_status: LeadStatus | null;
+  body: string | null;
+  actor_id: string | null;
+  actor_name: string | null;
+  created_at: string;
+};
+
+export type LeadDetail = Lead & { events: LeadEvent[] };
+
+export type LeadListResponse = {
+  items: Lead[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type LeadStats = {
+  total: number;
+  by_status: Record<LeadStatus, number>;
+  by_segment_wave: { segment: string; wave: string | null; count: number }[];
+  open_pipeline: number;
+  overdue_actions: number;
+  in_demo_or_pilot: number;
+  conversion_rate: number | null;
+};
+
+export type LeadImportResult = {
+  created: number;
+  updated: number;
+  unchanged: number;
+  skipped: { row: number; reason: string }[];
+};
+
+/** PATCH body: any editable column; `null` clears a nullable one. */
+export type LeadPatch = Partial<
+  Omit<Lead, "id" | "tenant_id" | "converted_at" | "created_by" | "created_at" | "updated_at">
+>;
