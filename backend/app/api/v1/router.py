@@ -17,6 +17,7 @@ from app.api.v1 import (
     notifications,
     organizations,
     platform,
+    platform_leads,
     reports,
     request_responses,
     staffing_requests,
@@ -38,6 +39,9 @@ api_router.include_router(notifications.router, prefix='/notifications', tags=['
 api_router.include_router(reports.router, prefix='/reports', tags=['reports'])
 api_router.include_router(audit_logs.router, prefix='/audit-logs', tags=['audit_logs'])
 api_router.include_router(networks.router, prefix='/networks', tags=['networks'])
+# Registered before the console router: it carries its own gate (owner/marketing),
+# not the console's platform_admin surface gate.
+api_router.include_router(platform_leads.router, prefix='/platform/leads', tags=['platform'])
 api_router.include_router(platform.router, prefix='/platform', tags=['platform'])
 api_router.include_router(tenant.router, prefix='/tenant', tags=['tenant'])
 api_router.include_router(apf.router, prefix='/apf', tags=['apf'])
