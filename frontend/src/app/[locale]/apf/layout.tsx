@@ -17,6 +17,9 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
   if (CLERK_ENABLED) {
     const session = await requireServerSession(["network_admin", "platform_admin"]);
     isPlatformAdmin = session.role === "platform_admin";
+    // A marketing operator owns the sales pipeline only — the API refuses
+    // every workspace call, which would otherwise read as "suspended" below.
+    if (session.platform_operator_role === "marketing") redirect("/platform/leads");
   }
 
   // The caller's own tenant — names the workspace in the sidebar. A 403 here

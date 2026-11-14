@@ -4,7 +4,7 @@ import { ArrowUpRight, Shield } from "lucide-react";
 import { HeaderSignOutButton } from "../../../components/header-sign-out-button";
 import { PlatformNav } from "../../../components/platform-nav";
 import { getTenantProfile, requireServerSession } from "../../../lib/api";
-import type { TenantProfile } from "../../../lib/types";
+import type { PlatformOperatorRole, TenantProfile } from "../../../lib/types";
 
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -12,14 +12,21 @@ const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 // /apf shell: near-black sidebar + "OS" badge + aggregate-only framing.
 
 export default async function PlatformLayout({ children }: { children: React.ReactNode }) {
+  // Tier-0 role decides the nav: `marketing` sees the pipeline only, owner
+  // sees everything, operator/support the console without Leads. null = dev
+  // mode (no Clerk), where every entry shows.
+  let operatorRole: PlatformOperatorRole | null = null;
   if (CLERK_ENABLED) {
-    await requireServerSession(["platform_admin"]);
+    const session = await requireServerSession(["platform_admin"]);
+    operatorRole = session.platform_operator_role;
   }
+  const marketing = operatorRole === "marketing";
 
   // The operator's path into a tenant workspace, when they have one: their
   // own tenant (membership — e.g. the bootstrap admin) or a §2.2 access
   // grant (read-only). 404 = membership-less operator with no grant.
-  const workspace: TenantProfile | null = await getTenantProfile().catch(() => null);
+  // A marketing operator never has one (the API refuses the call).
+  const workspace: TenantProfile | null = marketing ? null : await getTenantProfile().catch(() => null);
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--paper)", color: "var(--ink)" }}>
@@ -102,7 +109,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
         >
           Operate
         </div>
-        <PlatformNav />
+        <PlatformNav operatorRole={operatorRole} />
 
         {workspace ? (
           <>
@@ -177,7 +184,9 @@ export default async function PlatformLayout({ children }: { children: React.Rea
             Isolation
           </div>
           <div style={{ fontSize: 11, color: "rgba(246,244,238,.6)", lineHeight: 1.4 }}>
-            Aggregate metrics only. The operator never sees inside a tenant&apos;s data.
+            {marketing
+              ? "Prospects only. Leads describe organizations that are not tenants yet."
+              : "Aggregate metrics only. The operator never sees inside a tenant\u2019s data."}
           </div>
         </div>
       </aside>
@@ -197,7 +206,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
             gap: 16,
           }}
         >
-          <span style={{ fontSize: 12, color: "var(--ink-3)" }}>Platform Operator</span>
+          <span style={{ fontSize: 12, color: "var(--ink-3)" }}>{marketing ? "Platform · Marketing" : "Platform Operator"}</span>
           {CLERK_ENABLED ? <HeaderSignOutButton /> : null}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
