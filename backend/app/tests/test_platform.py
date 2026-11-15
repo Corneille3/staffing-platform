@@ -22,6 +22,7 @@ def test_platform_tenants_overview_shape_and_counts(platform_admin_client, seed)
     assert set(row) == {
         'id', 'name', 'slug', 'region', 'status', 'org_count',
         'substitute_count', 'fill_rate_30d', 'admin_name', 'admin_email', 'since',
+        'lead_segment', 'lead_source',  # tier-0 data: the sales lead it came from
     }
 
 

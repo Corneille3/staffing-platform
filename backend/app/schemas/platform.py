@@ -31,6 +31,9 @@ class PlatformTenantRow(BaseModel):
     admin_name: str | None = None
     admin_email: str | None = None
     since: datetime | None = None  # activated_at, else created_at
+    # Set when the tenant was invited from a sales lead (/platform/leads).
+    lead_segment: str | None = None
+    lead_source: str | None = None
 
 
 class PlatformTenantsResponse(BaseModel):
