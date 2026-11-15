@@ -269,4 +269,13 @@ Lignes sans `org_name` → `skipped`. Un `external_ref` déjà présent → mise
 ### Reste à faire
 
 - **Session frontend** : onglet Leads, liste, fiche, i18n, option Marketing dans l'écran des opérateurs, redirection d'un compte marketing vers `/platform/leads`, export CSV.
-- **Session conversion + intake** : `POST /{id}/invite` (owner ; demande de découper `TenantService.create_network`, qui commite et envoie le courriel lui-même), passage à `won` à l'activation du tenant, intake public. Le formulaire de kouamvision.com passe par une route serveur : prévoir un secret partagé et la transmission de l'IP du visiteur plutôt que du CORS.
+- **Intake public** (session suivante) : `POST /api/v1/public/leads/intake`. Le formulaire de kouamvision.com passe par une route serveur : prévoir un secret partagé et la transmission de l'IP du visiteur plutôt que du CORS. Un site dédié à StaffiG est prévu plus tard : l'intake ne doit rien supposer du site appelant.
+
+### Conversion (2026-11-15)
+
+- `POST /api/v1/platform/leads/{id}/invite` — **owner seulement**. Le corps apporte ce que le lead n'a pas : `slug`, prénom, nom et courriel de l'admin ; `name`, `admin_phone` et la langue retombent sur les valeurs du lead. Retourne `{lead, tenant}`.
+- Tout ou rien : tenant, premier admin, `platform_leads.tenant_id`, statut `invited` et événement `invited` sont une seule transaction (`TenantService.stage_network`, sans commit ni courriel) ; le courriel d'invitation part après le commit.
+- 409 si le lead est déjà lié à un tenant ou s'il est `won` / `lost` ; les conflits de slug ou de courriel sont ceux de l'invitation classique.
+- À la fin de l'onboarding (`complete_onboarding`), le lead lié passe à `won` avec `converted_at` et un événement `converted` écrit par le système, dans la transaction du tenant.
+- **Aucun retour arrière automatique** : une invitation révoquée ou un tenant supprimé laisse le lead tel quel ; `won` reste terminal.
+- `/platform/tenants` affiche une colonne « Origine » (segment + source du lead) ; la fiche du lead affiche le tenant lié et son état.
