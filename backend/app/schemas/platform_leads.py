@@ -233,6 +233,7 @@ class LeadStats(BaseModel):
     open_pipeline: int        # everything that is neither won nor lost
     overdue_actions: int      # next_action_at < today, still open
     in_demo_or_pilot: int
+    new_website_requests: int  # source website_form, still `new`
     # won ÷ leads that got past `new`; None while nothing has been contacted.
     conversion_rate: float | None
 

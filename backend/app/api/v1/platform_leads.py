@@ -23,7 +23,7 @@ from app.models.tenant import Tenant
 from app.schemas.platform_leads import (
     Kind, LeadCreate, LeadDetail, LeadEventCreate, LeadEventOut, LeadImportResult,
     LeadInvite, LeadInviteResult, LeadListResponse, LeadOut, LeadStats, LeadTenantSummary,
-    LeadUpdate, Segment, Status, Wave,
+    LeadUpdate, Segment, Source, Status, Wave,
 )
 from app.services.platform_lead_conversion import LeadConversionService
 from app.services.platform_lead_import import LeadImportService
@@ -39,6 +39,7 @@ def list_leads(
     province: str | None = Query(default=None, min_length=2, max_length=2),
     wave: Wave | None = None,
     kind: Kind | None = None,
+    source: Source | None = None,
     q: str | None = Query(default=None, max_length=120),
     next_action_before: date | None = None,
     sort: Literal['next_action', 'score', 'updated'] = 'next_action',
@@ -47,7 +48,7 @@ def list_leads(
     db: Session = Depends(get_db_session),
 ) -> LeadListResponse:
     rows, total = PlatformLeadService(db).search(
-        status_=status_, segment=segment, province=province, wave=wave, kind=kind, q=q,
+        status_=status_, segment=segment, province=province, wave=wave, kind=kind, source=source, q=q,
         next_action_before=next_action_before, sort=sort, limit=limit, offset=offset,
     )
     return LeadListResponse(

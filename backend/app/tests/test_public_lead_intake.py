@@ -144,3 +144,27 @@ def test_the_pipeline_itself_stays_closed_to_the_secret(site, monkeypatch):
     monkeypatch.setattr(settings, 'dev_auth_bypass', False)
     assert site.get('/api/v1/platform/leads').status_code == 401
     assert site.post('/api/v1/platform/leads', json=FORM).status_code == 401
+
+
+def test_new_website_requests_are_counted_and_filterable(site, db_session, platform_admin_client):
+    """The list sorts a form lead last (no next action, no score): the stats
+    flag it and `source` filters it, until someone picks it up."""
+    assert site.post(INTAKE, json=FORM).status_code == 201
+    assert site.post(INTAKE, json={**FORM, 'email': 'second@petitspas.example', 'org_name': 'Second'}).status_code == 201
+    hand_made = platform_admin_client.post(
+        '/api/v1/platform/leads', json={'org_name': 'Hand made', 'segment': 'other', 'province': 'QC'},
+    )
+    assert hand_made.status_code == 201
+
+    leads = '/api/v1/platform/leads'
+    assert platform_admin_client.get(f'{leads}/stats').json()['new_website_requests'] == 2
+    listed = platform_admin_client.get(leads, params={'source': 'website_form', 'status': 'new'}).json()
+    assert listed['total'] == 2
+    assert {row['org_name'] for row in listed['items']} == {'CPE Les Petits Pas', 'Second'}
+    assert platform_admin_client.get(leads, params={'source': 'spaceships'}).status_code == 422
+
+    # Picked up: it leaves the count.
+    first = next(row for row in listed['items'] if row['org_name'] == 'Second')
+    moved = platform_admin_client.patch(f"{leads}/{first['id']}", json={'status': 'contacted'})
+    assert moved.status_code == 200
+    assert platform_admin_client.get(f'{leads}/stats').json()['new_website_requests'] == 1
