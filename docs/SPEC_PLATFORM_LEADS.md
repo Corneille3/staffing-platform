@@ -269,7 +269,17 @@ Lignes sans `org_name` → `skipped`. Un `external_ref` déjà présent → mise
 ### Reste à faire
 
 - **Session frontend** : onglet Leads, liste, fiche, i18n, option Marketing dans l'écran des opérateurs, redirection d'un compte marketing vers `/platform/leads`, export CSV.
-- **Intake public** (session suivante) : `POST /api/v1/public/leads/intake`. Le formulaire de kouamvision.com passe par une route serveur : prévoir un secret partagé et la transmission de l'IP du visiteur plutôt que du CORS. Un site dédié à StaffiG est prévu plus tard : l'intake ne doit rien supposer du site appelant.
+- Rien : les trois sessions sont livrées. Idées non construites : suppression d'un lead (owner), rappel automatique des actions en retard.
+
+### Intake public (2026-11-15)
+
+- `POST /api/v1/public/leads/intake`, monté hors de la barrière Clerk. Appelé par la **route serveur** d'un site vitrine, jamais par un navigateur : pas de CORS à ouvrir.
+- **Secret partagé** dans l'en-tête `X-Intake-Secret` (`LEADS_INTAKE_SECRET` côté API et côté site). Secret absent ou faux → 403 ; secret non configuré côté API → 404 (la route n'existe pas dans cet environnement).
+- Le site transmet l'IP du visiteur dans `X-Visitor-IP` ; **5 demandes par heure et par IP**, 429 à la sixième. Le compteur est **en mémoire** (rien n'est stocké, il repart à zéro à chaque déploiement) : conserver des adresses IP aurait demandé une migration et une politique de rétention.
+- Champs acceptés, et rien d'autre (clé inconnue → 422) : `org_name`, `email`, `contact_name`, `phone`, `segment` (défaut `other`), `province` (défaut `QC` — le formulaire ne la demande pas), `language`, `notes`, `site`.
+- Crée un lead `new`, `source = website_form`, `source_detail = site`, événement système `form_submitted`. **Si un lead ouvert a déjà ce courriel**, la demande s'ajoute à son fil au lieu de créer un doublon.
+- La réponse ne dit rien du lead : `{"status": "received"}`.
+- N'importe quel site détenant le secret peut poster ; `site` dit lequel (kouamvision.com aujourd'hui, un site StaffiG dédié plus tard). Le pot de miel reste côté site.
 
 ### Conversion (2026-11-15)
 
