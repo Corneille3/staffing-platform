@@ -35,3 +35,7 @@ apf_bootstrap_last_name  = "Name"
 twilio_account_sid = "AC..."
 twilio_auth_token  = "CHANGE_ME"
 twilio_from_number = "+15145551234"
+
+# Public lead intake (marketing site -> API). `openssl rand -hex 32`; the same
+# value goes in the marketing site's Vercel env. Omit to keep the route off.
+leads_intake_secret = "CHANGE_ME"
