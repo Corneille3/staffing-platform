@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     # feature on production instances — set false to relax the gate until
     # the Clerk plan supports TOTP enrollment. Role gates still apply.
     platform_mfa_enforced: bool = True
+    # Shared secret of the public lead intake (SPEC_PLATFORM_LEADS §14). The
+    # marketing site's server route sends it in X-Intake-Secret. Blank = the
+    # intake route answers 404, i.e. it does not exist in that environment.
+    leads_intake_secret: str = ''
 
     smtp_host: str = ''
     smtp_port: int = 1025

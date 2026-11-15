@@ -247,3 +247,33 @@ class LeadImportResult(BaseModel):
     updated: int
     unchanged: int
     skipped: list[LeadImportSkipped]
+
+
+class PublicLeadIntake(BaseModel):
+    """What a marketing site may send — and nothing else (extra keys are
+    refused). Organization-level contact details only (§9)."""
+
+    model_config = ConfigDict(extra='forbid')
+
+    org_name: str = Field(min_length=1, max_length=255)
+    email: NormalizedEmail
+    contact_name: str | None = Field(default=None, max_length=160)
+    phone: str | None = Field(default=None, max_length=60)
+    segment: Segment = 'other'
+    province: str = Field(default='QC', min_length=2, max_length=2, pattern=r'^[A-Z]{2}$')
+    language: Language = 'fr'
+    notes: str | None = Field(default=None, max_length=5000)
+    # Which site the form lives on ("kouamvision.com"); kept in source_detail.
+    site: str | None = Field(default=None, max_length=120, pattern=r'^[a-z0-9][a-z0-9.-]*$')
+
+    @field_validator('org_name', 'contact_name', 'phone', 'notes', mode='before')
+    @classmethod
+    def _strip(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
+
+
+class PublicLeadIntakeResult(BaseModel):
+    status: Literal['received'] = 'received'
