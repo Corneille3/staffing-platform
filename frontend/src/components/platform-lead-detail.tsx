@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowLeft, ArrowUpRight, Check, ExternalLink, Send } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Check, ExternalLink, Info, Send } from "lucide-react";
 import { Link } from "../i18n/navigation";
 import { addLeadEvent, fetchLead, inviteLead, updateLead } from "../lib/browser-api";
 import {
@@ -18,6 +18,7 @@ import {
   daysBetween,
   formatDay,
   isLeadOverdue,
+  leadTenantBanner,
   slugifyOrgName,
   splitContactName,
 } from "../lib/leads";
@@ -127,40 +128,7 @@ export function PlatformLeadDetail({
 
       <StatusBar lead={lead} canWin={isOwner && tenant?.status === "active"} onMove={(status, reason) => patch(reason ? { status, lost_reason: reason } : { status })} />
 
-      {lead.tenant_id ? (
-        <div style={{ ...leadCard, padding: "16px 20px", marginBottom: 18, background: "var(--moss-soft)", borderColor: "transparent", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <Check size={18} style={{ color: "var(--moss)", flexShrink: 0 }} />
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--moss)" }}>
-              {t(lead.converted_at ? "detail.convertedTitle" : tenant?.status === "active" ? "detail.pilotTitle" : "detail.invitedTitle")}
-              {tenant && !lead.converted_at ? (
-                <span style={{ fontWeight: 400, color: "var(--ink-2)" }}>
-                  {" · "}
-                  {t.has(`detail.tenantStatus.${tenant.status}`) ? t(`detail.tenantStatus.${tenant.status}`) : tenant.status}
-                </span>
-              ) : null}
-            </div>
-            <div style={{ fontSize: 13, color: "var(--ink)", marginTop: 2 }}>
-              {lead.converted_at
-                ? t("detail.convertedBody", {
-                    date: formatDay(shiftDateKey(lead.converted_at), locale),
-                    days: daysBetween(lead.created_at, lead.converted_at),
-                  })
-                : t(tenant?.status === "active" ? "detail.pilotBody" : "detail.invitedBody", { name: tenant?.name ?? lead.org_name })}
-            </div>
-            {tenant ? (
-              <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 3, fontFamily: "var(--mono)" }}>{tenant.slug}</div>
-            ) : null}
-            <div>
-            </div>
-          </div>
-          {isOwner ? (
-            <Link href="/platform/tenants" style={{ ...leadRowBtn, textDecoration: "none", background: "#fff" }}>
-              {t("detail.viewTenants")} <ArrowUpRight size={13} />
-            </Link>
-          ) : null}
-        </div>
-      ) : null}
+      {lead.tenant_id ? <TenantBanner lead={lead} tenant={tenant} isOwner={isOwner} /> : null}
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.5fr) minmax(300px, 1fr)", gap: 18, alignItems: "start" }}>
         {/* Left — every field edits in place and saves on blur */}
@@ -232,6 +200,69 @@ export function PlatformLeadDetail({
         {/* Right — the activity feed */}
         <ActivityFeed leadId={lead.id} events={events} onAdded={(event) => setEvents((prev) => [event, ...prev])} />
       </div>
+    </div>
+  );
+}
+
+// ── Linked tenant ────────────────────────────────────────────────────────────
+
+const BANNER_TONE = {
+  moss: { bg: "var(--moss-soft)", c: "var(--moss)" },
+  sand: { bg: "var(--sand-soft)", c: "#8C6B14" },
+  muted: { bg: "var(--paper-2)", c: "var(--ink-3)" },
+} as const;
+
+function TenantBanner({ lead, tenant, isOwner }: { lead: Lead; tenant: LeadTenantSummary | null; isOwner: boolean }) {
+  const t = useTranslations("platform.leads");
+  const locale = useLocale();
+  const kind = leadTenantBanner(lead, tenant?.status ?? null);
+  const tone = BANNER_TONE[kind === "removed" ? "muted" : kind === "lost_live" ? "sand" : "moss"];
+  const name = tenant?.name ?? lead.org_name;
+  const title = {
+    won: "detail.convertedTitle",
+    removed: "detail.removedTitle",
+    lost_live: "detail.lostLiveTitle",
+    pilot: "detail.pilotTitle",
+    invited: "detail.invitedTitle",
+  }[kind];
+  const body =
+    kind === "won" && lead.converted_at
+      ? t("detail.convertedBody", {
+          date: formatDay(shiftDateKey(lead.converted_at), locale),
+          days: daysBetween(lead.created_at, lead.converted_at),
+        })
+      : t({ won: "detail.pilotBody", removed: "detail.removedBody", lost_live: "detail.lostLiveBody", pilot: "detail.pilotBody", invited: "detail.invitedBody" }[kind], { name });
+  // The tenant's own state adds nothing once the title already says it.
+  const showState = tenant && (kind === "invited" || kind === "pilot" || kind === "lost_live");
+
+  return (
+    <div style={{ ...leadCard, padding: "16px 20px", marginBottom: 18, background: tone.bg, borderColor: "transparent", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+      {tone === BANNER_TONE.moss ? (
+        <Check size={18} style={{ color: tone.c, flexShrink: 0 }} />
+      ) : (
+        <Info size={18} style={{ color: tone.c, flexShrink: 0 }} />
+      )}
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <div style={{ fontWeight: 600, fontSize: 13, color: tone.c }}>
+          {t(title)}
+          {showState ? (
+            <span style={{ fontWeight: 400, color: "var(--ink-2)" }}>
+              {" · "}
+              {t.has(`detail.tenantStatus.${tenant.status}`) ? t(`detail.tenantStatus.${tenant.status}`) : tenant.status}
+            </span>
+          ) : null}
+        </div>
+        <div style={{ fontSize: 13, color: "var(--ink)", marginTop: 2 }}>{body}</div>
+        {tenant ? (
+          <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 3, fontFamily: "var(--mono)" }}>{tenant.slug}</div>
+        ) : null}
+      </div>
+      {/* A removed tenant is no longer listed on the tenants page. */}
+      {isOwner && kind !== "removed" ? (
+        <Link href="/platform/tenants" style={{ ...leadRowBtn, textDecoration: "none", background: "#fff" }}>
+          {t("detail.viewTenants")} <ArrowUpRight size={13} />
+        </Link>
+      ) : null}
     </div>
   );
 }

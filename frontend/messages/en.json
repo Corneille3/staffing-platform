@@ -698,7 +698,11 @@
         "pilotTitle": "Pilot under way",
         "pilotBody": "{name} is using its workspace. Mark the lead as won when the client commits, or as lost if the pilot ends.",
         "winConfirm": "Mark this lead as won? Do it once the client has committed — a won lead is closed and cannot be reopened.",
-        "confirmWon": "Mark as won"
+        "confirmWon": "Mark as won",
+        "removedTitle": "Workspace removed",
+        "removedBody": "{name}'s workspace has been removed.",
+        "lostLiveTitle": "Workspace still there",
+        "lostLiveBody": "This lead is lost, but {name}'s workspace still exists. Remove it from Tenants if the pilot is over."
       },
       "inviteModal": {
         "eyebrow": "Conversion",

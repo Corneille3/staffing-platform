@@ -4,6 +4,7 @@ import {
   canMoveLead,
   daysBetween,
   isLeadOverdue,
+  leadTenantBanner,
   leadsQuery,
   leadsToCsv,
   parseLeadFilters,
@@ -166,5 +167,29 @@ describe("invite helpers", () => {
     expect(canInviteLead({ status: "invited", tenant_id: "t1" })).toBe(false);
     expect(canInviteLead({ status: "lost", tenant_id: null })).toBe(false);
     expect(canInviteLead({ status: "won", tenant_id: "t1" })).toBe(false);
+  });
+});
+
+describe("leadTenantBanner", () => {
+  const open = { status: "invited", converted_at: null } as const;
+
+  it("follows the tenant while the lead is open", () => {
+    expect(leadTenantBanner(open, "pending")).toBe("invited");
+    expect(leadTenantBanner(open, "onboarding")).toBe("invited");
+    expect(leadTenantBanner({ status: "pilot", converted_at: null }, "active")).toBe("pilot");
+  });
+
+  it("says so when the tenant is gone", () => {
+    expect(leadTenantBanner(open, "removed")).toBe("removed");
+    expect(leadTenantBanner({ status: "lost", converted_at: null }, "removed")).toBe("removed");
+  });
+
+  it("flags a lost lead whose workspace still exists", () => {
+    expect(leadTenantBanner({ status: "lost", converted_at: null }, "active")).toBe("lost_live");
+    expect(leadTenantBanner({ status: "lost", converted_at: null }, "pending")).toBe("lost_live");
+  });
+
+  it("keeps a won lead won, whatever happened to the tenant since", () => {
+    expect(leadTenantBanner({ status: "won", converted_at: "2026-11-15T10:00:00Z" }, "removed")).toBe("won");
   });
 });
