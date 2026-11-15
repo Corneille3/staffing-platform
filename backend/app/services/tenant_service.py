@@ -40,7 +40,7 @@ from app.notifications.i18n import localized, localized_subject
 from app.schemas.tenant import TenantNetworkCreate
 from app.services.audit_service import AuditService
 from app.services.platform_audit_service import PlatformAuditService
-from app.services.platform_lead_service import mark_lead_won
+from app.services.platform_lead_service import mark_lead_piloting
 from app.services.platform_settings_service import reserved_slugs
 from app.services.user_service import REMOVED_EMAIL_MARKER
 
@@ -232,8 +232,8 @@ class TenantService:
                 action='tenant.onboarding_completed', entity_type='tenant', entity_id=tenant.id,
                 actor_user_id=scope.user.id, payload={'tenant_slug': tenant.slug},
             )
-            # Same transaction: the sales lead this tenant came from is won.
-            mark_lead_won(self.db, tenant.id)
+            # Same transaction: the sales lead this tenant came from enters pilot.
+            mark_lead_piloting(self.db, tenant.id)
             self.db.commit()
             self.db.refresh(tenant)
         return tenant
