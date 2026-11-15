@@ -60,6 +60,7 @@ export type LeadFilters = {
   province?: string;
   wave?: string;
   kind?: string;
+  source?: string;
   q?: string;
   sort?: string;
   page?: number;
@@ -103,7 +104,7 @@ export function daysBetween(fromIso: string, toIso: string): number {
  * defaults are dropped so the URL stays short and shareable. */
 export function leadsQuery(filters: LeadFilters, forApi = false): string {
   const params = new URLSearchParams();
-  for (const key of ["status", "segment", "province", "wave", "kind"] as const) {
+  for (const key of ["status", "segment", "province", "wave", "kind", "source"] as const) {
     const value = filters[key];
     if (value) params.set(key, value);
   }
@@ -140,6 +141,7 @@ export function parseLeadFilters(
     province: province && /^[A-Z]{2}$/.test(province) ? province : undefined,
     wave: within(one("wave")?.toUpperCase(), LEAD_WAVES),
     kind: within(one("kind"), LEAD_KINDS),
+    source: within(one("source"), LEAD_SOURCES),
     q: one("q")?.slice(0, 120),
     sort: within(one("sort"), LEAD_SORTS),
     page: Number.isFinite(page) && page > 1 ? page : 1,
@@ -219,4 +221,11 @@ export function leadTenantBanner(
   if (tenantStatus === "removed") return "removed";
   if (lead.status === "lost") return "lost_live";
   return tenantStatus === "active" ? "pilot" : "invited";
+}
+
+/** The filter behind the « new requests from the website » banner. */
+export const WEBSITE_REQUESTS_FILTER: LeadFilters = { status: "new", source: "website_form" };
+
+export function isWebsiteRequestsFilter(filters: LeadFilters): boolean {
+  return filters.status === "new" && filters.source === "website_form";
 }

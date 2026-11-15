@@ -528,7 +528,12 @@
         "prev": "Précédent",
         "next": "Suivant",
         "overdue": "En retard",
-        "exportFailed": "L'exportation a échoué. Réessayez."
+        "exportFailed": "L'exportation a échoué. Réessayez.",
+        "allSources": "Toutes les sources",
+        "siteBadge": "Site",
+        "websiteBanner": "{count, plural, one {# nouvelle demande du site} other {# nouvelles demandes du site}}",
+        "websiteBannerSub": "Des demandes de démo que personne n'a encore prises en charge. Elles quittent cet avis dès qu'elles dépassent l'étape Nouveau.",
+        "websiteBannerCta": "Les voir"
       },
       "status": {
         "new": "Nouveau",

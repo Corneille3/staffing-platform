@@ -3,6 +3,8 @@ import {
   canInviteLead,
   canMoveLead,
   daysBetween,
+  isWebsiteRequestsFilter,
+  WEBSITE_REQUESTS_FILTER,
   isLeadOverdue,
   leadTenantBanner,
   leadsQuery,
@@ -80,6 +82,12 @@ describe("leadsQuery", () => {
     );
   });
 
+  it("carries the source, for the website-requests banner", () => {
+    expect(leadsQuery(WEBSITE_REQUESTS_FILTER)).toBe("?status=new&source=website_form");
+    expect(isWebsiteRequestsFilter(parseLeadFilters({ status: "new", source: "website_form" }))).toBe(true);
+    expect(isWebsiteRequestsFilter(parseLeadFilters({ status: "new", source: "nonsense" }))).toBe(false);
+  });
+
   it("turns the page into limit/offset for the API", () => {
     expect(leadsQuery({ wave: "A", page: 3 }, true)).toBe("?wave=A&limit=50&offset=100");
     expect(leadsQuery({}, true)).toBe("?limit=50&offset=0");
@@ -96,6 +104,7 @@ describe("parseLeadFilters", () => {
       province: "SK",
       wave: "A",
       kind: undefined,
+      source: undefined,
       q: undefined,
       sort: undefined,
       page: 2,

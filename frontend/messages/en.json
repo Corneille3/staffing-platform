@@ -528,7 +528,12 @@
         "prev": "Previous",
         "next": "Next",
         "overdue": "Overdue",
-        "exportFailed": "The export failed. Try again."
+        "exportFailed": "The export failed. Try again.",
+        "allSources": "All sources",
+        "siteBadge": "Website",
+        "websiteBanner": "{count, plural, one {# new request from the website} other {# new requests from the website}}",
+        "websiteBannerSub": "Demo requests nobody has picked up yet. They leave this notice once moved past New.",
+        "websiteBannerCta": "Show them"
       },
       "status": {
         "new": "New",
