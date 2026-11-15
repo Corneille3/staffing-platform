@@ -40,6 +40,7 @@ from app.notifications.i18n import localized, localized_subject
 from app.schemas.tenant import TenantNetworkCreate
 from app.services.audit_service import AuditService
 from app.services.platform_audit_service import PlatformAuditService
+from app.services.platform_lead_service import mark_lead_won
 from app.services.platform_settings_service import reserved_slugs
 from app.services.user_service import REMOVED_EMAIL_MARKER
 
@@ -90,6 +91,28 @@ class TenantService:
     def create_network(
         self, payload: TenantNetworkCreate, scope: AccessScope
     ) -> tuple[Tenant, User]:
+        tenant, admin = self.stage_network(payload, scope)
+        self.db.commit()
+        self.db.refresh(tenant)
+        self.db.refresh(admin)
+        self.send_invite_email(admin, tenant)
+        return tenant, admin
+
+    def send_invite_email(self, admin: User, tenant: Tenant) -> None:
+        """Best-effort: the tenant + admin already exist, and Resend invite
+        covers a lost email. Call it only after the commit."""
+        try:
+            self._send_tenant_invite_email(admin, tenant)
+        except Exception:  # pragma: no cover - never block creation on email
+            pass
+
+    def stage_network(
+        self, payload: TenantNetworkCreate, scope: AccessScope
+    ) -> tuple[Tenant, User]:
+        """Validate and add the tenant, its first admin and the audit rows to
+        the session — no commit, no email. The caller owns the transaction, so
+        a lead can be linked to the tenant in the same all-or-nothing write
+        (SPEC_PLATFORM_LEADS §7)."""
         slug = payload.slug.strip().lower()
         admin_email = payload.admin_email.lower()
 
@@ -163,16 +186,7 @@ class TenantService:
             payload={'slug': tenant.slug, 'name': tenant.name},
         )
 
-        self.db.commit()
-        self.db.refresh(tenant)
-        self.db.refresh(admin)
-
-        # Invitation email is best-effort — the tenant + admin already exist.
-        try:
-            self._send_tenant_invite_email(admin, tenant)
-        except Exception:  # pragma: no cover - never block creation on email
-            pass
-
+        self.db.flush()
         return tenant, admin
 
     def _get_tenant_or_404(self, tenant_id: UUID) -> Tenant:
@@ -218,6 +232,8 @@ class TenantService:
                 action='tenant.onboarding_completed', entity_type='tenant', entity_id=tenant.id,
                 actor_user_id=scope.user.id, payload={'tenant_slug': tenant.slug},
             )
+            # Same transaction: the sales lead this tenant came from is won.
+            mark_lead_won(self.db, tenant.id)
             self.db.commit()
             self.db.refresh(tenant)
         return tenant

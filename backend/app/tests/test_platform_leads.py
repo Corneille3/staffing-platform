@@ -12,7 +12,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.core.timeutil import shift_today
 from app.models.enums import LeadStatus, PlatformOperatorRole
@@ -26,6 +26,15 @@ SEED_WAVE_A = 30
 XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 NEW_LEAD = {'org_name': 'Résidence Test', 'segment': 'rpa_qc', 'province': 'QC'}
+
+
+@pytest.fixture(autouse=True)
+def _empty_pipeline(db_session):
+    """The suite runs against the dev database, which may hold imported
+    leads (the counts below assume none). Cleared inside the test's own
+    transaction, so the rollback at teardown puts them back."""
+    db_session.execute(delete(PlatformLead))
+    db_session.flush()
 
 
 def _create(client, **overrides) -> dict:
@@ -369,3 +378,135 @@ def test_stats_counts_overdue_open_actions_only(platform_admin_client):
 
     late = platform_admin_client.get(LEADS, params={'next_action_before': str(today)}).json()
     assert {row['org_name'] for row in late['items']} == {'Late', 'Late too', 'Late but lost'}
+
+
+# ── criteria 4 + 5: conversion (« Invite as a network » → won) ────────────────
+
+INVITE = {
+    'slug': 'residence-test',
+    'admin_first_name': 'Claire',
+    'admin_last_name': 'Dubois',
+    'admin_email': 'Claire.Dubois@residence-test.example',
+}
+
+
+def _invite(client, lead_id, **overrides):
+    return client.post(f'{LEADS}/{lead_id}/invite', json={**INVITE, **overrides})
+
+
+def test_invite_creates_the_tenant_and_links_the_lead(platform_admin_client, db_session, seed):
+    from app.models.enums import TenantStatus, UserRole
+    from app.models.tenant import Tenant
+    from app.models.user import User
+
+    lead = _create(platform_admin_client, status='pilot', language='en', phone='(514) 555-0100')
+    res = _invite(platform_admin_client, lead['id'])
+    assert res.status_code == 201, res.text
+    body = res.json()
+    assert body['lead']['status'] == 'invited'
+    assert body['tenant']['slug'] == 'residence-test'
+    assert body['tenant']['status'] == 'pending'
+    assert body['lead']['tenant_id'] == body['tenant']['id']
+
+    tenant = db_session.scalar(select(Tenant).where(Tenant.slug == 'residence-test'))
+    assert tenant.name == 'Résidence Test' and tenant.status == TenantStatus.PENDING
+    admin = db_session.scalar(select(User).where(User.email == 'claire.dubois@residence-test.example'))
+    assert admin.role == UserRole.NETWORK_ADMIN
+    assert admin.preferred_language == 'en'  # falls back to the lead's language
+
+    last = _events(db_session, lead['id'])[-1]
+    assert (last.type, last.from_status, last.to_status) == ('invited', LeadStatus.PILOT, LeadStatus.INVITED)
+
+    detail = platform_admin_client.get(f"{LEADS}/{lead['id']}").json()
+    assert detail['tenant'] == body['tenant']
+
+    # The tenants table shows where the tenant came from.
+    rows = platform_admin_client.get('/api/v1/platform/tenants').json()['tenants']
+    row = next(r for r in rows if r['slug'] == 'residence-test')
+    assert (row['lead_segment'], row['lead_source']) == ('rpa_qc', 'research')
+    assert next(r for r in rows if r['slug'] == seed.tenant.slug)['lead_segment'] is None
+
+    # One lead, one tenant.
+    again = _invite(platform_admin_client, lead['id'], slug='residence-test-2',
+                    admin_email='other@residence-test.example')
+    assert again.status_code == 409
+
+
+def test_invite_is_all_or_nothing(platform_admin_client, db_session, seed):
+    from app.models.tenant import Tenant
+
+    lead = _create(platform_admin_client, status='pilot')
+    events_before = len(_events(db_session, lead['id']))
+
+    # The admin email already belongs to someone: refused after the slug
+    # checks passed — nothing may be left behind.
+    clash = _invite(platform_admin_client, lead['id'], admin_email=seed.apf.email)
+    assert clash.status_code == 409
+    taken = _invite(platform_admin_client, lead['id'], slug=seed.tenant.slug)
+    assert taken.status_code == 409
+    assert _invite(platform_admin_client, lead['id'], slug='Bad Slug').status_code == 422
+
+    row = db_session.get(PlatformLead, lead['id'])
+    db_session.refresh(row)
+    assert row.status == LeadStatus.PILOT and row.tenant_id is None
+    assert len(_events(db_session, lead['id'])) == events_before
+    assert db_session.scalar(select(Tenant).where(Tenant.slug == 'residence-test')) is None
+
+
+def test_invite_refuses_closed_and_unknown_leads(platform_admin_client, seed):
+    lost = _create(platform_admin_client, status='lost', lost_reason='No budget')
+    assert _invite(platform_admin_client, lost['id']).status_code == 409
+    assert _invite(platform_admin_client, '00000000-0000-0000-0000-000000000000').status_code == 404
+
+
+def test_invite_is_owner_only(platform_admin_client, db_session, seed):
+    lead = _create(platform_admin_client, status='pilot')
+    operator, _user = _add_operator(db_session, PlatformOperatorRole.MARKETING, clerk_sub='int-op-mk-invite')
+    operator.mfa_enabled = True
+    db_session.flush()
+    with _client_for(db_session, 'int-op-mk-invite') as marketing:
+        assert _invite(marketing, lead['id']).status_code == 403
+    _add_operator(db_session, PlatformOperatorRole.OPERATOR, clerk_sub='int-op-op-invite')
+    with _client_for(db_session, 'int-op-op-invite') as operator_client:
+        assert _invite(operator_client, lead['id']).status_code == 403
+    assert db_session.get(PlatformLead, lead['id']).tenant_id is None
+
+
+def test_tenant_activation_wins_the_lead(platform_admin_client, db_session, seed):
+    from app.models.user import User
+    from app.tests.conftest import _make_test_client
+
+    lead = _create(platform_admin_client, status='demo_booked')
+    assert _invite(platform_admin_client, lead['id']).status_code == 201
+
+    # The invited admin signs up and finishes the onboarding wizard.
+    admin = db_session.scalar(select(User).where(User.email == 'claire.dubois@residence-test.example'))
+    admin.clerk_user_id = 'int-lead-admin'
+    db_session.flush()
+    tenant_admin = _make_test_client(db_session, 'int-lead-admin', 'network_admin')
+    done = tenant_admin.post('/api/v1/tenant/onboarding/complete')
+    assert done.status_code == 200 and done.json()['status'] == 'active'
+
+    row = db_session.get(PlatformLead, lead['id'])
+    db_session.refresh(row)
+    assert row.status == LeadStatus.WON and row.converted_at is not None
+    last = _events(db_session, lead['id'])[-1]
+    assert (last.type, last.from_status, last.to_status, last.actor_id) == (
+        'converted', LeadStatus.INVITED, LeadStatus.WON, None,
+    )
+
+    # Idempotent: finishing again writes nothing more; won stays terminal.
+    count = len(_events(db_session, lead['id']))
+    assert tenant_admin.post('/api/v1/tenant/onboarding/complete').status_code == 200
+    assert len(_events(db_session, lead['id'])) == count
+    stats = platform_admin_client.get(f'{LEADS}/stats').json()
+    assert stats['by_status']['won'] == 1
+
+
+def test_activation_without_a_lead_changes_nothing(apf_client, seed, db_session):
+    from app.models.enums import TenantStatus
+
+    seed.tenant.status = TenantStatus.ONBOARDING
+    db_session.flush()
+    assert apf_client.post('/api/v1/tenant/onboarding/complete').status_code == 200
+    assert db_session.scalar(select(PlatformLead)) is None

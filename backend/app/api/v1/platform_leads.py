@@ -3,8 +3,9 @@
 Mounted at /api/v1/platform/leads. Tier-0 `owner` and `marketing` only:
 `operator`, `support` and every tenant-side identity get the same 403, with
 no hint whether a lead exists. Writes add the 2FA gate (when enforced).
+« Invite as a network » is the owner's alone.
 
-Not in this module yet: POST /{id}/invite (conversion) and the public intake.
+Not in this module yet: the public intake.
 """
 from datetime import date
 from typing import Literal
@@ -14,12 +15,17 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
-from app.auth.permissions import require_platform_leads, require_platform_leads_mfa
+from app.auth.permissions import (
+    require_platform_leads, require_platform_leads_mfa, require_platform_owner,
+)
 from app.auth.scope import AccessScope
+from app.models.tenant import Tenant
 from app.schemas.platform_leads import (
     Kind, LeadCreate, LeadDetail, LeadEventCreate, LeadEventOut, LeadImportResult,
-    LeadListResponse, LeadOut, LeadStats, LeadUpdate, Segment, Status, Wave,
+    LeadInvite, LeadInviteResult, LeadListResponse, LeadOut, LeadStats, LeadTenantSummary,
+    LeadUpdate, Segment, Status, Wave,
 )
+from app.services.platform_lead_conversion import LeadConversionService
 from app.services.platform_lead_import import LeadImportService
 from app.services.platform_lead_service import PlatformLeadService
 
@@ -84,7 +90,15 @@ def get_lead(lead_id: UUID, db: Session = Depends(get_db_session)) -> LeadDetail
     lead = service.get(lead_id)
     detail = LeadDetail.model_validate(lead)
     detail.events = service.recent_events(lead.id)
+    if lead.tenant_id is not None:
+        detail.tenant = _tenant_summary(db.get(Tenant, lead.tenant_id))
     return detail
+
+
+def _tenant_summary(tenant: Tenant) -> LeadTenantSummary:
+    return LeadTenantSummary(
+        id=tenant.id, name=tenant.name, slug=tenant.slug, status=tenant.status.value,
+    )
 
 
 @router.patch('/{lead_id}', response_model=LeadOut)
@@ -105,3 +119,16 @@ def add_lead_event(
     db: Session = Depends(get_db_session),
 ) -> LeadEventOut:
     return PlatformLeadService(db).add_event(lead_id, payload, scope)
+
+
+@router.post('/{lead_id}/invite', status_code=status.HTTP_201_CREATED, response_model=LeadInviteResult)
+def invite_lead_as_network(
+    lead_id: UUID,
+    payload: LeadInvite,
+    # Creating a tenant stays the owner's call — marketing runs the pipeline
+    # up to `pilot` and hands over (§14).
+    scope: AccessScope = Depends(require_platform_owner),
+    db: Session = Depends(get_db_session),
+) -> LeadInviteResult:
+    lead, tenant = LeadConversionService(db).invite(lead_id, payload, scope)
+    return LeadInviteResult(lead=LeadOut.model_validate(lead), tenant=_tenant_summary(tenant))

@@ -15,8 +15,11 @@ State machine (§4, as settled with the product owner):
 - `won` is never set by hand — it is stamped when the linked tenant goes
   active — and is terminal.
 - Every transition writes a `status_changed` event with from/to.
+- Conversion (§7): « Invite as a network » stages the tenant and links it in
+  one transaction (`invited` event); the tenant finishing its onboarding
+  stamps `won` + `converted_at` (`converted` event, written by the system).
 """
-from datetime import date
+from datetime import date, datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -55,6 +58,24 @@ def check_transition(current: LeadStatus, target: LeadStatus) -> None:
         raise _unprocessable('"won" is set automatically when the invited tenant becomes active.')
     if current == LeadStatus.LOST and target != LeadStatus.CONTACTED:
         raise _unprocessable('A lost lead can only be reopened to "contacted".')
+
+
+def mark_lead_won(db: Session, tenant_id: UUID) -> PlatformLead | None:
+    """The tenant just went active: close its lead as won. No commit — the
+    caller's transaction carries it, so tenant and lead flip together.
+    Whatever stage the lead was left in (even `lost`), a live tenant wins."""
+    lead = db.scalar(select(PlatformLead).where(PlatformLead.tenant_id == tenant_id))
+    if lead is None or lead.status == LeadStatus.WON:
+        return None
+    previous = lead.status
+    lead.status = LeadStatus.WON
+    lead.lost_reason = None
+    lead.converted_at = datetime.now(timezone.utc)
+    db.add(PlatformLeadEvent(
+        lead_id=lead.id, type='converted', actor_id=None,
+        from_status=previous, to_status=LeadStatus.WON,
+    ))
+    return lead
 
 
 class PlatformLeadService:
