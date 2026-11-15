@@ -682,9 +682,41 @@
         "system": "System",
         "convertedTitle": "Converted",
         "convertedBody": "Tenant live since {date} — {days, plural, =0 {the same day} one {# day} other {# days}} after the lead was created.",
-        "invitedBody": "A tenant has been invited from this lead.",
+        "invitedBody": "{name} has been invited — the lead is won when their admin finishes setting up the workspace.",
         "viewTenants": "See the tenants",
-        "notFound": "This lead does not exist."
+        "notFound": "This lead does not exist.",
+        "invitedTitle": "Invited",
+        "tenantStatus": {
+          "pending": "Invitation sent",
+          "onboarding": "Setting up",
+          "active": "Active",
+          "suspended": "Suspended",
+          "removed": "Removed"
+        },
+        "invite": "Invite as a network"
+      },
+      "inviteModal": {
+        "eyebrow": "Conversion",
+        "title": "Invite as a",
+        "titleEm": "network",
+        "intro": "This creates an empty workspace and emails the admin a sign-up link. The lead moves to Invited, and to Won once they finish setting up.",
+        "name": "Network name",
+        "slug": "Workspace address (slug)",
+        "slugHint": "Lowercase letters, digits and hyphens.",
+        "firstName": "Admin first name",
+        "lastName": "Admin last name",
+        "email": "Admin email",
+        "phone": "Admin phone (optional)",
+        "region": "Region (optional)",
+        "language": "Admin language",
+        "required": "The name, the address, the admin's name and their email are required.",
+        "slugInvalid": "The address can only hold lowercase letters, digits and hyphens.",
+        "send": "Send the invitation",
+        "sending": "Sending…",
+        "cancel": "Cancel"
+      },
+      "tenants": {
+        "origin": "Origin"
       }
     }
   }

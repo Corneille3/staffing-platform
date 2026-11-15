@@ -682,9 +682,41 @@
         "system": "Système",
         "convertedTitle": "Converti",
         "convertedBody": "Tenant actif depuis le {date} — {days, plural, =0 {le jour même} one {# jour} other {# jours}} après la création du prospect.",
-        "invitedBody": "Un tenant a été invité à partir de ce prospect.",
+        "invitedBody": "{name} a été invité — le prospect sera gagné quand son admin aura terminé la configuration de l'espace.",
         "viewTenants": "Voir les tenants",
-        "notFound": "Ce prospect n'existe pas."
+        "notFound": "Ce prospect n'existe pas.",
+        "invitedTitle": "Invité",
+        "tenantStatus": {
+          "pending": "Invitation envoyée",
+          "onboarding": "Configuration en cours",
+          "active": "Actif",
+          "suspended": "Suspendu",
+          "removed": "Supprimé"
+        },
+        "invite": "Inviter comme réseau"
+      },
+      "inviteModal": {
+        "eyebrow": "Conversion",
+        "title": "Inviter comme",
+        "titleEm": "réseau",
+        "intro": "Un espace vide est créé et l'admin reçoit un lien d'inscription par courriel. Le prospect passe à « Invitation envoyée », puis à « Gagné » quand la configuration est terminée.",
+        "name": "Nom du réseau",
+        "slug": "Adresse de l'espace (slug)",
+        "slugHint": "Minuscules, chiffres et traits d'union.",
+        "firstName": "Prénom de l'admin",
+        "lastName": "Nom de l'admin",
+        "email": "Courriel de l'admin",
+        "phone": "Téléphone de l'admin (facultatif)",
+        "region": "Région (facultatif)",
+        "language": "Langue de l'admin",
+        "required": "Le nom, l'adresse, le nom de l'admin et son courriel sont obligatoires.",
+        "slugInvalid": "L'adresse ne peut contenir que des minuscules, des chiffres et des traits d'union.",
+        "send": "Envoyer l'invitation",
+        "sending": "Envoi…",
+        "cancel": "Annuler"
+      },
+      "tenants": {
+        "origin": "Origine"
       }
     }
   }

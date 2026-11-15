@@ -704,6 +704,9 @@ export type PlatformTenantRow = {
   admin_name: string | null;
   admin_email: string | null;
   since: string | null;
+  // The sales lead this tenant was invited from, if any (/platform/leads).
+  lead_segment: string | null;
+  lead_source: string | null;
 };
 
 export type PlatformTenantsResponse = {
@@ -892,7 +895,22 @@ export type LeadEvent = {
   created_at: string;
 };
 
-export type LeadDetail = Lead & { events: LeadEvent[] };
+export type LeadTenantSummary = { id: string; name: string; slug: string; status: string };
+
+export type LeadDetail = Lead & { events: LeadEvent[]; tenant: LeadTenantSummary | null };
+
+export type LeadInvitePayload = {
+  slug: string;
+  admin_first_name: string;
+  admin_last_name: string;
+  admin_email: string;
+  name?: string | null;
+  region?: string | null;
+  admin_phone?: string | null;
+  admin_preferred_language?: "fr" | "en";
+};
+
+export type LeadInviteResult = { lead: Lead; tenant: LeadTenantSummary };
 
 export type LeadListResponse = {
   items: Lead[];

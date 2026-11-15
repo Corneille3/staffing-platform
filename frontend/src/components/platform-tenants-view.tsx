@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { ArrowRight, ArrowUpRight, Eye, Plus, Shield, Trash2, X } from "lucide-react";
 import {
   invitePlatformTenant,
@@ -20,7 +21,7 @@ const STATUS_META: Record<string, { chip: string; bg: string; c: string }> = {
   suspended: { chip: "Suspended", bg: "var(--rose-soft)", c: "var(--rose)" },
 };
 
-const GRID = "2.2fr 1fr 0.7fr 0.7fr 0.9fr 1.2fr 1.4fr";
+const GRID = "2.2fr 1fr 0.6fr 0.6fr 0.8fr 1.1fr 1.2fr 1.4fr";
 
 function fmtSince(value: string | null): string {
   if (!value) return "—";
@@ -51,6 +52,7 @@ export function PlatformTenantsView({
   // buttons — the backend 403s those anyway). null (dev mode) = full UI.
   callerOperatorRole?: "owner" | "operator" | "support" | "marketing" | null;
 }) {
+  const tLeads = useTranslations("platform.leads");
   const router = useRouter();
   const [inviteOpen, setInviteOpen] = useState(false);
   const readOnlyOperator = callerOperatorRole === "support";
@@ -103,7 +105,7 @@ export function PlatformTenantsView({
       {/* Tenant table */}
       <div style={{ ...card, padding: 0, overflow: "hidden" }}>
         <div style={{ display: "grid", gridTemplateColumns: GRID, padding: "12px 22px", borderBottom: "0.5px solid var(--line)", fontSize: 10, color: "var(--ink-3)", letterSpacing: ".1em", textTransform: "uppercase", fontWeight: 500 }}>
-          <div>Network</div><div>Region</div><div>Orgs</div><div>Subs</div><div>Fill rate</div><div>Status</div><div />
+          <div>Network</div><div>Region</div><div>Orgs</div><div>Subs</div><div>Fill rate</div><div>{tLeads("tenants.origin")}</div><div>Status</div><div />
         </div>
         {tenants.length === 0 ? (
           <div style={{ padding: "28px 22px", fontSize: 13, color: "var(--ink-3)" }}>
@@ -189,6 +191,7 @@ function TenantRow({
       <div style={{ fontFamily: "var(--mono)", fontSize: 13, color: fillColor(t.fill_rate_30d) }}>
         {t.fill_rate_30d != null ? `${t.fill_rate_30d}%` : "—"}
       </div>
+      <LeadOrigin segment={t.lead_segment} source={t.lead_source} />
       <div>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 500, background: s.bg, color: s.c }}>
           <span style={{ width: 5, height: 5, borderRadius: 99, background: s.c }} />{s.chip}
@@ -497,6 +500,19 @@ function RequestAccessModal({
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Where the tenant came from: the segment and source of its sales lead. */
+function LeadOrigin({ segment, source }: { segment: string | null; source: string | null }) {
+  const tLeads = useTranslations("platform.leads");
+  if (!segment) return <div style={{ fontSize: 13, color: "var(--ink-4)" }}>—</div>;
+  const label = (group: string, code: string) => (tLeads.has(`${group}.${code}`) ? tLeads(`${group}.${code}`) : code);
+  return (
+    <div style={{ lineHeight: 1.3, minWidth: 0 }}>
+      <div style={{ fontSize: 12.5 }}>{label("segment", segment)}</div>
+      {source ? <div style={{ fontSize: 10.5, color: "var(--ink-3)" }}>{label("source", source)}</div> : null}
     </div>
   );
 }

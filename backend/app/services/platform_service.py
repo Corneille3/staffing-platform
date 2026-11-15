@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.models.enums import RequestStatus, TenantStatus, UserRole
 from app.models.organization import Organization
+from app.models.platform_lead import PlatformLead
 from app.models.staffing_request import StaffingRequest
 from app.models.tenant import Tenant
 from app.models.tenant_membership import TenantMembership
@@ -77,6 +78,15 @@ class PlatformService:
             .order_by(Tenant.created_at.desc())
         ).all()
 
+        # « Origine »: the sales lead a tenant was invited from, if any.
+        origins = {
+            tenant_id: (segment, source)
+            for tenant_id, segment, source in self.db.execute(
+                select(PlatformLead.tenant_id, PlatformLead.segment, PlatformLead.source)
+                .where(PlatformLead.tenant_id.in_([t.id for t in tenants]))
+            )
+        }
+
         rows: list[dict] = []
         active_tenants = 0
         total_orgs = 0
@@ -109,6 +119,8 @@ class PlatformService:
                 'admin_name': f'{admin.first_name} {admin.last_name}' if admin else None,
                 'admin_email': admin.email if admin else None,
                 'since': t.activated_at or t.created_at,
+                'lead_segment': origins.get(t.id, (None, None))[0],
+                'lead_source': origins.get(t.id, (None, None))[1],
             })
 
         return {

@@ -9,6 +9,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.schemas.common import NormalizedEmail, NormalizedPhone
+
 SEGMENTS = (
     'rpa_qc', 'chsld_qc', 'cpe_qc', 'ltc_on', 'retirement_on', 'agency_on',
     'childcare_sk', 'ltc_sk', 'school_board', 'other',
@@ -175,10 +177,40 @@ class LeadOut(BaseModel):
         return getattr(value, 'value', value)
 
 
+class LeadTenantSummary(BaseModel):
+    """The tenant a lead was invited as — just enough to label the link."""
+
+    id: UUID
+    name: str
+    slug: str
+    status: str
+
+
 class LeadDetail(LeadOut):
     """The lead + its 50 most recent events, newest first."""
 
     events: list[LeadEventOut] = []
+    tenant: LeadTenantSummary | None = None
+
+
+class LeadInvite(BaseModel):
+    """« Invite as a network » (§7). The lead knows the organization; the
+    operator supplies what a tenant needs on top: a slug and a named admin.
+    `name`, `admin_phone` and the language fall back to the lead's values."""
+
+    slug: str = Field(min_length=2, max_length=100, pattern=r'^[a-z0-9][a-z0-9-]*[a-z0-9]$')
+    admin_first_name: str = Field(min_length=1, max_length=100)
+    admin_last_name: str = Field(min_length=1, max_length=100)
+    admin_email: NormalizedEmail
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    region: str | None = Field(default=None, max_length=100)
+    admin_phone: NormalizedPhone = None
+    admin_preferred_language: Language | None = None
+
+
+class LeadInviteResult(BaseModel):
+    lead: LeadOut
+    tenant: LeadTenantSummary
 
 
 class LeadListResponse(BaseModel):
