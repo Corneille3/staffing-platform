@@ -1,3 +1,4 @@
+import { getLocale } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { PlatformLeadsView } from "../../../../components/platform-leads-view";
 import { getPlatformLeadStats, getPlatformLeads, requireServerSession } from "../../../../lib/api";
@@ -16,7 +17,7 @@ export default async function PlatformLeadsPage({
   if (CLERK_ENABLED) {
     const session = await requireServerSession(["platform_admin"]);
     const role = session.platform_operator_role;
-    if (role !== "owner" && role !== "marketing") redirect("/platform/tenants");
+    if (role !== "owner" && role !== "marketing") redirect(`/${await getLocale()}/platform/tenants`);
   }
 
   const filters = parseLeadFilters(await searchParams);

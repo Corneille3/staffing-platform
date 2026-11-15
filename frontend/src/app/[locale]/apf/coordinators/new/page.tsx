@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { Link, useRouter } from "../../../../../i18n/navigation";
 import { useEffect, useState } from "react";
 import { Eyebrow } from "../../../../../components/ui";
 import { HideOnReadOnlyVisit, ReadOnlyVisitNotice } from "../../../../../components/read-only-visit";
@@ -270,9 +270,9 @@ function InviteCoordinatorPageForm() {
               }}
             >
               No organizations yet.{" "}
-              <a href="/apf/organizations/new" style={{ color: "var(--terra)", textDecoration: "none" }}>
+              <Link href="/apf/organizations/new" style={{ color: "var(--terra)", textDecoration: "none" }}>
                 Create one first →
-              </a>
+              </Link>
             </p>
           ) : (
             <div style={{ display: "grid", gap: 8 }}>

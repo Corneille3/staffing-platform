@@ -13,8 +13,15 @@ export function LanguageSwitcher({ style }: { style?: React.CSSProperties }) {
 
   function switchTo(nextLocale: string) {
     if (nextLocale === locale) return;
+    // Keep the query string: the console lists hold their filters in the
+    // URL (/admin/requests?status=…, /platform/leads?…), and a language
+    // switch must not drop them. Read at click time, like EdgeLanguageToggle,
+    // so no useSearchParams Suspense boundary is needed.
+    const search = typeof window === "undefined" ? "" : window.location.search;
     startTransition(() => {
-      router.replace(pathname, { locale: nextLocale as (typeof routing.locales)[number] });
+      router.replace(`${pathname}${search}`, {
+        locale: nextLocale as (typeof routing.locales)[number],
+      });
     });
   }
 

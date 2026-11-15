@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter } from "../../../../../i18n/navigation";
 import { useState } from "react";
 import { Eyebrow } from "../../../../../components/ui";
 import { HideOnReadOnlyVisit, ReadOnlyVisitNotice } from "../../../../../components/read-only-visit";

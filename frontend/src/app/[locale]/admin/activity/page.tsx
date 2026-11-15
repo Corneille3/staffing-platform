@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "../../../../i18n/navigation";
 import { Eyebrow, Mono } from "../../../../components/ui";
 import { AdminActivityList } from "../../../../components/admin-activity-list";
 import { getAdminActivity } from "../../../../lib/api";

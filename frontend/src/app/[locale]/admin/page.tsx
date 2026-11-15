@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "../../../i18n/navigation";
 import { Eyebrow, Mono } from "../../../components/ui";
 import { ActivityRowCard } from "../../../components/apf-activity-row";
 import { AdminDashboardUrgentCard } from "../../../components/admin-dashboard-urgent";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter } from "../i18n/navigation";
 import { Role, ROLE_HOME, ROLE_LABEL, useRole } from "../lib/role-context";
 
 const ROLES: Role[] = ["worker", "org_admin", "network_admin"];

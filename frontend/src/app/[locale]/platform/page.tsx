@@ -1,3 +1,4 @@
+import { getLocale } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { requireServerSession } from "../../../lib/api";
 
@@ -8,7 +9,7 @@ export default async function PlatformIndex() {
   // tenants console would only answer 403.
   if (CLERK_ENABLED) {
     const session = await requireServerSession(["platform_admin"]);
-    if (session.platform_operator_role === "marketing") redirect("/platform/leads");
+    if (session.platform_operator_role === "marketing") redirect(`/${await getLocale()}/platform/leads`);
   }
-  redirect("/platform/tenants");
+  redirect(`/${await getLocale()}/platform/tenants`);
 }

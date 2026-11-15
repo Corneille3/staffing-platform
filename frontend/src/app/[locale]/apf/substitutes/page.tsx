@@ -1,5 +1,5 @@
+import { Link } from "../../../../i18n/navigation";
 import { HideOnReadOnlyVisit } from "../../../../components/read-only-visit";
-import Link from "next/link";
 import { Eyebrow, Mono } from "../../../../components/ui";
 import { ApfBulkInviteButton } from "../../../../components/apf-bulk-invite-button";
 import { getApfNetworkPool, getAssignments, getWorkers } from "../../../../lib/api";

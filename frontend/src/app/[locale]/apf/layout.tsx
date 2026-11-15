@@ -1,11 +1,12 @@
+import { getLocale } from "next-intl/server";
+import { Link } from "../../../i18n/navigation";
 import React from "react";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, ClipboardList, Eye } from "lucide-react";
 import { ApfNavigation } from "../../../components/apf-navigation";
 import { HeaderSignOutButton } from "../../../components/header-sign-out-button";
 import { ReadOnlyVisitProvider } from "../../../components/read-only-visit";
-import { Eyebrow } from "../../../components/ui";
+import { Eyebrow, LanguageSwitcher } from "../../../components/ui";
 import { WorkspaceSuspendedScreen } from "../../../components/workspace-suspended";
 import { ApiError, getOrganizations, getTenantProfile, requireServerSession } from "../../../lib/api";
 import type { TenantProfile } from "../../../lib/types";
@@ -19,7 +20,7 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
     isPlatformAdmin = session.role === "platform_admin";
     // A marketing operator owns the sales pipeline only — the API refuses
     // every workspace call, which would otherwise read as "suspended" below.
-    if (session.platform_operator_role === "marketing") redirect("/platform/leads");
+    if (session.platform_operator_role === "marketing") redirect(`/${await getLocale()}/platform/leads`);
   }
 
   // The caller's own tenant — names the workspace in the sidebar. A 403 here
@@ -38,12 +39,12 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
   // A platform operator with no workspace in scope (no membership, no active
   // grant — including a tenant suspended out of scope): back to the console.
   if (CLERK_ENABLED && isPlatformAdmin && tenant === null) {
-    redirect("/platform");
+    redirect(`/${await getLocale()}/platform`);
   }
   // Non-platform admin whose tenant hasn't finished onboarding → the setup
   // wizard (MULTITENANCY_HANDOFF §6).
   if (CLERK_ENABLED && !isPlatformAdmin && tenant && tenant.status !== "active") {
-    redirect("/welcome");
+    redirect(`/${await getLocale()}/welcome`);
   }
 
   let orgCount: number | null = null;
@@ -232,7 +233,10 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
           }}
         >
           <Eyebrow>{tenant?.via_grant ? "Support access · read-only" : "Your Network"}</Eyebrow>
-          {CLERK_ENABLED ? <HeaderSignOutButton /> : null}
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <LanguageSwitcher />
+            {CLERK_ENABLED ? <HeaderSignOutButton /> : null}
+          </div>
         </div>
         <div style={{ flex: 1, padding: "32px 32px 64px", maxWidth: 1280, width: "100%" }}>
           <ReadOnlyVisitProvider readOnly={tenant?.via_grant === true}>{children}</ReadOnlyVisitProvider>

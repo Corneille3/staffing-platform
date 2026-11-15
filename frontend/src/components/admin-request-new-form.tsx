@@ -1,7 +1,7 @@
 "use client";
 
+import { useRouter } from "../i18n/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import {
   createAdminRequest,

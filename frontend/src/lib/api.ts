@@ -149,7 +149,7 @@ export async function requireServerSession(
   const user = (await response.json()) as ServerSession;
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    redirect(ROLE_HOME_BY_ROLE[user.role] ?? "/");
+    redirect(`/${await getLocale()}${ROLE_HOME_BY_ROLE[user.role] ?? ""}`);
   }
 
   return user;

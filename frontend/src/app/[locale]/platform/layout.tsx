@@ -1,8 +1,9 @@
+import { Link } from "../../../i18n/navigation";
 import React from "react";
-import Link from "next/link";
 import { ArrowUpRight, Shield } from "lucide-react";
 import { HeaderSignOutButton } from "../../../components/header-sign-out-button";
 import { PlatformNav } from "../../../components/platform-nav";
+import { LanguageSwitcher } from "../../../components/ui";
 import { getTenantProfile, requireServerSession } from "../../../lib/api";
 import type { PlatformOperatorRole, TenantProfile } from "../../../lib/types";
 
@@ -207,7 +208,10 @@ export default async function PlatformLayout({ children }: { children: React.Rea
           }}
         >
           <span style={{ fontSize: 12, color: "var(--ink-3)" }}>{marketing ? "Platform · Marketing" : "Platform Operator"}</span>
-          {CLERK_ENABLED ? <HeaderSignOutButton /> : null}
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <LanguageSwitcher />
+            {CLERK_ENABLED ? <HeaderSignOutButton /> : null}
+          </div>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
       </main>
