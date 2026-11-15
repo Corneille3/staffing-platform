@@ -279,6 +279,7 @@ Lignes sans `org_name` → `skipped`. Un `external_ref` déjà présent → mise
 - Champs acceptés, et rien d'autre (clé inconnue → 422) : `org_name`, `email`, `contact_name`, `phone`, `segment` (défaut `other`), `province` (défaut `QC` — le formulaire ne la demande pas), `language`, `notes`, `site`.
 - Crée un lead `new`, `source = website_form`, `source_detail = site`, événement système `form_submitted`. **Si un lead ouvert a déjà ce courriel**, la demande s'ajoute à son fil au lieu de créer un doublon.
 - La réponse ne dit rien du lead : `{"status": "received"}`.
+- **Visibilité** : une demande du site n'a ni prochaine action ni score, donc le tri par défaut la met en fin de liste. `/stats` renvoie `new_website_requests` (source `website_form`, statut `new`) ; la liste affiche un bandeau « N nouvelles demandes du site » qui filtre sur `status=new&source=website_form` (nouveau filtre `source`), et une pastille « Site » sur ces lignes. Une demande répétée sur un lead déjà pris en charge ne réapparaît pas dans le bandeau (le courriel du formulaire reste le signal).
 - N'importe quel site détenant le secret peut poster ; `site` dit lequel (kouamvision.com aujourd'hui, un site StaffiG dédié plus tard). Le pot de miel reste côté site.
 
 ### Conversion (2026-11-15)
