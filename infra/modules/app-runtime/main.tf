@@ -2,9 +2,14 @@ data "aws_ami" "amazon_linux" {
   most_recent = true
   owners      = ["amazon"]
 
+  # The standard Amazon Linux 2023 image only. "al2023-ami-*" also matches
+  # the minimal variant (no SSM agent) and the ECS / ECS-GPU images, whose
+  # 30 GB snapshot does not fit the 20 GB root volume — on 2026-11-15
+  # most_recent resolved to al2023-ami-ecs-neuron and the replacement
+  # instance could not be created.
   filter {
     name   = "name"
-    values = ["al2023-ami-*-x86_64"]
+    values = ["al2023-ami-2023.*-x86_64"]
   }
 }
 

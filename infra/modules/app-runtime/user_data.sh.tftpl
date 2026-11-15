@@ -2,6 +2,15 @@
 set -euxo pipefail
 
 dnf update -y
+
+# Session access without SSH. The AMI filter can resolve to the *minimal*
+# Amazon Linux 2023 image, which ships without the SSM agent — the instance
+# then never registers, and nobody can read a log on it (the role already
+# carries AmazonSSMManagedInstanceCore). Not fatal if it fails: the app
+# matters more than the shell.
+dnf install -y amazon-ssm-agent || true
+systemctl enable --now amazon-ssm-agent || true
+
 dnf install -y docker
 systemctl enable docker
 systemctl start docker
@@ -24,6 +33,11 @@ Requires=docker.service
 [Service]
 Restart=always
 ExecStartPre=-/usr/bin/docker rm -f apf-app
+# Every deploy pulls a new :latest; the image it replaces loses its tag and
+# would stay on the 20 GB disk forever (2026-11-15: a deploy could no longer
+# start the app, after six months of accumulated images). Drop untagged
+# images before pulling — the current :latest stays cached.
+ExecStartPre=-/usr/bin/docker image prune -f
 ExecStartPre=/bin/bash -c 'aws ecr get-login-password --region ${aws_region} | docker login --username AWS --password-stdin \$(aws sts get-caller-identity --region ${aws_region} --query Account --output text).dkr.ecr.${aws_region}.amazonaws.com && docker pull ${app_image}'
 ExecStart=/usr/bin/docker run --name apf-app \
   -p 80:${app_port} \
