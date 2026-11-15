@@ -195,7 +195,7 @@ def normalize_row(raw: dict[str, Any]) -> dict[str, Any]:
         if status_code not in STATUS_LABELS.values():
             raise RowError(f'unknown status "{status_text}"')
         if status_code in ('won', 'lost'):
-            raise RowError(f'status "{status_text}" cannot be imported (won is automatic, lost needs a reason)')
+            raise RowError(f'status "{status_text}" cannot be imported (won needs an active tenant, lost needs a reason)')
         out['status'] = status_code
 
     # « Recherche 2026-09 » -> source research, the label kept as the detail.

@@ -188,11 +188,11 @@ def test_same_status_writes_no_event(platform_admin_client, db_session):
     assert [e.type for e in _events(db_session, lead['id'])] == ['created']
 
 
-def test_won_is_never_set_by_hand_and_is_terminal(platform_admin_client, db_session):
+def test_won_needs_a_live_tenant_and_is_terminal(platform_admin_client, db_session):
     lead = _create(platform_admin_client)
+    # No tenant behind the lead: nothing to have won.
     assert platform_admin_client.patch(f"{LEADS}/{lead['id']}", json={'status': 'won'}).status_code == 422
 
-    # What the conversion flow will do (session 3): stamp it directly.
     row = db_session.get(PlatformLead, lead['id'])
     row.status = LeadStatus.WON
     db_session.flush()
@@ -380,7 +380,7 @@ def test_stats_counts_overdue_open_actions_only(platform_admin_client):
     assert {row['org_name'] for row in late['items']} == {'Late', 'Late too', 'Late but lost'}
 
 
-# ── criteria 4 + 5: conversion (« Invite as a network » → won) ────────────────
+# ── criteria 4 + 5: conversion (« Invite as a network » → pilot → won) ───────
 
 INVITE = {
     'slug': 'residence-test',
@@ -472,35 +472,96 @@ def test_invite_is_owner_only(platform_admin_client, db_session, seed):
     assert db_session.get(PlatformLead, lead['id']).tenant_id is None
 
 
-def test_tenant_activation_wins_the_lead(platform_admin_client, db_session, seed):
+def _activate_invited_tenant(db_session):
+    """The invited admin signs up and finishes the onboarding wizard."""
     from app.models.user import User
     from app.tests.conftest import _make_test_client
 
-    lead = _create(platform_admin_client, status='demo_booked')
-    assert _invite(platform_admin_client, lead['id']).status_code == 201
-
-    # The invited admin signs up and finishes the onboarding wizard.
     admin = db_session.scalar(select(User).where(User.email == 'claire.dubois@residence-test.example'))
     admin.clerk_user_id = 'int-lead-admin'
     db_session.flush()
     tenant_admin = _make_test_client(db_session, 'int-lead-admin', 'network_admin')
     done = tenant_admin.post('/api/v1/tenant/onboarding/complete')
     assert done.status_code == 200 and done.json()['status'] == 'active'
+    return tenant_admin
 
+
+def test_tenant_activation_starts_the_pilot(platform_admin_client, db_session, seed):
+    lead = _create(platform_admin_client, status='demo_booked')
+    assert _invite(platform_admin_client, lead['id']).status_code == 201
+    tenant_admin = _activate_invited_tenant(db_session)
+
+    # The trial runs in the prospect's real workspace: active = pilot, not won.
     row = db_session.get(PlatformLead, lead['id'])
     db_session.refresh(row)
-    assert row.status == LeadStatus.WON and row.converted_at is not None
+    assert row.status == LeadStatus.PILOT and row.converted_at is None
     last = _events(db_session, lead['id'])[-1]
     assert (last.type, last.from_status, last.to_status, last.actor_id) == (
-        'converted', LeadStatus.INVITED, LeadStatus.WON, None,
+        'tenant_activated', LeadStatus.INVITED, LeadStatus.PILOT, None,
     )
 
-    # Idempotent: finishing again writes nothing more; won stays terminal.
+    # Idempotent: finishing again writes nothing more.
     count = len(_events(db_session, lead['id']))
     assert tenant_admin.post('/api/v1/tenant/onboarding/complete').status_code == 200
     assert len(_events(db_session, lead['id'])) == count
-    stats = platform_admin_client.get(f'{LEADS}/stats').json()
-    assert stats['by_status']['won'] == 1
+
+
+def test_owner_wins_the_lead_once_the_client_commits(platform_admin_client, db_session, seed):
+    lead = _create(platform_admin_client, status='demo_booked')
+    url = f"{LEADS}/{lead['id']}"
+    assert _invite(platform_admin_client, lead['id']).status_code == 201
+
+    # Invited but not set up yet: the tenant is not live.
+    early = platform_admin_client.patch(url, json={'status': 'won'})
+    assert early.status_code == 422 and 'active' in early.json()['detail']
+
+    _activate_invited_tenant(db_session)
+
+    # Marketing runs the pipeline but never closes the sale.
+    operator, _user = _add_operator(db_session, PlatformOperatorRole.MARKETING, clerk_sub='int-op-mk-win')
+    operator.mfa_enabled = True
+    db_session.flush()
+    # (Not `_client_for`: its exit drops the session override the owner's
+    # client still needs below.)
+    from app.tests.conftest import _make_test_client
+    marketing = _make_test_client(db_session, 'int-op-mk-win', 'platform_admin')
+    assert marketing.patch(url, json={'status': 'won'}).status_code == 403
+    assert marketing.patch(url, json={'next_action': 'Call back'}).status_code == 200
+    row = db_session.get(PlatformLead, lead['id'])
+    db_session.refresh(row)
+    assert row.status == LeadStatus.PILOT
+
+    won = platform_admin_client.patch(url, json={'status': 'won'})
+    assert won.status_code == 200, won.text
+    assert won.json()['status'] == 'won' and won.json()['converted_at'] is not None
+    last = _events(db_session, lead['id'])[-1]
+    assert (last.type, last.from_status, last.to_status) == ('status_changed', LeadStatus.PILOT, LeadStatus.WON)
+    assert platform_admin_client.get(f'{LEADS}/stats').json()['by_status']['won'] == 1
+
+    # Terminal.
+    assert platform_admin_client.patch(url, json={'status': 'pilot'}).status_code == 422
+
+
+def test_a_failed_pilot_can_be_lost(platform_admin_client, db_session, seed):
+    lead = _create(platform_admin_client, status='contacted')
+    url = f"{LEADS}/{lead['id']}"
+    assert _invite(platform_admin_client, lead['id']).status_code == 201
+    _activate_invited_tenant(db_session)
+
+    lost = platform_admin_client.patch(url, json={'status': 'lost', 'lost_reason': 'Pilot dropped'})
+    assert lost.status_code == 200 and lost.json()['status'] == 'lost'
+    assert lost.json()['converted_at'] is None
+
+
+def test_activation_leaves_a_closed_lead_alone(platform_admin_client, db_session, seed):
+    lead = _create(platform_admin_client, status='contacted')
+    url = f"{LEADS}/{lead['id']}"
+    assert _invite(platform_admin_client, lead['id']).status_code == 201
+    assert platform_admin_client.patch(url, json={'status': 'lost', 'lost_reason': 'Went silent'}).status_code == 200
+    _activate_invited_tenant(db_session)
+    row = db_session.get(PlatformLead, lead['id'])
+    db_session.refresh(row)
+    assert row.status == LeadStatus.LOST
 
 
 def test_activation_without_a_lead_changes_nothing(apf_client, seed, db_session):

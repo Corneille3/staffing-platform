@@ -5,19 +5,21 @@ here reads or writes inside a tenant.
 
 State machine (§4, as settled with the product owner):
 
-    new ─ contacted ─ demo_booked ─ pilot ─ invited ─► won
-      └───────┴───────────┴──────────┴────────┴──────► lost ─► contacted
+    new ─ contacted ─ demo_booked ─ invited ─ pilot ─► won
+      └───────┴───────────┴───────────┴────────┴─────► lost ─► contacted
 
 - The five open stages move freely in both directions (skipping a stage or
   stepping back to fix a misclick are both fine).
 - `lost` needs a non-empty `lost_reason`; a lost lead reopens to `contacted`
   only, which clears the reason (the event keeps it).
-- `won` is never set by hand — it is stamped when the linked tenant goes
-  active — and is terminal.
+- `won` is the owner's call, made once the client commits: it needs a
+  linked tenant that is active, stamps `converted_at`, and is terminal.
 - Every transition writes a `status_changed` event with from/to.
 - Conversion (§7): « Invite as a network » stages the tenant and links it in
   one transaction (`invited` event); the tenant finishing its onboarding
-  stamps `won` + `converted_at` (`converted` event, written by the system).
+  moves the lead to `pilot` (`tenant_activated` event, written by the
+  system) — the trial runs in the prospect's real workspace, so an active
+  tenant is a pilot, not a sale.
 """
 from datetime import date, datetime, timezone
 from uuid import UUID
@@ -29,7 +31,9 @@ from sqlalchemy.orm import Session
 from app.auth.scope import AccessScope
 from app.core.timeutil import shift_today
 from app.models.enums import LeadStatus
+from app.models.enums import TenantStatus
 from app.models.platform_lead import PlatformLead, PlatformLeadEvent
+from app.models.tenant import Tenant
 from app.models.user import User
 from app.schemas.platform_leads import (
     LeadCreate, LeadEventCreate, LeadEventOut, LeadStats, LeadUpdate, SegmentWaveCount,
@@ -49,31 +53,28 @@ def _unprocessable(detail: str) -> HTTPException:
 
 
 def check_transition(current: LeadStatus, target: LeadStatus) -> None:
-    """Raise 422 unless `current -> target` is a legal manual move."""
+    """Raise 422 unless `current -> target` is a legal manual move. Moving to
+    `won` has extra conditions, checked by `PlatformLeadService._check_win`."""
     if target == current:
         return
     if current == LeadStatus.WON:
         raise _unprocessable('A won lead is closed — its tenant is live.')
-    if target == LeadStatus.WON:
-        raise _unprocessable('"won" is set automatically when the invited tenant becomes active.')
     if current == LeadStatus.LOST and target != LeadStatus.CONTACTED:
         raise _unprocessable('A lost lead can only be reopened to "contacted".')
 
 
-def mark_lead_won(db: Session, tenant_id: UUID) -> PlatformLead | None:
-    """The tenant just went active: close its lead as won. No commit — the
-    caller's transaction carries it, so tenant and lead flip together.
-    Whatever stage the lead was left in (even `lost`), a live tenant wins."""
+def mark_lead_piloting(db: Session, tenant_id: UUID) -> PlatformLead | None:
+    """The tenant just went active: its lead is now in pilot. No commit — the
+    caller's transaction carries it, so tenant and lead move together. A lead
+    the operator already closed (won / lost) is left alone."""
     lead = db.scalar(select(PlatformLead).where(PlatformLead.tenant_id == tenant_id))
-    if lead is None or lead.status == LeadStatus.WON:
+    if lead is None or lead.status in (LeadStatus.PILOT, *CLOSED_STATUSES):
         return None
     previous = lead.status
-    lead.status = LeadStatus.WON
-    lead.lost_reason = None
-    lead.converted_at = datetime.now(timezone.utc)
+    lead.status = LeadStatus.PILOT
     db.add(PlatformLeadEvent(
-        lead_id=lead.id, type='converted', actor_id=None,
-        from_status=previous, to_status=LeadStatus.WON,
+        lead_id=lead.id, type='tenant_activated', actor_id=None,
+        from_status=previous, to_status=LeadStatus.PILOT,
     ))
     return lead
 
@@ -111,6 +112,18 @@ class PlatformLeadService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f'A lead with reference "{external_ref}" already exists.',
             )
+
+    def _check_win(self, lead: PlatformLead, scope: AccessScope) -> None:
+        """`won` = the client committed. Owner only, and only for a lead whose
+        tenant is live — otherwise there is nothing to have won."""
+        if not scope.is_platform_owner:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail='Only a platform owner can mark a lead as won.',
+            )
+        tenant = self.db.get(Tenant, lead.tenant_id) if lead.tenant_id else None
+        if tenant is None or tenant.status != TenantStatus.ACTIVE:
+            raise _unprocessable('A lead can only be won once its invited tenant is active.')
 
     # ── reads ─────────────────────────────────────────────────────────────────
 
@@ -220,7 +233,7 @@ class PlatformLeadService:
     def create(self, payload: LeadCreate, scope: AccessScope) -> PlatformLead:
         target = LeadStatus(payload.status)
         if target == LeadStatus.WON:
-            raise _unprocessable('"won" is set automatically when the invited tenant becomes active.')
+            raise _unprocessable('A new lead cannot be won — it has no tenant yet.')
         if target == LeadStatus.LOST and not payload.lost_reason:
             raise _unprocessable('A lost lead needs a reason (lost_reason).')
         self._ensure_ref_free(payload.external_ref)
@@ -249,6 +262,8 @@ class PlatformLeadService:
         current = lead.status
         target = LeadStatus(changes.pop('status')) if 'status' in changes else current
         check_transition(current, target)
+        if target == LeadStatus.WON and current != LeadStatus.WON:
+            self._check_win(lead, scope)
 
         # Validate everything before touching the row — a refused PATCH must
         # leave the lead exactly as it was.
@@ -263,6 +278,8 @@ class PlatformLeadService:
 
         if target != current:
             lead.status = target
+            if target == LeadStatus.WON:
+                lead.converted_at = datetime.now(timezone.utc)
             if current == LeadStatus.LOST:
                 lead.lost_reason = None  # reopened — the event below keeps the history
             self._event(

@@ -276,6 +276,15 @@ Lignes sans `org_name` → `skipped`. Un `external_ref` déjà présent → mise
 - `POST /api/v1/platform/leads/{id}/invite` — **owner seulement**. Le corps apporte ce que le lead n'a pas : `slug`, prénom, nom et courriel de l'admin ; `name`, `admin_phone` et la langue retombent sur les valeurs du lead. Retourne `{lead, tenant}`.
 - Tout ou rien : tenant, premier admin, `platform_leads.tenant_id`, statut `invited` et événement `invited` sont une seule transaction (`TenantService.stage_network`, sans commit ni courriel) ; le courriel d'invitation part après le commit.
 - 409 si le lead est déjà lié à un tenant ou s'il est `won` / `lost` ; les conflits de slug ou de courriel sont ceux de l'invitation classique.
-- À la fin de l'onboarding (`complete_onboarding`), le lead lié passe à `won` avec `converted_at` et un événement `converted` écrit par le système, dans la transaction du tenant.
-- **Aucun retour arrière automatique** : une invitation révoquée ou un tenant supprimé laisse le lead tel quel ; `won` reste terminal.
+- **Aucun retour arrière automatique** : une invitation révoquée ou un tenant supprimé laisse le lead tel quel.
+
+### Pilote et « Gagné » (2026-11-15, remplace la règle « won automatique »)
+
+Le pilote se déroule dans le vrai espace du prospect : il n'existe pas d'environnement d'essai séparé. Un tenant actif est donc un pilote en cours, pas une vente.
+
+- Ordre des étapes : `new` → `contacted` → `demo_booked` → **`invited` → `pilot`** → `won` / `lost`. On invite quand le prospect accepte d'essayer.
+- À la fin de l'onboarding (`complete_onboarding`), le lead lié passe à **`pilot`** (événement système `tenant_activated`), dans la transaction du tenant. Un lead déjà clos n'est pas touché.
+- **`won` est posé à la main par l'owner**, quand le client s'engage : refusé au marketing (403), refusé sans tenant lié actif (422). Il pose `converted_at` et reste terminal.
+- Un pilote qui échoue se clôt en `lost` avec une raison, comme toute autre étape ouverte.
+- Quand la facturation existera, `won` pourra redevenir automatique au premier paiement.
 - `/platform/tenants` affiche une colonne « Origine » (segment + source du lead) ; la fiche du lead affiche le tenant lié et son état.

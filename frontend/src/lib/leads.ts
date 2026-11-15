@@ -4,13 +4,14 @@
 
 import type { Lead, LeadStatus } from "./types";
 
-// Display order = pipeline order (SPEC_PLATFORM_LEADS §4).
+// Display order = pipeline order (SPEC_PLATFORM_LEADS §4 + §14): the pilot
+// runs in the prospect's own workspace, so the invitation comes first.
 export const LEAD_STATUSES: LeadStatus[] = [
   "new",
   "contacted",
   "demo_booked",
-  "pilot",
   "invited",
+  "pilot",
   "won",
   "lost",
 ];
@@ -71,11 +72,13 @@ export function isClosedLeadStatus(status: LeadStatus): boolean {
 }
 
 /** Mirrors the backend state machine: which stage can be clicked from here.
- * `won` is never set by hand; a won lead is closed; a lost lead reopens to
- * `contacted` only; the five open stages move freely both ways. */
-export function canMoveLead(current: LeadStatus, target: LeadStatus): boolean {
+ * A won lead is closed; a lost lead reopens to `contacted` only; the five
+ * open stages move freely both ways. `won` is offered only when `canWin`
+ * (the viewer is an owner and the lead's tenant is active). */
+export function canMoveLead(current: LeadStatus, target: LeadStatus, canWin = false): boolean {
   if (target === current) return false;
-  if (current === "won" || target === "won") return false;
+  if (current === "won") return false;
+  if (target === "won") return canWin && current !== "lost";
   if (current === "lost") return target === "contacted";
   return true;
 }
