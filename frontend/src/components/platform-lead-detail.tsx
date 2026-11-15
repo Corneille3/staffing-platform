@@ -125,14 +125,14 @@ export function PlatformLeadDetail({
 
       {inviting ? <InviteModal lead={lead} onClose={() => setInviting(false)} onInvited={onInvited} /> : null}
 
-      <StatusBar lead={lead} onMove={(status, reason) => patch(reason ? { status, lost_reason: reason } : { status })} />
+      <StatusBar lead={lead} canWin={isOwner && tenant?.status === "active"} onMove={(status, reason) => patch(reason ? { status, lost_reason: reason } : { status })} />
 
       {lead.tenant_id ? (
         <div style={{ ...leadCard, padding: "16px 20px", marginBottom: 18, background: "var(--moss-soft)", borderColor: "transparent", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <Check size={18} style={{ color: "var(--moss)", flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 220 }}>
             <div style={{ fontWeight: 600, fontSize: 13, color: "var(--moss)" }}>
-              {t(lead.converted_at ? "detail.convertedTitle" : "detail.invitedTitle")}
+              {t(lead.converted_at ? "detail.convertedTitle" : tenant?.status === "active" ? "detail.pilotTitle" : "detail.invitedTitle")}
               {tenant && !lead.converted_at ? (
                 <span style={{ fontWeight: 400, color: "var(--ink-2)" }}>
                   {" · "}
@@ -146,7 +146,7 @@ export function PlatformLeadDetail({
                     date: formatDay(shiftDateKey(lead.converted_at), locale),
                     days: daysBetween(lead.created_at, lead.converted_at),
                   })
-                : t("detail.invitedBody", { name: tenant?.name ?? lead.org_name })}
+                : t(tenant?.status === "active" ? "detail.pilotBody" : "detail.invitedBody", { name: tenant?.name ?? lead.org_name })}
             </div>
             {tenant ? (
               <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 3, fontFamily: "var(--mono)" }}>{tenant.slug}</div>
@@ -240,15 +240,19 @@ export function PlatformLeadDetail({
 
 function StatusBar({
   lead,
+  canWin,
   onMove,
 }: {
   lead: Lead;
+  // Owner + active tenant: the only case where « Won » can be clicked.
+  canWin: boolean;
   onMove: (status: LeadStatus, lostReason?: string) => Promise<void>;
 }) {
   const t = useTranslations("platform.leads");
   const [busy, setBusy] = useState<LeadStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [losing, setLosing] = useState(false);
+  const [winning, setWinning] = useState(false);
   const [reason, setReason] = useState("");
 
   async function move(status: LeadStatus, lostReason?: string) {
@@ -257,6 +261,7 @@ function StatusBar({
     try {
       await onMove(status, lostReason);
       setLosing(false);
+      setWinning(false);
       setReason("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -271,7 +276,7 @@ function StatusBar({
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {LEAD_STATUSES.map((status) => {
           const current = lead.status === status;
-          const allowed = canMoveLead(lead.status, status);
+          const allowed = canMoveLead(lead.status, status, canWin);
           const tone = LEAD_STATUS_TONE[status];
           return (
             <button
@@ -279,8 +284,12 @@ function StatusBar({
               type="button"
               disabled={!allowed || busy !== null}
               aria-pressed={current}
-              title={status === "won" && !current ? t("detail.wonHint") : undefined}
-              onClick={() => (status === "lost" ? setLosing(true) : move(status))}
+              title={status === "won" && !current && !allowed ? t("detail.wonHint") : undefined}
+              onClick={() => {
+                setLosing(status === "lost");
+                setWinning(status === "won");
+                if (status !== "lost" && status !== "won") void move(status);
+              }}
               style={{
                 flex: "1 1 110px",
                 padding: "10px 8px",
@@ -328,6 +337,21 @@ function StatusBar({
               {t("detail.confirmLost")}
             </button>
           </div>
+        </div>
+      ) : null}
+
+      {winning ? (
+        <div style={{ marginTop: 14, padding: "14px 16px", borderRadius: 10, background: "var(--moss-soft)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <p style={{ margin: 0, flex: 1, minWidth: 220, fontSize: 13, lineHeight: 1.5 }}>{t("detail.winConfirm")}</p>
+          <button type="button" onClick={() => setWinning(false)} style={{ ...leadRowBtn, background: "#fff" }}>{t("detail.cancel")}</button>
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => move("won")}
+            style={{ ...leadPrimaryBtn, padding: "8px 14px", fontSize: 12, background: "var(--moss)", opacity: busy !== null ? 0.5 : 1 }}
+          >
+            {t("detail.confirmWon")}
+          </button>
         </div>
       ) : null}
 

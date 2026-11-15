@@ -23,8 +23,11 @@ describe("canMoveLead", () => {
     expect(canMoveLead("pilot", "pilot")).toBe(false);
   });
 
-  it("never offers won, and closes a won lead", () => {
+  it("offers won only to an owner with a live tenant, and closes a won lead", () => {
     expect(canMoveLead("invited", "won")).toBe(false);
+    expect(canMoveLead("pilot", "won", true)).toBe(true);
+    expect(canMoveLead("lost", "won", true)).toBe(false);
+    expect(canMoveLead("won", "pilot", true)).toBe(false);
     expect(canMoveLead("won", "contacted")).toBe(false);
     expect(canMoveLead("won", "lost")).toBe(false);
   });
