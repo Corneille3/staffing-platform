@@ -24,6 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.scope import AccessScope
+from app.core.errors import coded
 from app.models.enums import LeadStatus
 from app.models.platform_lead import PlatformLead, PlatformLeadEvent
 from app.schemas.platform_leads import (
@@ -99,7 +100,17 @@ FILL_IF_EMPTY = ('next_action', 'next_action_at', 'notes')
 
 
 class RowError(Exception):
-    """A row that cannot become a lead; the message goes into `skipped`."""
+    """A row that cannot become a lead; it goes into `skipped` with a code
+    the import modal can translate, the English sentence and its values."""
+
+    def __init__(self, code: str, message: str, **params: Any) -> None:
+        super().__init__(message)
+        self.code = code
+        self.params = params
+
+
+def _file_error(code: str, message: str, status_code: int = status.HTTP_422_UNPROCESSABLE_ENTITY, **params: Any) -> HTTPException:
+    return coded(status_code, f'lead.import.{code}', message, **params)
 
 
 def _text(value: Any) -> str | None:
@@ -118,9 +129,9 @@ def _int(value: Any, label: str, low: int, high: int) -> int | None:
     try:
         number = int(float(text))
     except ValueError:
-        raise RowError(f'{label}: "{text}" is not a number') from None
+        raise RowError('not_a_number', f'{label}: "{text}" is not a number', column=label, value=text) from None
     if not low <= number <= high:
-        raise RowError(f'{label}: {number} is out of range')
+        raise RowError('out_of_range', f'{label}: {number} is out of range', column=label, value=number)
     return number
 
 
@@ -137,7 +148,7 @@ def _date(value: Any) -> date | None:
             return datetime.strptime(text[:10], fmt).date()
         except ValueError:
             continue
-    raise RowError(f'Date action: "{text}" is not a date (use YYYY-MM-DD)')
+    raise RowError('bad_date', f'Date action: "{text}" is not a date (use YYYY-MM-DD)', value=text)
 
 
 def normalize_row(raw: dict[str, Any]) -> dict[str, Any]:
@@ -146,28 +157,28 @@ def normalize_row(raw: dict[str, Any]) -> dict[str, Any]:
 
     org_name = _text(raw.get('org_name'))
     if not org_name:
-        raise RowError('missing organisation name')
+        raise RowError('missing_org', 'missing organisation name')
     out['org_name'] = org_name
     out['external_ref'] = _text(raw.get('external_ref'))
 
     segment = _text(raw.get('segment'))
     if not segment:
-        raise RowError('missing segment')
+        raise RowError('missing_segment', 'missing segment')
     code = SEGMENT_LABELS.get(segment.lower(), segment.lower())
     if code not in SEGMENTS:
-        raise RowError(f'unknown segment "{segment}"')
+        raise RowError('unknown_segment', f'unknown segment "{segment}"', value=segment)
     out['segment'] = code
 
     kind = _text(raw.get('kind'))
     if kind:
         kind_code = KIND_LABELS.get(kind.lower(), kind.lower())
         if kind_code not in KINDS:
-            raise RowError(f'unknown type "{kind}"')
+            raise RowError('unknown_type', f'unknown type "{kind}"', value=kind)
         out['kind'] = kind_code
 
     province = (_text(raw.get('province')) or '').upper()
     if len(province) != 2 or not province.isalpha():
-        raise RowError('missing or invalid province (2 letters)')
+        raise RowError('bad_province', 'missing or invalid province (2 letters)')
     out['province'] = province
 
     # The agency ban is a Québec measure: « ON » / « SK » in this column just
@@ -193,9 +204,13 @@ def normalize_row(raw: dict[str, Any]) -> dict[str, Any]:
     if status_text:
         status_code = STATUS_LABELS.get(status_text.lower(), status_text.lower())
         if status_code not in STATUS_LABELS.values():
-            raise RowError(f'unknown status "{status_text}"')
+            raise RowError('unknown_status', f'unknown status "{status_text}"', value=status_text)
         if status_code in ('won', 'lost'):
-            raise RowError(f'status "{status_text}" cannot be imported (won needs an active tenant, lost needs a reason)')
+            raise RowError(
+                'status_not_importable',
+                f'status "{status_text}" cannot be imported (won needs an active tenant, lost needs a reason)',
+                value=status_text,
+            )
         out['status'] = status_code
 
     # « Recherche 2026-09 » -> source research, the label kept as the detail.
@@ -249,20 +264,14 @@ def read_rows(filename: str, content: bytes) -> list[tuple[int, dict[str, Any]]]
         elif name.endswith('.csv'):
             table = _rows_from_csv(content)
         else:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail='Upload a .xlsx or .csv file.',
-            )
+            raise _file_error('bad_extension', 'Upload a .xlsx or .csv file.')
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail='The file could not be read as a spreadsheet.',
-        ) from None
+        raise _file_error('unreadable', 'The file could not be read as a spreadsheet.') from None
 
     if not table:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail='The file is empty.')
+        raise _file_error('empty', 'The file is empty.')
 
     columns: dict[int, str] = {}
     seen: set[str] = set()
@@ -273,9 +282,10 @@ def read_rows(filename: str, content: bytes) -> list[tuple[int, dict[str, Any]]]
             seen.add(label)
     missing = [h for h in REQUIRED_HEADERS if h not in seen]
     if missing:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f'Missing column(s): {", ".join(missing)}. Expected the headers of the Leads sheet.',
+        raise _file_error(
+            'missing_columns',
+            f'Missing column(s): {", ".join(missing)}. Expected the headers of the Leads sheet.',
+            columns=', '.join(missing),
         )
 
     rows: list[tuple[int, dict[str, Any]]] = []
@@ -285,9 +295,9 @@ def read_rows(filename: str, content: bytes) -> list[tuple[int, dict[str, Any]]]
             continue  # blank spreadsheet line
         rows.append((offset, raw))
     if len(rows) > MAX_ROWS:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f'Too many rows ({len(rows)}); the limit is {MAX_ROWS}.',
+        raise _file_error(
+            'too_many_rows', f'Too many rows ({len(rows)}); the limit is {MAX_ROWS}.',
+            count=len(rows), limit=MAX_ROWS,
         )
     return rows
 
@@ -298,9 +308,9 @@ class LeadImportService:
 
     def run(self, filename: str, content: bytes, scope: AccessScope) -> LeadImportResult:
         if len(content) > MAX_BYTES:
-            raise HTTPException(
+            raise _file_error(
+                'too_large', 'The file is larger than 5 MB.',
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail='The file is larger than 5 MB.',
             )
         rows = read_rows(filename, content)
 
@@ -317,7 +327,9 @@ class LeadImportService:
             try:
                 values = normalize_row(raw)
             except RowError as exc:
-                skipped.append(LeadImportSkipped(row=row_number, reason=str(exc)))
+                skipped.append(LeadImportSkipped(
+                    row=row_number, reason=str(exc), code=exc.code, params=exc.params,
+                ))
                 continue
 
             ref = values.get('external_ref')

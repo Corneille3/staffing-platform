@@ -689,7 +689,7 @@
         "convertedTitle": "Gagné",
         "convertedBody": "Client depuis le {date} — {days, plural, =0 {le jour même} one {# jour} other {# jours}} après la création du prospect.",
         "invitedBody": "{name} a été invité — le prospect passera à Pilote quand son admin aura terminé la configuration de l'espace.",
-        "viewTenants": "Voir les tenants",
+        "viewTenants": "Voir l'espace",
         "notFound": "Ce prospect n'existe pas.",
         "invitedTitle": "Invité",
         "tenantStatus": {
@@ -730,7 +730,49 @@
         "cancel": "Annuler"
       },
       "tenants": {
-        "origin": "Origine"
+        "origin": "Origine",
+        "focused": "Affichage de l'espace invité depuis ce prospect : {name}.",
+        "showAll": "Afficher tous les réseaux",
+        "focusMissing": "L'espace de ce prospect n'est plus listé : il a été supprimé."
+      },
+      "errors": {
+        "generic": "Une erreur s'est produite. Réessayez.",
+        "close": "Fermer",
+        "validation": "Certaines valeurs ne sont pas valides : {fields}.",
+        "not_found": "Ce prospect n'existe plus.",
+        "won_is_closed": "Un prospect gagné est clos : son espace est en service.",
+        "lost_reopens_to_contacted": "Un prospect perdu ne peut être rouvert que vers Contacté.",
+        "ref_exists": "Un autre prospect porte déjà la référence « {ref} ».",
+        "win_owner_only": "Seul un owner de la plateforme peut marquer un prospect comme gagné.",
+        "win_needs_active_tenant": "Un prospect ne peut être gagné qu'une fois son espace invité actif.",
+        "new_cannot_be_won": "Un nouveau prospect ne peut pas être gagné : il n'a pas encore d'espace.",
+        "lost_needs_reason": "Un prospect perdu doit avoir une raison.",
+        "field_required": "« {field} » ne peut pas être vide.",
+        "already_invited": "Ce prospect a déjà été invité comme réseau.",
+        "closed_cannot_be_invited": "Un prospect clos ne peut pas être invité : rouvrez-le d'abord.",
+        "slug_reserved": "L'adresse « {slug} » est réservée et ne peut pas être utilisée.",
+        "slug_taken": "Un espace utilise déjà l'adresse « {slug} ».",
+        "email_taken": "Un utilisateur possède déjà ce courriel.",
+        "import": {
+          "bad_extension": "Envoyez un fichier .xlsx ou .csv.",
+          "unreadable": "Le fichier n'a pas pu être lu comme une feuille de calcul.",
+          "empty": "Le fichier est vide.",
+          "missing_columns": "Colonne(s) manquante(s) : {columns}. Le fichier doit reprendre les en-têtes de l'onglet Leads.",
+          "too_many_rows": "Trop de lignes ({count}) ; la limite est de {limit}.",
+          "too_large": "Le fichier dépasse 5 Mo."
+        },
+        "row": {
+          "not_a_number": "{column} : « {value} » n'est pas un nombre",
+          "out_of_range": "{column} : {value} est hors limites",
+          "bad_date": "date de l'action : « {value} » n'est pas une date (format AAAA-MM-JJ)",
+          "missing_org": "nom d'organisation manquant",
+          "missing_segment": "segment manquant",
+          "unknown_segment": "segment inconnu « {value} »",
+          "unknown_type": "type inconnu « {value} »",
+          "bad_province": "province manquante ou invalide (2 lettres)",
+          "unknown_status": "statut inconnu « {value} »",
+          "status_not_importable": "le statut « {value} » ne s'importe pas (gagné exige un espace actif, perdu exige une raison)"
+        }
       }
     }
   }

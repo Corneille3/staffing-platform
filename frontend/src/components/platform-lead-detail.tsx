@@ -36,6 +36,7 @@ import {
   leadInput,
   leadPrimaryBtn,
   leadRowBtn,
+  useLeadError,
 } from "./platform-leads-shared";
 import { SaveFlash, useSaveFlash } from "./ui";
 
@@ -259,7 +260,7 @@ function TenantBanner({ lead, tenant, isOwner }: { lead: Lead; tenant: LeadTenan
       </div>
       {/* A removed tenant is no longer listed on the tenants page. */}
       {isOwner && kind !== "removed" ? (
-        <Link href="/platform/tenants" style={{ ...leadRowBtn, textDecoration: "none", background: "#fff" }}>
+        <Link href={tenant ? `/platform/tenants?tenant=${tenant.id}` : "/platform/tenants"} style={{ ...leadRowBtn, textDecoration: "none", background: "#fff" }}>
           {t("detail.viewTenants")} <ArrowUpRight size={13} />
         </Link>
       ) : null}
@@ -279,6 +280,7 @@ function StatusBar({
   canWin: boolean;
   onMove: (status: LeadStatus, lostReason?: string) => Promise<void>;
 }) {
+  const leadError = useLeadError();
   const t = useTranslations("platform.leads");
   const [busy, setBusy] = useState<LeadStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -295,7 +297,7 @@ function StatusBar({
       setWinning(false);
       setReason("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
+      setError(leadError(err));
     } finally {
       setBusy(null);
     }
@@ -425,6 +427,7 @@ type FieldProps = {
 function Field({
   label, value, onSave, type = "text", options, emptyLabel, multiline, required, upper, link, danger, min, max, maxLength,
 }: FieldProps) {
+  const leadError = useLeadError();
   const tCommon = useTranslations("common");
   const stored = value === null || value === undefined ? "" : String(value);
   const [draft, setDraft] = useState(stored);
@@ -466,7 +469,7 @@ function Field({
     } catch (err) {
       flash.fail();
       setDraft(stored);
-      setError(err instanceof Error ? err.message : "Failed");
+      setError(leadError(err));
     }
   }
 
@@ -554,6 +557,7 @@ function ActivityFeed({
   events: LeadEvent[];
   onAdded: (event: LeadEvent) => void;
 }) {
+  const leadError = useLeadError();
   const t = useTranslations("platform.leads");
   const [type, setType] = useState<(typeof LEAD_EVENT_TYPES)[number]>("note");
   const [body, setBody] = useState("");
@@ -568,7 +572,7 @@ function ActivityFeed({
       onAdded(await addLeadEvent(leadId, type, body.trim()));
       setBody("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
+      setError(leadError(err));
     } finally {
       setBusy(false);
     }
@@ -670,6 +674,7 @@ function InviteModal({
   onClose: () => void;
   onInvited: (result: LeadInviteResult) => void;
 }) {
+  const leadError = useLeadError();
   const t = useTranslations("platform.leads");
   const contact = splitContactName(lead.contact_name);
   const [name, setName] = useState(lead.org_name);
@@ -709,7 +714,7 @@ function InviteModal({
         }),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
+      setError(leadError(err));
       setBusy(false);
     }
   }

@@ -4,7 +4,13 @@ import { getPlatformTenants, getTenantProfile, requireServerSession } from "../.
 
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-export default async function PlatformTenantsPage() {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export default async function PlatformTenantsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   // `support` gets a read-only tenants table: lifecycle controls hidden
   // (the backend 403s them anyway — PLATFORM_HANDOFF §1 capability table).
   // `marketing` has no business here at all — back to the pipeline.
@@ -19,9 +25,14 @@ export default async function PlatformTenantsPage() {
     getPlatformTenants(),
     getTenantProfile().catch(() => null),
   ]);
+  // ?tenant=<id>: arriving from a lead page — show that workspace's row only.
+  const raw = (await searchParams).tenant;
+  const focus = typeof raw === "string" && UUID.test(raw) ? raw : null;
+
   return (
     <PlatformTenantsView
       data={data}
+      focusTenantId={focus}
       callerWorkspace={callerWorkspace}
       callerOperatorRole={role}
     />

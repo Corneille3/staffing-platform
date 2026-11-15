@@ -31,6 +31,8 @@ import {
   leadEyebrow,
   leadGhostBtn,
   leadInput,
+  useImportRowReason,
+  useLeadError,
   leadPrimaryBtn,
   leadRowBtn,
 } from "./platform-leads-shared";
@@ -422,6 +424,8 @@ const selectStyle: React.CSSProperties = {
 // ── Import ───────────────────────────────────────────────────────────────────
 
 function ImportModal({ onClose }: { onClose: () => void }) {
+  const leadError = useLeadError();
+  const rowReason = useImportRowReason();
   const t = useTranslations("platform.leads.importModal");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -435,7 +439,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
     try {
       setResult(await importLeads(file));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Import failed");
+      setError(leadError(err));
     } finally {
       setBusy(false);
     }
@@ -454,7 +458,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
           {result.skipped.length > 0 ? (
             <ul style={{ margin: "0 0 16px", padding: "12px 14px 12px 28px", background: "var(--rose-soft)", borderRadius: 10, fontSize: 12, color: "var(--ink)", lineHeight: 1.5, maxHeight: 180, overflowY: "auto" }}>
               {result.skipped.map((s) => (
-                <li key={s.row}>{t("skippedRow", { row: s.row, reason: s.reason })}</li>
+                <li key={s.row}>{t("skippedRow", { row: s.row, reason: rowReason(s) })}</li>
               ))}
             </ul>
           ) : null}
@@ -502,6 +506,7 @@ function ImportCount({ value, label, tone }: { value: number; label: string; ton
 // ── New lead ─────────────────────────────────────────────────────────────────
 
 function NewLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated: (lead: Lead) => void }) {
+  const leadError = useLeadError();
   const t = useTranslations("platform.leads");
   const [orgName, setOrgName] = useState("");
   const [segment, setSegment] = useState("");
@@ -537,7 +542,7 @@ function NewLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
       });
       onCreated(lead);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
+      setError(leadError(err));
       setBusy(false);
     }
   }

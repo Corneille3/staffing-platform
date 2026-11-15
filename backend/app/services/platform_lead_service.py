@@ -29,6 +29,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.scope import AccessScope
+from app.core.errors import coded
 from app.core.timeutil import shift_today
 from app.models.enums import LeadStatus
 from app.models.enums import TenantStatus
@@ -49,8 +50,12 @@ EVENTS_ON_DETAIL = 50
 SORTS = ('next_action', 'score', 'updated')
 
 
-def _unprocessable(detail: str) -> HTTPException:
-    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail)
+def _unprocessable(code: str, message: str, **params: object) -> HTTPException:
+    return coded(status.HTTP_422_UNPROCESSABLE_ENTITY, f'lead.{code}', message, **params)
+
+
+def lead_not_found() -> HTTPException:
+    return coded(status.HTTP_404_NOT_FOUND, 'lead.not_found', 'Lead not found')
 
 
 def check_transition(current: LeadStatus, target: LeadStatus) -> None:
@@ -59,9 +64,9 @@ def check_transition(current: LeadStatus, target: LeadStatus) -> None:
     if target == current:
         return
     if current == LeadStatus.WON:
-        raise _unprocessable('A won lead is closed — its tenant is live.')
+        raise _unprocessable('won_is_closed', 'A won lead is closed — its tenant is live.')
     if current == LeadStatus.LOST and target != LeadStatus.CONTACTED:
-        raise _unprocessable('A lost lead can only be reopened to "contacted".')
+        raise _unprocessable('lost_reopens_to_contacted', 'A lost lead can only be reopened to "contacted".')
 
 
 def mark_lead_piloting(db: Session, tenant_id: UUID) -> PlatformLead | None:
@@ -124,7 +129,7 @@ class PlatformLeadService:
     def _get_or_404(self, lead_id: UUID) -> PlatformLead:
         lead = self.db.get(PlatformLead, lead_id)
         if lead is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Lead not found')
+            raise lead_not_found()
         return lead
 
     def _event(
@@ -144,22 +149,22 @@ class PlatformLeadService:
             return
         clash = self.db.scalar(select(PlatformLead).where(PlatformLead.external_ref == external_ref))
         if clash is not None and clash.id != except_id:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f'A lead with reference "{external_ref}" already exists.',
+            raise coded(
+                status.HTTP_409_CONFLICT, 'lead.ref_exists',
+                f'A lead with reference "{external_ref}" already exists.', ref=external_ref,
             )
 
     def _check_win(self, lead: PlatformLead, scope: AccessScope) -> None:
         """`won` = the client committed. Owner only, and only for a lead whose
         tenant is live — otherwise there is nothing to have won."""
         if not scope.is_platform_owner:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail='Only a platform owner can mark a lead as won.',
+            raise coded(
+                status.HTTP_403_FORBIDDEN, 'lead.win_owner_only',
+                'Only a platform owner can mark a lead as won.',
             )
         tenant = self.db.get(Tenant, lead.tenant_id) if lead.tenant_id else None
         if tenant is None or tenant.status != TenantStatus.ACTIVE:
-            raise _unprocessable('A lead can only be won once its invited tenant is active.')
+            raise _unprocessable('win_needs_active_tenant', 'A lead can only be won once its invited tenant is active.')
 
     # ── reads ─────────────────────────────────────────────────────────────────
 
@@ -282,9 +287,9 @@ class PlatformLeadService:
     def create(self, payload: LeadCreate, scope: AccessScope) -> PlatformLead:
         target = LeadStatus(payload.status)
         if target == LeadStatus.WON:
-            raise _unprocessable('A new lead cannot be won — it has no tenant yet.')
+            raise _unprocessable('new_cannot_be_won', 'A new lead cannot be won — it has no tenant yet.')
         if target == LeadStatus.LOST and not payload.lost_reason:
-            raise _unprocessable('A lost lead needs a reason (lost_reason).')
+            raise _unprocessable('lost_needs_reason', 'A lost lead needs a reason (lost_reason).')
         self._ensure_ref_free(payload.external_ref)
 
         data = payload.model_dump()
@@ -306,7 +311,7 @@ class PlatformLeadService:
         # Columns that are NOT NULL: an explicit null is a client mistake.
         for key in ('org_name', 'segment', 'province', 'kind', 'agency_ban_phase', 'language', 'source', 'status'):
             if key in changes and changes[key] is None:
-                raise _unprocessable(f'{key} cannot be empty.')
+                raise _unprocessable('field_required', f'{key} cannot be empty.', field=key)
 
         current = lead.status
         target = LeadStatus(changes.pop('status')) if 'status' in changes else current
@@ -318,7 +323,7 @@ class PlatformLeadService:
         # leave the lead exactly as it was.
         reason = changes['lost_reason'] if 'lost_reason' in changes else lead.lost_reason
         if target == LeadStatus.LOST and not (reason or '').strip():
-            raise _unprocessable('A lost lead needs a reason (lost_reason).')
+            raise _unprocessable('lost_needs_reason', 'A lost lead needs a reason (lost_reason).')
         if 'external_ref' in changes:
             self._ensure_ref_free(changes['external_ref'], except_id=lead.id)
 

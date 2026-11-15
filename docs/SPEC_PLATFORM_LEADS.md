@@ -282,6 +282,15 @@ Lignes sans `org_name` → `skipped`. Un `external_ref` déjà présent → mise
 - **Visibilité** : une demande du site n'a ni prochaine action ni score, donc le tri par défaut la met en fin de liste. `/stats` renvoie `new_website_requests` (source `website_form`, statut `new`) ; la liste affiche un bandeau « N nouvelles demandes du site » qui filtre sur `status=new&source=website_form` (nouveau filtre `source`), et une pastille « Site » sur ces lignes. Une demande répétée sur un lead déjà pris en charge ne réapparaît pas dans le bandeau (le courriel du formulaire reste le signal).
 - N'importe quel site détenant le secret peut poster ; `site` dit lequel (kouamvision.com aujourd'hui, un site StaffiG dédié plus tard). Le pot de miel reste côté site.
 
+### Finition (2026-11-15)
+
+Relecture du spec d'origine contre le code livré ; quatre écarts, dont trois fermés ici.
+
+- **Erreurs traduisibles** : les refus du module portent un code stable — `{"detail": {"code": "lead.lost_needs_reason", "message": "…", "params": {…}}}` (`core/errors.py::coded`). `message` reste une phrase anglaise lisible ; les écrans traduisent d'après `code` (`platform.leads.errors.*`) et retombent sur `message` pour un code inconnu. Les lignes ignorées d'un import portent aussi `code` + `params`. Les erreurs de validation de requête (422 de Pydantic) sont présentées comme « valeurs invalides : champs ».
+- **Lien vers le tenant** : la fiche ouvre `/platform/tenants?tenant=<id>`, qui n'affiche que cette ligne avec un retour à la liste complète. Pas de bouton « Open workspace » sur la fiche : entrer dans l'espace d'un tenant passe par la demande d'accès avec consentement, dont le bouton est sur cette ligne.
+- **Langue du visiteur** : le site envoie `language` (`fr` depuis la page StaffiG française, `en` sinon — le formulaire lui-même est en anglais).
+- **Non fermé** : le pot de miel reste côté site (un futur site devra avoir le sien).
+
 ### Conversion (2026-11-15)
 
 - `POST /api/v1/platform/leads/{id}/invite` — **owner seulement**. Le corps apporte ce que le lead n'a pas : `slug`, prénom, nom et courriel de l'admin ; `name`, `admin_phone` et la langue retombent sur les valeurs du lead. Retourne `{lead, tenant}`.
