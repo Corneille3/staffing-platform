@@ -1,5 +1,5 @@
+import { Link } from "../../../../i18n/navigation";
 import { HideOnReadOnlyVisit } from "../../../../components/read-only-visit";
-import Link from "next/link";
 import { Eyebrow, Mono } from "../../../../components/ui";
 import { ApfActivityList } from "../../../../components/apf-activity-list";
 import { getApfActivity, getOrganizations } from "../../../../lib/api";

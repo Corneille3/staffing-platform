@@ -1,7 +1,7 @@
 "use client";
 
+import { useRouter } from "../i18n/navigation";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Check, TriangleAlert } from "lucide-react";
 import { patchAdminRequest } from "../lib/browser-api";
 import {

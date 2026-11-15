@@ -1,7 +1,7 @@
 "use client";
 
+import { Link } from "../i18n/navigation";
 import React from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Activity, Briefcase, Settings, Sparkles, Target } from "lucide-react";
 import type { PlatformOperatorRole } from "../lib/types";

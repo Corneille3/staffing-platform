@@ -1,8 +1,8 @@
 "use client";
 
+import { Link } from "../i18n/navigation";
 import { useReadOnlyVisit } from "./read-only-visit";
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Check, Circle, Pencil } from "lucide-react";
 import { usePolling } from "../hooks/use-polling";

@@ -1,8 +1,8 @@
 "use client";
 
+import { Link } from "../i18n/navigation";
 import { useReadOnlyVisit } from "./read-only-visit";
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { Mono } from "./ui";

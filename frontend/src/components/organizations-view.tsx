@@ -1,7 +1,7 @@
 "use client";
 
+import { useRouter } from "../i18n/navigation";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { HideOnReadOnlyVisit } from "./read-only-visit";
 import { Eyebrow, Mono } from "./ui";

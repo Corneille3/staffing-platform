@@ -1,3 +1,4 @@
+import { getLocale } from "next-intl/server";
 import { notFound, redirect } from "next/navigation";
 import { PlatformLeadDetail } from "../../../../../components/platform-lead-detail";
 import { getPlatformLead, requireServerSession } from "../../../../../lib/api";
@@ -10,7 +11,7 @@ export default async function PlatformLeadPage({ params }: { params: Promise<{ i
   if (CLERK_ENABLED) {
     const session = await requireServerSession(["platform_admin"]);
     const role = session.platform_operator_role;
-    if (role !== "owner" && role !== "marketing") redirect("/platform/tenants");
+    if (role !== "owner" && role !== "marketing") redirect(`/${await getLocale()}/platform/tenants`);
     isOwner = role === "owner";
   }
 

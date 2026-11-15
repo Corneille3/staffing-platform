@@ -1,5 +1,6 @@
+import { getLocale } from "next-intl/server";
+import { Link } from "../../../i18n/navigation";
 import React from "react";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, Search, Bell, User as UserIcon } from "lucide-react";
 import { AdminNavigation } from "../../../components/admin-navigation";
@@ -8,7 +9,7 @@ import { AdminProfileCard } from "../../../components/admin-profile-card";
 import { ReadOnlyVisitProvider } from "../../../components/read-only-visit";
 import { AdminBreadcrumb } from "../../../components/admin-breadcrumb";
 import { HeaderSignOutButton } from "../../../components/header-sign-out-button";
-import { Eyebrow } from "../../../components/ui";
+import { Eyebrow, LanguageSwitcher } from "../../../components/ui";
 import { WorkspaceSuspendedScreen } from "../../../components/workspace-suspended";
 import {
   ApiError,
@@ -28,7 +29,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     sessionRole = session.role;
     // A marketing operator owns the sales pipeline only — the API refuses
     // every workspace call, which would otherwise read as "suspended" below.
-    if (session.platform_operator_role === "marketing") redirect("/platform/leads");
+    if (session.platform_operator_role === "marketing") redirect(`/${await getLocale()}/platform/leads`);
   }
 
   // Sidebar data — both calls are tenant-scoped via AccessScope and reused across
@@ -67,7 +68,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     tenantProfile &&
     tenantProfile.status !== "active"
   ) {
-    redirect("/welcome");
+    redirect(`/${await getLocale()}/welcome`);
   }
   const viaGrant = tenantProfile?.via_grant === true;
 
@@ -250,6 +251,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             ) : null}
             <Search size={17} strokeWidth={1.7} color="var(--ink-3)" aria-label="Search" />
             <Bell size={17} strokeWidth={1.7} color="var(--ink-3)" aria-label="Notifications" />
+            <LanguageSwitcher />
             {CLERK_ENABLED ? (
               <HeaderSignOutButton />
             ) : (

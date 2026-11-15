@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "../../../../i18n/navigation";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { PageFrame } from "../../../../components/page-frame";
 import { AdminSubstitutesTable } from "../../../../components/admin-substitutes-table";

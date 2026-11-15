@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "../../../i18n/navigation";
 import { TenantAccessRequestsCard } from "../../../components/tenant-access-requests-card";
 import { Eyebrow, Mono } from "../../../components/ui";
 import { getApfSnapshot, getTenantAccessGrants } from "../../../lib/api";

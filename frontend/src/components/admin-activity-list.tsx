@@ -1,7 +1,7 @@
 "use client";
 
+import { Link } from "../i18n/navigation";
 import { useState } from "react";
-import Link from "next/link";
 import type { AdminActivityFilter, ApfActivityRow } from "../lib/types";
 import { fetchAdminActivity } from "../lib/browser-api";
 import { Mono } from "./ui";

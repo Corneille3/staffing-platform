@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "../../../../../i18n/navigation";
 import { ArrowLeft } from "lucide-react";
 import { AdminRequestNewForm } from "../../../../../components/admin-request-new-form";
 import { HideOnReadOnlyVisit, ReadOnlyVisitNotice } from "../../../../../components/read-only-visit";

@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { getLocale } from "next-intl/server";
+import { Link } from "../../../../../../i18n/navigation";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { AdminRequestEditForm } from "../../../../../../components/admin-request-edit-form";
@@ -25,7 +26,7 @@ export default async function EditRequestPage({
   }
 
   if (!EDITABLE_STATUSES.has(request.status)) {
-    redirect(`/admin/requests/${id}`);
+    redirect(`/${await getLocale()}/admin/requests/${id}`);
   }
 
   const organizations = await getOrganizations();

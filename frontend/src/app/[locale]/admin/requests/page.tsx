@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "../../../../i18n/navigation";
 import { Eyebrow, Mono } from "../../../../components/ui";
 import { PollingRefresh } from "../../../../components/polling-refresh";
 import { HideOnReadOnlyVisit } from "../../../../components/read-only-visit";

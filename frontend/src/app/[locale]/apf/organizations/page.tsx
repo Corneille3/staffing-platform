@@ -1,5 +1,5 @@
+import { Link } from "../../../../i18n/navigation";
 import { HideOnReadOnlyVisit } from "../../../../components/read-only-visit";
-import Link from "next/link";
 import { RemoveOrganizationButton } from "../../../../components/remove-organization-button";
 import { Eyebrow, Mono } from "../../../../components/ui";
 import { getOrganizations } from "../../../../lib/api";

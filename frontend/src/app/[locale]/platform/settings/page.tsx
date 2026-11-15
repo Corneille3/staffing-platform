@@ -1,3 +1,4 @@
+import { getLocale } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { PlatformSettingsView } from "../../../../components/platform-settings-view";
 import {
@@ -14,7 +15,7 @@ export default async function PlatformSettingsPage() {
   let viewerEmail: string | null = null;
   if (CLERK_ENABLED) {
     const session = await requireServerSession(["platform_admin"]);
-    if (session.platform_operator_role === "marketing") redirect("/platform/leads");
+    if (session.platform_operator_role === "marketing") redirect(`/${await getLocale()}/platform/leads`);
     viewerEmail = session.email;
   }
   const [operators, settings, grants] = await Promise.all([

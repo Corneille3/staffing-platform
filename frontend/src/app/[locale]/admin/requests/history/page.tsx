@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "../../../../../i18n/navigation";
 import { PageFrame } from "../../../../../components/page-frame";
 import { Panel } from "../../../../../components/panel";
 import { getAssignments, getOrganizations, getRequests, getUsers, getWorkers } from "../../../../../lib/api";

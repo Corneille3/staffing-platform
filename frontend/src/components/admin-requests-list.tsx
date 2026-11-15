@@ -1,7 +1,7 @@
 "use client";
 
+import { Link } from "../i18n/navigation";
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { MoreVertical } from "lucide-react";
 import { useReadOnlyVisit } from "./read-only-visit";
 import { Mono } from "./ui";

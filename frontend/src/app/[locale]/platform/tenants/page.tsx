@@ -1,3 +1,4 @@
+import { getLocale } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { PlatformTenantsView } from "../../../../components/platform-tenants-view";
 import { getPlatformTenants, getTenantProfile, requireServerSession } from "../../../../lib/api";
@@ -16,7 +17,7 @@ export default async function PlatformTenantsPage({
   // `marketing` has no business here at all — back to the pipeline.
   const session = CLERK_ENABLED ? await requireServerSession(["platform_admin"]) : null;
   const role = session?.platform_operator_role ?? null;
-  if (role === "marketing") redirect("/platform/leads");
+  if (role === "marketing") redirect(`/${await getLocale()}/platform/leads`);
 
   // callerWorkspace: the tenant this operator can already open (own
   // membership or active §2.2 grant) — its row shows "Open workspace"
