@@ -332,7 +332,7 @@ def test_import_refuses_what_is_not_a_leads_sheet(platform_admin_client):
     no_headers = platform_admin_client.post(
         f'{LEADS}/import', files={'file': ('leads.csv', b'a,b,c\n1,2,3\n', 'text/csv')},
     )
-    assert no_headers.status_code == 422 and 'organisation' in no_headers.json()['detail']
+    assert no_headers.status_code == 422 and 'organisation' in no_headers.json()['detail']['message']
 
 
 # ── list filters + stats (criterion 8) ────────────────────────────────────────
@@ -513,7 +513,7 @@ def test_owner_wins_the_lead_once_the_client_commits(platform_admin_client, db_s
 
     # Invited but not set up yet: the tenant is not live.
     early = platform_admin_client.patch(url, json={'status': 'won'})
-    assert early.status_code == 422 and 'active' in early.json()['detail']
+    assert early.status_code == 422 and early.json()['detail']['code'] == 'lead.win_needs_active_tenant'
 
     _activate_invited_tenant(db_session)
 
@@ -571,3 +571,49 @@ def test_activation_without_a_lead_changes_nothing(apf_client, seed, db_session)
     db_session.flush()
     assert apf_client.post('/api/v1/tenant/onboarding/complete').status_code == 200
     assert db_session.scalar(select(PlatformLead)) is None
+
+
+# ── errors carry a code the bilingual screens translate ──────────────────────
+
+def test_refusals_carry_a_code_and_their_values(platform_admin_client, seed):
+    lead = _create(platform_admin_client, status='pilot', external_ref='L900')
+    url = f"{LEADS}/{lead['id']}"
+
+    def detail(res):
+        body = res.json()['detail']
+        return body['code'], body['params'], body['message']
+
+    code, params, message = detail(platform_admin_client.patch(url, json={'status': 'lost'}))
+    assert code == 'lead.lost_needs_reason' and message.startswith('A lost lead')
+
+    code, params, _ = detail(platform_admin_client.patch(url, json={'org_name': None}))
+    assert (code, params) == ('lead.field_required', {'field': 'org_name'})
+
+    code, params, _ = detail(platform_admin_client.post(LEADS, json={**NEW_LEAD, 'external_ref': 'L900'}))
+    assert (code, params) == ('lead.ref_exists', {'ref': 'L900'})
+
+    code, params, _ = detail(_invite(platform_admin_client, lead['id'], slug=seed.tenant.slug))
+    assert (code, params) == ('lead.slug_taken', {'slug': seed.tenant.slug})
+    code, _, _ = detail(_invite(platform_admin_client, lead['id'], admin_email=seed.apf.email))
+    assert code == 'lead.email_taken'
+
+    missing = platform_admin_client.get(f'{LEADS}/00000000-0000-0000-0000-000000000000')
+    assert missing.status_code == 404 and missing.json()['detail']['code'] == 'lead.not_found'
+
+
+def test_import_refusals_carry_codes(platform_admin_client, seed):
+    def upload(name, content):
+        return platform_admin_client.post(f'{LEADS}/import', files={'file': (name, content, 'text/csv')})
+
+    assert upload('leads.txt', b'x').json()['detail']['code'] == 'lead.import.bad_extension'
+    assert upload('leads.csv', b'').json()['detail']['code'] == 'lead.import.empty'
+    no_headers = upload('leads.csv', b'a;b\n1;2\n').json()['detail']
+    assert no_headers['code'] == 'lead.import.missing_columns' and 'organisation' in no_headers['params']['columns']
+
+    sheet = 'ID;Organisation;Segment;Prov.\nT1;Sans segment;;QC\nT2;Mauvais segment;Usines (QC);QC\n'
+    result = upload('leads.csv', sheet.encode()).json()
+    assert [(row['code'], row['params']) for row in result['skipped']] == [
+        ('missing_segment', {}),
+        ('unknown_segment', {'value': 'Usines (QC)'}),
+    ]
+    assert all(row['reason'] for row in result['skipped'])  # the English sentence stays

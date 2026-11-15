@@ -106,6 +106,18 @@ class TenantService:
         except Exception:  # pragma: no cover - never block creation on email
             pass
 
+    def network_conflict(self, slug: str, admin_email: str) -> str | None:
+        """Why this slug / admin email cannot become a new network, as a code
+        (`slug_reserved`, `slug_taken`, `email_taken`) — or None when free.
+        Callers word the refusal themselves."""
+        if slug in reserved_slugs(self.db):
+            return 'slug_reserved'
+        if self.db.scalar(select(Tenant).where(Tenant.slug == slug)):
+            return 'slug_taken'
+        if self.db.scalar(select(User).where(User.email == admin_email)):
+            return 'email_taken'
+        return None
+
     def stage_network(
         self, payload: TenantNetworkCreate, scope: AccessScope
     ) -> tuple[Tenant, User]:
@@ -116,22 +128,15 @@ class TenantService:
         slug = payload.slug.strip().lower()
         admin_email = payload.admin_email.lower()
 
-        if slug in reserved_slugs(self.db):
+        conflict = self.network_conflict(slug, admin_email)
+        if conflict is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f'The slug "{slug}" is reserved and cannot be used.',
-            )
-
-        if self.db.scalar(select(Tenant).where(Tenant.slug == slug)):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f'A tenant with slug "{slug}" already exists.',
-            )
-
-        if self.db.scalar(select(User).where(User.email == admin_email)):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail='A user with that email already exists.',
+                detail={
+                    'slug_reserved': f'The slug "{slug}" is reserved and cannot be used.',
+                    'slug_taken': f'A tenant with slug "{slug}" already exists.',
+                    'email_taken': 'A user with that email already exists.',
+                }[conflict],
             )
 
         tenant = Tenant(

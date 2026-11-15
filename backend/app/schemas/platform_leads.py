@@ -240,7 +240,10 @@ class LeadStats(BaseModel):
 
 class LeadImportSkipped(BaseModel):
     row: int
-    reason: str
+    reason: str  # English sentence
+    # Stable code + the values it was built from, for a translated message.
+    code: str | None = None
+    params: dict[str, str | int] = {}
 
 
 class LeadImportResult(BaseModel):
