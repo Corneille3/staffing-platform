@@ -174,3 +174,32 @@ export function formatDay(day: string, locale: string): string {
     timeZone: "UTC",
   });
 }
+
+/** Workspace address suggested for « Invite as a network »: accents dropped,
+ * anything else collapsed to single hyphens — the shape the API accepts
+ * (`^[a-z0-9][a-z0-9-]*[a-z0-9]$`). */
+export function slugifyOrgName(name: string): string {
+  return name
+    .toLowerCase()
+    // Ligatures have no decomposition: NFD leaves « œ » as is.
+    .replace(/œ/g, "oe")
+    .replace(/æ/g, "ae")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60)
+    .replace(/-+$/, "");
+}
+
+/** "Claire Dubois-Roy" → first / last, to pre-fill the invited admin. A
+ * single word is a first name; the operator completes the rest. */
+export function splitContactName(name: string | null): { first: string; last: string } {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  return { first: parts[0] ?? "", last: parts.slice(1).join(" ") };
+}
+
+/** A lead can be invited once, and only while it is still open. */
+export function canInviteLead(lead: Pick<Lead, "status" | "tenant_id">): boolean {
+  return !lead.tenant_id && !isClosedLeadStatus(lead.status);
+}

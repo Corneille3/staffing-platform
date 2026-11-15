@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowLeft, ArrowUpRight, Check, ExternalLink } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Check, ExternalLink, Send } from "lucide-react";
 import { Link } from "../i18n/navigation";
-import { addLeadEvent, fetchLead, updateLead } from "../lib/browser-api";
+import { addLeadEvent, fetchLead, inviteLead, updateLead } from "../lib/browser-api";
 import {
   LEAD_BAN_PHASES,
   LEAD_EVENT_TYPES,
@@ -13,20 +13,25 @@ import {
   LEAD_SOURCES,
   LEAD_STATUSES,
   LEAD_WAVES,
+  canInviteLead,
   canMoveLead,
   daysBetween,
   formatDay,
   isLeadOverdue,
+  slugifyOrgName,
+  splitContactName,
 } from "../lib/leads";
 import { shiftDateKey, shiftDateTime } from "../lib/shift-time";
-import type { Lead, LeadDetail, LeadEvent, LeadPatch, LeadStatus } from "../lib/types";
+import type { Lead, LeadDetail, LeadEvent, LeadInviteResult, LeadPatch, LeadStatus, LeadTenantSummary } from "../lib/types";
 import {
   LEAD_STATUS_TONE,
   LeadFieldLabel,
   LeadKindBadge,
+  LeadModal,
   LeadStatusChip,
   leadCard,
   leadEyebrow,
+  leadGhostBtn,
   leadInput,
   leadPrimaryBtn,
   leadRowBtn,
@@ -39,31 +44,45 @@ type FieldKey = keyof LeadPatch;
 export function PlatformLeadDetail({
   initial,
   todayKey,
-  canSeeTenants,
+  isOwner,
 }: {
   initial: LeadDetail;
   todayKey: string;
-  // Only an owner can open the tenants console; marketing cannot.
-  canSeeTenants: boolean;
+  // Only an owner can invite the lead as a network and open the tenants
+  // console; marketing runs the pipeline up to the hand-over.
+  isOwner: boolean;
 }) {
   const t = useTranslations("platform.leads");
   const locale = useLocale();
   const [lead, setLead] = useState<Lead>(initial);
   const [events, setEvents] = useState<LeadEvent[]>(initial.events);
+  const [tenant, setTenant] = useState<LeadTenantSummary | null>(initial.tenant);
+  const [inviting, setInviting] = useState(false);
+
+  async function reloadFeed() {
+    try {
+      const fresh = await fetchLead(lead.id);
+      setEvents(fresh.events);
+      setTenant(fresh.tenant);
+    } catch {
+      // The write itself went through; a stale feed is not worth an error.
+    }
+  }
+
+  function onInvited(result: LeadInviteResult) {
+    setLead(result.lead);
+    setTenant(result.tenant);
+    setInviting(false);
+    void reloadFeed();
+  }
 
   /** One PATCH; the row state follows the server's answer. Throws on refusal
    * so the calling field can show the message and roll its draft back. */
   async function patch(change: LeadPatch): Promise<void> {
     const updated = await updateLead(lead.id, change);
     setLead(updated);
-    if (change.status) {
-      // A transition wrote an event — pull the feed rather than guess it.
-      try {
-        setEvents((await fetchLead(lead.id)).events);
-      } catch {
-        // The lead itself is saved; a stale feed is not worth an error.
-      }
-    }
+    // A transition wrote an event — pull the feed rather than guess it.
+    if (change.status) await reloadFeed();
   }
 
   const overdue = isLeadOverdue(lead, todayKey);
@@ -97,7 +116,14 @@ export function PlatformLeadDetail({
             <span>· {t("detail.created", { date: formatDay(shiftDateKey(lead.created_at), locale) })}</span>
           </div>
         </div>
+        {isOwner && canInviteLead(lead) ? (
+          <button type="button" onClick={() => setInviting(true)} style={leadPrimaryBtn}>
+            <Send size={14} /> {t("detail.invite")}
+          </button>
+        ) : null}
       </div>
+
+      {inviting ? <InviteModal lead={lead} onClose={() => setInviting(false)} onInvited={onInvited} /> : null}
 
       <StatusBar lead={lead} onMove={(status, reason) => patch(reason ? { status, lost_reason: reason } : { status })} />
 
@@ -105,17 +131,30 @@ export function PlatformLeadDetail({
         <div style={{ ...leadCard, padding: "16px 20px", marginBottom: 18, background: "var(--moss-soft)", borderColor: "transparent", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <Check size={18} style={{ color: "var(--moss)", flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 220 }}>
-            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--moss)" }}>{t("detail.convertedTitle")}</div>
+            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--moss)" }}>
+              {t(lead.converted_at ? "detail.convertedTitle" : "detail.invitedTitle")}
+              {tenant && !lead.converted_at ? (
+                <span style={{ fontWeight: 400, color: "var(--ink-2)" }}>
+                  {" · "}
+                  {t.has(`detail.tenantStatus.${tenant.status}`) ? t(`detail.tenantStatus.${tenant.status}`) : tenant.status}
+                </span>
+              ) : null}
+            </div>
             <div style={{ fontSize: 13, color: "var(--ink)", marginTop: 2 }}>
               {lead.converted_at
                 ? t("detail.convertedBody", {
                     date: formatDay(shiftDateKey(lead.converted_at), locale),
                     days: daysBetween(lead.created_at, lead.converted_at),
                   })
-                : t("detail.invitedBody")}
+                : t("detail.invitedBody", { name: tenant?.name ?? lead.org_name })}
+            </div>
+            {tenant ? (
+              <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 3, fontFamily: "var(--mono)" }}>{tenant.slug}</div>
+            ) : null}
+            <div>
             </div>
           </div>
-          {canSeeTenants ? (
+          {isOwner ? (
             <Link href="/platform/tenants" style={{ ...leadRowBtn, textDecoration: "none", background: "#fff" }}>
               {t("detail.viewTenants")} <ArrowUpRight size={13} />
             </Link>
@@ -542,7 +581,7 @@ function ActivityFeed({
                   {shiftDateTime(event.created_at)}
                 </span>
               </div>
-              {event.type === "status_changed" && event.from_status && event.to_status ? (
+              {event.from_status && event.to_status && event.from_status !== event.to_status ? (
                 <div style={{ fontSize: 12.5, color: "var(--ink-2)", marginTop: 3 }}>
                   {t("detail.transition", { from: t(`status.${event.from_status}`), to: t(`status.${event.to_status}`) })}
                 </div>
@@ -558,5 +597,123 @@ function ActivityFeed({
         )}
       </div>
     </section>
+  );
+}
+
+// ── « Invite as a network » ──────────────────────────────────────────────────
+
+const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+
+/** Owner only. Pre-filled from the lead; the operator supplies what a tenant
+ * needs on top — an address and a named admin. */
+function InviteModal({
+  lead,
+  onClose,
+  onInvited,
+}: {
+  lead: Lead;
+  onClose: () => void;
+  onInvited: (result: LeadInviteResult) => void;
+}) {
+  const t = useTranslations("platform.leads");
+  const contact = splitContactName(lead.contact_name);
+  const [name, setName] = useState(lead.org_name);
+  const [slug, setSlug] = useState(slugifyOrgName(lead.org_name));
+  const [first, setFirst] = useState(contact.first);
+  const [last, setLast] = useState(contact.last);
+  const [email, setEmail] = useState(lead.email ?? "");
+  const [phone, setPhone] = useState(lead.phone ?? "");
+  const [region, setRegion] = useState("");
+  const [language, setLanguage] = useState<"fr" | "en">(lead.language === "en" ? "en" : "fr");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    const cleanSlug = slug.trim().toLowerCase();
+    if (!name.trim() || !cleanSlug || !first.trim() || !last.trim() || !email.trim()) {
+      setError(t("inviteModal.required"));
+      return;
+    }
+    if (!SLUG_PATTERN.test(cleanSlug)) {
+      setError(t("inviteModal.slugInvalid"));
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      onInvited(
+        await inviteLead(lead.id, {
+          name: name.trim(),
+          slug: cleanSlug,
+          region: region.trim() || null,
+          admin_first_name: first.trim(),
+          admin_last_name: last.trim(),
+          admin_email: email.trim(),
+          admin_phone: phone.trim() || null,
+          admin_preferred_language: language,
+        }),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+      setBusy(false);
+    }
+  }
+
+  const input = { ...leadInput, background: "#fff" };
+  const row = { display: "block", marginBottom: 14 } as const;
+
+  return (
+    <LeadModal eyebrow={t("inviteModal.eyebrow")} title={t("inviteModal.title")} titleEm={t("inviteModal.titleEm")} width={520} onClose={busy ? () => {} : onClose}>
+      <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>{t("inviteModal.intro")}</p>
+
+      <label style={row}>
+        <LeadFieldLabel>{t("inviteModal.name")}</LeadFieldLabel>
+        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={255} style={input} />
+      </label>
+      <label style={row}>
+        <LeadFieldLabel>{t("inviteModal.slug")}</LeadFieldLabel>
+        <input value={slug} onChange={(e) => setSlug(e.target.value)} maxLength={100} style={{ ...input, fontFamily: "var(--mono)" }} />
+        <span style={{ display: "block", marginTop: 4, fontSize: 11, color: "var(--ink-3)" }}>{t("inviteModal.slugHint")}</span>
+      </label>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+        <label style={row}>
+          <LeadFieldLabel>{t("inviteModal.firstName")}</LeadFieldLabel>
+          <input value={first} onChange={(e) => setFirst(e.target.value)} maxLength={100} style={input} />
+        </label>
+        <label style={row}>
+          <LeadFieldLabel>{t("inviteModal.lastName")}</LeadFieldLabel>
+          <input value={last} onChange={(e) => setLast(e.target.value)} maxLength={100} style={input} />
+        </label>
+      </div>
+      <label style={row}>
+        <LeadFieldLabel>{t("inviteModal.email")}</LeadFieldLabel>
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={255} style={input} />
+      </label>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+        <label style={row}>
+          <LeadFieldLabel>{t("inviteModal.phone")}</LeadFieldLabel>
+          <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={40} style={input} />
+        </label>
+        <label style={row}>
+          <LeadFieldLabel>{t("inviteModal.region")}</LeadFieldLabel>
+          <input value={region} onChange={(e) => setRegion(e.target.value)} maxLength={100} style={input} />
+        </label>
+      </div>
+      <label style={row}>
+        <LeadFieldLabel>{t("inviteModal.language")}</LeadFieldLabel>
+        <select value={language} onChange={(e) => setLanguage(e.target.value === "en" ? "en" : "fr")} style={input}>
+          <option value="fr">{t("language.fr")}</option>
+          <option value="en">{t("language.en")}</option>
+        </select>
+      </label>
+
+      {error ? <p role="alert" style={{ margin: "0 0 12px", color: "var(--rose)", fontSize: 12.5 }}>{error}</p> : null}
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+        <button type="button" onClick={onClose} disabled={busy} style={leadGhostBtn}>{t("inviteModal.cancel")}</button>
+        <button type="button" onClick={submit} disabled={busy} style={{ ...leadPrimaryBtn, opacity: busy ? 0.6 : 1 }}>
+          <Send size={14} /> {busy ? t("inviteModal.sending") : t("inviteModal.send")}
+        </button>
+      </div>
+    </LeadModal>
   );
 }

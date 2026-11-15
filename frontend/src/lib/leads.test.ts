@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  canInviteLead,
   canMoveLead,
   daysBetween,
   isLeadOverdue,
   leadsQuery,
   leadsToCsv,
   parseLeadFilters,
+  slugifyOrgName,
+  splitContactName,
 } from "./leads";
 import type { Lead } from "./types";
 
@@ -134,5 +137,31 @@ describe("leadsToCsv", () => {
   it("defuses cells Excel would run as a formula", () => {
     const csv = leadsToCsv([lead], [{ header: "Notes", value: (l) => l.notes }]);
     expect(csv).toContain("\r\n'=HYPERLINK(evil)\r\n");
+  });
+});
+
+describe("invite helpers", () => {
+  it("suggests a slug the API accepts", () => {
+    expect(slugifyOrgName("Résidence « Le Havre » — Laval")).toBe("residence-le-havre-laval");
+    expect(slugifyOrgName("  CPE L'Étoile #2 ")).toBe("cpe-l-etoile-2");
+    expect(slugifyOrgName("Au cœur de la vie")).toBe("au-coeur-de-la-vie");
+    expect(slugifyOrgName("Œuvres Lætitia")).toBe("oeuvres-laetitia");
+    expect(slugifyOrgName("———")).toBe("");
+    expect(slugifyOrgName("a".repeat(59) + " b")).toBe("a".repeat(59));
+  });
+
+  it("splits a contact name into first and last", () => {
+    expect(splitContactName("Claire Dubois-Roy")).toEqual({ first: "Claire", last: "Dubois-Roy" });
+    expect(splitContactName("  Jean  Pierre Tremblay ")).toEqual({ first: "Jean", last: "Pierre Tremblay" });
+    expect(splitContactName("Direction")).toEqual({ first: "Direction", last: "" });
+    expect(splitContactName(null)).toEqual({ first: "", last: "" });
+  });
+
+  it("offers the invitation once, on an open lead", () => {
+    expect(canInviteLead({ status: "pilot", tenant_id: null })).toBe(true);
+    expect(canInviteLead({ status: "new", tenant_id: null })).toBe(true);
+    expect(canInviteLead({ status: "invited", tenant_id: "t1" })).toBe(false);
+    expect(canInviteLead({ status: "lost", tenant_id: null })).toBe(false);
+    expect(canInviteLead({ status: "won", tenant_id: "t1" })).toBe(false);
   });
 });

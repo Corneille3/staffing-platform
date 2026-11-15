@@ -37,6 +37,8 @@ import {
   LeadDetail,
   LeadEvent,
   LeadImportResult,
+  LeadInvitePayload,
+  LeadInviteResult,
   LeadListResponse,
   LeadPatch,
 } from "./types";
@@ -810,6 +812,11 @@ export async function updateLead(id: string, patch: LeadPatch): Promise<Lead> {
 
 export async function fetchLead(id: string): Promise<LeadDetail> {
   return getJson<LeadDetail>(`/api/v1/platform/leads/${id}`);
+}
+
+/** « Invite as a network » — owner only. Creates the tenant and links it. */
+export async function inviteLead(id: string, payload: LeadInvitePayload): Promise<LeadInviteResult> {
+  return postJson<LeadInviteResult>(`/api/v1/platform/leads/${id}/invite`, payload);
 }
 
 export async function addLeadEvent(id: string, type: string, body: string): Promise<LeadEvent> {
