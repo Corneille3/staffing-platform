@@ -166,7 +166,8 @@ class PlatformLeadService:
     def search(
         self, *,
         status_: str | None = None, segment: str | None = None, province: str | None = None,
-        wave: str | None = None, kind: str | None = None, q: str | None = None,
+        wave: str | None = None, kind: str | None = None, source: str | None = None,
+        q: str | None = None,
         next_action_before: date | None = None,
         sort: str = 'next_action', limit: int = 50, offset: int = 0,
     ) -> tuple[list[PlatformLead], int]:
@@ -181,6 +182,8 @@ class PlatformLeadService:
             conditions.append(PlatformLead.wave == wave.upper())
         if kind:
             conditions.append(PlatformLead.kind == kind)
+        if source:
+            conditions.append(PlatformLead.source == source)
         if q and q.strip():
             escaped = q.strip().replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
             conditions.append(PlatformLead.org_name.ilike(f'%{escaped}%', escape='\\'))
@@ -250,6 +253,15 @@ class PlatformLeadService:
             )
         ) or 0
 
+        # Demo requests from a marketing site nobody has picked up yet — the
+        # list sorts them last (no next action, no score), so it flags them.
+        new_website = self.db.scalar(
+            select(func.count()).select_from(PlatformLead).where(
+                PlatformLead.status == LeadStatus.NEW,
+                PlatformLead.source == 'website_form',
+            )
+        ) or 0
+
         past_new = total - by_status['new']
         return LeadStats(
             total=total,
@@ -261,6 +273,7 @@ class PlatformLeadService:
             open_pipeline=total - by_status['won'] - by_status['lost'],
             overdue_actions=overdue,
             in_demo_or_pilot=by_status['demo_booked'] + by_status['pilot'],
+            new_website_requests=new_website,
             conversion_rate=round(by_status['won'] / past_new, 4) if past_new else None,
         )
 

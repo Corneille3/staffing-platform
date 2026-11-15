@@ -926,6 +926,8 @@ export type LeadStats = {
   open_pipeline: number;
   overdue_actions: number;
   in_demo_or_pilot: number;
+  // Demo requests from a marketing site that are still `new`.
+  new_website_requests: number;
   conversion_rate: number | null;
 };
 

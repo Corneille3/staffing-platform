@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowRight, Download, Plus, Search, Upload } from "lucide-react";
+import { ArrowRight, Download, Inbox, Plus, Search, Upload } from "lucide-react";
 import { Link, useRouter } from "../i18n/navigation";
 import { createLead, fetchLeadsPage, importLeads } from "../lib/browser-api";
 import {
@@ -10,10 +10,13 @@ import {
   LEAD_PROVINCES,
   LEAD_SEGMENTS,
   LEAD_SORTS,
+  LEAD_SOURCES,
   LEAD_STATUSES,
   LEAD_WAVES,
+  WEBSITE_REQUESTS_FILTER,
   formatDay,
   isLeadOverdue,
+  isWebsiteRequestsFilter,
   leadsQuery,
   leadsToCsv,
   type LeadFilters,
@@ -83,7 +86,7 @@ export function PlatformLeadsView({
   const page = filters.page ?? 1;
   const from = data.total === 0 ? 0 : data.offset + 1;
   const to = data.offset + data.items.length;
-  const hasFilters = !!(filters.status || filters.segment || filters.province || filters.wave || filters.kind || filters.q);
+  const hasFilters = !!(filters.status || filters.segment || filters.province || filters.wave || filters.kind || filters.source || filters.q);
 
   async function exportCsv() {
     setExporting(true);
@@ -187,6 +190,21 @@ export function PlatformLeadsView({
         />
       </div>
 
+      {/* A form lead has no next action and no score, so the default sort puts
+          it last: say so up front, with a one-click filter. */}
+      {stats.new_website_requests > 0 && !isWebsiteRequestsFilter(filters) ? (
+        <div role="status" style={{ ...leadCard, padding: "14px 18px", marginBottom: 18, background: "var(--terra-soft)", borderColor: "transparent", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <Inbox size={18} style={{ color: "var(--terra-ink)", flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 220, fontSize: 13.5, color: "var(--terra-ink)", fontWeight: 500 }}>
+            {t("list.websiteBanner", { count: stats.new_website_requests })}
+            <span style={{ display: "block", fontSize: 12, fontWeight: 400, color: "var(--ink-2)", marginTop: 2 }}>{t("list.websiteBannerSub")}</span>
+          </div>
+          <button type="button" onClick={() => { setSearch(""); go(WEBSITE_REQUESTS_FILTER); }} style={{ ...leadPrimaryBtn, padding: "8px 14px", fontSize: 12 }}>
+            {t("list.websiteBannerCta")}
+          </button>
+        </div>
+      ) : null}
+
       {/* Filters — every one of them lives in the URL */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
         <label style={{ position: "relative", flex: "1 1 220px", maxWidth: 320 }}>
@@ -210,6 +228,8 @@ export function PlatformLeadsView({
           options={LEAD_WAVES.map((w) => [w, t("list.wave", { wave: w })])} />
         <FilterSelect value={filters.kind} onChange={(v) => setFilter("kind", v)} all={t("list.allKinds")}
           options={LEAD_KINDS.map((k) => [k, t(`kind.${k}`)])} />
+        <FilterSelect value={filters.source} onChange={(v) => setFilter("source", v)} all={t("list.allSources")}
+          options={LEAD_SOURCES.map((s) => [s, t(`source.${s}`)])} />
         <div style={{ flex: 1 }} />
         <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--ink-3)" }}>
           {t("list.sortLabel")}
@@ -300,6 +320,11 @@ function LeadRow({ lead, last, todayKey, locale }: { lead: Lead; last: boolean; 
           <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
             <span style={{ fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lead.org_name}</span>
             <LeadKindBadge kind={lead.kind} />
+            {lead.source === "website_form" ? (
+              <span style={{ padding: "1px 7px", borderRadius: 999, fontSize: 9.5, fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", flexShrink: 0, background: "var(--terra-soft)", color: "var(--terra-ink)" }}>
+                {t("list.siteBadge")}
+              </span>
+            ) : null}
           </div>
           {lead.subtype ? (
             <div style={{ fontSize: 11, color: "var(--ink-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lead.subtype}</div>
