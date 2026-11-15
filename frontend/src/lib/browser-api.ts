@@ -1,5 +1,6 @@
 "use client";
 
+import { ApiError, parseApiError } from "./api-error";
 import {
   AbsenceSite,
   AdminActivity,
@@ -69,20 +70,14 @@ async function authHeaders(): Promise<Record<string, string>> {
 // {"detail": "..."} (or a list of validation errors) — surfacing the raw JSON
 // body in the UI looks broken, so pull out `detail` when present.
 export async function errorMessageFromResponse(response: Response, fallback: string): Promise<string> {
+  return (await apiErrorFromResponse(response, fallback)).message;
+}
+
+/** The same, as an ApiError: carries the backend's error code and values
+ * when it sent them, so a bilingual screen can word the refusal itself. */
+export async function apiErrorFromResponse(response: Response, fallback: string): Promise<ApiError> {
   const text = await response.text().catch(() => "");
-  if (!text) return fallback;
-  try {
-    const body = JSON.parse(text);
-    const detail = body?.detail;
-    if (typeof detail === "string") return detail;
-    if (Array.isArray(detail)) {
-      const msg = detail.map((d) => d?.msg).filter(Boolean).join("; ");
-      if (msg) return msg;
-    }
-  } catch {
-    // Not JSON — fall through to the raw text.
-  }
-  return text || fallback;
+  return parseApiError(text, response.status, fallback);
 }
 
 async function getJson<T>(path: string): Promise<T> {
@@ -91,7 +86,7 @@ async function getJson<T>(path: string): Promise<T> {
     headers: await authHeaders(),
   });
   if (!response.ok) {
-    throw new Error(await errorMessageFromResponse(response, `GET ${path} failed (${response.status})`));
+    throw await apiErrorFromResponse(response, `GET ${path} failed (${response.status})`);
   }
   return response.json();
 }
@@ -103,7 +98,7 @@ async function postJson<T>(path: string, body?: object): Promise<T> {
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!response.ok) {
-    throw new Error(await errorMessageFromResponse(response, `POST ${path} failed (${response.status})`));
+    throw await apiErrorFromResponse(response, `POST ${path} failed (${response.status})`);
   }
   return response.json();
 }
@@ -114,7 +109,7 @@ async function deleteJson<T>(path: string): Promise<T> {
     headers: await authHeaders(),
   });
   if (!response.ok) {
-    throw new Error(await errorMessageFromResponse(response, `DELETE ${path} failed (${response.status})`));
+    throw await apiErrorFromResponse(response, `DELETE ${path} failed (${response.status})`);
   }
   return response.json();
 }
@@ -126,7 +121,7 @@ async function putJson<T>(path: string, body: object): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(await errorMessageFromResponse(response, `PUT ${path} failed (${response.status})`));
+    throw await apiErrorFromResponse(response, `PUT ${path} failed (${response.status})`);
   }
   return response.json();
 }
@@ -138,7 +133,7 @@ async function patchJson<T>(path: string, body: object): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(await errorMessageFromResponse(response, `PATCH ${path} failed (${response.status})`));
+    throw await apiErrorFromResponse(response, `PATCH ${path} failed (${response.status})`);
   }
   return response.json();
 }
@@ -173,7 +168,7 @@ export async function downloadApfExportCsv(jobId: string): Promise<Blob> {
     headers: await authHeaders(),
   });
   if (!response.ok) {
-    throw new Error(await errorMessageFromResponse(response, `Download failed (${response.status})`));
+    throw await apiErrorFromResponse(response, `Download failed (${response.status})`);
   }
   return response.blob();
 }
@@ -232,7 +227,7 @@ export async function removePlatformOperator(operatorId: string): Promise<void> 
     headers: await authHeaders(),
   });
   if (!response.ok) {
-    throw new Error(await errorMessageFromResponse(response, `Remove failed (${response.status})`));
+    throw await apiErrorFromResponse(response, `Remove failed (${response.status})`);
   }
 }
 
@@ -839,7 +834,7 @@ export async function importLeads(file: File): Promise<LeadImportResult> {
     body: form,
   });
   if (!response.ok) {
-    throw new Error(await errorMessageFromResponse(response, `Import failed (${response.status})`));
+    throw await apiErrorFromResponse(response, `Import failed (${response.status})`);
   }
   return response.json();
 }

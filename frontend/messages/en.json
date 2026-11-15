@@ -689,7 +689,7 @@
         "convertedTitle": "Won",
         "convertedBody": "Client since {date} — {days, plural, =0 {the same day} one {# day} other {# days}} after the lead was created.",
         "invitedBody": "{name} has been invited — the lead moves to Pilot when their admin finishes setting up the workspace.",
-        "viewTenants": "See the tenants",
+        "viewTenants": "See the workspace",
         "notFound": "This lead does not exist.",
         "invitedTitle": "Invited",
         "tenantStatus": {
@@ -730,7 +730,49 @@
         "cancel": "Cancel"
       },
       "tenants": {
-        "origin": "Origin"
+        "origin": "Origin",
+        "focused": "Showing the workspace invited from this lead: {name}.",
+        "showAll": "Show every network",
+        "focusMissing": "The workspace of this lead is no longer listed — it was removed."
+      },
+      "errors": {
+        "generic": "Something went wrong. Try again.",
+        "close": "Close",
+        "validation": "Some values are not valid: {fields}.",
+        "not_found": "This lead no longer exists.",
+        "won_is_closed": "A won lead is closed — its workspace is live.",
+        "lost_reopens_to_contacted": "A lost lead can only be reopened to Contacted.",
+        "ref_exists": "Another lead already has the reference “{ref}”.",
+        "win_owner_only": "Only a platform owner can mark a lead as won.",
+        "win_needs_active_tenant": "A lead can only be won once its invited workspace is active.",
+        "new_cannot_be_won": "A new lead cannot be won — it has no workspace yet.",
+        "lost_needs_reason": "A lost lead needs a reason.",
+        "field_required": "“{field}” cannot be empty.",
+        "already_invited": "This lead has already been invited as a network.",
+        "closed_cannot_be_invited": "A closed lead cannot be invited — reopen it first.",
+        "slug_reserved": "The address “{slug}” is reserved and cannot be used.",
+        "slug_taken": "A workspace already uses the address “{slug}”.",
+        "email_taken": "A user with that email already exists.",
+        "import": {
+          "bad_extension": "Upload a .xlsx or .csv file.",
+          "unreadable": "The file could not be read as a spreadsheet.",
+          "empty": "The file is empty.",
+          "missing_columns": "Missing column(s): {columns}. The file needs the headers of the Leads sheet.",
+          "too_many_rows": "Too many rows ({count}); the limit is {limit}.",
+          "too_large": "The file is larger than 5 MB."
+        },
+        "row": {
+          "not_a_number": "{column}: “{value}” is not a number",
+          "out_of_range": "{column}: {value} is out of range",
+          "bad_date": "action date: “{value}” is not a date (use YYYY-MM-DD)",
+          "missing_org": "missing organization name",
+          "missing_segment": "missing segment",
+          "unknown_segment": "unknown segment “{value}”",
+          "unknown_type": "unknown type “{value}”",
+          "bad_province": "missing or invalid province (2 letters)",
+          "unknown_status": "unknown status “{value}”",
+          "status_not_importable": "the status “{value}” cannot be imported (won needs an active workspace, lost needs a reason)"
+        }
       }
     }
   }

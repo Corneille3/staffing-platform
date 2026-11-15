@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ArrowRight, ArrowUpRight, Eye, Plus, Shield, Trash2, X } from "lucide-react";
 import {
@@ -43,8 +43,12 @@ export function PlatformTenantsView({
   data,
   callerWorkspace,
   callerOperatorRole,
+  focusTenantId = null,
 }: {
   data: PlatformTenantsResponse;
+  // Set when the page is opened from a sales lead (?tenant=<id>): the table
+  // shows that workspace only, with a way back to the full list.
+  focusTenantId?: string | null;
   // The tenant this operator can already open (own membership or active
   // §2.2 grant) — its row shows "Open workspace" instead of "Request access".
   callerWorkspace?: TenantProfile | null;
@@ -58,6 +62,9 @@ export function PlatformTenantsView({
   const readOnlyOperator = callerOperatorRole === "support";
 
   const { kpis, tenants } = data;
+  const focused = focusTenantId ? tenants.find((t) => t.id === focusTenantId) ?? null : null;
+  const rows = focused ? [focused] : tenants;
+  const pathname = usePathname();
   const counts = tenants.reduce(
     (acc, t) => {
       acc[t.status] = (acc[t.status] ?? 0) + 1;
@@ -102,6 +109,17 @@ export function PlatformTenantsView({
         <PlatKpi label="Network fill rate" value={kpis.weighted_fill_rate == null ? "—" : String(kpis.weighted_fill_rate)} unit={kpis.weighted_fill_rate == null ? undefined : "%"} sub="weighted average" tone="moss" />
       </div>
 
+      {focusTenantId ? (
+        <div role="status" style={{ ...card, padding: "12px 18px", marginBottom: 14, background: focused ? "var(--sand-soft)" : "var(--paper-2)", borderColor: "transparent", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", fontSize: 13 }}>
+          <span style={{ flex: 1, minWidth: 220 }}>
+            {focused ? tLeads("tenants.focused", { name: focused.name }) : tLeads("tenants.focusMissing")}
+          </span>
+          <Link href={pathname} style={{ ...rowBtn, textDecoration: "none", background: "#fff", color: "var(--ink)" }}>
+            {tLeads("tenants.showAll")}
+          </Link>
+        </div>
+      ) : null}
+
       {/* Tenant table */}
       <div style={{ ...card, padding: 0, overflow: "hidden" }}>
         <div style={{ display: "grid", gridTemplateColumns: GRID, padding: "12px 22px", borderBottom: "0.5px solid var(--line)", fontSize: 10, color: "var(--ink-3)", letterSpacing: ".1em", textTransform: "uppercase", fontWeight: 500 }}>
@@ -112,11 +130,11 @@ export function PlatformTenantsView({
             No networks yet. Invite your first one.
           </div>
         ) : (
-          tenants.map((t, i) => (
+          rows.map((t, i) => (
             <TenantRow
               key={t.id}
               t={t}
-              last={i === tenants.length - 1}
+              last={i === rows.length - 1}
               workspace={callerWorkspace?.id === t.id ? callerWorkspace : null}
               readOnlyOperator={readOnlyOperator}
               onAction={() => router.refresh()}

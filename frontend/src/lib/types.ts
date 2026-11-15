@@ -931,11 +931,18 @@ export type LeadStats = {
   conversion_rate: number | null;
 };
 
+export type LeadImportSkipped = {
+  row: number;
+  reason: string; // English sentence
+  code?: string | null;
+  params?: Record<string, string | number>;
+};
+
 export type LeadImportResult = {
   created: number;
   updated: number;
   unchanged: number;
-  skipped: { row: number; reason: string }[];
+  skipped: LeadImportSkipped[];
 };
 
 /** PATCH body: any editable column; `null` clears a nullable one. */

@@ -6,6 +6,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { X } from "lucide-react";
+import { ApiError } from "../lib/api-error";
 import type { LeadStatus } from "../lib/types";
 
 // Colour rule (same as the worker screens): moss = positive, terra =
@@ -84,6 +85,7 @@ export function LeadModal({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const t = useTranslations("platform.leads");
   return (
     <div
       role="dialog"
@@ -123,7 +125,7 @@ export function LeadModal({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("errors.close")}
             style={{ ...leadRowBtn, width: 32, height: 32, borderRadius: 99, padding: 0, justifyContent: "center" }}
           >
             <X size={15} />
@@ -133,6 +135,37 @@ export function LeadModal({
       </div>
     </div>
   );
+}
+
+/** Words an API refusal in the viewer's language. The backend's lead errors
+ * carry a code (`lead.lost_needs_reason`, `lead.import.too_large`, …); an
+ * unknown code, or an error from elsewhere, falls back to its own sentence. */
+export function useLeadError(): (err: unknown) => string {
+  const t = useTranslations("platform.leads");
+  return (err) => {
+    if (err instanceof ApiError && err.code) {
+      const key = `errors.${err.code.replace(/^lead\./, "")}`;
+      if (t.has(key)) {
+        const params = { ...err.params };
+        // A column name reads better as the label the screen already shows.
+        if (typeof params.field === "string" && t.has(`field.${params.field}`)) {
+          params.field = t(`field.${params.field}`);
+        }
+        return t(key, params);
+      }
+    }
+    if (err instanceof Error && err.message) return err.message;
+    return t("errors.generic");
+  };
+}
+
+/** One skipped import row: translated when the code is known. */
+export function useImportRowReason(): (row: { reason: string; code?: string | null; params?: Record<string, string | number> }) => string {
+  const t = useTranslations("platform.leads");
+  return (row) => {
+    const key = row.code ? `errors.row.${row.code}` : null;
+    return key && t.has(key) ? t(key, row.params ?? {}) : row.reason;
+  };
 }
 
 export function LeadFieldLabel({ children }: { children: ReactNode }) {
