@@ -36,7 +36,8 @@ from app.models.platform_lead import PlatformLead, PlatformLeadEvent
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.schemas.platform_leads import (
-    LeadCreate, LeadEventCreate, LeadEventOut, LeadStats, LeadUpdate, SegmentWaveCount,
+    LeadCreate, LeadEventCreate, LeadEventOut, LeadStats, LeadUpdate, PublicLeadIntake,
+    SegmentWaveCount,
 )
 
 OPEN_STATUSES = (
@@ -76,6 +77,41 @@ def mark_lead_piloting(db: Session, tenant_id: UUID) -> PlatformLead | None:
         lead_id=lead.id, type='tenant_activated', actor_id=None,
         from_status=previous, to_status=LeadStatus.PILOT,
     ))
+    return lead
+
+
+def receive_public_intake(db: Session, payload: PublicLeadIntake) -> PlatformLead:
+    """A demo request from a marketing site. A new lead — or, when an open
+    lead already has that email, one more event on its feed: someone who asks
+    twice must not become two prospects. Written by the system (no actor)."""
+    lead = db.scalar(
+        select(PlatformLead)
+        .where(
+            func.lower(PlatformLead.email) == payload.email,
+            PlatformLead.status.notin_(CLOSED_STATUSES),
+        )
+        .order_by(PlatformLead.created_at.desc())
+    )
+    body = ' — '.join(part for part in (payload.site, payload.notes) if part) or None
+    if lead is None:
+        lead = PlatformLead(
+            org_name=payload.org_name, email=payload.email,
+            contact_name=payload.contact_name, phone=payload.phone,
+            segment=payload.segment, province=payload.province, language=payload.language,
+            notes=payload.notes, source='website_form', source_detail=payload.site,
+            status=LeadStatus.NEW, created_by=None,
+        )
+        db.add(lead)
+        db.flush()
+        db.add(PlatformLeadEvent(
+            lead_id=lead.id, type='form_submitted', actor_id=None,
+            to_status=LeadStatus.NEW, body=body,
+        ))
+    else:
+        db.add(PlatformLeadEvent(lead_id=lead.id, type='form_submitted', actor_id=None, body=body))
+        lead.updated_at = func.now()
+    db.commit()
+    db.refresh(lead)
     return lead
 
 

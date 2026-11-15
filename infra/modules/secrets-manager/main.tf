@@ -38,6 +38,9 @@ resource "aws_secretsmanager_secret_version" "app_env" {
     # supports MFA enrollment (paid feature on production instances).
     PLATFORM_MFA_ENFORCED = tostring(var.platform_mfa_enforced)
 
+    # Public lead intake. Blank = the route answers 404.
+    LEADS_INTAKE_SECRET = var.leads_intake_secret
+
     # SMS (Twilio). Blank SID = SmsNotificationService skips — SMS off.
     TWILIO_ACCOUNT_SID = var.twilio_account_sid
     TWILIO_AUTH_TOKEN  = var.twilio_auth_token

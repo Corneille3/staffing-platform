@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.api.v1.router import api_router
+from app.api.v1.public_leads import router as public_leads_router
 from app.api.v1.webhooks import router as webhooks_router
 from app.auth.permissions import require_authenticated
 from app.core.config import settings
@@ -68,6 +69,13 @@ app.include_router(
 app.include_router(
     webhooks_router,
     prefix=f'{settings.api_v1_prefix}/webhooks',
+)
+
+# Also outside require_authenticated: the marketing site's server route posts
+# demo requests here with a shared secret (X-Intake-Secret), no Clerk JWT.
+app.include_router(
+    public_leads_router,
+    prefix=f'{settings.api_v1_prefix}/public',
 )
 
 

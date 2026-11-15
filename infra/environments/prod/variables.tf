@@ -89,3 +89,13 @@ variable "vapid_subject" {
   type    = string
   default = "mailto:noreply@staffig.kouamvision.com"
 }
+
+# Shared secret of the public lead intake (marketing site -> API, header
+# X-Intake-Secret). Blank = the intake route answers 404. Generate with
+# `openssl rand -hex 32`; the value lives in terraform.tfvars and in the
+# marketing site's Vercel env (LEADS_INTAKE_SECRET).
+variable "leads_intake_secret" {
+  type      = string
+  default   = ""
+  sensitive = true
+}

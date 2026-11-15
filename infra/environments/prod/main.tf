@@ -96,6 +96,7 @@ module "secrets" {
   apf_bootstrap_last_name  = var.apf_bootstrap_last_name
 
   platform_mfa_enforced = var.platform_mfa_enforced
+  leads_intake_secret   = var.leads_intake_secret
 
   twilio_account_sid = var.twilio_account_sid
   twilio_auth_token  = var.twilio_auth_token
