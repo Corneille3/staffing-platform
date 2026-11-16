@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { Link } from "../../../../i18n/navigation";
 import { Eyebrow, Mono } from "../../../../components/ui";
 import { AdminActivityList } from "../../../../components/admin-activity-list";
@@ -6,15 +7,16 @@ import type { AdminActivityFilter } from "../../../../lib/types";
 import { shiftDateKey } from "../../../../lib/shift-time";
 
 const FILTERS: { key: AdminActivityFilter; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "posted", label: "Posted" },
-  { key: "accepted", label: "Accepted" },
-  { key: "declined", label: "Declined" },
-  { key: "assigned", label: "Assigned" },
-  { key: "completed", label: "Completed" },
-  { key: "cancelled", label: "Cancelled" },
-  { key: "expired", label: "Expired" },
-  { key: "invited", label: "Invited" },
+  // label = key under admin.activity
+  { key: "all", label: "filterAll" },
+  { key: "posted", label: "filterPosted" },
+  { key: "accepted", label: "filterAccepted" },
+  { key: "declined", label: "filterDeclined" },
+  { key: "assigned", label: "filterAssigned" },
+  { key: "completed", label: "filterCompleted" },
+  { key: "cancelled", label: "filterCancelled" },
+  { key: "expired", label: "filterExpired" },
+  { key: "invited", label: "filterInvited" },
 ];
 
 function normalizeFilter(value: string | string[] | undefined): AdminActivityFilter {
@@ -40,6 +42,8 @@ export default async function AdminActivityPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const t = await getTranslations("admin.activity");
+  const tDash = await getTranslations("admin.dashboard");
   const params = await searchParams;
   const filter = normalizeFilter(params.filter);
   const siteId = singleString(params.site_id);
@@ -51,9 +55,9 @@ export default async function AdminActivityPage({
   const dayMs = 86400000;
   const isoDaysAgo = (n: number) => shiftDateKey(Date.now() - n * dayMs);
   const ranges: { label: string; from?: string }[] = [
-    { label: "All" },
-    { label: "7 days", from: isoDaysAgo(7) },
-    { label: "30 days", from: isoDaysAgo(30) },
+    { label: t("rangeAll") },
+    { label: t("range7"), from: isoDaysAgo(7) },
+    { label: t("range30"), from: isoDaysAgo(30) },
   ];
   const rangeHref = (rFrom?: string) => {
     const p = new URLSearchParams();
@@ -72,17 +76,17 @@ export default async function AdminActivityPage({
   const cancelPct = kpis.posted ? Math.round((100 * kpis.cancelled) / kpis.posted) : 0;
 
   const kpiTiles: { label: string; value: string; sub: string; color?: string }[] = [
-    { label: "Requests posted", value: `${kpis.posted}`, sub: `${kpis.sites} site${kpis.sites === 1 ? "" : "s"}` },
-    { label: "Filled", value: `${kpis.filled}`, sub: `${kpis.fill_rate}% rate`, color: "var(--moss)" },
-    { label: "Cancelled", value: `${kpis.cancelled}`, sub: `${cancelPct}% of total`, color: "var(--rose)" },
-    { label: "Expired", value: `${kpis.expired}`, sub: "no fill in time", color: kpis.expired > 0 ? "var(--rose)" : undefined },
-    { label: "Avg time-to-fill", value: fmtDuration(kpis.avg_time_to_fill_minutes), sub: "request → assigned" },
+    { label: t("kpiPosted"), value: `${kpis.posted}`, sub: t("kpiSites", { count: kpis.sites }) },
+    { label: t("kpiFilled"), value: `${kpis.filled}`, sub: t("kpiRate", { rate: kpis.fill_rate }), color: "var(--moss)" },
+    { label: t("kpiCancelled"), value: `${kpis.cancelled}`, sub: t("kpiOfTotal", { pct: cancelPct }), color: "var(--rose)" },
+    { label: t("kpiExpired"), value: `${kpis.expired}`, sub: t("kpiExpiredSub"), color: kpis.expired > 0 ? "var(--rose)" : undefined },
+    { label: tDash("kpiTimeToFill"), value: fmtDuration(kpis.avg_time_to_fill_minutes), sub: tDash("kpiTimeToFillSub") },
   ];
 
   return (
     <div>
       <header style={{ marginBottom: 26 }}>
-        <Eyebrow style={{ marginBottom: 6 }}>Audit history</Eyebrow>
+        <Eyebrow style={{ marginBottom: 6 }}>{t("eyebrow")}</Eyebrow>
         <h1
           style={{
             margin: 0,
@@ -93,11 +97,10 @@ export default async function AdminActivityPage({
             color: "var(--ink)",
           }}
         >
-          Every move, <em style={{ fontStyle: "italic" }}>logged</em>.
+          {t("titleLead")} <em style={{ fontStyle: "italic" }}>{t("titleEm")}</em>.
         </h1>
         <p style={{ margin: "10px 0 0", maxWidth: 720, fontSize: 14, lineHeight: 1.55, color: "var(--ink-2)" }}>
-          The full timeline across your sites — read-only, newest first. For reporting, compliance, and
-          &ldquo;what happened on Thursday?&rdquo;.
+          {t("description")}
         </p>
       </header>
 
@@ -130,7 +133,7 @@ export default async function AdminActivityPage({
           href={exportHref}
           style={{ padding: "8px 16px", borderRadius: 999, background: "transparent", border: "0.5px solid var(--line)", color: "var(--ink)", fontSize: 13, fontWeight: 500, textDecoration: "none" }}
         >
-          Export CSV ↓
+          {t("export")}
         </a>
       </div>
 
@@ -175,7 +178,7 @@ export default async function AdminActivityPage({
                 textDecoration: "none",
               }}
             >
-              {f.label}
+              {t(f.label)}
               <Mono style={{ fontSize: 11, opacity: 0.7 }}>{count}</Mono>
             </Link>
           );

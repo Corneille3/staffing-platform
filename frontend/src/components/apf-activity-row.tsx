@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { Mono } from "./ui";
 import type { ApfActivityRow } from "../lib/types";
 import { shiftDateKey } from "../lib/shift-time";
@@ -31,34 +32,39 @@ const ACTION_META: Record<string, ActionMeta> = {
   "assignment.checkout_reminder_sent": { label: "Check-out reminder", accent: "var(--ink-3)" },
 };
 
-const ROLE_LABEL: Record<string, string> = {
-  worker: "substitute",
-  org_admin: "coordinator",
-  network_admin: "APF admin",
-  platform_admin: "platform admin",
-};
-
 function meta(action: string): ActionMeta {
   return ACTION_META[action] ?? { label: action.replace(/\./g, " · "), accent: "var(--ink-3)" };
 }
 
-function relativeTime(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
+type T = ReturnType<typeof useTranslations>;
+
+/** audit action -> key under admin.activity.actions ("a.b" -> "a_b"). */
+export function activityActionKey(action: string): string {
+  return action.replace(/\./g, "_");
+}
+
+/** "5m ago" / « il y a 5 min » — `t` is scoped to admin.requests. */
+export function activityRelativeTime(iso: string, t: T): string {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return t("justNow");
+  if (mins < 60) return t("minutesAgo", { n: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  if (hours < 24) return t("hoursAgo", { n: hours });
+  return t("daysAgo", { n: Math.floor(hours / 24) });
 }
 
 export function ActivityRowCard({ row }: { row: ApfActivityRow }) {
+  const t = useTranslations("admin.activity");
+  const tTime = useTranslations("admin.requests");
   const m = meta(row.action);
+  const labelKey = `actions.${activityActionKey(row.action)}.label`;
+  const label = t.has(labelKey) ? t(labelKey) : m.label;
   const actorName = row.actor
     ? `${row.actor.first_name} ${row.actor.last_name}`
-    : "System";
-  const actorRoleLabel = row.actor ? ROLE_LABEL[row.actor.role] ?? row.actor.role : null;
+    : t("system");
+  const actorRoleLabel = row.actor
+    ? t.has(`actorRoles.${row.actor.role}`) ? t(`actorRoles.${row.actor.role}`) : row.actor.role
+    : null;
 
   return (
     <div
@@ -97,7 +103,7 @@ export function ActivityRowCard({ row }: { row: ApfActivityRow }) {
               color: m.accent,
             }}
           >
-            {m.label}
+            {label}
           </span>
           {row.organization && (
             <span style={{ fontSize: 12, color: "var(--ink-3)" }}>{row.organization.name}</span>
@@ -111,13 +117,13 @@ export function ActivityRowCard({ row }: { row: ApfActivityRow }) {
         )}
 
         <div style={{ marginTop: 4, fontSize: 12, color: "var(--ink-3)" }}>
-          by {actorName}
+          {t("by", { name: actorName })}
           {actorRoleLabel ? ` · ${actorRoleLabel}` : ""}
         </div>
       </div>
 
       <div style={{ fontSize: 12, color: "var(--ink-3)", whiteSpace: "nowrap" }}>
-        <Mono>{relativeTime(row.created_at)}</Mono>
+        <Mono>{activityRelativeTime(row.created_at, tTime)}</Mono>
       </div>
     </div>
   );
@@ -130,15 +136,18 @@ function dayKey(iso: string): string {
   return shiftDateKey(iso);
 }
 
-function dayLabel(key: string): string {
+export type DayLabels = { today: string; yesterday: string; locale?: string };
+const DEFAULT_DAY_LABELS: DayLabels = { today: "Today", yesterday: "Yesterday" };
+
+function dayLabel(key: string, labels: DayLabels): string {
   const now = Date.now();
-  if (key === shiftDateKey(now)) return "Today";
-  if (key === shiftDateKey(now - 86_400_000)) return "Yesterday";
+  if (key === shiftDateKey(now)) return labels.today;
+  if (key === shiftDateKey(now - 86_400_000)) return labels.yesterday;
   try {
     // The key is a plain date; pin the formatter to UTC so a "YYYY-MM-DD"
     // parsed as UTC midnight doesn't render as the previous day in a
     // negative-offset browser.
-    return new Date(key).toLocaleDateString(undefined, {
+    return new Date(key).toLocaleDateString(labels.locale, {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -151,6 +160,7 @@ function dayLabel(key: string): string {
 
 export function groupByDate(
   rows: ApfActivityRow[],
+  labels: DayLabels = DEFAULT_DAY_LABELS,
 ): { key: string; label: string; entries: ApfActivityRow[] }[] {
   const groups: { key: string; label: string; entries: ApfActivityRow[] }[] = [];
   for (const row of rows) {
@@ -159,7 +169,7 @@ export function groupByDate(
     if (last?.key === key) {
       last.entries.push(row);
     } else {
-      groups.push({ key, label: dayLabel(key), entries: [row] });
+      groups.push({ key, label: dayLabel(key, labels), entries: [row] });
     }
   }
   return groups;

@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { Link } from "../../../../../i18n/navigation";
 import { PageFrame } from "../../../../../components/page-frame";
 import { Panel } from "../../../../../components/panel";
@@ -38,14 +39,15 @@ function outcomeText(
   request: StaffingRequest,
   assignment: Assignment | undefined,
   users: Named[],
+  t: Awaited<ReturnType<typeof getTranslations>>,
 ): string {
   if (request.status === "cancelled") {
     const duration = request.cancelled_at
       ? timeDiff(request.created_at ?? request.work_date, request.cancelled_at)
       : null;
-    return duration ? `Cancelled after ${duration}` : "Cancelled";
+    return duration ? t("history.cancelledAfter", { duration }) : t("status.cancelled");
   }
-  if (request.status === "expired") return "Expired — no assignment made";
+  if (request.status === "expired") return t("history.expiredNoAssign");
   if (assignment) {
     const name = workerName(users, assignment.worker_user_id);
     const fill = request.created_at && assignment.assigned_at
@@ -53,13 +55,14 @@ function outcomeText(
       : null;
     const parts = [];
     if (name) parts.push(name);
-    if (fill) parts.push(`filled in ${fill}`);
-    return parts.join(" · ") || "Assigned";
+    if (fill) parts.push(t("history.filledIn", { duration: fill }));
+    return parts.join(" · ") || t("status.assigned");
   }
-  return "Completed";
+  return t("status.completed");
 }
 
 export default async function CoverageHistoryPage() {
+  const t = await getTranslations("admin");
   const [requests, assignments, organizations, activeUsers, workersIncludingRemoved] = await Promise.all([
     getRequests(),
     getAssignments(),
@@ -80,28 +83,28 @@ export default async function CoverageHistoryPage() {
 
   return (
     <PageFrame
-      eyebrow="Requests"
-      title="Coverage history"
-      description="Past, completed, and cancelled coverage requests with outcomes and time-to-fill."
+      eyebrow={t("nav.requests")}
+      title={t("history.title")}
+      description={t("history.description")}
     >
       <div style={{ marginBottom: 18 }}>
         <Link
           href="/admin/requests"
           style={{ color: "var(--ink-2)", fontSize: 13, textDecoration: "none" }}
         >
-          ← Back to active requests
+          {t("history.back")}
         </Link>
       </div>
 
-      <Panel title="Closed requests" subtitle={`${closed.length} records`}>
+      <Panel title={t("history.closedTitle")} subtitle={t("history.records", { count: closed.length })}>
         {closed.length === 0 ? (
-          <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>No closed requests yet.</p>
+          <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>{t("history.empty")}</p>
         ) : (
           <div style={{ display: "grid", gap: 12 }}>
             {closed.map((request) => {
               const assignment = assignmentMap.get(request.id);
               const palette = STATUS_PALETTE[request.status] ?? STATUS_PALETTE.expired;
-              const outcome = outcomeText(request, assignment, users);
+              const outcome = outcomeText(request, assignment, users, t);
               return (
                 <article
                   key={request.id}
@@ -125,7 +128,7 @@ export default async function CoverageHistoryPage() {
                         </strong>
                       </Link>
                       <p style={{ margin: "4px 0 0", color: "var(--ink-3)", fontSize: 12 }}>
-                        {orgMap.get(request.organization_id) ?? "Unknown org"} · {request.city} · {request.work_date}
+                        {orgMap.get(request.organization_id) ?? t("history.unknownOrg")} · {request.city} · {request.work_date}
                       </p>
                     </div>
                     <span
@@ -142,7 +145,7 @@ export default async function CoverageHistoryPage() {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {request.status}
+                      {t.has(`status.${request.status}`) ? t(`status.${request.status}`) : request.status}
                     </span>
                   </div>
 
@@ -162,7 +165,7 @@ export default async function CoverageHistoryPage() {
                     <span>{request.start_time.slice(0, 5)} – {request.end_time.slice(0, 5)}</span>
                     {request.language_requirement ? <span>{request.language_requirement.toUpperCase()}</span> : null}
                     {request.created_at ? (
-                      <span>Created {request.created_at.slice(0, 10)}</span>
+                      <span>{t("history.created", { date: request.created_at.slice(0, 10) })}</span>
                     ) : null}
                   </div>
                 </article>

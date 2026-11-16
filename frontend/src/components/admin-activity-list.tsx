@@ -2,10 +2,11 @@
 
 import { Link } from "../i18n/navigation";
 import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import type { AdminActivityFilter, ApfActivityRow } from "../lib/types";
 import { fetchAdminActivity } from "../lib/browser-api";
 import { Mono } from "./ui";
-import { ActivityDateHeader, groupByDate } from "./apf-activity-row";
+import { ActivityDateHeader, activityActionKey, activityRelativeTime, groupByDate } from "./apf-activity-row";
 import { shiftTime } from "../lib/shift-time";
 
 function requestIdFor(row: ApfActivityRow): string | null {
@@ -38,24 +39,8 @@ const ACTION_KIND: Record<string, Kind> = {
   "coordinator.invited": { verb: "invited a coordinator", kind: "Invited", tone: "var(--terra)" },
 };
 
-const ROLE_LABEL: Record<string, string> = {
-  worker: "substitute",
-  org_admin: "coordinator",
-  network_admin: "APF admin",
-  platform_admin: "platform admin",
-};
-
 function kindFor(action: string): Kind {
   return ACTION_KIND[action] ?? { verb: action.replace(/\./g, " · "), kind: "Event", tone: "var(--ink-3)" };
-}
-
-function relativeTime(iso: string): string {
-  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
 }
 
 // Wall-clock in the shift timezone — an ISO slice would print UTC
@@ -86,9 +71,20 @@ function Chip({ label, tone, soft }: { label: string; tone: string; soft?: boole
 }
 
 function AdminActivityRow({ row }: { row: ApfActivityRow }) {
-  const k = kindFor(row.action);
-  const actorName = row.actor ? `${row.actor.first_name} ${row.actor.last_name}` : "System";
-  const actorRole = row.actor ? ROLE_LABEL[row.actor.role] ?? row.actor.role : null;
+  const t = useTranslations("admin.activity");
+  const tTime = useTranslations("admin.requests");
+  const base = kindFor(row.action);
+  const actionKey = `actions.${activityActionKey(row.action)}`;
+  const known = row.action in ACTION_KIND;
+  const k = {
+    tone: base.tone,
+    verb: t.has(`${actionKey}.verb`) ? t(`${actionKey}.verb`) : base.verb,
+    kind: t.has(`${actionKey}.kind`) ? t(`${actionKey}.kind`) : known ? base.kind : t("event"),
+  };
+  const actorName = row.actor ? `${row.actor.first_name} ${row.actor.last_name}` : t("system");
+  const actorRole = row.actor
+    ? t.has(`actorRoles.${row.actor.role}`) ? t(`actorRoles.${row.actor.role}`) : row.actor.role
+    : null;
   const reason = typeof row.payload?.reason === "string" ? row.payload.reason : null;
 
   return (
@@ -128,8 +124,8 @@ function AdminActivityRow({ row }: { row: ApfActivityRow }) {
         </div>
         <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
           {actorRole ? `${actorRole} · ` : ""}
-          {relativeTime(row.created_at)}
-          {reason ? <> · <span style={{ color: "var(--rose)" }}>Reason: {reason}</span></> : null}
+          {activityRelativeTime(row.created_at, tTime)}
+          {reason ? <> · <span style={{ color: "var(--rose)" }}>{t("reason", { reason })}</span></> : null}
         </div>
       </div>
 
@@ -149,6 +145,10 @@ interface Props {
 }
 
 export function AdminActivityList({ filter, initialRows, initialCursor, siteId }: Props) {
+  const t = useTranslations("admin.activity");
+  const tReq = useTranslations("admin.requests");
+  const tCommon = useTranslations("common");
+  const locale = useLocale();
   const [rows, setRows] = useState<ApfActivityRow[]>(initialRows);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
   const [loading, setLoading] = useState(false);
@@ -163,7 +163,7 @@ export function AdminActivityList({ filter, initialRows, initialCursor, siteId }
       setRows((prev) => [...prev, ...page.items]);
       setCursor(page.next_cursor);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load older activity");
+      setError(err instanceof Error ? err.message : t("loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -173,14 +173,14 @@ export function AdminActivityList({ filter, initialRows, initialCursor, siteId }
     return (
       <div style={{ background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: "var(--r-md)", padding: "32px 20px", textAlign: "center" }}>
         <h2 style={{ fontFamily: "var(--serif)", fontSize: 20, margin: 0, fontWeight: 400, color: "var(--ink)" }}>
-          Nothing to see <em style={{ fontStyle: "italic" }}>here</em>.
+          {tReq("emptyLead")} <em style={{ fontStyle: "italic" }}>{tReq("emptyEm")}</em>.
         </h2>
-        <p style={{ color: "var(--ink-3)", fontSize: 13, marginTop: 6 }}>No activity recorded for this filter.</p>
+        <p style={{ color: "var(--ink-3)", fontSize: 13, marginTop: 6 }}>{t("emptyBody")}</p>
       </div>
     );
   }
 
-  const groups = groupByDate(rows);
+  const groups = groupByDate(rows, { today: t("today"), yesterday: t("yesterday"), locale: locale === "fr" ? "fr-CA" : "en-CA" });
 
   return (
     <div style={{ display: "grid", gap: 24 }}>
@@ -221,7 +221,7 @@ export function AdminActivityList({ filter, initialRows, initialCursor, siteId }
             cursor: loading ? "wait" : "pointer",
           }}
         >
-          {loading ? "Loading…" : "Load older →"}
+          {loading ? tCommon("loading") : tReq("loadOlder")}
         </button>
       )}
     </div>

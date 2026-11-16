@@ -1,15 +1,17 @@
+import { getTranslations } from "next-intl/server";
 import { PageFrame } from "../../../../components/page-frame";
 import { OrganizationsView } from "../../../../components/organizations-view";
 import { getAdminOrganizations } from "../../../../lib/api";
 
 export default async function OrganizationsPage() {
+  const t = await getTranslations("admin");
   const sites = await getAdminOrganizations();
 
   return (
     <PageFrame
-      eyebrow="Your sites"
-      title="Organizations"
-      description="The physical reality of the sites you run — enrollment, coordinators, hours, and fill rate per location."
+      eyebrow={t("organizations.eyebrow")}
+      title={t("nav.organizations")}
+      description={t("organizations.description")}
     >
       <OrganizationsView sites={sites} />
     </PageFrame>

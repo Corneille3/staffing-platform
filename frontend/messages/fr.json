@@ -646,6 +646,290 @@
       "moreActions": "Autres actions",
       "notifyMore": "Aviser d'autres personnes",
       "cancelRequest": "Annuler la demande"
+    },
+    "languageNames": {
+      "fr": "Français",
+      "en": "Anglais",
+      "bilingual": "Bilingue"
+    },
+    "history": {
+      "title": "Historique des demandes",
+      "description": "Demandes passées, terminées et annulées, avec leur issue et le délai pour les pourvoir.",
+      "back": "← Retour aux demandes en cours",
+      "closedTitle": "Demandes fermées",
+      "records": "{count, plural, one {# dossier} other {# dossiers}}",
+      "empty": "Aucune demande fermée pour l'instant.",
+      "unknownOrg": "Organisation inconnue",
+      "created": "Créée le {date}",
+      "cancelledAfter": "Annulée après {duration}",
+      "expiredNoAssign": "Expirée — aucune assignation",
+      "filledIn": "pourvue en {duration}"
+    },
+    "activity": {
+      "eyebrow": "Historique d'audit",
+      "titleLead": "Chaque geste,",
+      "titleEm": "consigné",
+      "description": "Le fil complet de vos emplacements — en lecture seule, du plus récent au plus ancien. Pour les rapports, la conformité et « que s'est-il passé jeudi ? ».",
+      "rangeAll": "Tout",
+      "range7": "7 jours",
+      "range30": "30 jours",
+      "export": "Exporter en CSV ↓",
+      "kpiPosted": "Demandes publiées",
+      "kpiSites": "{count, plural, one {# emplacement} other {# emplacements}}",
+      "kpiFilled": "Pourvues",
+      "kpiRate": "taux de {rate} %",
+      "kpiCancelled": "Annulées",
+      "kpiOfTotal": "{pct} % du total",
+      "kpiExpired": "Expirées",
+      "kpiExpiredSub": "non pourvues à temps",
+      "filterAll": "Tout",
+      "filterPosted": "Publiées",
+      "filterAccepted": "Acceptées",
+      "filterDeclined": "Refusées",
+      "filterAssigned": "Assignées",
+      "filterCompleted": "Terminées",
+      "filterCancelled": "Annulées",
+      "filterExpired": "Expirées",
+      "filterInvited": "Invitations",
+      "emptyBody": "Aucune activité pour ce filtre.",
+      "loadFailed": "Échec du chargement de l'activité plus ancienne",
+      "system": "Système",
+      "reason": "Raison : {reason}",
+      "by": "par {name}",
+      "today": "Aujourd'hui",
+      "yesterday": "Hier",
+      "event": "Événement",
+      "actorRoles": {
+        "worker": "remplaçant·e",
+        "org_admin": "coordonnateur",
+        "network_admin": "admin du réseau",
+        "platform_admin": "admin de la plateforme"
+      },
+      "actions": {
+        "staffing_request_created": {
+          "label": "Demande créée",
+          "verb": "a créé le brouillon",
+          "kind": "Brouillon"
+        },
+        "staffing_request_published": {
+          "label": "Demande publiée",
+          "verb": "a publié",
+          "kind": "Publiée"
+        },
+        "staffing_request_cancelled": {
+          "label": "Demande annulée",
+          "verb": "a annulé la demande",
+          "kind": "Annulée"
+        },
+        "staffing_request_completed": {
+          "label": "Demande terminée",
+          "verb": "a terminé",
+          "kind": "Terminée"
+        },
+        "staffing_request_renotified": {
+          "label": "Avis relancés",
+          "verb": "a relancé les avis",
+          "kind": "Relance"
+        },
+        "request_response_accepted": {
+          "label": "Réponse acceptée",
+          "verb": "a accepté",
+          "kind": "Acceptée"
+        },
+        "request_response_declined": {
+          "label": "Réponse refusée",
+          "verb": "a refusé",
+          "kind": "Refusée"
+        },
+        "request_response_viewed": {
+          "label": "Demande consultée",
+          "verb": "a consulté",
+          "kind": "Consultée"
+        },
+        "request_response_withdrawn": {
+          "label": "Désistement",
+          "verb": "s'est désisté·e",
+          "kind": "Désistement"
+        },
+        "request_response_no_response": {
+          "label": "Sans réponse"
+        },
+        "assignment_confirmed": {
+          "label": "Assignation confirmée",
+          "verb": "a assigné",
+          "kind": "Assignée"
+        },
+        "assignment_cancelled": {
+          "label": "Assignation annulée",
+          "verb": "a annulé l'assignation",
+          "kind": "Annulée"
+        },
+        "assignment_checked_in": {
+          "label": "Arrivée enregistrée",
+          "verb": "a enregistré son arrivée",
+          "kind": "Arrivée"
+        },
+        "coordinator_invited": {
+          "label": "Coordonnateur invité",
+          "verb": "a invité un coordonnateur",
+          "kind": "Invitation"
+        },
+        "worker_invited": {
+          "label": "Remplaçant·e invité·e",
+          "verb": "a invité un·e remplaçant·e",
+          "kind": "Invitation"
+        },
+        "worker_onboarded": {
+          "label": "Remplaçant·e inscrit·e"
+        },
+        "worker_availability_updated": {
+          "label": "Disponibilités mises à jour"
+        },
+        "tenant_created": {
+          "label": "Réseau créé"
+        },
+        "tenant_removed": {
+          "label": "Réseau retiré"
+        },
+        "user_removed": {
+          "label": "Utilisateur retiré"
+        },
+        "replacement_unfilled": {
+          "label": "Expirée sans preneur",
+          "verb": "expirée sans preneur",
+          "kind": "Expirée"
+        },
+        "replacement_escalated": {
+          "label": "Escaladée",
+          "verb": "escaladée",
+          "kind": "Escalade"
+        },
+        "assignment_no_show_alerted": {
+          "label": "Alerte d'absence envoyée",
+          "verb": "alerte d'absence envoyée",
+          "kind": "Absence"
+        },
+        "assignment_checkin_reminder_sent": {
+          "label": "Rappel d'arrivée",
+          "verb": "rappel d'arrivée envoyé",
+          "kind": "Rappel"
+        },
+        "assignment_checkout_reminder_sent": {
+          "label": "Rappel de sortie",
+          "verb": "rappel de sortie envoyé",
+          "kind": "Rappel"
+        }
+      }
+    },
+    "substitutes": {
+      "eyebrow": "Le bassin",
+      "titleRanked": "Classement pour une demande",
+      "description": "Parcourez le bassin de remplaçant·e·s. Ouvrez une demande et choisissez « Classer les remplaçant·e·s » pour évaluer tout le monde par rapport à elle.",
+      "descriptionRanked": "Les remplaçant·e·s de votre réseau, classé·e·s selon leur correspondance avec une demande ouverte — langue, qualifications, ville, disponibilité.",
+      "backToRequest": "Retour à la demande",
+      "rankingAgainst": "Classement par correspondance avec",
+      "clear": "Effacer",
+      "factors": "Critères du classement : langue · qualifications · certifications · ville · disponibilité.",
+      "colSubstitute": "Remplaçant·e",
+      "colCity": "Ville",
+      "colAvailability": "Disponibilité",
+      "colLanguages": "Langues",
+      "colMatch": "Correspondance",
+      "empty": "Aucun·e remplaçant·e dans le bassin pour l'instant.",
+      "top": "Top",
+      "available": "Disponible",
+      "unavailable": "Non disponible",
+      "notify": "Aviser",
+      "notified": "Avisé·e",
+      "notifyTitle": "Ajouter aux avis de cette demande",
+      "notifyTitleNoRequest": "Ouvrez cette liste depuis une demande pour aviser",
+      "notifyAria": "Aviser {name}",
+      "whyAria": "Pourquoi {name} obtient {score}"
+    },
+    "organizations": {
+      "eyebrow": "Vos emplacements",
+      "description": "La réalité de vos emplacements — inscriptions, coordonnateurs, heures et taux de quarts pourvus par emplacement.",
+      "types": {
+        "childcare": "Service de garde",
+        "long_term_care": "Soins de longue durée",
+        "community_care": "Soins communautaires",
+        "home_care": "Soins à domicile",
+        "assisted_living": "Résidence avec services",
+        "other": "Autre"
+      },
+      "noSitesLead": "Aucun emplacement",
+      "noSitesEm": "pour l'instant",
+      "noSitesBody": "Vous n'avez encore été ajouté à aucun emplacement. Adressez-vous à l'admin de votre réseau.",
+      "countWords": "zéro,Un,Deux,Trois,Quatre,Cinq,Six,Sept,Huit",
+      "locations": "emplacements",
+      "inactive": "Inactif",
+      "enrolled": "Inscrits",
+      "fill30d": "Pourvus 30 j",
+      "requests": "Demandes",
+      "kpiFillRate": "Quarts pourvus",
+      "kpiRequests30d": "Demandes 30 j",
+      "kpiFilled30d": "Pourvues 30 j",
+      "kpiEnrollment": "Inscriptions",
+      "siteDetails": "Détails de l'emplacement",
+      "type": "Type",
+      "hours": "Heures",
+      "phone": "Téléphone",
+      "language": "Langue",
+      "capacity": "Capacité",
+      "coordinators": "Coordonnateurs",
+      "noneAssigned": "Aucun coordonnateur assigné",
+      "roster": "Équipe du jour : <b>{onSite}</b> sur place · <b>{arriving}</b> en route",
+      "recentActivity": "Activité récente",
+      "openLog": "Ouvrir le journal d'activité →",
+      "noRecent": "Aucune activité récente à cet emplacement.",
+      "saveFailed": "Échec de l'enregistrement",
+      "editLead": "Modifier",
+      "editEm": "l'emplacement",
+      "name": "Nom",
+      "address": "Adresse",
+      "saveChanges": "Enregistrer les changements"
+    },
+    "replacements": {
+      "eyebrow": "Suppléance en libre-service",
+      "titleLead": "Quarts",
+      "titleEm": "comblés par le bassin",
+      "description": "Chaque quart libéré par un·e remplaçant·e ou signalé en absence par le personnel. Vous voyez tout — sans être le goulot d'étranglement.",
+      "kpiReleased": "Libérés (7 j)",
+      "kpiFilled": "Comblés par le bassin",
+      "kpiAvg": "Délai moyen",
+      "kpiUnfilled": "Non comblés",
+      "colPerson": "Personne",
+      "colShift": "Quart",
+      "colStatus": "Statut",
+      "colTakenBy": "Pris par",
+      "colTime": "Délai",
+      "empty": "Aucun quart libéré pour l'instant.",
+      "absence": "Absence",
+      "status": {
+        "searching": "En recherche",
+        "filled": "Comblé",
+        "unfilled": "Non comblé",
+        "cancelled": "Annulé"
+      },
+      "policy": {
+        "title": "Politique de suppléance",
+        "auto": "Automatique",
+        "managed": "Géré par le coordonnateur",
+        "autoSub": "Diffusé au bassin · premier arrivé, premier servi",
+        "managedSub": "Diffusé au bassin · le coordonnateur choisit qui assigner",
+        "rolesLabel": "Rôles autorisés à libérer un quart",
+        "noticeLabel": "Préavis minimum (minutes avant le quart)",
+        "loadFailed": "Échec du chargement",
+        "saveFailed": "Échec de l'enregistrement",
+        "roles": {
+          "educator": "Éducatrice",
+          "assistant_educator": "Aide-éducatrice",
+          "psw": "PAB / PSW",
+          "nurse": "Infirmière",
+          "food_handler": "Cuisine",
+          "other": "Autre"
+        }
+      }
     }
   },
   "platform": {

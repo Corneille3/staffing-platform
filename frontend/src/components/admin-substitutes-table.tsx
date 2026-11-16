@@ -1,13 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useReadOnlyVisit } from "./read-only-visit";
 import { Mono } from "./ui";
 import { notifyWorkers } from "../lib/browser-api";
 import { reasonChips } from "../lib/eligibility-chips";
 import type { AdminSubstituteRow } from "../lib/types";
-
-const LANG_LABEL: Record<string, string> = { fr: "FR", en: "EN", bilingual: "Bilingual" };
 
 type SortKey = "name" | "city" | "availability" | "match";
 
@@ -37,6 +36,8 @@ function availabilityLabel(row: AdminSubstituteRow): string {
 export function AdminSubstitutesTable({ rows, ranked, requestId }: Props) {
   const [notified, setNotified] = useState<Record<string, "busy" | "done">>({});
   const readOnlyVisit = useReadOnlyVisit();
+  const t = useTranslations("admin.substitutes");
+  const tLang = useTranslations("admin.languages");
 
   async function notify(workerId: string) {
     if (!requestId) return;
@@ -109,17 +110,17 @@ export function AdminSubstitutesTable({ rows, ranked, requestId }: Props) {
           fontWeight: 500,
         }}
       >
-        <SortableHeader label="Substitute" active={sortKey === "name"} dir={sortDir} onClick={() => clickSort("name")} />
-        <SortableHeader label="City" active={sortKey === "city"} dir={sortDir} onClick={() => clickSort("city")} />
-        <SortableHeader label="Availability" active={sortKey === "availability"} dir={sortDir} onClick={() => clickSort("availability")} />
-        <div>Languages</div>
-        <SortableHeader label="Match" active={sortKey === "match"} dir={sortDir} onClick={() => clickSort("match")} disabled={!ranked} />
+        <SortableHeader label={t("colSubstitute")} active={sortKey === "name"} dir={sortDir} onClick={() => clickSort("name")} />
+        <SortableHeader label={t("colCity")} active={sortKey === "city"} dir={sortDir} onClick={() => clickSort("city")} />
+        <SortableHeader label={t("colAvailability")} active={sortKey === "availability"} dir={sortDir} onClick={() => clickSort("availability")} />
+        <div>{t("colLanguages")}</div>
+        <SortableHeader label={t("colMatch")} active={sortKey === "match"} dir={sortDir} onClick={() => clickSort("match")} disabled={!ranked} />
         <div></div>
       </div>
 
       {sorted.length === 0 ? (
         <p style={{ margin: 0, padding: "24px 18px", color: "var(--ink-3)", fontSize: 13 }}>
-          No substitutes in the pool yet.
+          {t("empty")}
         </p>
       ) : (
         sorted.map((row, i) => {
@@ -185,7 +186,7 @@ export function AdminSubstitutesTable({ rows, ranked, requestId }: Props) {
                           textTransform: "uppercase",
                         }}
                       >
-                        Top
+                        {t("top")}
                       </span>
                     )}
                   </div>
@@ -229,7 +230,7 @@ export function AdminSubstitutesTable({ rows, ranked, requestId }: Props) {
                     flexShrink: 0,
                   }}
                 />
-                <span style={{ color: "var(--ink)" }}>{availabilityLabel(row)}</span>
+                <span style={{ color: "var(--ink)" }}>{profile?.availability_status === "available" ? t("available") : profile?.availability_status === "unavailable" ? t("unavailable") : "—"}</span>
               </div>
 
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
@@ -245,7 +246,7 @@ export function AdminSubstitutesTable({ rows, ranked, requestId }: Props) {
                     letterSpacing: ".04em",
                   }}
                 >
-                  {LANG_LABEL[row.worker.preferred_language] ?? row.worker.preferred_language.toUpperCase()}
+                  {tLang.has(row.worker.preferred_language) ? tLang(row.worker.preferred_language) : row.worker.preferred_language.toUpperCase()}
                 </span>
               </div>
 
@@ -286,7 +287,7 @@ export function AdminSubstitutesTable({ rows, ranked, requestId }: Props) {
                     type="button"
                     onClick={() => notify(row.worker.id)}
                     disabled={disabled}
-                    title={requestId ? "Add to this request's notification batch" : "Open from a request to notify"}
+                    title={requestId ? t("notifyTitle") : t("notifyTitleNoRequest")}
                     style={{
                       padding: "6px 12px",
                       fontSize: 11,
@@ -299,9 +300,9 @@ export function AdminSubstitutesTable({ rows, ranked, requestId }: Props) {
                       justifySelf: "end",
                       fontFamily: "var(--ui)",
                     }}
-                    aria-label={`Notify ${row.worker.first_name}`}
+                    aria-label={t("notifyAria", { name: row.worker.first_name })}
                   >
-                    {state === "busy" ? "…" : state === "done" ? "Notified" : "Notify"}
+                    {state === "busy" ? "…" : state === "done" ? t("notified") : t("notify")}
                   </button>
                 );
               })()}
@@ -316,7 +317,7 @@ export function AdminSubstitutesTable({ rows, ranked, requestId }: Props) {
                     marginTop: 8,
                     paddingLeft: 46,
                   }}
-                  aria-label={`Why ${row.worker.first_name} scores ${score ?? "—"}`}
+                  aria-label={t("whyAria", { name: row.worker.first_name, score: score ?? "—" })}
                 >
                   {chips.map((c) => (
                     <span
