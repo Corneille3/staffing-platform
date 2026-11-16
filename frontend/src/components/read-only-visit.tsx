@@ -2,6 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import { Eye } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 /**
  * A platform operator inside a tenant through a §2.2 access grant is
@@ -28,6 +29,7 @@ export function HideOnReadOnlyVisit({ children, fallback = null }: { children: R
 
 /** Stands in for a whole write form reached by URL during a visit. */
 export function ReadOnlyVisitNotice() {
+  const t = useTranslations("admin.readOnlyVisit");
   return (
     <div
       role="note"
@@ -47,8 +49,7 @@ export function ReadOnlyVisitNotice() {
     >
       <Eye size={16} style={{ flexShrink: 0, marginTop: 2 }} aria-hidden />
       <span>
-        <strong style={{ fontWeight: 600 }}>Read-only visit.</strong> This action isn&apos;t available during a
-        support access visit — only the network&apos;s own administrators can make changes.
+        <strong style={{ fontWeight: 600 }}>{t("title")}</strong> {t("body")}
       </span>
     </div>
   );

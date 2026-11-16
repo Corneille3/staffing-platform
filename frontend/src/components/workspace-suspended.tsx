@@ -1,4 +1,5 @@
 import { PauseCircle } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { HeaderSignOutButton } from "./header-sign-out-button";
 
 /** Full-page lockout shown to a suspended tenant's users (the backend
@@ -6,6 +7,7 @@ import { HeaderSignOutButton } from "./header-sign-out-button";
  * face of that). Platform operators never see this: their scope drops
  * the tenant instead, so they can still reach /platform to reactivate. */
 export function WorkspaceSuspendedScreen() {
+  const t = useTranslations("admin.suspended");
   return (
     <div
       style={{
@@ -44,7 +46,7 @@ export function WorkspaceSuspendedScreen() {
             marginBottom: 10,
           }}
         >
-          Workspace paused
+          {t("eyebrow")}
         </div>
         <h1
           style={{
@@ -54,13 +56,10 @@ export function WorkspaceSuspendedScreen() {
             margin: "0 0 10px",
           }}
         >
-          This workspace is <em style={{ fontStyle: "italic" }}>suspended</em>
+          {t("titleLead")} <em style={{ fontStyle: "italic" }}>{t("titleEm")}</em>
         </h1>
         <p style={{ margin: "0 0 24px", color: "var(--ink-2)", fontSize: 14, lineHeight: 1.55 }}>
-          Your network&apos;s access to Staffig has been paused by the platform
-          operator. Your data is safe and nothing has been deleted — access
-          returns the moment the workspace is reactivated. If you believe this
-          is a mistake, contact your platform operator.
+          {t("body")}
         </p>
         <HeaderSignOutButton />
       </div>

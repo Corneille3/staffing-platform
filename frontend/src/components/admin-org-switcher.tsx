@@ -2,6 +2,7 @@
 
 import { useRouter } from "../i18n/navigation";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { ChevronsUpDown } from "lucide-react";
 
 type Site = { id: string; name: string; city: string | null };
@@ -22,6 +23,7 @@ export function AdminOrgSwitcher({
   multiOrg: boolean;
 }) {
   const router = useRouter();
+  const t = useTranslations("admin.shell");
   const [open, setOpen] = useState(false);
   const switchable = sites.length > 1;
 
@@ -70,7 +72,7 @@ export function AdminOrgSwitcher({
               boxShadow: "0 8px 24px rgba(21,20,15,.12)",
             }}
           >
-            <SwitchItem label="All sites" onClick={() => { setOpen(false); router.push("/admin/requests"); }} />
+            <SwitchItem label={t("allSites")} onClick={() => { setOpen(false); router.push("/admin/requests"); }} />
             {sites.map((s) => (
               <SwitchItem
                 key={s.id}

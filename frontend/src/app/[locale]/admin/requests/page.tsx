@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { Link } from "../../../../i18n/navigation";
 import { Eyebrow, Mono } from "../../../../components/ui";
 import { PollingRefresh } from "../../../../components/polling-refresh";
@@ -8,9 +9,10 @@ import { getAdminOrganizations, getAdminRequestsIndex } from "../../../../lib/ap
 import type { AdminRequestTab } from "../../../../lib/types";
 
 const TABS: { key: AdminRequestTab; label: string }[] = [
-  { key: "active", label: "Live" },
-  { key: "assigned", label: "Assigned" },
-  { key: "all", label: "All" },
+  // label = key under admin.requests
+  { key: "active", label: "tabLive" },
+  { key: "assigned", label: "tabAssigned" },
+  { key: "all", label: "tabAll" },
 ];
 
 function normalizeTab(value: string | string[] | undefined): AdminRequestTab {
@@ -36,6 +38,8 @@ export default async function RequestsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const t = await getTranslations("admin.requests");
+  const tAdmin = await getTranslations("admin");
   const params = await searchParams;
   const tab = normalizeTab(params.tab);
   const siteId = singleString(params.site_id);
@@ -52,23 +56,23 @@ export default async function RequestsPage({
   const urgentCount = items.filter((r) => r.urgent && r.status !== "assigned").length;
   const headline =
     tab === "active" && counts.active > 0
-      ? `${counts.active} request${counts.active === 1 ? "" : "s"} need your eyes`
+      ? t("headlineActive", { count: counts.active })
       : tab === "assigned"
-        ? "Assigned shifts"
-        : "All requests";
+        ? t("headlineAssigned")
+        : t("headlineAll");
 
   return (
     <div>
       <PollingRefresh everyMs={60_000} />
       <header style={{ marginBottom: 22 }}>
-        <Eyebrow style={{ marginBottom: 6 }}>Dispatch queue</Eyebrow>
+        <Eyebrow style={{ marginBottom: 6 }}>{t("eyebrow")}</Eyebrow>
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div>
             <h1 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: "clamp(2rem, 4vw, 2.9rem)", lineHeight: 1.05, fontWeight: 500, color: "var(--ink)" }}>
               {headline.split(" ")[0]} <em style={{ fontStyle: "italic" }}>{headline.split(" ").slice(1).join(" ")}</em>
             </h1>
             <p style={{ margin: "8px 0 0", fontSize: 14, color: "var(--ink-2)" }}>
-              {urgentCount > 0 ? `${urgentCount} urgent and unassigned · ` : ""}sorted by soonest shift.
+              {urgentCount > 0 ? t("urgentUnassigned", { count: urgentCount }) : ""}{t("sorted")}
             </p>
           </div>
           <HideOnReadOnlyVisit>
@@ -76,7 +80,7 @@ export default async function RequestsPage({
               href="/admin/requests/new"
               style={{ padding: "10px 18px", borderRadius: 999, background: "var(--ink)", color: "var(--paper)", fontSize: 14, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap" }}
             >
-              + New request
+              {tAdmin("dashboard.newRequest")}
             </Link>
           </HideOnReadOnlyVisit>
         </div>
@@ -84,12 +88,12 @@ export default async function RequestsPage({
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-        {TABS.map((t) => {
-          const active = tab === t.key;
+        {TABS.map((tabDef) => {
+          const active = tab === tabDef.key;
           return (
             <Link
-              key={t.key}
-              href={hrefFor(t.key, siteId)}
+              key={tabDef.key}
+              href={hrefFor(tabDef.key, siteId)}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -104,8 +108,8 @@ export default async function RequestsPage({
                 textDecoration: "none",
               }}
             >
-              {t.label}
-              <Mono style={{ fontSize: 11, opacity: 0.7 }}>{counts[t.key]}</Mono>
+              {t(tabDef.label)}
+              <Mono style={{ fontSize: 11, opacity: 0.7 }}>{counts[tabDef.key]}</Mono>
             </Link>
           );
         })}
@@ -116,7 +120,7 @@ export default async function RequestsPage({
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {sites.length > 1 && (
             <>
-              <SitePill href={hrefFor(tab, undefined)} active={!siteId} label="All sites" />
+              <SitePill href={hrefFor(tab, undefined)} active={!siteId} label={tAdmin("shell.allSites")} />
               {sites.map((s) => (
                 <SitePill key={s.id} href={hrefFor(tab, s.id)} active={siteId === s.id} label={s.name} />
               ))}

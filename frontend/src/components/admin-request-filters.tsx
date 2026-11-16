@@ -2,19 +2,21 @@
 
 import { useRouter } from "../i18n/navigation";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { SlidersHorizontal } from "lucide-react";
 import type { AdminRequestTab } from "../lib/types";
 
 const URGENCY = [
-  { key: "all", label: "All urgency" },
-  { key: "urgent", label: "Urgent" },
-  { key: "planned", label: "Planned" },
+  // label = key under admin.requests
+  { key: "all", label: "urgencyAll" },
+  { key: "urgent", label: "urgencyUrgent" },
+  { key: "planned", label: "urgencyPlanned" },
 ];
 const LANGUAGE = [
-  { key: "all", label: "All languages" },
-  { key: "fr", label: "French" },
-  { key: "en", label: "English" },
-  { key: "bilingual", label: "Bilingual" },
+  { key: "all", label: "languageAll" },
+  { key: "fr", label: "languageFr" },
+  { key: "en", label: "languageEn" },
+  { key: "bilingual", label: "languageBilingual" },
 ];
 
 export function AdminRequestFilters({
@@ -29,6 +31,7 @@ export function AdminRequestFilters({
   language: string;
 }) {
   const router = useRouter();
+  const t = useTranslations("admin.requests");
   const [open, setOpen] = useState(false);
   const active = urgency !== "all" || language !== "all";
 
@@ -64,14 +67,14 @@ export function AdminRequestFilters({
           border: `0.5px solid ${active ? "var(--ink)" : "var(--line)"}`,
         }}
       >
-        <SlidersHorizontal size={13} /> More
+        <SlidersHorizontal size={13} /> {t("more")}
       </button>
       {open && (
         <>
           <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
           <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 21, background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: 10, padding: 12, minWidth: 200, boxShadow: "0 8px 24px rgba(21,20,15,.12)", display: "grid", gap: 12 }}>
-            <Group label="Urgency" options={URGENCY} value={urgency} onPick={(v) => apply({ urgency: v })} />
-            <Group label="Language" options={LANGUAGE} value={language} onPick={(v) => apply({ language: v })} />
+            <Group label={t("urgency")} options={URGENCY.map((o) => ({ key: o.key, label: t(o.label) }))} value={urgency} onPick={(v) => apply({ urgency: v })} />
+            <Group label={t("language")} options={LANGUAGE.map((o) => ({ key: o.key, label: t(o.label) }))} value={language} onPick={(v) => apply({ language: v })} />
           </div>
         </>
       )}
