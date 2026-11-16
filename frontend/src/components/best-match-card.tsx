@@ -2,16 +2,16 @@
 
 import { useReadOnlyVisit } from "./read-only-visit";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 import { Check, Sparkles } from "lucide-react";
 import { errorMessageFromResponse } from "../lib/browser-api";
+import { useCredentialLabel } from "../hooks/use-credential-label";
 import type { EligibilityReason, Worker } from "../lib/types";
 
 const browserApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 const CLERK_ENABLED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 type ClerkLike = { session?: { getToken: () => Promise<string | null> } };
-
-const LANG_LABEL: Record<string, string> = { fr: "French", en: "English", bilingual: "Bilingual" };
 
 interface Props {
   worker: Worker;
@@ -24,37 +24,45 @@ function initials(first: string, last: string): string {
   return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
 }
 
-function tagsFromReasons(worker: Worker, reasons: EligibilityReason[]): string[] {
+type Translate = (key: string, values?: Record<string, string | number>) => string;
+
+// `t` is scoped to admin.detail.best; `languageName` words the worker's language.
+function tagsFromReasons(
+  worker: Worker,
+  reasons: EligibilityReason[],
+  t: Translate,
+  languageName: (code: string) => string,
+): string[] {
   const tags: string[] = [];
   // Language
   const langReason = reasons.find((r) => r.type === "language");
   if (langReason?.status === "matched") {
-    tags.push(`${LANG_LABEL[worker.preferred_language] ?? worker.preferred_language.toUpperCase()} · primary`);
+    tags.push(t("langPrimary", { language: languageName(worker.preferred_language) }));
   } else if (langReason) {
-    tags.push(`Missing language`);
+    tags.push(t("missingLanguage"));
   }
   // City
   const cityReason = reasons.find((r) => r.type === "city");
   if (cityReason?.status === "matched") {
-    tags.push(`${cityReason.code ?? "City"} ✓`);
+    tags.push(t("cityOk", { city: cityReason.code ?? t("city") }));
   } else if (cityReason?.code) {
-    tags.push(`No ${cityReason.code} coverage`);
+    tags.push(t("noCity", { city: cityReason.code }));
   }
   // Availability
   const availReason = reasons.find((r) => r.type === "availability");
   if (availReason?.status === "matched") {
-    tags.push("Available today");
+    tags.push(t("availableToday"));
   } else if (availReason) {
-    tags.push("Unavailable");
+    tags.push(t("unavailable"));
   }
   // Qualifications (matched count)
   const qualReasons = reasons.filter((r) => r.type === "qualification");
   if (qualReasons.length > 0) {
     const matched = qualReasons.filter((r) => r.status === "matched").length;
     if (matched === qualReasons.length) {
-      tags.push("Qualifications ✓");
+      tags.push(t("qualsOk"));
     } else {
-      tags.push(`Missing ${qualReasons.length - matched} qual`);
+      tags.push(t("missingQuals", { count: qualReasons.length - matched }));
     }
   }
   return tags.slice(0, 4);
@@ -63,6 +71,10 @@ function tagsFromReasons(worker: Worker, reasons: EligibilityReason[]): string[]
 export function BestMatchCard({ worker, matchScore, reasons, requestId }: Props) {
   const router = useRouter();
   const readOnlyVisit = useReadOnlyVisit();
+  const t = useTranslations("admin.detail.best");
+  const tLang = useTranslations("admin.languageNames");
+  const credentialLabel = useCredentialLabel();
+  const languageName = (code: string) => (tLang.has(code) ? tLang(code) : code.toUpperCase());
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -86,15 +98,16 @@ export function BestMatchCard({ worker, matchScore, reasons, requestId }: Props)
         }),
       });
       if (!resp.ok) {
-        throw new Error(await errorMessageFromResponse(resp, `Assign failed (${resp.status})`));
+        throw new Error(await errorMessageFromResponse(resp, t("assignFailedStatus", { status: resp.status })));
       }
       startTransition(() => router.refresh());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Assign failed");
+      setError(err instanceof Error ? err.message : t("assignFailed"));
     }
   }
 
-  const tags = tagsFromReasons(worker, reasons);
+  const tags = tagsFromReasons(worker, reasons, t, languageName);
+  const topQualification = worker.profile?.qualifications?.[0];
   const fullName = `${worker.first_name} ${worker.last_name}`;
 
   // The card exists to assign — nothing to offer a read-only visitor.
@@ -123,7 +136,7 @@ export function BestMatchCard({ worker, matchScore, reasons, requestId }: Props)
         }}
       >
         <Sparkles size={12} strokeWidth={1.8} />
-        Best match
+        {t("title")}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
@@ -159,7 +172,10 @@ export function BestMatchCard({ worker, matchScore, reasons, requestId }: Props)
             {fullName}
           </div>
           <div style={{ fontSize: 12, color: "rgba(246, 244, 238, 0.7)", marginTop: 2 }}>
-            {worker.profile?.qualifications?.[0] ?? "Substitute"} · {matchScore}% match
+            {t("matchLine", {
+              qualification: topQualification ? credentialLabel(topQualification) : t("substitute"),
+              score: matchScore,
+            })}
           </div>
         </div>
       </div>
@@ -173,9 +189,9 @@ export function BestMatchCard({ worker, matchScore, reasons, requestId }: Props)
             marginBottom: 16,
           }}
         >
-          {tags.map((t) => (
+          {tags.map((tag) => (
             <div
-              key={t}
+              key={tag}
               style={{
                 padding: "6px 10px",
                 fontSize: 11,
@@ -187,7 +203,7 @@ export function BestMatchCard({ worker, matchScore, reasons, requestId }: Props)
                 textAlign: "center",
               }}
             >
-              {t}
+              {tag}
             </div>
           ))}
         </div>
@@ -215,7 +231,7 @@ export function BestMatchCard({ worker, matchScore, reasons, requestId }: Props)
           gap: 6,
         }}
       >
-        {pending ? "Assigning…" : `Assign ${worker.first_name}`}
+        {pending ? t("assigning") : t("assign", { name: worker.first_name })}
         {!pending && <Check size={14} strokeWidth={2.2} />}
       </button>
 
@@ -242,7 +258,7 @@ export function BestMatchCard({ worker, matchScore, reasons, requestId }: Props)
           lineHeight: 1.4,
         }}
       >
-        Workflow card below has the same controls.
+        {t("sameControls")}
       </p>
     </div>
   );

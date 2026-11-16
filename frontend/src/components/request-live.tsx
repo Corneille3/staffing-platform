@@ -197,12 +197,13 @@ function workflowSteps(
   hasAssignment: boolean,
   assignmentConfirmed: boolean,
 ) {
-  const steps: { label: string; state: StepState }[] = [
-    { label: "Created", state: "pending" },
-    { label: "Notified", state: "pending" },
-    { label: "Responses", state: "pending" },
-    { label: "Assign", state: "pending" },
-    { label: "Confirmed", state: "pending" },
+  // `key` names the label under admin.detail.steps.
+  const steps: { key: string; state: StepState }[] = [
+    { key: "created", state: "pending" },
+    { key: "notified", state: "pending" },
+    { key: "responses", state: "pending" },
+    { key: "assign", state: "pending" },
+    { key: "confirmed", state: "pending" },
   ];
   // Always done since the request exists
   steps[0].state = "done";
@@ -244,6 +245,7 @@ function workflowSteps(
 
 export function WorkflowTracker() {
   const live = useRequestLive();
+  const d = useTranslations("admin.detail");
   if (!live) return null;
   const { request, responses, assignment } = live;
   const steps = workflowSteps(
@@ -262,7 +264,7 @@ export function WorkflowTracker() {
         marginBottom: 22,
       }}
     >
-      <Eyebrow style={{ marginBottom: 16 }}>Workflow</Eyebrow>
+      <Eyebrow style={{ marginBottom: 16 }}>{d("workflow")}</Eyebrow>
       <ol
         style={{
           listStyle: "none",
@@ -282,7 +284,7 @@ export function WorkflowTracker() {
                 ? { ring: "var(--terra)", fill: "var(--terra-soft)", icon: "var(--terra)", text: "var(--ink)" }
                 : { ring: "var(--line)", fill: "transparent", icon: "var(--ink-4)", text: "var(--ink-3)" };
           return (
-            <li key={step.label} style={{ position: "relative", textAlign: "center" }}>
+            <li key={step.key} style={{ position: "relative", textAlign: "center" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
                 {i > 0 && (
                   <div style={{
@@ -325,7 +327,7 @@ export function WorkflowTracker() {
                 </div>
               </div>
               <div style={{ marginTop: 10, fontSize: 12, fontWeight: step.state === "current" ? 600 : 500, color: colors.text }}>
-                {step.label}
+                {d(`steps.${step.key}`)}
               </div>
             </li>
           );
@@ -335,25 +337,22 @@ export function WorkflowTracker() {
   );
 }
 
-function formatStatus(value: string) {
-  return value.replace(/_/g, " ");
-}
-
 /** Tally cards — every notified worker has a response row, so rows = alerted. */
 export function ResponseSummaryPanel() {
   const live = useRequestLive();
   const t = useTranslations("admin.live");
+  const d = useTranslations("admin.detail");
   if (!live) return null;
   const { responses } = live;
   const count = (status: string) => responses.filter((r) => r.status === status).length;
   const stats = [
     { label: t("notified"), value: responses.length, tone: "var(--ink)" },
-    { label: "Opened", value: responses.filter((r) => r.viewed_at != null).length, tone: "var(--ink)" },
+    { label: d("opened"), value: responses.filter((r) => r.viewed_at != null).length, tone: "var(--ink)" },
     { label: t("accepted"), value: count("accepted"), tone: count("accepted") > 0 ? "var(--moss)" : "var(--ink)" },
-    { label: "Declined", value: count("declined"), tone: "var(--ink)" },
+    { label: d("declined"), value: count("declined"), tone: "var(--ink)" },
   ];
   return (
-    <Panel title="Response summary" subtitle={<UpdatedAgo />}>
+    <Panel title={d("summaryTitle")} subtitle={<UpdatedAgo />}>
       <div
         style={{
           display: "grid",
@@ -382,35 +381,38 @@ export function ResponseSummaryPanel() {
 
 export function AssignmentPanel({ users }: { users: User[] }) {
   const live = useRequestLive();
+  const d = useTranslations("admin.detail");
   if (!live) return null;
   const { assignment, releasedAssignment } = live;
   const assignedWorker = assignment ? users.find((u) => u.id === assignment.worker_user_id) : null;
-  const assignedName = assignedWorker ? `${assignedWorker.first_name} ${assignedWorker.last_name}` : "Unknown worker";
+  const assignedName = assignedWorker ? `${assignedWorker.first_name} ${assignedWorker.last_name}` : d("unknownWorker");
   return (
-    <Panel title="Assignment">
+    <Panel title={d("assignmentTitle")}>
       {assignment ? (
         <div style={{ display: "grid", gap: 6, color: "var(--ink-2)", fontSize: 13 }}>
           <span>
-            <strong style={{ color: "var(--ink)" }}>Substitute:</strong> {assignedName}
+            <strong style={{ color: "var(--ink)" }}>{d("substitute")}</strong> {assignedName}
           </span>
           <span>
-            <strong style={{ color: "var(--ink)" }}>Status:</strong> {formatStatus(assignment.status)}
+            <strong style={{ color: "var(--ink)" }}>{d("statusLabel")}</strong>{" "}
+            {d.has(`assignmentStatus.${assignment.status}`)
+              ? d(`assignmentStatus.${assignment.status}`)
+              : assignment.status.replace(/_/g, " ")}
           </span>
           <span>
-            <strong style={{ color: "var(--ink)" }}>Assigned at:</strong> {shiftDateTime(assignment.assigned_at)}
+            <strong style={{ color: "var(--ink)" }}>{d("assignedAt")}</strong> {shiftDateTime(assignment.assigned_at)}
           </span>
           <span>
-            <strong style={{ color: "var(--ink)" }}>Notes:</strong> {assignment.notes || "None"}
+            <strong style={{ color: "var(--ink)" }}>{d("notes")}</strong> {assignment.notes || d("none")}
           </span>
         </div>
       ) : releasedAssignment ? (
         <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>
-          <strong style={{ color: "var(--ink)" }}>Released</strong> — the substitute
-          handed this shift off. It&apos;s being covered through a replacement request.
+          {d.rich("released", { b: (chunks) => <strong style={{ color: "var(--ink)" }}>{chunks}</strong> })}
         </p>
       ) : (
         <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>
-          No assignment has been confirmed for this request yet.
+          {d("noAssignment")}
         </p>
       )}
     </Panel>
@@ -450,17 +452,18 @@ export function RequestHeaderPills({ requestId, initialStatus }: { requestId: st
   const live = useRequestLive();
   const status = live?.request.status ?? initialStatus;
   const readOnlyVisit = useReadOnlyVisit();
+  const d = useTranslations("admin.detail");
   return (
     <>
       {isEditableStatus(status) && !readOnlyVisit ? (
         <Link href={`/admin/requests/${requestId}/edit`} style={PILL_STYLE}>
           <Pencil size={13} strokeWidth={1.8} />
-          Edit request
+          {d("editRequest")}
         </Link>
       ) : null}
       {!isClosedStatus(status) ? (
         <Link href={`/admin/substitutes?rank_against_request_id=${requestId}`} style={PILL_STYLE}>
-          Rank substitutes →
+          {d("rank")}
         </Link>
       ) : null}
     </>
