@@ -1,6 +1,8 @@
 "use client";
 
 import { useRouter } from "../i18n/navigation";
+import { useTranslations } from "next-intl";
+import { useCredentialLabel } from "../hooks/use-credential-label";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import {
@@ -21,7 +23,8 @@ import { Eyebrow, Mono } from "./ui";
 import { ShiftDurationNote } from "./shift-duration-note";
 import { shiftDuration } from "../lib/shift-duration";
 
-const STEPS = ["Where & when", "Who you need", "Notify"] as const;
+// Keys under admin.form.
+const STEPS = ["stepWhere", "stepWho", "stepNotify"] as const;
 
 interface DraftState {
   organization_id: string;
@@ -95,6 +98,8 @@ function step1Complete(d: DraftState): boolean {
 
 export function AdminRequestNewForm({ organizations }: { organizations: Organization[] }) {
   const router = useRouter();
+  const t = useTranslations("admin.form");
+  const tCommon = useTranslations("common");
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<DraftState>(() => emptyDraft(organizations[0]));
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -155,7 +160,7 @@ export function AdminRequestNewForm({ organizations }: { organizations: Organiza
         })
         .catch((err) => {
           if (cancelled) return;
-          setError(err instanceof Error ? err.message : "Failed to create draft");
+          setError(err instanceof Error ? err.message : t("createFailed"));
           setSaveState("error");
         });
     }
@@ -192,7 +197,7 @@ export function AdminRequestNewForm({ organizations }: { organizations: Organiza
       })
         .then(() => setSaveState("saved"))
         .catch((err) => {
-          setError(err instanceof Error ? err.message : "Autosave failed");
+          setError(err instanceof Error ? err.message : t("autosaveFailed"));
           setSaveState("error");
         });
     }, 400);
@@ -255,7 +260,7 @@ export function AdminRequestNewForm({ organizations }: { organizations: Organiza
 
   async function handlePublish() {
     if (!draftId) {
-      setError("Draft is not saved yet — wait a moment.");
+      setError(t("notSaved"));
       return;
     }
     setPublishing(true);
@@ -265,14 +270,14 @@ export function AdminRequestNewForm({ organizations }: { organizations: Organiza
       router.push(`/admin/requests/${draftId}`);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Publish failed");
+      setError(err instanceof Error ? err.message : t("publishFailed"));
       setPublishing(false);
     }
   }
 
   function next() {
     if (step === 0 && !step1Complete(draft)) {
-      setError("Fill in organization, title, city, date, and times before continuing.");
+      setError(t("incomplete"));
       return;
     }
     setError(null);
@@ -304,7 +309,7 @@ export function AdminRequestNewForm({ organizations }: { organizations: Organiza
             gap: 18,
           }}
         >
-          <Eyebrow>Step {step + 1} · {STEPS[step]}</Eyebrow>
+          <Eyebrow>{t("stepHeading", { n: step + 1, label: t(STEPS[step]) })}</Eyebrow>
 
           {step === 0 && (
             <StepWhere draft={draft} organizations={organizations} update={update} />
@@ -335,22 +340,22 @@ export function AdminRequestNewForm({ organizations }: { organizations: Organiza
                 cursor: step === 0 ? "not-allowed" : "pointer",
               }}
             >
-              <ArrowLeft size={14} strokeWidth={1.8} /> Back
+              <ArrowLeft size={14} strokeWidth={1.8} /> {tCommon("back")}
             </button>
             {step < STEPS.length - 1 ? (
               <button type="button" onClick={next} style={primaryBtn}>
-                Continue <ArrowRight size={14} strokeWidth={1.8} />
+                {t("continue")} <ArrowRight size={14} strokeWidth={1.8} />
               </button>
             ) : (
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 {shiftEnded(draft) && (
                   <span style={{ fontSize: 12.5, color: "var(--rose)" }}>
-                    This shift has already ended — adjust the date to publish.
+                    {t("ended")}
                   </span>
                 )}
                 {tooLong && (
                   <span style={{ fontSize: 12.5, color: "var(--rose)" }}>
-                    This shift is longer than 16 hours — fix the times in step 1.
+                    {t("tooLong")}
                   </span>
                 )}
                 <button
@@ -363,7 +368,7 @@ export function AdminRequestNewForm({ organizations }: { organizations: Organiza
                     cursor: publishBlocked ? "not-allowed" : "pointer",
                   }}
                 >
-                  {publishing ? "Publishing…" : "Publish request"} <Check size={14} strokeWidth={2.2} />
+                  {publishing ? t("publishing") : t("publish")} <Check size={14} strokeWidth={2.2} />
                 </button>
               </div>
             )}
@@ -374,7 +379,7 @@ export function AdminRequestNewForm({ organizations }: { organizations: Organiza
           draft={draft}
           eligibleCount={eligibleCount}
           notifyCount={notifyCount}
-          orgName={currentOrg?.name ?? "Organization"}
+          orgName={currentOrg?.name ?? t("organization")}
           ready={draftId !== null}
         />
       </div>
@@ -413,6 +418,10 @@ const primaryBtn: React.CSSProperties = {
 };
 
 function Stepper({ step, saveState, draftId }: { step: number; saveState: string; draftId: string | null }) {
+  const t = useTranslations("admin.form");
+  const tAdmin = useTranslations("admin");
+  const tCommon = useTranslations("common");
+  const credentialLabel = useCredentialLabel();
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
       <div style={{ display: "flex", gap: 8, flex: 1, flexWrap: "wrap" }}>
@@ -460,9 +469,9 @@ function Stepper({ step, saveState, draftId }: { step: number; saveState: string
                     textTransform: "uppercase",
                   }}
                 >
-                  Step {i + 1}
+                  {t("stepN", { n: i + 1 })}
                 </div>
-                <div style={{ fontSize: 12, fontWeight: 500 }}>{label}</div>
+                <div style={{ fontSize: 12, fontWeight: 500 }}>{t(label)}</div>
               </div>
             </div>
           );
@@ -477,7 +486,7 @@ function Stepper({ step, saveState, draftId }: { step: number; saveState: string
           whiteSpace: "nowrap",
         }}
       >
-        {draftId ? (saveState === "saving" ? "Saving…" : saveState === "saved" ? "Draft · saved" : saveState === "error" ? "Save failed" : "Draft") : "Draft · pending"}
+        {draftId ? (saveState === "saving" ? tCommon("saving") : saveState === "saved" ? t("draftSaved") : saveState === "error" ? t("saveFailed") : t("draft")) : t("draftPending")}
       </div>
     </div>
   );
@@ -492,16 +501,20 @@ function StepWhere({
   organizations: Organization[];
   update: <K extends keyof DraftState>(key: K, value: DraftState[K]) => void;
 }) {
+  const t = useTranslations("admin.form");
+  const tAdmin = useTranslations("admin");
+  const tCommon = useTranslations("common");
+  const credentialLabel = useCredentialLabel();
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <Field label="Organization">
+      <Field label={t("organization")}>
         <select
           value={draft.organization_id}
           onChange={(e) => update("organization_id", e.target.value)}
           style={inputStyle}
         >
           {organizations.length === 0 ? (
-            <option value="">No organizations yet</option>
+            <option value="">{t("noOrganizations")}</option>
           ) : (
             organizations.map((org) => (
               <option key={org.id} value={org.id}>
@@ -512,37 +525,37 @@ function StepWhere({
         </select>
       </Field>
 
-      <Field label="Title">
+      <Field label={t("title")}>
         <input
           value={draft.title}
           onChange={(e) => update("title", e.target.value)}
-          placeholder="Educator · today, 07:30 — 14:30"
+          placeholder={t("titlePlaceholder")}
           style={inputStyle}
         />
       </Field>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <Field label="City">
+        <Field label={t("city")}>
           <input value={draft.city} onChange={(e) => update("city", e.target.value)} style={inputStyle} />
         </Field>
-        <Field label="Location (optional)">
+        <Field label={t("location")}>
           <input
             value={draft.location_name}
             onChange={(e) => update("location_name", e.target.value)}
-            placeholder="Toddler room, 2nd floor"
+            placeholder={t("locationPlaceholder")}
             style={inputStyle}
           />
         </Field>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
-        <Field label="Date">
+        <Field label={t("date")}>
           <input type="date" min={todayIso()} value={draft.work_date} onChange={(e) => update("work_date", e.target.value)} style={inputStyle} />
         </Field>
-        <Field label="Start">
+        <Field label={t("start")}>
           <input type="time" value={draft.start_time} onChange={(e) => update("start_time", e.target.value)} style={inputStyle} />
         </Field>
-        <Field label="End">
+        <Field label={t("end")}>
           <input type="time" value={draft.end_time} onChange={(e) => update("end_time", e.target.value)} style={inputStyle} />
         </Field>
       </div>
@@ -560,9 +573,13 @@ function StepWho({
   update: <K extends keyof DraftState>(key: K, value: DraftState[K]) => void;
   toggleListItem: (key: "required_qualifications" | "required_certifications", code: string) => void;
 }) {
+  const t = useTranslations("admin.form");
+  const tAdmin = useTranslations("admin");
+  const tCommon = useTranslations("common");
+  const credentialLabel = useCredentialLabel();
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <Field label="Role">
+      <Field label={t("role")}>
         <ChipRow>
           {ROLES.map((r) => (
             <Chip
@@ -570,13 +587,13 @@ function StepWho({
               active={draft.role === r.value}
               onClick={() => update("role", r.value)}
             >
-              {r.label}
+              {r.value === "other" ? t("roleOther") : tAdmin(`roles.${r.value}`)}
             </Chip>
           ))}
         </ChipRow>
       </Field>
 
-      <Field label="Required qualifications">
+      <Field label={t("qualifications")}>
         <ChipRow>
           {QUALIFICATIONS.map((q) => (
             <Chip
@@ -587,13 +604,13 @@ function StepWho({
               {draft.required_qualifications.includes(q.code) && (
                 <Check size={10} strokeWidth={2.2} />
               )}
-              {q.label}
+              {credentialLabel(q.code)}
             </Chip>
           ))}
         </ChipRow>
       </Field>
 
-      <Field label="Required certifications">
+      <Field label={t("certifications")}>
         <ChipRow>
           {CERTIFICATIONS.map((c) => (
             <Chip
@@ -604,13 +621,13 @@ function StepWho({
               {draft.required_certifications.includes(c.code) && (
                 <Check size={10} strokeWidth={2.2} />
               )}
-              {c.label}
+              {credentialLabel(c.code)}
             </Chip>
           ))}
         </ChipRow>
       </Field>
 
-      <Field label="Language">
+      <Field label={t("language")}>
         <ChipRow>
           {LANGUAGES.map((l) => (
             <Chip
@@ -618,17 +635,17 @@ function StepWho({
               active={draft.language_requirement === l.value}
               onClick={() => update("language_requirement", l.value)}
             >
-              {l.label}
+              {l.value ? tAdmin(`languageNames.${l.value}`) : t("noPreference")}
             </Chip>
           ))}
         </ChipRow>
       </Field>
 
-      <Field label="Arrival instructions (visible to substitute)">
+      <Field label={t("arrival")}>
         <textarea
           value={draft.arrival_instructions}
           onChange={(e) => update("arrival_instructions", e.target.value)}
-          placeholder="Ask for Sylvie at the front desk."
+          placeholder={t("arrivalPlaceholder")}
           rows={3}
           style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
         />
@@ -644,9 +661,13 @@ function StepNotify({
   draft: DraftState;
   update: <K extends keyof DraftState>(key: K, value: DraftState[K]) => void;
 }) {
+  const t = useTranslations("admin.form");
+  const tAdmin = useTranslations("admin");
+  const tCommon = useTranslations("common");
+  const credentialLabel = useCredentialLabel();
   return (
     <div style={{ display: "grid", gap: 18 }}>
-      <Field label="Urgency">
+      <Field label={t("urgency")}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           {COVERAGE_TYPES.map((opt) => {
             const active = draft.coverage_type === opt.value;
@@ -681,16 +702,16 @@ function StepNotify({
                   >
                     {active && <div style={{ width: 6, height: 6, borderRadius: 99, background: "#fff" }} />}
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>{opt.label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{t(`coverage.${opt.value}.label`)}</div>
                 </div>
-                <div style={{ fontSize: 11, color: "var(--ink-3)", marginLeft: 22 }}>{opt.sub}</div>
+                <div style={{ fontSize: 11, color: "var(--ink-3)", marginLeft: 22 }}>{t(`coverage.${opt.value}.sub`)}</div>
               </button>
             );
           })}
         </div>
       </Field>
 
-      <Field label="Dispatch">
+      <Field label={t("dispatch")}>
         <label
           style={{
             display: "flex",
@@ -711,22 +732,21 @@ function StepNotify({
           />
           <span>
             <span style={{ display: "block", fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>
-              First come, first served
+              {t("fcfsTitle")}
             </span>
             <span style={{ display: "block", fontSize: 12, color: "var(--ink-3)", marginTop: 2, lineHeight: 1.45 }}>
-              The first eligible substitute to claim gets the shift, in the app or by texting 1 back. You don't pick.
-              Leave it off to review who accepted and choose.
+              {t("fcfsBody")}
             </span>
           </span>
         </label>
       </Field>
 
-      <Field label="Urgency level (matching weight)">
+      <Field label={t("urgencyLevel")}>
         <ChipRow>
           {[
-            { v: 1, l: "Low" },
-            { v: 2, l: "Standard" },
-            { v: 3, l: "Urgent" },
+            { v: 1, l: t("low") },
+            { v: 2, l: t("standard") },
+            { v: 3, l: t("urgent") },
           ].map((opt) => (
             <Chip
               key={opt.v}
@@ -740,7 +760,7 @@ function StepNotify({
       </Field>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <Field label="Contact name (optional)">
+        <Field label={t("contactName")}>
           <input
             value={draft.contact_name}
             onChange={(e) => update("contact_name", e.target.value)}
@@ -748,7 +768,7 @@ function StepNotify({
             style={inputStyle}
           />
         </Field>
-        <Field label="Contact phone (optional)">
+        <Field label={t("contactPhone")}>
           <input
             type="tel"
             value={draft.contact_phone}
@@ -759,12 +779,12 @@ function StepNotify({
         </Field>
       </div>
 
-      <Field label="Notes (internal, optional)">
+      <Field label={t("notes")}>
         <textarea
           value={draft.description}
           onChange={(e) => update("description", e.target.value)}
           rows={2}
-          placeholder="Coverage details — only visible to the coordinator team."
+          placeholder={t("notesPlaceholder")}
           style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
         />
       </Field>
@@ -785,11 +805,15 @@ function PreviewSidebar({
   orgName: string;
   ready: boolean;
 }) {
+  const t = useTranslations("admin.form");
+  const tAdmin = useTranslations("admin");
+  const tCommon = useTranslations("common");
+  const credentialLabel = useCredentialLabel();
   const optedOut =
     eligibleCount !== null && notifyCount !== null ? eligibleCount - notifyCount : 0;
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <Eyebrow style={{ marginBottom: 0 }}>Preview · what workers will see</Eyebrow>
+      <Eyebrow style={{ marginBottom: 0 }}>{t("previewEyebrow")}</Eyebrow>
       <div
         style={{
           width: "100%",
@@ -815,7 +839,7 @@ function PreviewSidebar({
               letterSpacing: ".04em",
             }}
           >
-            Urgent
+            {tCommon("urgent")}
           </span>
           <span
             style={{
@@ -828,7 +852,7 @@ function PreviewSidebar({
               letterSpacing: ".04em",
             }}
           >
-            New request
+            {t("newRequestChip")}
           </span>
         </div>
 
@@ -836,13 +860,13 @@ function PreviewSidebar({
           {orgName}
         </div>
         <div style={{ fontSize: 12, color: "var(--ink-2)", marginBottom: 10 }}>
-          {draft.role.replace(/_/g, " ")} · {draft.title || "New shift"}
+          {draft.role === "other" ? t("roleOther") : tAdmin.has(`roles.${draft.role}`) ? tAdmin(`roles.${draft.role}`) : draft.role} · {draft.title || t("newShift")}
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
           <div style={{ padding: "8px 10px", background: "var(--paper)", borderRadius: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 500, color: "var(--ink)" }}>
-              {draft.work_date || "Date"}
+              {draft.work_date || t("datePlaceholder")}
             </div>
             <div style={{ fontSize: 10, color: "var(--ink-3)", fontFamily: "var(--mono)" }}>
               <Mono>
@@ -851,7 +875,7 @@ function PreviewSidebar({
             </div>
           </div>
           <div style={{ padding: "8px 10px", background: "var(--paper)", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 500, color: "var(--ink)" }}>{draft.city || "City"}</div>
+            <div style={{ fontSize: 11, fontWeight: 500, color: "var(--ink)" }}>{draft.city || t("cityPlaceholder")}</div>
             <div style={{ fontSize: 10, color: "var(--ink-3)" }}>
               {draft.location_name || "—"}
             </div>
@@ -871,7 +895,7 @@ function PreviewSidebar({
               textAlign: "center",
             }}
           >
-            I can take it
+            {t("take")}
           </div>
           <div
             style={{
@@ -882,7 +906,7 @@ function PreviewSidebar({
               color: "var(--ink-2)",
             }}
           >
-            Decline
+            {tCommon("decline")}
           </div>
         </div>
       </div>
@@ -895,13 +919,13 @@ function PreviewSidebar({
           padding: "14px 16px",
         }}
       >
-        <Eyebrow style={{ color: "var(--moss)", marginBottom: 6 }}>Reach estimate</Eyebrow>
+        <Eyebrow style={{ color: "var(--moss)", marginBottom: 6 }}>{t("reachEyebrow")}</Eyebrow>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
           <span style={{ fontFamily: "var(--serif)", fontSize: 30, lineHeight: 1, color: "var(--moss)" }}>
             {ready ? (eligibleCount ?? "…") : "—"}
           </span>
           <span style={{ fontSize: 13, color: "var(--moss)", fontStyle: "italic" }}>
-            eligible substitutes
+            {t("eligible")}
           </span>
         </div>
         {ready && notifyCount !== null && eligibleCount !== null ? (
@@ -910,14 +934,14 @@ function PreviewSidebar({
               {notifyCount}
             </span>
             <span style={{ fontSize: 12, color: "var(--moss)" }}>
-              will be notified on publish
+              {t("willNotify")}
             </span>
           </div>
         ) : null}
         <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--moss)", lineHeight: 1.5, opacity: 0.85 }}>
           {ready
-            ? "match language, qualifications, city, and weekly availability."
-            : "complete step 1 and continue — the estimate appears once the draft is saved."}
+            ? t("reachReady")
+            : t("reachPending")}
         </p>
         {optedOut > 0 ? (
           <p
@@ -932,8 +956,7 @@ function PreviewSidebar({
               lineHeight: 1.5,
             }}
           >
-            {optedOut} {optedOut === 1 ? "has" : "have"} muted urgent or weekend-overnight alerts for this
-            slot — you can still notify them directly from the substitutes list.
+            {t("optedOut", { count: optedOut })}
           </p>
         ) : null}
       </div>

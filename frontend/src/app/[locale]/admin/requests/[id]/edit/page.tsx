@@ -1,4 +1,4 @@
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "../../../../../../i18n/navigation";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -29,11 +29,12 @@ export default async function EditRequestPage({
     redirect(`/${await getLocale()}/admin/requests/${id}`);
   }
 
+  const t = await getTranslations("admin");
   const organizations = await getOrganizations();
   const orgName =
     organizations.find((o) => o.id === request.organization_id)?.name ??
     request.organization?.name ??
-    "Organization";
+    t("form.organization");
   // The warning under the form points at Re-notify, which hides once someone
   // accepted — fetch responses so the copy can tell the truth in both cases.
   const responses = await getRequestResponses(id).catch(() => []);
@@ -54,12 +55,12 @@ export default async function EditRequestPage({
           }}
         >
           <ArrowLeft size={14} />
-          Back to request
+          {t("substitutes.backToRequest")}
         </Link>
       </div>
 
       <div style={{ marginBottom: 22 }}>
-        <Eyebrow style={{ marginBottom: 6 }}>Coverage Desk</Eyebrow>
+        <Eyebrow style={{ marginBottom: 6 }}>{t("nav.desk")}</Eyebrow>
         <h1
           style={{
             margin: 0,
@@ -70,10 +71,10 @@ export default async function EditRequestPage({
             color: "var(--ink)",
           }}
         >
-          Edit <em style={{ fontStyle: "italic" }}>request</em>
+          {t("form.editTitleLead")} <em style={{ fontStyle: "italic" }}>{t("form.editTitleEm")}</em>
         </h1>
         <p style={{ margin: "10px 0 0", maxWidth: 660, color: "var(--ink-2)", fontSize: 14, lineHeight: 1.55 }}>
-          Fix shift details before a substitute is assigned. Changes save in one click.
+          {t("form.editDescription")}
         </p>
       </div>
 

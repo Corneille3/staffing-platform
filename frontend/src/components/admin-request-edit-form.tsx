@@ -1,6 +1,8 @@
 "use client";
 
 import { useRouter } from "../i18n/navigation";
+import { useTranslations } from "next-intl";
+import { useCredentialLabel } from "../hooks/use-credential-label";
 import { useState } from "react";
 import { Check, TriangleAlert } from "lucide-react";
 import { patchAdminRequest } from "../lib/browser-api";
@@ -72,6 +74,10 @@ export function AdminRequestEditForm({
   hasAccepted?: boolean;
 }) {
   const router = useRouter();
+  const t = useTranslations("admin.form");
+  const tAdmin = useTranslations("admin");
+  const tCommon = useTranslations("common");
+  const credentialLabel = useCredentialLabel();
   const [form, setForm] = useState<EditState>(() => initialState(request));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +102,7 @@ export function AdminRequestEditForm({
 
   async function handleSave() {
     if (!form.title.trim() || !form.city.trim() || !form.work_date || !form.start_time || !form.end_time) {
-      setError("Title, city, date, start, and end are required.");
+      setError(t("editRequired"));
       return;
     }
     setSaving(true);
@@ -123,7 +129,7 @@ export function AdminRequestEditForm({
       router.push(`/admin/requests/${request.id}`);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("saveFailed"));
       setSaving(false);
     }
   }
@@ -147,19 +153,9 @@ export function AdminRequestEditForm({
         >
           <TriangleAlert size={18} strokeWidth={1.6} style={{ flexShrink: 0, marginTop: 1 }} />
           {hasAccepted ? (
-            <div>
-              A substitute has already accepted this shift. Saving here
-              <strong style={{ fontWeight: 600 }}> won&rsquo;t alert them</strong> — they&rsquo;ll see a
-              &ldquo;modified&rdquo; notice next time they open it. For a date or time change,
-              consider contacting them directly.
-            </div>
+            <div>{t.rich("warnAccepted", { b: (chunks) => <strong style={{ fontWeight: 600 }}>{chunks}</strong> })}</div>
           ) : (
-            <div>
-              Substitutes have already been notified about this shift. Saving here
-              <strong style={{ fontWeight: 600 }}> won&rsquo;t re-notify them</strong> — if you change the
-              date, time, or location, use <strong style={{ fontWeight: 600 }}>Re-notify</strong> on the
-              request page afterwards so they&rsquo;re alerted to the change.
-            </div>
+            <div>{t.rich("warnNotified", { b: (chunks) => <strong style={{ fontWeight: 600 }}>{chunks}</strong> })}</div>
           )}
         </div>
       )}
@@ -175,52 +171,52 @@ export function AdminRequestEditForm({
         }}
       >
         <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
-          Organization: <strong style={{ color: "var(--ink-2)", fontWeight: 600 }}>{orgName}</strong>
-          <span style={{ marginLeft: 6 }}>· can&rsquo;t be changed after creation</span>
+          {t.rich("orgLine", { name: orgName, b: (chunks) => <strong style={{ color: "var(--ink-2)", fontWeight: 600 }}>{chunks}</strong> })}
+          <span style={{ marginLeft: 6 }}>{t("orgLocked")}</span>
         </div>
 
-        <Field label="Title">
+        <Field label={t("title")}>
           <input value={form.title} onChange={(e) => update("title", e.target.value)} style={inputStyle} />
         </Field>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <Field label="City">
+          <Field label={t("city")}>
             <input value={form.city} onChange={(e) => update("city", e.target.value)} style={inputStyle} />
           </Field>
-          <Field label="Location (optional)">
+          <Field label={t("location")}>
             <input
               value={form.location_name}
               onChange={(e) => update("location_name", e.target.value)}
-              placeholder="Toddler room, 2nd floor"
+              placeholder={t("locationPlaceholder")}
               style={inputStyle}
             />
           </Field>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
-          <Field label="Date">
+          <Field label={t("date")}>
             <input type="date" value={form.work_date} onChange={(e) => update("work_date", e.target.value)} style={inputStyle} />
           </Field>
-          <Field label="Start">
+          <Field label={t("start")}>
             <input type="time" value={form.start_time} onChange={(e) => update("start_time", e.target.value)} style={inputStyle} />
           </Field>
-          <Field label="End">
+          <Field label={t("end")}>
             <input type="time" value={form.end_time} onChange={(e) => update("end_time", e.target.value)} style={inputStyle} />
           </Field>
         </div>
         <ShiftDurationNote start={form.start_time} end={form.end_time} />
 
-        <Field label="Role">
+        <Field label={t("role")}>
           <ChipRow>
             {ROLES.map((r) => (
               <Chip key={r.value} active={form.role === r.value} onClick={() => update("role", r.value)}>
-                {r.label}
+                {r.value === "other" ? t("roleOther") : tAdmin(`roles.${r.value}`)}
               </Chip>
             ))}
           </ChipRow>
         </Field>
 
-        <Field label="Required qualifications">
+        <Field label={t("qualifications")}>
           <ChipRow>
             {QUALIFICATIONS.map((q) => (
               <Chip
@@ -229,13 +225,13 @@ export function AdminRequestEditForm({
                 onClick={() => toggleListItem("required_qualifications", q.code)}
               >
                 {form.required_qualifications.includes(q.code) && <Check size={10} strokeWidth={2.2} />}
-                {q.label}
+                {credentialLabel(q.code)}
               </Chip>
             ))}
           </ChipRow>
         </Field>
 
-        <Field label="Required certifications">
+        <Field label={t("certifications")}>
           <ChipRow>
             {CERTIFICATIONS.map((c) => (
               <Chip
@@ -244,13 +240,13 @@ export function AdminRequestEditForm({
                 onClick={() => toggleListItem("required_certifications", c.code)}
               >
                 {form.required_certifications.includes(c.code) && <Check size={10} strokeWidth={2.2} />}
-                {c.label}
+                {credentialLabel(c.code)}
               </Chip>
             ))}
           </ChipRow>
         </Field>
 
-        <Field label="Language">
+        <Field label={t("language")}>
           <ChipRow>
             {LANGUAGES.map((l) => (
               <Chip
@@ -258,13 +254,13 @@ export function AdminRequestEditForm({
                 active={form.language_requirement === l.value}
                 onClick={() => update("language_requirement", l.value)}
               >
-                {l.label}
+                {l.value ? tAdmin(`languageNames.${l.value}`) : t("noPreference")}
               </Chip>
             ))}
           </ChipRow>
         </Field>
 
-        <Field label="Urgency">
+        <Field label={t("urgency")}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             {COVERAGE_TYPES.map((opt) => {
               const active = form.coverage_type === opt.value;
@@ -284,20 +280,20 @@ export function AdminRequestEditForm({
                     fontFamily: "var(--ui)",
                   }}
                 >
-                  <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>{opt.label}</div>
-                  <div style={{ fontSize: 11, color: "var(--ink-3)" }}>{opt.sub}</div>
+                  <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>{t(`coverage.${opt.value}.label`)}</div>
+                  <div style={{ fontSize: 11, color: "var(--ink-3)" }}>{t(`coverage.${opt.value}.sub`)}</div>
                 </button>
               );
             })}
           </div>
         </Field>
 
-        <Field label="Urgency level (matching weight)">
+        <Field label={t("urgencyLevel")}>
           <ChipRow>
             {[
-              { v: 1, l: "Low" },
-              { v: 2, l: "Standard" },
-              { v: 3, l: "Urgent" },
+              { v: 1, l: t("low") },
+              { v: 2, l: t("standard") },
+              { v: 3, l: t("urgent") },
             ].map((opt) => (
               <Chip key={opt.v} active={form.urgency_level === opt.v} onClick={() => update("urgency_level", opt.v)}>
                 {opt.l}
@@ -307,15 +303,15 @@ export function AdminRequestEditForm({
         </Field>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <Field label="Contact name (optional)">
+          <Field label={t("contactName")}>
             <input value={form.contact_name} onChange={(e) => update("contact_name", e.target.value)} style={inputStyle} />
           </Field>
-          <Field label="Contact phone (optional)">
+          <Field label={t("contactPhone")}>
             <input type="tel" value={form.contact_phone} onChange={(e) => update("contact_phone", e.target.value)} style={inputStyle} />
           </Field>
         </div>
 
-        <Field label="Arrival instructions (visible to substitute)">
+        <Field label={t("arrival")}>
           <textarea
             value={form.arrival_instructions}
             onChange={(e) => update("arrival_instructions", e.target.value)}
@@ -324,7 +320,7 @@ export function AdminRequestEditForm({
           />
         </Field>
 
-        <Field label="Notes (internal, optional)">
+        <Field label={t("notes")}>
           <textarea
             value={form.description}
             onChange={(e) => update("description", e.target.value)}
@@ -337,7 +333,7 @@ export function AdminRequestEditForm({
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
           <button type="button" onClick={() => router.push(`/admin/requests/${request.id}`)} style={ghostBtn}>
-            Cancel
+            {tCommon("cancel")}
           </button>
           <button
             type="button"
@@ -345,7 +341,7 @@ export function AdminRequestEditForm({
             disabled={saving || tooLong}
             style={{ ...primaryBtn, opacity: saving || tooLong ? 0.6 : 1, cursor: saving || tooLong ? "not-allowed" : "pointer" }}
           >
-            {saving ? "Saving…" : "Save changes"} <Check size={14} strokeWidth={2.2} />
+            {saving ? tCommon("saving") : t("saveChanges")} <Check size={14} strokeWidth={2.2} />
           </button>
         </div>
       </div>

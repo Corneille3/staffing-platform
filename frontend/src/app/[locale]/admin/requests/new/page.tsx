@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { Link } from "../../../../../i18n/navigation";
 import { ArrowLeft } from "lucide-react";
 import { AdminRequestNewForm } from "../../../../../components/admin-request-new-form";
@@ -6,6 +7,7 @@ import { Eyebrow, Mono } from "../../../../../components/ui";
 import { getOrganizations } from "../../../../../lib/api";
 
 export default async function NewRequestPage() {
+  const t = await getTranslations("admin");
   const organizations = await getOrganizations();
 
   return (
@@ -23,13 +25,13 @@ export default async function NewRequestPage() {
           }}
         >
           <ArrowLeft size={14} />
-          Back to requests
+          {t("form.backToRequests")}
         </Link>
       </div>
 
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 22 }}>
         <div>
-          <Eyebrow style={{ marginBottom: 6 }}>Coverage Desk</Eyebrow>
+          <Eyebrow style={{ marginBottom: 6 }}>{t("nav.desk")}</Eyebrow>
           <h1
             style={{
               margin: 0,
@@ -40,15 +42,14 @@ export default async function NewRequestPage() {
               color: "var(--ink)",
             }}
           >
-            New staffing <em style={{ fontStyle: "italic" }}>request</em>
+            {t("form.newTitleLead")} <em style={{ fontStyle: "italic" }}>{t("form.newTitleEm")}</em>
           </h1>
           <p style={{ margin: "10px 0 0", maxWidth: 660, color: "var(--ink-2)", fontSize: 14, lineHeight: 1.55 }}>
-            Three steps. The draft autosaves while you type. We only notify substitutes who match the
-            language, qualifications, city, and weekly availability you choose.
+            {t("form.newDescription")}
           </p>
         </div>
         <div style={{ fontSize: 11, color: "var(--ink-3)", fontFamily: "var(--mono)" }}>
-          <Mono>REQ · draft</Mono>
+          <Mono>{t("form.reqDraft")}</Mono>
         </div>
       </div>
 
