@@ -1,7 +1,7 @@
 "use client";
 
 import { useClerk } from "@clerk/nextjs";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 interface Props {
   tone?: "light" | "dark";
@@ -10,6 +10,7 @@ interface Props {
 export function HeaderSignOutButton({ tone = "light" }: Props = {}) {
   const { signOut } = useClerk();
   const locale = useLocale();
+  const t = useTranslations("common");
 
   async function handleSignOut() {
     window.localStorage.removeItem("apf.workerId");
@@ -34,7 +35,7 @@ export function HeaderSignOutButton({ tone = "light" }: Props = {}) {
         cursor: "pointer",
       }}
     >
-      Sign out
+      {t("signOut")}
     </button>
   );
 }

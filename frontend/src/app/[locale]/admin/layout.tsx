@@ -1,4 +1,4 @@
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "../../../i18n/navigation";
 import React from "react";
 import { redirect } from "next/navigation";
@@ -71,6 +71,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect(`/${await getLocale()}/welcome`);
   }
   const viaGrant = tenantProfile?.via_grant === true;
+  const t = await getTranslations("admin.shell");
 
   // Primary org used for the switcher card. org_admin typically has one; for
   // network/platform admin we show a generic "All organizations" line.
@@ -120,7 +121,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               textTransform: "uppercase",
             }}
           >
-            Admin
+            {t("badge")}
           </span>
         </div>
 
@@ -128,10 +129,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <AdminOrgSwitcher
           sites={organizations.map((o) => ({ id: o.id, name: o.name, city: o.city }))}
           multiOrg={isMultiOrgRole}
-          label={isMultiOrgRole ? "All organizations" : primaryOrg?.name ?? "No organization"}
+          label={isMultiOrgRole ? t("allOrganizations") : primaryOrg?.name ?? t("noOrganization")}
           sublabel={
             isMultiOrgRole
-              ? `Network · ${organizations.length} org${organizations.length === 1 ? "" : "s"}`
+              ? t("networkOrgs", { count: organizations.length })
               : primaryOrg
                 ? `${primaryOrg.city}${primaryOrg.region ? ` · ${primaryOrg.region}` : ""}`
                 : "—"
@@ -158,7 +159,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               }}
             >
               <ArrowLeft size={13} style={{ color: "var(--terra)" }} />
-              Network view
+              {t("networkView")}
             </div>
           </Link>
         )}
@@ -174,7 +175,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             padding: "6px 10px 8px",
           }}
         >
-          Workspace
+          {t("workspace")}
         </div>
         <AdminNavigation openCount={overview?.unfilled_count ?? 0} />
 
@@ -192,7 +193,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             border: "0.5px solid var(--line)",
           }}
         >
-          <Eyebrow style={{ marginBottom: 6 }}>Fill rate</Eyebrow>
+          <Eyebrow style={{ marginBottom: 6 }}>{t("fillRate")}</Eyebrow>
           <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
             <span
               style={{
@@ -208,8 +209,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
           <div style={{ fontSize: 10, color: "var(--ink-3)", marginTop: 4, lineHeight: 1.4 }}>
             {overview
-              ? `${overview.filled_count} of ${overview.total_requests} requests filled`
-              : "no data"}
+              ? t("requestsFilled", { filled: overview.filled_count, total: overview.total_requests })
+              : t("noData")}
           </div>
         </div>
       </aside>
@@ -246,11 +247,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                   letterSpacing: ".04em",
                 }}
               >
-                Read-only · access grant
+                {t("readOnlyGrant")}
               </span>
             ) : null}
-            <Search size={17} strokeWidth={1.7} color="var(--ink-3)" aria-label="Search" />
-            <Bell size={17} strokeWidth={1.7} color="var(--ink-3)" aria-label="Notifications" />
+            <Search size={17} strokeWidth={1.7} color="var(--ink-3)" aria-label={t("search")} />
+            <Bell size={17} strokeWidth={1.7} color="var(--ink-3)" aria-label={t("notifications")} />
             <LanguageSwitcher />
             {CLERK_ENABLED ? (
               <HeaderSignOutButton />

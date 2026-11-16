@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 import { Link } from "../../../i18n/navigation";
 import { Eyebrow, Mono } from "../../../components/ui";
 import { ActivityRowCard } from "../../../components/apf-activity-row";
@@ -8,21 +10,6 @@ import { getAdminDashboard, getAdminOrganizations } from "../../../lib/api";
 import { shiftClock } from "../../../lib/shift-time";
 import type { AdminCoverageForward, AdminRequestSummary } from "../../../lib/types";
 
-const ROLE_LABEL: Record<string, string> = {
-  educator: "Educator",
-  assistant_educator: "Assistant educator",
-  psw: "PSW",
-  nurse: "Nurse",
-  food_handler: "Food handler",
-  other: "Staff",
-};
-const STATUS_LABEL: Record<string, string> = {
-  open: "Open",
-  notified: "Notified",
-  responses_received: "Responses in",
-  assigned: "Filled",
-};
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function fmtDuration(minutes: number | null): string {
   if (minutes == null) return "—";
@@ -38,13 +25,16 @@ function fillColor(rate: number): string {
   return "var(--rose)";
 }
 
-function greeting(h: number): string {
-  if (h < 12) return "Bonjour";
-  if (h < 18) return "Bon après-midi";
-  return "Bonsoir";
+function greetingKey(h: number): "greetingMorning" | "greetingAfternoon" | "greetingEvening" {
+  if (h < 12) return "greetingMorning";
+  if (h < 18) return "greetingAfternoon";
+  return "greetingEvening";
 }
 
 export default async function AdminDashboardPage() {
+  const t = await getTranslations("admin.dashboard");
+  const tAdmin = await getTranslations("admin");
+  const DAYS = t("weekdays").split(",");
   const [dash, sites] = await Promise.all([getAdminDashboard(), getAdminOrganizations()]);
   const siteNames = Object.fromEntries(sites.map((s) => [s.id, s.name]));
   const { coordinator, urgent_now, kpis, live_requests, activity_today, week_fill_rate, roster_today, coverage_forward } = dash;
@@ -56,21 +46,21 @@ export default async function AdminDashboardPage() {
   const clock = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 
   const headline = urgent_now
-    ? "You have one urgent to settle."
+    ? t("headlineUrgent")
     : kpis.open_count > 0
-      ? `${kpis.open_count} open request${kpis.open_count === 1 ? "" : "s"} in flight.`
-      : "Everything's covered.";
+      ? t("headlineOpen", { count: kpis.open_count })
+      : t("headlineCovered");
 
   const kpiTiles = [
     {
-      label: "Fill rate this week",
+      label: t("kpiFillRate"),
       value: `${kpis.fill_rate_week}%`,
       color: fillColor(kpis.fill_rate_week),
-      sub: kpis.fill_rate_delta === 0 ? "—" : `${kpis.fill_rate_delta > 0 ? "▲" : "▼"} ${Math.abs(kpis.fill_rate_delta)} pts vs last wk`,
+      sub: kpis.fill_rate_delta === 0 ? "—" : t("kpiFillDelta", { arrow: kpis.fill_rate_delta > 0 ? "▲" : "▼", points: Math.abs(kpis.fill_rate_delta) }),
     },
-    { label: "Avg time-to-fill", value: fmtDuration(kpis.avg_time_to_fill_minutes), sub: "request → assigned" },
-    { label: "Open right now", value: `${kpis.open_count}`, sub: "awaiting action" },
-    { label: "Substitutes ready", value: `${kpis.substitutes_ready}`, sub: "available now", color: "var(--moss)" },
+    { label: t("kpiTimeToFill"), value: fmtDuration(kpis.avg_time_to_fill_minutes), sub: t("kpiTimeToFillSub") },
+    { label: t("kpiOpen"), value: `${kpis.open_count}`, sub: t("kpiOpenSub") },
+    { label: t("kpiReady"), value: `${kpis.substitutes_ready}`, sub: t("kpiReadySub"), color: "var(--moss)" },
   ];
 
   return (
@@ -80,14 +70,14 @@ export default async function AdminDashboardPage() {
       {/* 1 · Hero */}
       <header style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 22 }}>
         <div>
-          <Eyebrow style={{ marginBottom: 6 }}>{greeting(hour)}, {coordinator.first_name} · {clock}</Eyebrow>
+          <Eyebrow style={{ marginBottom: 6 }}>{t(greetingKey(hour))}, {coordinator.first_name} · {clock}</Eyebrow>
           <h1 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: "clamp(2rem, 4vw, 2.9rem)", lineHeight: 1.05, fontWeight: 500, color: "var(--ink)" }}>
             {headline.split(" ")[0]} <em style={{ fontStyle: "italic" }}>{headline.split(" ").slice(1).join(" ")}</em>
           </h1>
         </div>
         <HideOnReadOnlyVisit>
           <Link href="/admin/requests/new" style={{ padding: "10px 18px", borderRadius: 999, background: "var(--ink)", color: "var(--paper)", fontSize: 14, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap" }}>
-            + New request
+            {t("newRequest")}
           </Link>
         </HideOnReadOnlyVisit>
       </header>
@@ -98,9 +88,9 @@ export default async function AdminDashboardPage() {
       ) : (
         <div style={{ background: "var(--moss-soft)", border: "0.5px solid #C8DCC1", borderRadius: "var(--r-md)", padding: 22, marginBottom: 22 }}>
           <h2 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 22, fontWeight: 400, color: "var(--moss)" }}>
-            Nothing <em style={{ fontStyle: "italic" }}>urgent</em>.
+            {t("nothingLead")} <em style={{ fontStyle: "italic" }}>{t("nothingEm")}</em>.
           </h2>
-          <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--ink-2)" }}>No urgent unassigned requests right now.</p>
+          <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--ink-2)" }}>{t("nothingBody")}</p>
         </div>
       )}
 
@@ -121,7 +111,7 @@ export default async function AdminDashboardPage() {
       {/* 4 · Two-up: live requests | today activity */}
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 22, alignItems: "start", marginBottom: 22 }}>
         <section>
-          <PanelHeader title="Live requests" href="/admin/requests" linkLabel="All requests →" />
+          <PanelHeader title={t("liveRequests")} href="/admin/requests" linkLabel={t("allRequests")} />
           <div style={{ display: "grid", gap: 8 }}>
             {live_requests.length === 0 ? (
               <LiveRequestsEmptyState assignedCount={kpis.assigned_count} />
@@ -133,14 +123,14 @@ export default async function AdminDashboardPage() {
 
         <section>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <h3 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 18, fontWeight: 400, color: "var(--ink)" }}>Today</h3>
+            <h3 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 18, fontWeight: 400, color: "var(--ink)" }}>{t("today")}</h3>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10, fontWeight: 700, letterSpacing: ".1em", color: "var(--moss)" }}>
-              <span style={{ width: 6, height: 6, borderRadius: 99, background: "var(--moss)" }} /> LIVE
+              <span style={{ width: 6, height: 6, borderRadius: 99, background: "var(--moss)" }} /> {t("live")}
             </span>
           </div>
           <div style={{ display: "grid", gap: 8 }}>
             {activity_today.length === 0 ? (
-              <p style={{ color: "var(--ink-3)", fontSize: 13 }}>No activity yet today.</p>
+              <p style={{ color: "var(--ink-3)", fontSize: 13 }}>{t("noActivity")}</p>
             ) : (
               activity_today.map((row) => <ActivityRowCard key={row.id} row={row} />)
             )}
@@ -151,7 +141,7 @@ export default async function AdminDashboardPage() {
       {/* 5 · Bottom row: this week | working today */}
       <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 22, alignItems: "start" }}>
         <section style={{ background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: "var(--r-md)", padding: 18 }}>
-          <Eyebrow style={{ marginBottom: 16 }}>This week · fill rate</Eyebrow>
+          <Eyebrow style={{ marginBottom: 16 }}>{t("weekFillRate")}</Eyebrow>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 120 }}>
             {week_fill_rate.map((rate, i) => (
               <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
@@ -174,19 +164,19 @@ export default async function AdminDashboardPage() {
         </section>
 
         <section>
-          <PanelHeader title="Working today" href="/admin/activity" linkLabel="Activity →" />
+          <PanelHeader title={t("workingToday")} href="/admin/activity" linkLabel={t("activityLink")} />
           <div style={{ display: "grid", gap: 8 }}>
             {roster_today.length === 0 ? (
-              <p style={{ color: "var(--ink-3)", fontSize: 13 }}>No substitutes scheduled today.</p>
+              <p style={{ color: "var(--ink-3)", fontSize: 13 }}>{t("noRoster")}</p>
             ) : (
               roster_today.map((p, i) => (
                 <div key={i} style={{ background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: 12, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>{p.name}</div>
-                    <div style={{ fontSize: 12, color: "var(--ink-3)" }}>{p.role ?? "Staff"} · <Mono style={{ fontSize: 12 }}>{p.starts_at.slice(0, 5)}→{p.ends_at.slice(0, 5)}</Mono></div>
+                    <div style={{ fontSize: 12, color: "var(--ink-3)" }}>{p.role ?? tAdmin("roles.other")} · <Mono style={{ fontSize: 12 }}>{p.starts_at.slice(0, 5)}→{p.ends_at.slice(0, 5)}</Mono></div>
                   </div>
                   <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: p.status === "on_site" || p.status === "done" ? "var(--moss)" : p.status === "not_checked_in" ? "var(--rose)" : "var(--sand)" }}>
-                    {p.status === "on_site" ? "On site" : p.status === "done" ? "Done" : p.status === "not_checked_in" ? "Not checked in" : p.status === "en_route" ? "En route" : "Arriving"}
+                    {p.status === "on_site" ? t("rosterOnSite") : p.status === "done" ? t("rosterDone") : p.status === "not_checked_in" ? t("rosterNotCheckedIn") : p.status === "en_route" ? t("rosterEnRoute") : t("rosterArriving")}
                   </span>
                 </div>
               ))
@@ -198,34 +188,35 @@ export default async function AdminDashboardPage() {
   );
 }
 
-const DAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"]; // Date.getDay() order
 
 function CoverageForwardCard({ coverage }: { coverage: AdminCoverageForward }) {
+  const t = useTranslations("admin.dashboard");
+  const DAY_LETTERS = t("dayLetters").split(","); // Date.getDay() order
   const { days, uncovered_total, urgent_48h, not_checked_in_today } = coverage;
   const risky = urgent_48h > 0;
   const maxCount = Math.max(1, ...days.map((d) => d.open + d.released + d.pending_approval + d.covered));
   const headline =
     uncovered_total === 0
-      ? "All covered for the next 14 days."
-      : `${uncovered_total} uncovered shift${uncovered_total === 1 ? "" : "s"} in the next 14 days.`;
+      ? t("coverageAll")
+      : t("coverageUncovered", { count: uncovered_total });
 
   return (
     <section style={{ background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: "var(--r-md)", padding: 18, marginBottom: 22 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
         <div>
-          <Eyebrow style={{ marginBottom: 4 }}>Coverage · next 14 days</Eyebrow>
+          <Eyebrow style={{ marginBottom: 4 }}>{t("coverageEyebrow")}</Eyebrow>
           <span style={{ fontFamily: "var(--serif)", fontSize: 18, color: risky ? "var(--rose)" : uncovered_total > 0 ? "var(--ink)" : "var(--moss)" }}>
             {headline}
           </span>
           {risky && (
             <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 700, color: "var(--rose)" }}>
-              {urgent_48h} within 48 h
+              {t("coverageWithin48", { count: urgent_48h })}
             </span>
           )}
         </div>
         {not_checked_in_today > 0 && (
           <span style={{ background: "var(--rose-soft)", border: "0.5px solid var(--rose)", borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 700, color: "var(--rose)" }}>
-            {not_checked_in_today} not checked in today
+            {t("coverageNotCheckedIn", { count: not_checked_in_today })}
           </span>
         )}
       </div>
@@ -234,7 +225,7 @@ function CoverageForwardCard({ coverage }: { coverage: AdminCoverageForward }) {
           const uncovered = d.open + d.released + d.pending_approval;
           const total = uncovered + d.covered;
           const dayDate = new Date(`${d.date}T12:00:00`);
-          const title = `${d.date} — open ${d.open} · released ${d.released} · pending ${d.pending_approval} · covered ${d.covered}`;
+          const title = t("coverageTooltip", { date: d.date, open: d.open, released: d.released, pending: d.pending_approval, covered: d.covered });
           return (
             <div key={d.date} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 0 }} title={title}>
               <div style={{ flex: 1, width: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 1 }}>
@@ -254,8 +245,8 @@ function CoverageForwardCard({ coverage }: { coverage: AdminCoverageForward }) {
         })}
       </div>
       <div style={{ display: "flex", gap: 14, marginTop: 10, fontSize: 11, color: "var(--ink-3)" }}>
-        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "var(--rose)", marginRight: 5 }} />Uncovered</span>
-        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "var(--moss)", opacity: 0.55, marginRight: 5 }} />Covered</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "var(--rose)", marginRight: 5 }} />{t("uncovered")}</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "var(--moss)", opacity: 0.55, marginRight: 5 }} />{t("covered")}</span>
       </div>
     </section>
   );
@@ -264,6 +255,7 @@ function CoverageForwardCard({ coverage }: { coverage: AdminCoverageForward }) {
 function LiveRequestsEmptyState({ assignedCount }: { assignedCount: number }) {
   // Distinguish "nothing has happened yet" from "everything's handled" so a new
   // coordinator and a caught-up one don't see the same blank panel (E2E bug #7).
+  const t = useTranslations("admin.dashboard");
   const allHandled = assignedCount > 0;
   return (
     <div
@@ -277,17 +269,17 @@ function LiveRequestsEmptyState({ assignedCount }: { assignedCount: number }) {
     >
       <p style={{ margin: 0, fontSize: 13, color: "var(--ink-2)" }}>
         {allHandled
-          ? "Nothing needs your attention right now."
-          : "No active requests yet."}
+          ? t("emptyHandled")
+          : t("emptyNone")}
       </p>
       {allHandled ? (
         <Link href="/admin/requests?tab=assigned" style={EMPTY_CTA_STYLE}>
-          {`View ${assignedCount} assigned shift${assignedCount === 1 ? "" : "s"} →`}
+          {t("viewAssigned", { count: assignedCount })}
         </Link>
       ) : (
         <HideOnReadOnlyVisit>
           <Link href="/admin/requests/new" style={EMPTY_CTA_STYLE}>
-            + Create a request to start dispatching
+            {t("createFirst")}
           </Link>
         </HideOnReadOnlyVisit>
       )}
@@ -296,6 +288,7 @@ function LiveRequestsEmptyState({ assignedCount }: { assignedCount: number }) {
 }
 
 function LiveRow({ r, siteName }: { r: AdminRequestSummary; siteName: string }) {
+  const t = useTranslations("admin");
   return (
     <Link href={`/admin/requests/${r.id}`} style={{ textDecoration: "none" }}>
       <div
@@ -313,14 +306,14 @@ function LiveRow({ r, siteName }: { r: AdminRequestSummary; siteName: string }) 
       >
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>
-            {r.role ? ROLE_LABEL[r.role] ?? r.role : "Staff"} <span style={{ color: "var(--ink-3)", fontWeight: 400 }}>· {siteName}</span>
+            {r.role ? (t.has(`roles.${r.role}`) ? t(`roles.${r.role}`) : r.role) : t("roles.other")} <span style={{ color: "var(--ink-3)", fontWeight: 400 }}>· {siteName}</span>
           </div>
           <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
-            <Mono style={{ fontSize: 12 }}>{r.start_time.slice(0, 5)}→{r.end_time.slice(0, 5)}</Mono> · {r.work_date} · {r.metrics.accepted} accepted
+            <Mono style={{ fontSize: 12 }}>{r.start_time.slice(0, 5)}→{r.end_time.slice(0, 5)}</Mono> · {r.work_date} · {t("dashboard.acceptedCount", { count: r.metrics.accepted })}
           </div>
         </div>
         <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: r.status === "responses_received" ? "var(--terra)" : "var(--ink-3)", whiteSpace: "nowrap" }}>
-          {STATUS_LABEL[r.status] ?? r.status}
+          {t.has(`status.${r.status}`) ? t(`status.${r.status}`) : r.status}
         </span>
       </div>
     </Link>

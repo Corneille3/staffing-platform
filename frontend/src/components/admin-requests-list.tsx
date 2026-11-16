@@ -3,30 +3,13 @@
 import { Link } from "../i18n/navigation";
 import { useEffect, useRef, useState } from "react";
 import { MoreVertical } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useCredentialLabel } from "../hooks/use-credential-label";
 import { useReadOnlyVisit } from "./read-only-visit";
 import { Mono } from "./ui";
 import { assignWorker, cancelRequest, fetchAdminRequestsIndex, renotifyRequest } from "../lib/browser-api";
 import type { AdminRequestSummary, AdminRequestTab } from "../lib/types";
 
-const LANG_LABEL: Record<string, string> = { fr: "FR", en: "EN", bilingual: "Bilingual" };
-const ROLE_LABEL: Record<string, string> = {
-  educator: "Educator",
-  assistant_educator: "Assistant educator",
-  psw: "PSW",
-  nurse: "Nurse",
-  food_handler: "Food handler",
-  other: "Staff",
-};
-const STATUS_LABEL: Record<string, string> = {
-  open: "Open",
-  notified: "Notified",
-  responses_received: "Responses in",
-  assigned: "Filled",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  expired: "Expired",
-  draft: "Draft",
-};
 const STATUS_TONE: Record<string, string> = {
   responses_received: "var(--terra)",
   assigned: "var(--moss)",
@@ -35,13 +18,15 @@ const STATUS_TONE: Record<string, string> = {
   expired: "var(--ink-3)",
 };
 
-function relTime(iso: string): string {
+type T = ReturnType<typeof useTranslations>;
+
+function relTime(iso: string, t: T): string {
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t("requests.justNow");
+  if (mins < 60) return t("requests.minutesAgo", { n: mins });
   const h = Math.floor(mins / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  if (h < 24) return t("requests.hoursAgo", { n: h });
+  return t("requests.daysAgo", { n: Math.floor(h / 24) });
 }
 
 function duration(start: string, end: string): string {
@@ -69,6 +54,8 @@ interface Props {
 }
 
 export function AdminRequestsList({ tab, initialRows, initialCursor, siteNames, siteId, urgency, language }: Props) {
+  const t = useTranslations("admin.requests");
+  const tCommon = useTranslations("common");
   const [rows, setRows] = useState(initialRows);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
   // The page polls via router.refresh(), which hands us a fresh first page.
@@ -95,7 +82,7 @@ export function AdminRequestsList({ tab, initialRows, initialCursor, siteNames, 
       setRows((prev) => [...prev, ...page.items]);
       setCursor(page.next_cursor);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load older");
+      setError(err instanceof Error ? err.message : t("loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -115,22 +102,22 @@ export function AdminRequestsList({ tab, initialRows, initialCursor, siteNames, 
         ),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Assign failed — someone may have been assigned already.");
+      setError(err instanceof Error ? err.message : t("assignFailed"));
     } finally {
       setBusyId(null);
     }
   }
 
   async function handleCancel(row: AdminRequestSummary) {
-    const reason = window.prompt("Cancel this request — reason?", "");
+    const reason = window.prompt(t("cancelPrompt"), "");
     if (reason === null) return;
     setBusyId(row.id);
     setError(null);
     try {
-      await cancelRequest(row.id, reason || "Cancelled by coordinator");
+      await cancelRequest(row.id, reason || t("cancelDefaultReason"));
       setRows((prev) => prev.filter((r) => r.id !== row.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Cancel failed.");
+      setError(err instanceof Error ? err.message : t("cancelFailed"));
     } finally {
       setBusyId(null);
     }
@@ -143,7 +130,7 @@ export function AdminRequestsList({ tab, initialRows, initialCursor, siteNames, 
       await renotifyRequest(row.id);
       setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: r.status === "open" ? "notified" : r.status } : r)));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Notify failed.");
+      setError(err instanceof Error ? err.message : t("notifyFailed"));
     } finally {
       setBusyId(null);
     }
@@ -153,9 +140,9 @@ export function AdminRequestsList({ tab, initialRows, initialCursor, siteNames, 
     return (
       <div style={{ background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: "var(--r-md)", padding: "36px 20px", textAlign: "center" }}>
         <h2 style={{ fontFamily: "var(--serif)", fontSize: 22, margin: 0, fontWeight: 400, color: "var(--ink)" }}>
-          Nothing to see <em style={{ fontStyle: "italic" }}>here</em>.
+          {t("emptyLead")} <em style={{ fontStyle: "italic" }}>{t("emptyEm")}</em>.
         </h2>
-        <p style={{ color: "var(--ink-3)", fontSize: 13, marginTop: 6 }}>No requests match this view.</p>
+        <p style={{ color: "var(--ink-3)", fontSize: 13, marginTop: 6 }}>{t("emptyBody")}</p>
       </div>
     );
   }
@@ -192,7 +179,7 @@ export function AdminRequestsList({ tab, initialRows, initialCursor, siteNames, 
             cursor: loading ? "wait" : "pointer",
           }}
         >
-          {loading ? "Loading…" : "Load older →"}
+          {loading ? tCommon("loading") : t("loadOlder")}
         </button>
       )}
     </div>
@@ -214,6 +201,8 @@ function RequestRow({
   onCancel: () => void;
   onNotifyMore: () => void;
 }) {
+  const t = useTranslations("admin");
+  const credentialLabel = useCredentialLabel();
   const statusTone = STATUS_TONE[row.status] ?? "var(--ink-3)";
   // A read-only visitor gets the View link and no overflow menu.
   const readOnlyVisit = useReadOnlyVisit();
@@ -238,50 +227,50 @@ function RequestRow({
         <Mono style={{ fontSize: 11, color: "var(--ink-2)", fontWeight: 600 }}>{row.public_id}</Mono>
         {row.urgent && (
           <span style={{ display: "inline-block", marginLeft: 6, fontSize: 9, fontWeight: 700, color: "var(--terra)", letterSpacing: ".08em" }}>
-            URGENT
+            {t("requests.urgentTag")}
           </span>
         )}
-        <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>{relTime(row.created_at)}</div>
+        <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>{relTime(row.created_at, t)}</div>
       </div>
 
       {/* 2 · role + time + chips */}
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>
-          {row.role ? ROLE_LABEL[row.role] ?? row.role : "Staff"}
+          {row.role ? (t.has(`roles.${row.role}`) ? t(`roles.${row.role}`) : row.role) : t("roles.other")}
           <span style={{ color: "var(--ink-3)", fontWeight: 400 }}> · </span>
           <Mono style={{ fontSize: 13 }}>{row.start_time.slice(0, 5)}→{row.end_time.slice(0, 5)}</Mono>
           <span style={{ color: "var(--ink-3)", fontWeight: 400, fontSize: 12 }}> {duration(row.start_time, row.end_time)}</span>
         </div>
         <div style={{ display: "flex", gap: 6, marginTop: 5, flexWrap: "wrap" }}>
           {siteName && <RowChip>{siteName}</RowChip>}
-          {row.language_requirement && <RowChip>{LANG_LABEL[row.language_requirement] ?? row.language_requirement}</RowChip>}
-          {row.required_qualifications.slice(0, 2).map((q) => <RowChip key={q}>{q}</RowChip>)}
+          {row.language_requirement && <RowChip>{t.has(`languages.${row.language_requirement}`) ? t(`languages.${row.language_requirement}`) : row.language_requirement}</RowChip>}
+          {row.required_qualifications.slice(0, 2).map((q) => <RowChip key={q}>{credentialLabel(q)}</RowChip>)}
         </div>
       </div>
 
       {/* 3 · status + progress */}
       <div>
         <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: statusTone }}>
-          {STATUS_LABEL[row.status] ?? row.status}
+          {t.has(`status.${row.status}`) ? t(`status.${row.status}`) : row.status}
         </span>
         <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 3 }}>
-          {row.metrics.notified} notified · {row.metrics.accepted} accepted · {row.metrics.declined} declined
+          {t("requests.metrics", { notified: row.metrics.notified, accepted: row.metrics.accepted, declined: row.metrics.declined })}
         </div>
       </div>
 
       {/* 4 · people */}
       <div style={{ minWidth: 0 }}>
         {row.assigned_worker ? (
-          <Person name={row.assigned_worker.name} tone="moss" label="Assigned" />
+          <Person name={row.assigned_worker.name} tone="moss" label={t("requests.personAssigned")} />
         ) : row.top_match ? (
           <Person
             name={row.top_match.name}
             tone="terra"
-            label={row.top_match.match_score != null ? `Top match · ${row.top_match.match_score}%` : "Top match"}
+            label={row.top_match.match_score != null ? t("requests.topMatchScore", { score: row.top_match.match_score }) : t("requests.topMatch")}
           />
         ) : (
           <span style={{ fontSize: 12, color: "var(--ink-3)", fontStyle: "italic" }}>
-            {row.status === "responses_received" ? "Awaiting acceptor" : "Notifying…"}
+            {row.status === "responses_received" ? t("requests.awaitingAcceptor") : t("requests.notifying")}
           </span>
         )}
       </div>
@@ -306,7 +295,7 @@ function RequestRow({
               minHeight: 38,
             }}
           >
-            {busy ? "Assigning…" : "Assign"}
+            {busy ? t("requests.assigning") : t("requests.assign")}
           </button>
         ) : (
           <Link
@@ -326,7 +315,7 @@ function RequestRow({
               alignItems: "center",
             }}
           >
-            View
+            {t("requests.view")}
           </Link>
         )}
         {row.status !== "assigned" && !readOnlyVisit && (
@@ -338,13 +327,14 @@ function RequestRow({
 }
 
 function OverflowMenu({ busy, onCancel, onNotifyMore }: { busy: boolean; onCancel: () => void; onNotifyMore: () => void }) {
+  const t = useTranslations("admin.requests");
   const [open, setOpen] = useState(false);
   return (
     <div style={{ position: "relative" }}>
       <button
         onClick={() => setOpen((v) => !v)}
         disabled={busy}
-        aria-label="More actions"
+        aria-label={t("moreActions")}
         style={{
           width: 38,
           height: 38,
@@ -377,8 +367,8 @@ function OverflowMenu({ busy, onCancel, onNotifyMore }: { busy: boolean; onCance
               boxShadow: "0 8px 24px rgba(21,20,15,.12)",
             }}
           >
-            <MenuItem label="Notify more" onClick={() => { setOpen(false); onNotifyMore(); }} />
-            <MenuItem label="Cancel request" tone="var(--rose)" onClick={() => { setOpen(false); onCancel(); }} />
+            <MenuItem label={t("notifyMore")} onClick={() => { setOpen(false); onNotifyMore(); }} />
+            <MenuItem label={t("cancelRequest")} tone="var(--rose)" onClick={() => { setOpen(false); onCancel(); }} />
           </div>
         </>
       )}

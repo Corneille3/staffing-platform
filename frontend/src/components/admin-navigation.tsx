@@ -2,25 +2,28 @@
 
 import { Link } from "../i18n/navigation";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Activity, Briefcase, History, Repeat, User as UserIcon, Zap } from "lucide-react";
 import type { ComponentType } from "react";
 
 interface NavItem {
   href: string;
+  /** Key under admin.nav. */
   label: string;
   Icon: ComponentType<{ size?: number; strokeWidth?: number; color?: string }>;
 }
 
 const links: NavItem[] = [
-  { href: "/admin",               label: "Coverage Desk",  Icon: Activity },
-  { href: "/admin/requests",      label: "Requests",       Icon: Zap },
-  { href: "/admin/substitutes",   label: "Substitutes",    Icon: UserIcon },
-  { href: "/admin/replacements",  label: "Replacements",   Icon: Repeat },
-  { href: "/admin/organizations", label: "Organizations",  Icon: Briefcase },
-  { href: "/admin/activity",      label: "Activity",       Icon: History },
+  { href: "/admin",               label: "desk",          Icon: Activity },
+  { href: "/admin/requests",      label: "requests",      Icon: Zap },
+  { href: "/admin/substitutes",   label: "substitutes",   Icon: UserIcon },
+  { href: "/admin/replacements",  label: "replacements",  Icon: Repeat },
+  { href: "/admin/organizations", label: "organizations", Icon: Briefcase },
+  { href: "/admin/activity",      label: "activity",      Icon: History },
 ];
 
 export function AdminNavigation({ openCount = 0 }: { openCount?: number }) {
+  const t = useTranslations("admin.nav");
   const pathname = usePathname();
   // Strip any [locale] prefix so /en/admin/requests still matches /admin/requests.
   const strippedPath = pathname.replace(/^\/(?:en|fr)(?=\/|$)/, "") || "/";
@@ -56,7 +59,7 @@ export function AdminNavigation({ openCount = 0 }: { openCount?: number }) {
               strokeWidth={1.6}
               color={active ? "var(--terra)" : "var(--ink-3)"}
             />
-            <span>{label}</span>
+            <span>{t(label)}</span>
             {href === "/admin/requests" && openCount > 0 && (
               <span
                 style={{
