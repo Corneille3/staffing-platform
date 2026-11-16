@@ -1,5 +1,6 @@
 import { Link } from "../../../../../i18n/navigation";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { ArrowLeft, TriangleAlert } from "lucide-react";
 import { BestMatchCard } from "../../../../../components/best-match-card";
 import { PageFrame } from "../../../../../components/page-frame";
@@ -28,16 +29,17 @@ import {
   getWorkers,
 } from "../../../../../lib/api";
 
-function formatStatus(value: string) {
-  return value.replace(/_/g, " ");
-}
-
 export default async function RequestDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const t = await getTranslations("admin.detail");
+  const tAdmin = await getTranslations("admin");
+  const tCred = await getTranslations("worker.credentials");
+  const credentialList = (codes: string[] | null | undefined) =>
+    (codes ?? []).map((code) => (tCred.has(code) ? tCred(code) : code)).join(", ") || t("none");
 
   let request;
   try {
@@ -116,10 +118,10 @@ export default async function RequestDetailPage({
       initialAssignments={assignments}
     >
     <PageFrame
-      eyebrow="Request Detail"
+      eyebrow={t("eyebrow")}
       title={request.title}
       titleAddon={<LiveBadge />}
-      description="Inspect one coverage request, its matching context, response board, and assignment state."
+      description={t("description")}
     >
       <div style={{ marginBottom: 22, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Link
@@ -134,7 +136,7 @@ export default async function RequestDetailPage({
           }}
         >
           <ArrowLeft size={14} />
-          Back to request queue
+          {t("back")}
         </Link>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <RequestHeaderPills requestId={request.id} initialStatus={request.status} />
@@ -159,11 +161,12 @@ export default async function RequestDetailPage({
         >
           <TriangleAlert size={18} strokeWidth={1.6} style={{ flexShrink: 0, marginTop: 1 }} />
           <div>
-            <strong style={{ fontWeight: 600 }}>
-              {declinedWithReasonWorker.first_name} {declinedWithReasonWorker.last_name}
-            </strong>{" "}
-            declined: &ldquo;{declinedWithReason.decline_reason}.&rdquo;
-            {declineCount > 1 ? ` ${declineCount} declines on this request so far.` : ""}
+            {t.rich("declinedCallout", {
+              name: `${declinedWithReasonWorker.first_name} ${declinedWithReasonWorker.last_name}`,
+              reason: declinedWithReason.decline_reason ?? "",
+              b: (chunks) => <strong style={{ fontWeight: 600 }}>{chunks}</strong>,
+            })}
+            {declineCount > 1 ? ` ${t("declineCount", { count: declineCount })}` : ""}
           </div>
         </div>
       ) : null}
@@ -179,44 +182,59 @@ export default async function RequestDetailPage({
         }}
       >
         <div style={{ display: "grid", gap: 22 }}>
-          <Panel title="Request brief" subtitle={formatStatus(request.status)}>
+          <Panel
+            title={t("briefTitle")}
+            subtitle={
+              tAdmin.has(`status.${request.status}`)
+                ? tAdmin(`status.${request.status}`)
+                : request.status.replace(/_/g, " ")
+            }
+          >
             <div style={{ display: "grid", gap: 10, color: "var(--ink-2)", fontSize: 13 }}>
               <p style={{ margin: 0, lineHeight: 1.55 }}>
-                {request.description || "No additional notes have been added."}
+                {request.description || t("noNotes")}
               </p>
               <div style={{ display: "grid", gap: 6 }}>
                 <span>
-                  <strong style={{ color: "var(--ink)" }}>Organization:</strong> {organization?.name || "Unknown organization"}
+                  <strong style={{ color: "var(--ink)" }}>{t("organization")}</strong> {organization?.name || t("unknownOrganization")}
                 </span>
                 <span>
-                  <strong style={{ color: "var(--ink)" }}>Location:</strong> {request.location_name || "No room listed"}, {request.city}
+                  <strong style={{ color: "var(--ink)" }}>{t("location")}</strong> {request.location_name || t("noRoom")}, {request.city}
                 </span>
                 <span>
-                  <strong style={{ color: "var(--ink)" }}>Date:</strong> {request.work_date}
+                  <strong style={{ color: "var(--ink)" }}>{t("date")}</strong> {request.work_date}
                 </span>
                 <span>
-                  <strong style={{ color: "var(--ink)" }}>Time:</strong> <Mono style={{ fontSize: 13 }}>{request.start_time.slice(0, 5)} – {request.end_time.slice(0, 5)}</Mono>
+                  <strong style={{ color: "var(--ink)" }}>{t("time")}</strong> <Mono style={{ fontSize: 13 }}>{request.start_time.slice(0, 5)} – {request.end_time.slice(0, 5)}</Mono>
                 </span>
                 <span>
-                  <strong style={{ color: "var(--ink)" }}>Language:</strong> {request.language_requirement || "None"}
+                  <strong style={{ color: "var(--ink)" }}>{t("language")}</strong>{" "}
+                  {request.language_requirement
+                    ? tAdmin.has(`languageNames.${request.language_requirement}`)
+                      ? tAdmin(`languageNames.${request.language_requirement}`)
+                      : request.language_requirement
+                    : t("none")}
                 </span>
                 <span>
-                  <strong style={{ color: "var(--ink)" }}>Urgency:</strong> {request.urgency_level}
+                  <strong style={{ color: "var(--ink)" }}>{t("urgency")}</strong> {request.urgency_level}
                 </span>
               </div>
             </div>
           </Panel>
 
-          <Panel title="Requirements">
+          <Panel title={t("requirementsTitle")}>
             <div style={{ display: "grid", gap: 8, color: "var(--ink-2)", fontSize: 13 }}>
               <span>
-                <strong style={{ color: "var(--ink)" }}>Qualifications:</strong> {request.required_qualifications.join(", ") || "None"}
+                <strong style={{ color: "var(--ink)" }}>{t("qualifications")}</strong> {credentialList(request.required_qualifications)}
               </span>
               <span>
-                <strong style={{ color: "var(--ink)" }}>Certifications:</strong> {request.required_certifications?.join(", ") || "None"}
+                <strong style={{ color: "var(--ink)" }}>{t("certifications")}</strong> {credentialList(request.required_certifications)}
               </span>
               <span>
-                <strong style={{ color: "var(--ink)" }}>Request type:</strong> {formatStatus(request.request_type)}
+                <strong style={{ color: "var(--ink)" }}>{t("requestType")}</strong>{" "}
+                {t.has(`requestTypes.${request.request_type}`)
+                  ? t(`requestTypes.${request.request_type}`)
+                  : request.request_type.replace(/_/g, " ")}
               </span>
             </div>
           </Panel>
@@ -238,7 +256,7 @@ export default async function RequestDetailPage({
             </HideWhenClosed>
           ) : null}
 
-          <Panel title="Workflow actions" subtitle="Live controls">
+          <Panel title={t("workflowActions")} subtitle={t("liveControls")}>
             <RequestWorkflowCard
               request={request}
               responses={responses}

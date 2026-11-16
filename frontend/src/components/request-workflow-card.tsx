@@ -6,7 +6,7 @@ import { useRef, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { CheckCircle2 } from "lucide-react";
 import { errorMessageFromResponse } from "../lib/browser-api";
-import { availabilityStatusLabel } from "../lib/status-labels";
+import { useCredentialLabel } from "../hooks/use-credential-label";
 import { isClosedStatus, LIVE_STATUSES, useRequestLive } from "./request-live";
 import { useReadOnlyVisit } from "./read-only-visit";
 import { Eyebrow } from "./ui";
@@ -21,51 +21,46 @@ function formatStatus(value: string) {
   return value.replace(/_/g, " ");
 }
 
-// What actually happened on the shift, when the clock knows better than the
-// raw status ("confirmed" forever on a missed shift).
-function attendanceLabel(assignment: Assignment): string {
-  switch (assignment.attendance) {
-    case "missed": return "no-show";
-    case "unclosed": return "check-out missing";
-    case "on_shift": return "on shift";
-    case "due": return "not checked in yet";
-    case "completed": return "completed";
-    default: return formatStatus(assignment.status);
-  }
+/** Wording shared by the card and its sub-cards, from `admin.*`. Every label
+ * falls back to the raw value, so an unknown status or code still shows. */
+function useDetailLabels() {
+  const a = useTranslations("admin");
+  const credential = useCredentialLabel();
+  const lookup = (key: string, raw: string) => (a.has(key) ? a(key) : formatStatus(raw));
+  return {
+    requestStatus: (status: string) => lookup(`status.${status}`, status),
+    assignmentStatus: (status: string) => lookup(`detail.assignmentStatus.${status}`, status),
+    // What actually happened on the shift, when the clock knows better than
+    // the raw status ("confirmed" forever on a missed shift).
+    attendance: (assignment: Assignment) =>
+      assignment.attendance && a.has(`detail.attendance.${assignment.attendance}`)
+        ? a(`detail.attendance.${assignment.attendance}`)
+        : lookup(`detail.assignmentStatus.${assignment.status}`, assignment.status),
+    language: (code: string | null | undefined, none: string) =>
+      code ? (a.has(`languageNames.${code}`) ? a(`languageNames.${code}`) : code) : none,
+    credentials: (codes: string[] | null | undefined, none: string) =>
+      (codes ?? []).map(credential).join(", ") || none,
+    availability: (status: string) => lookup(`detail.card.${status}`, status),
+    coverage: (value: string) => lookup(`form.coverage.${value}.label`, value),
+  };
 }
 
-function workerResponseLabel(status: string): string {
-  switch (status) {
-    case "notified": return "Notified — awaiting reply";
-    case "viewed": return "Viewed — awaiting reply";
-    case "accepted": return "Accepted";
-    case "declined": return "Declined";
-    case "no_response": return "No response";
-    default: return formatStatus(status);
-  }
-}
-
-const RESPONSE_PALETTE: Record<string, { bg: string; chip: string; chipColor: string; label: string }> = {
-  notified:    { bg: "var(--paper-2)",  chip: "var(--sand-soft)",  chipColor: "#8C6B14",      label: "Awaiting reply" },
-  viewed:      { bg: "var(--paper-2)",  chip: "var(--sand-soft)",  chipColor: "#8C6B14",      label: "Viewed — no reply yet" },
-  accepted:    { bg: "var(--moss-soft)", chip: "var(--moss)",      chipColor: "#FFFFFF",      label: "Accepted" },
-  declined:    { bg: "var(--rose-soft)", chip: "var(--rose-soft)", chipColor: "var(--rose)",  label: "Declined" },
-  no_response: { bg: "var(--paper-2)",  chip: "var(--line)",       chipColor: "var(--ink-3)", label: "No response" },
-  withdrawn:   { bg: "var(--paper-2)",  chip: "var(--line)",       chipColor: "var(--ink-3)", label: "Withdrawn" },
+const RESPONSE_PALETTE: Record<string, { bg: string; chip: string; chipColor: string }> = {
+  notified:    { bg: "var(--paper-2)",  chip: "var(--sand-soft)",  chipColor: "#8C6B14" },
+  viewed:      { bg: "var(--paper-2)",  chip: "var(--sand-soft)",  chipColor: "#8C6B14" },
+  accepted:    { bg: "var(--moss-soft)", chip: "var(--moss)",      chipColor: "#FFFFFF" },
+  declined:    { bg: "var(--rose-soft)", chip: "var(--rose-soft)", chipColor: "var(--rose)" },
+  no_response: { bg: "var(--paper-2)",  chip: "var(--line)",       chipColor: "var(--ink-3)" },
+  withdrawn:   { bg: "var(--paper-2)",  chip: "var(--line)",       chipColor: "var(--ink-3)" },
 };
 
-const COVERAGE_TYPE_LABELS: Record<string, string> = {
-  same_day_urgent: "Same-day urgent",
-  planned_absence: "Planned absence",
-  recurring: "Recurring",
-  emergency: "Emergency",
-};
-
+// `value` is what the API stores (kept in English, as before); `key` names
+// the label under admin.detail.card.cancelReasons.
 const ASSIGNMENT_CANCELLATION_REASONS = [
-  "Substitute unavailable",
-  "Coordinator changed plan",
-  "Request no longer needed",
-  "Other",
+  { value: "Substitute unavailable", key: "unavailable" },
+  { value: "Coordinator changed plan", key: "plan" },
+  { value: "Request no longer needed", key: "notNeeded" },
+  { value: "Other", key: "other" },
 ];
 
 const STATUS_ORDER = ["accepted", "viewed", "notified", "declined", "no_response", "withdrawn"];
@@ -97,6 +92,8 @@ export function RequestWorkflowCard({
   const responses = sortResponses(live?.responses ?? initialResponses);
   const assignment = live ? live.assignment : initialAssignment;
   const t = useTranslations("admin.live");
+  const c = useTranslations("admin.detail.card");
+  const labels = useDetailLabels();
   const [isPending, startTransition] = useTransition();
   // Rows present on first render don't animate; anything that shows up on a
   // later poll fades in. Never reset, so a row only ever animates once.
@@ -116,7 +113,7 @@ export function RequestWorkflowCard({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancelAssignmentOpen, setCancelAssignmentOpen] = useState(false);
-  const [cancelReason, setCancelReason] = useState(ASSIGNMENT_CANCELLATION_REASONS[0]);
+  const [cancelReason, setCancelReason] = useState(ASSIGNMENT_CANCELLATION_REASONS[0].value);
   const [cancelNotes, setCancelNotes] = useState("");
 
   const workerUsers = users.filter((user) => user.role === "worker");
@@ -154,7 +151,7 @@ export function RequestWorkflowCard({
       });
 
       if (!response.ok) {
-        setError(await errorMessageFromResponse(response, `Action failed with status ${response.status}`));
+        setError(await errorMessageFromResponse(response, c("actionFailed", { status: response.status })));
         return;
       }
 
@@ -166,7 +163,7 @@ export function RequestWorkflowCard({
         router.refresh();
       });
     } catch {
-      setError("Network error — please try again.");
+      setError(c("networkError"));
     } finally {
       setBusyAction(null);
     }
@@ -206,22 +203,28 @@ export function RequestWorkflowCard({
             whiteSpace: "nowrap",
           }}
         >
-          {formatStatus(request.status)}
+          {labels.requestStatus(request.status)}
         </span>
       </div>
 
       <div style={{ color: "var(--ink-2)", display: "grid", gap: 6, fontSize: 13, lineHeight: 1.5 }}>
-        <span>{request.description || "No additional notes."}</span>
+        <span>{request.description || c("noNotes")}</span>
         <span>
-          {request.coverage_type ? `${COVERAGE_TYPE_LABELS[request.coverage_type] ?? request.coverage_type} · ` : ""}
-          Language: {request.language_requirement || "none"} · Urgency {request.urgency_level}
+          {request.coverage_type ? `${labels.coverage(request.coverage_type)} · ` : ""}
+          {c("metaLine", {
+            language: labels.language(request.language_requirement, c("none")),
+            urgency: request.urgency_level,
+          })}
         </span>
-        <span>Required qualifications: {request.required_qualifications.join(", ") || "none"}</span>
-        <span>Required certifications: {request.required_certifications?.join(", ") || "none"}</span>
+        <span>{c("requiredQualifications", { list: labels.credentials(request.required_qualifications, c("none")) })}</span>
+        <span>{c("requiredCertifications", { list: labels.credentials(request.required_certifications, c("none")) })}</span>
         {assignedWorker ? (
           <span>
-            Assigned to: <strong style={{ color: "var(--ink)" }}>{assignedWorker.first_name} {assignedWorker.last_name}</strong>
-            {assignment ? ` · ${attendanceLabel(assignment)}` : ""}
+            {c.rich("assignedTo", {
+              name: `${assignedWorker.first_name} ${assignedWorker.last_name}`,
+              b: (chunks) => <strong style={{ color: "var(--ink)" }}>{chunks}</strong>,
+            })}
+            {assignment ? ` · ${labels.attendance(assignment)}` : ""}
           </span>
         ) : null}
       </div>
@@ -238,8 +241,7 @@ export function RequestWorkflowCard({
             fontSize: 13,
           }}
         >
-          First come, first served — the first eligible substitute to claim this shift is assigned on the spot.
-          Nothing to pick here; you'll see the name the moment it's taken.
+          {c("fcfs")}
         </p>
       ) : null}
 
@@ -255,8 +257,9 @@ export function RequestWorkflowCard({
             fontSize: 13,
           }}
         >
-          This request was cancelled{request.cancelled_at ? ` on ${shiftDateTime(request.cancelled_at)}` : ""}.
-          Notified substitutes were told; nothing is left to do here.
+          {request.cancelled_at
+            ? c("cancelledOn", { date: shiftDateTime(request.cancelled_at) })
+            : c("cancelled")}
         </p>
       ) : null}
 
@@ -272,7 +275,7 @@ export function RequestWorkflowCard({
             fontSize: 13,
           }}
         >
-          This request expired before it was filled. Create a new request to cover the shift.
+          {c("expired")}
         </p>
       ) : null}
 
@@ -293,7 +296,7 @@ export function RequestWorkflowCard({
             minHeight: 40,
           }}
         >
-          Open detail
+          {c("openDetail")}
         </Link>
         {request.status === "draft" && !readOnlyVisit ? (
           <button
@@ -314,7 +317,7 @@ export function RequestWorkflowCard({
               minHeight: 40,
             }}
           >
-            {busyAction?.endsWith("/publish") ? "Publishing…" : "Publish request"}
+            {busyAction?.endsWith("/publish") ? c("publishing") : c("publish")}
           </button>
         ) : null}
         {/* Re-notify serves two cases: nudging non-responders AND alerting the
@@ -341,7 +344,7 @@ export function RequestWorkflowCard({
               minHeight: 40,
             }}
           >
-            {busyAction?.endsWith("/renotify") ? "Re-notifying…" : "Re-notify workers"}
+            {busyAction?.endsWith("/renotify") ? c("renotifying") : c("renotify")}
           </button>
         ) : null}
         {!isClosed && !readOnlyVisit ? (
@@ -363,7 +366,7 @@ export function RequestWorkflowCard({
               minHeight: 40,
             }}
           >
-            {busyAction?.endsWith("/cancel") && busyAction?.includes("/requests/") ? "Cancelling…" : "Cancel request"}
+            {busyAction?.endsWith("/cancel") && busyAction?.includes("/requests/") ? c("cancelling") : c("cancelRequest")}
           </button>
         ) : null}
       </div>
@@ -388,7 +391,7 @@ export function RequestWorkflowCard({
       ) : null}
 
       <div style={{ display: "grid", gap: 10 }}>
-        <Eyebrow>Substitute responses</Eyebrow>
+        <Eyebrow>{c("responsesEyebrow")}</Eyebrow>
         {responses.length === 0 && LIVE_STATUSES.has(request.status) ? (
           <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
             <span
@@ -407,7 +410,7 @@ export function RequestWorkflowCard({
           </p>
         ) : responses.length === 0 ? (
           <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>
-            No substitutes have been notified yet.
+            {c("noneNotified")}
           </p>
         ) : (
           responses.map((response) => {
@@ -431,7 +434,7 @@ export function RequestWorkflowCard({
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
                   <div>
                     <strong style={{ fontSize: 14, fontWeight: 600 }}>
-                      {user ? `${user.first_name} ${user.last_name}` : "Unknown substitute"}
+                      {user ? `${user.first_name} ${user.last_name}` : c("unknownSubstitute")}
                     </strong>
                     {user ? (
                       <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>{user.email}</div>
@@ -449,7 +452,7 @@ export function RequestWorkflowCard({
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {palette.label}
+                    {c.has(`response.${response.status}`) ? c(`response.${response.status}`) : formatStatus(response.status)}
                   </span>
                 </div>
                 {response.status === "accepted" && respondedTime ? (
@@ -462,12 +465,12 @@ export function RequestWorkflowCard({
                   </div>
                 ) : response.viewed_at ? (
                   <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
-                    Viewed {shiftDateTime(response.viewed_at)}
+                    {c("viewedAt", { date: shiftDateTime(response.viewed_at) })}
                   </div>
                 ) : null}
                 {response.decline_reason ? (
                   <div style={{ fontSize: 13, color: "var(--rose)" }}>
-                    Reason: {response.decline_reason}
+                    {c("reason", { reason: response.decline_reason })}
                   </div>
                 ) : null}
                 {!isClosed && !firstClaim && !readOnlyVisit ? (
@@ -494,7 +497,7 @@ export function RequestWorkflowCard({
                         minHeight: 36,
                       }}
                     >
-                      Accept
+                      {c("accept")}
                     </button>
                     <button
                       type="button"
@@ -518,7 +521,7 @@ export function RequestWorkflowCard({
                         minHeight: 36,
                       }}
                     >
-                      Decline
+                      {c("decline")}
                     </button>
                   </div>
                 ) : null}
@@ -533,7 +536,7 @@ export function RequestWorkflowCard({
           "Assign Eva" card here after #8 hid the Best-match one. */}
       {!isClosed && !firstClaim && acceptedResponses.length > 0 ? (
         <div style={{ display: "grid", gap: 12 }}>
-          <Eyebrow>Review accepted workers</Eyebrow>
+          <Eyebrow>{c("reviewEyebrow")}</Eyebrow>
           {acceptedResponses.map((response) => {
             const worker = workers.find((item) => item.id === response.worker_user_id);
             if (!worker) return null;
@@ -566,7 +569,7 @@ export function RequestWorkflowCard({
             border: "0.5px solid #E6D08F",
           }}
         >
-          Assignment opens after at least one notified worker accepts.
+          {c("opensAfterAccept")}
         </div>
       ) : null}
 
@@ -575,7 +578,7 @@ export function RequestWorkflowCard({
           workerName={
             assignedWorker
               ? `${assignedWorker.first_name} ${assignedWorker.last_name}`
-              : "this substitute"
+              : c("thisSubstitute")
           }
           reason={cancelReason}
           notes={cancelNotes}
@@ -629,6 +632,8 @@ function AssignedWorkerCard({
   onAdjustTimes: (payload: { checked_in_at?: string; checked_out_at?: string; reason: string }) => void;
 }) {
   const profile = worker.profile;
+  const c = useTranslations("admin.detail.card");
+  const labels = useDetailLabels();
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [adjustIn, setAdjustIn] = useState("");
   const [adjustOut, setAdjustOut] = useState("");
@@ -668,7 +673,7 @@ function AssignedWorkerCard({
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
         <div>
-          <Eyebrow style={{ color: "var(--moss)", marginBottom: 4 }}>Assigned substitute</Eyebrow>
+          <Eyebrow style={{ color: "var(--moss)", marginBottom: 4 }}>{c("assignedEyebrow")}</Eyebrow>
           <strong style={{ display: "block", fontSize: 16, fontWeight: 600 }}>
             {worker.first_name} {worker.last_name}
           </strong>
@@ -676,50 +681,56 @@ function AssignedWorkerCard({
             {worker.email}
           </span>
         </div>
-        <StatusChip label={missed ? "no-show" : formatStatus(assignment.status)} tone={missed ? "warn" : "good"} />
+        <StatusChip label={missed ? c("noShow") : labels.assignmentStatus(assignment.status)} tone={missed ? "warn" : "good"} />
       </div>
 
       <div style={{ display: "grid", gap: 6, color: "var(--ink-2)", fontSize: 13 }}>
-        <span><strong style={{ color: "var(--ink)" }}>Availability:</strong> {profile ? availabilityStatusLabel(profile.availability_status) : "no profile"}</span>
-        <span><strong style={{ color: "var(--ink)" }}>Language:</strong> {worker.preferred_language}</span>
-        <span><strong style={{ color: "var(--ink)" }}>Cities:</strong> {profile?.supported_cities.join(", ") || "none"}</span>
-        <span><strong style={{ color: "var(--ink)" }}>Qualifications:</strong> {profile?.qualifications.join(", ") || "none"}</span>
-        <span><strong style={{ color: "var(--ink)" }}>Certifications:</strong> {profile?.certifications.join(", ") || "none"}</span>
-        <span><strong style={{ color: "var(--ink)" }}>Assigned at:</strong> {shiftDateTime(assignment.assigned_at)}</span>
+        <span><strong style={{ color: "var(--ink)" }}>{c("availability")}</strong> {profile ? labels.availability(profile.availability_status) : c("noProfile")}</span>
+        <span><strong style={{ color: "var(--ink)" }}>{c("language")}</strong> {labels.language(worker.preferred_language, c("none"))}</span>
+        <span><strong style={{ color: "var(--ink)" }}>{c("cities")}</strong> {profile?.supported_cities.join(", ") || c("none")}</span>
+        <span><strong style={{ color: "var(--ink)" }}>{c("qualifications")}</strong> {labels.credentials(profile?.qualifications, c("none"))}</span>
+        <span><strong style={{ color: "var(--ink)" }}>{c("certifications")}</strong> {labels.credentials(profile?.certifications, c("none"))}</span>
+        <span><strong style={{ color: "var(--ink)" }}>{c("assignedAt")}</strong> {shiftDateTime(assignment.assigned_at)}</span>
         {assignment.checked_in_at ? (
           <span style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--moss)", fontWeight: 600 }}>
             <CheckCircle2 size={14} strokeWidth={2.5} />
-            Checked in at {shiftDateTime(assignment.checked_in_at)}
-            {assignment.checked_in_latitude && assignment.checked_in_longitude ? " · location recorded" : ""}
+            {c("checkedInAt", { date: shiftDateTime(assignment.checked_in_at) })}
+            {assignment.checked_in_latitude && assignment.checked_in_longitude ? ` · ${c("locationRecorded")}` : ""}
           </span>
         ) : missed ? (
           <span style={{ color: "var(--rose)", fontWeight: 700 }}>
-            No-show — never checked in
-            {assignment.no_show_alerted_at ? ` · alert sent ${shiftTime(assignment.no_show_alerted_at)}` : ""}
+            {c("noShowNever")}
+            {assignment.no_show_alerted_at ? ` · ${c("alertSent", { time: shiftTime(assignment.no_show_alerted_at) })}` : ""}
           </span>
         ) : notCheckedIn ? (
           <span style={{ color: "var(--rose)", fontWeight: 700 }}>
-            Not checked in — shift started {startedMinutesAgo < 120 ? `${startedMinutesAgo} min` : `${Math.floor(startedMinutesAgo / 60)} h`} ago
+            {startedMinutesAgo < 120
+              ? c("notCheckedInMin", { n: startedMinutesAgo })
+              : c("notCheckedInHours", { n: Math.floor(startedMinutesAgo / 60) })}
           </span>
         ) : (
-          <span style={{ color: "var(--ink-3)" }}><strong style={{ color: "var(--ink)" }}>Check-in:</strong> not checked in yet</span>
+          <span style={{ color: "var(--ink-3)" }}><strong style={{ color: "var(--ink)" }}>{c("checkIn")}</strong> {c("notYet")}</span>
         )}
         {assignment.checked_in_at && (
           assignment.checked_out_at ? (
             <span style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--moss)", fontWeight: 600 }}>
               <CheckCircle2 size={14} strokeWidth={2.5} />
-              Checked out at {shiftDateTime(assignment.checked_out_at)}
+              {c("checkedOutAt", { date: shiftDateTime(assignment.checked_out_at) })}
             </span>
           ) : (
-            <span style={{ color: "#8C6B14", fontWeight: 600 }}>Check-out: not recorded yet</span>
+            <span style={{ color: "#8C6B14", fontWeight: 600 }}>{c("checkOutMissing")}</span>
           )
         )}
         {assignment.worked_hours != null && (
           <span>
-            <strong style={{ color: "var(--ink)" }}>Worked:</strong> {assignment.worked_hours} h
+            <strong style={{ color: "var(--ink)" }}>{c("worked")}</strong> {assignment.worked_hours} h
             {" "}<span style={{ color: "var(--ink-3)" }}>
-              (scheduled {scheduledHours} h · variance {assignment.worked_hours - scheduledHours >= 0 ? "+" : ""}
-              {Math.round((assignment.worked_hours - scheduledHours) * 100) / 100} h)
+              {c("workedDetail", {
+                scheduled: String(scheduledHours),
+                variance: `${assignment.worked_hours - scheduledHours >= 0 ? "+" : ""}${
+                  Math.round((assignment.worked_hours - scheduledHours) * 100) / 100
+                }`,
+              })}
             </span>
           </span>
         )}
@@ -732,7 +743,7 @@ function AssignedWorkerCard({
             color: "#8C6B14",
             fontSize: 12,
           }}>
-            Times corrected by coordinator
+            {c("timesCorrected")}
             {assignment.hours_adjustment_reason ? ` — ${assignment.hours_adjustment_reason}` : ""}
           </span>
         )}
@@ -756,7 +767,7 @@ function AssignedWorkerCard({
             minHeight: 40,
           }}
         >
-          Adjust recorded times
+          {c("adjustTimes")}
         </button>
       )}
 
@@ -769,9 +780,9 @@ function AssignedWorkerCard({
           display: "grid",
           gap: 10,
         }}>
-          <Eyebrow>Correct attendance times</Eyebrow>
+          <Eyebrow>{c("correctEyebrow")}</Eyebrow>
           <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--ink-2)" }}>
-            Check-in
+            {c("checkInField")}
             <input
               type="datetime-local"
               value={adjustIn}
@@ -780,7 +791,7 @@ function AssignedWorkerCard({
             />
           </label>
           <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--ink-2)" }}>
-            Check-out
+            {c("checkOutField")}
             <input
               type="datetime-local"
               value={adjustOut}
@@ -789,12 +800,12 @@ function AssignedWorkerCard({
             />
           </label>
           <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--ink-2)" }}>
-            Reason (required — this edits a payroll number)
+            {c("adjustReason")}
             <input
               type="text"
               value={adjustReason}
               onChange={(e) => setAdjustReason(e.target.value)}
-              placeholder="e.g. Worker forgot to tap Done"
+              placeholder={c("adjustPlaceholder")}
               style={{ border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13 }}
             />
           </label>
@@ -822,7 +833,7 @@ function AssignedWorkerCard({
                 fontFamily: "inherit",
               }}
             >
-              Save correction
+              {c("saveCorrection")}
             </button>
             <button
               type="button"
@@ -839,7 +850,7 @@ function AssignedWorkerCard({
                 fontFamily: "inherit",
               }}
             >
-              Cancel
+              {c("cancel")}
             </button>
           </div>
         </div>
@@ -865,7 +876,7 @@ function AssignedWorkerCard({
           minHeight: 40,
         }}
       >
-        Cancel assignment
+        {c("cancelAssignment")}
       </button>
       )}
     </article>
@@ -891,6 +902,7 @@ function CancelAssignmentModal({
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const c = useTranslations("admin.detail.card");
   return (
     <div
       role="dialog"
@@ -920,15 +932,15 @@ function CancelAssignmentModal({
       >
         <div>
           <h3 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 22, lineHeight: 1.15, fontWeight: 400 }}>
-            Cancel assignment
+            {c("cancelAssignment")}
           </h3>
           <p style={{ margin: "8px 0 0", color: "var(--ink-2)", fontSize: 13, lineHeight: 1.5 }}>
-            Cancel the confirmed shift for {workerName}. The request will reopen for coordinator review.
+            {c("cancelBody", { name: workerName })}
           </p>
         </div>
 
         <label style={{ display: "grid", gap: 8, color: "var(--ink)", fontWeight: 500, fontSize: 13 }}>
-          Reason
+          {c("reasonLabel")}
           <select
             value={reason}
             onChange={(event) => onReasonChange(event.target.value)}
@@ -943,20 +955,20 @@ function CancelAssignmentModal({
             }}
           >
             {ASSIGNMENT_CANCELLATION_REASONS.map((item) => (
-              <option key={item} value={item}>
-                {item}
+              <option key={item.key} value={item.value}>
+                {c(`cancelReasons.${item.key}`)}
               </option>
             ))}
           </select>
         </label>
 
         <label style={{ display: "grid", gap: 8, color: "var(--ink)", fontWeight: 500, fontSize: 13 }}>
-          Notes
+          {c("notesLabel")}
           <textarea
             value={notes}
             onChange={(event) => onNotesChange(event.target.value)}
             rows={4}
-            placeholder="Optional details"
+            placeholder={c("optionalDetails")}
             style={{
               borderRadius: 10,
               border: "0.5px solid var(--line)",
@@ -988,7 +1000,7 @@ function CancelAssignmentModal({
               minHeight: 40,
             }}
           >
-            Keep assignment
+            {c("keepAssignment")}
           </button>
           <button
             type="button"
@@ -1007,7 +1019,7 @@ function CancelAssignmentModal({
               minHeight: 40,
             }}
           >
-            Cancel assignment
+            {c("cancelAssignment")}
           </button>
         </div>
       </section>
@@ -1032,6 +1044,9 @@ function WorkerReviewCard({
   const languageMatches = !request.language_requirement || worker.preferred_language === request.language_requirement || worker.preferred_language === "bilingual";
   const cityMatches = Boolean(profile?.supported_cities.includes(request.city));
   const readOnlyVisit = useReadOnlyVisit();
+  const c = useTranslations("admin.detail.card");
+  const labels = useDetailLabels();
+  const credentialLabel = useCredentialLabel();
 
   return (
     <article
@@ -1054,30 +1069,30 @@ function WorkerReviewCard({
           </span>
         </div>
         <StatusChip
-          label={profile ? availabilityStatusLabel(profile.availability_status) : "no profile"}
+          label={profile ? labels.availability(profile.availability_status) : c("noProfile")}
           tone={profile?.availability_status === "available" ? "good" : "warn"}
         />
       </div>
 
       <div style={{ display: "grid", gap: 6, color: "var(--ink-2)", fontSize: 13 }}>
-        <span><strong style={{ color: "var(--ink)" }}>Language:</strong> {worker.preferred_language}</span>
-        <span><strong style={{ color: "var(--ink)" }}>Cities:</strong> {profile?.supported_cities.join(", ") || "none"}</span>
-        <span><strong style={{ color: "var(--ink)" }}>Qualifications:</strong> {profile?.qualifications.join(", ") || "none"}</span>
-        <span><strong style={{ color: "var(--ink)" }}>Certifications:</strong> {profile?.certifications.join(", ") || "none"}</span>
+        <span><strong style={{ color: "var(--ink)" }}>{c("language")}</strong> {labels.language(worker.preferred_language, c("none"))}</span>
+        <span><strong style={{ color: "var(--ink)" }}>{c("cities")}</strong> {profile?.supported_cities.join(", ") || c("none")}</span>
+        <span><strong style={{ color: "var(--ink)" }}>{c("qualifications")}</strong> {labels.credentials(profile?.qualifications, c("none"))}</span>
+        <span><strong style={{ color: "var(--ink)" }}>{c("certifications")}</strong> {labels.credentials(profile?.certifications, c("none"))}</span>
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-        <StatusChip label={cityMatches ? "City match" : `Missing: ${request.city}`} tone={cityMatches ? "good" : "warn"} />
-        <StatusChip label={languageMatches ? "Language match" : `Missing: ${request.language_requirement}`} tone={languageMatches ? "good" : "warn"} />
+        <StatusChip label={cityMatches ? c("cityMatch") : c("missing", { item: request.city })} tone={cityMatches ? "good" : "warn"} />
+        <StatusChip label={languageMatches ? c("languageMatch") : c("missing", { item: labels.language(request.language_requirement, "") })} tone={languageMatches ? "good" : "warn"} />
         {missingQualification.length === 0 ? (
-          <StatusChip label="Qualification match" tone="good" />
+          <StatusChip label={c("qualificationMatch")} tone="good" />
         ) : (
-          missingQualification.map((item) => <StatusChip key={item} label={`Missing: ${item}`} tone="warn" />)
+          missingQualification.map((item) => <StatusChip key={item} label={c("missing", { item: credentialLabel(item) })} tone="warn" />)
         )}
         {missingCertification.length === 0 ? (
-          <StatusChip label="Certification match" tone="good" />
+          <StatusChip label={c("certificationMatch")} tone="good" />
         ) : (
-          missingCertification.map((item) => <StatusChip key={item} label={`Missing: ${item}`} tone="warn" />)
+          missingCertification.map((item) => <StatusChip key={item} label={c("missing", { item: credentialLabel(item) })} tone="warn" />)
         )}
       </div>
 
@@ -1099,7 +1114,7 @@ function WorkerReviewCard({
           minHeight: 44,
         }}
       >
-        {disabled ? "Assigning…" : `Assign ${worker.first_name}`}
+        {disabled ? c("assigning") : c("assign", { name: worker.first_name })}
       </button>
       )}
     </article>
