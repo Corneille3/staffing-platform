@@ -560,6 +560,13 @@ function StepWhere({
         </Field>
       </div>
       <ShiftDurationNote start={draft.start_time} end={draft.end_time} />
+      {/* Same rule as the Publish button in step 3 — said here so a past
+          date is caught where it is typed, not two steps later. */}
+      {shiftEnded(draft) && (
+        <p role="alert" style={{ margin: "-6px 0 0", fontSize: 12.5, color: "var(--rose)" }}>
+          {t("endedStep1")}
+        </p>
+      )}
     </div>
   );
 }

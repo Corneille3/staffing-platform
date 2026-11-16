@@ -1028,7 +1028,8 @@
           "label": "Urgence majeure",
           "sub": "Aviser toutes les personnes disponibles"
         }
-      }
+      },
+      "endedStep1": "Ce quart est déjà terminé — vérifiez la date et les heures."
     }
   },
   "platform": {
