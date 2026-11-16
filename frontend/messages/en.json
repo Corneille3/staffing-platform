@@ -1028,7 +1028,8 @@
           "label": "Emergency",
           "sub": "Page everyone available"
         }
-      }
+      },
+      "endedStep1": "This shift has already ended — check the date and times."
     }
   },
   "platform": {
