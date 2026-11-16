@@ -646,6 +646,290 @@
       "moreActions": "More actions",
       "notifyMore": "Notify more",
       "cancelRequest": "Cancel request"
+    },
+    "languageNames": {
+      "fr": "French",
+      "en": "English",
+      "bilingual": "Bilingual"
+    },
+    "history": {
+      "title": "Coverage history",
+      "description": "Past, completed, and cancelled coverage requests with outcomes and time-to-fill.",
+      "back": "← Back to active requests",
+      "closedTitle": "Closed requests",
+      "records": "{count, plural, one {# record} other {# records}}",
+      "empty": "No closed requests yet.",
+      "unknownOrg": "Unknown org",
+      "created": "Created {date}",
+      "cancelledAfter": "Cancelled after {duration}",
+      "expiredNoAssign": "Expired — no assignment made",
+      "filledIn": "filled in {duration}"
+    },
+    "activity": {
+      "eyebrow": "Audit history",
+      "titleLead": "Every move,",
+      "titleEm": "logged",
+      "description": "The full timeline across your sites — read-only, newest first. For reporting, compliance, and “what happened on Thursday?”.",
+      "rangeAll": "All",
+      "range7": "7 days",
+      "range30": "30 days",
+      "export": "Export CSV ↓",
+      "kpiPosted": "Requests posted",
+      "kpiSites": "{count, plural, one {# site} other {# sites}}",
+      "kpiFilled": "Filled",
+      "kpiRate": "{rate}% rate",
+      "kpiCancelled": "Cancelled",
+      "kpiOfTotal": "{pct}% of total",
+      "kpiExpired": "Expired",
+      "kpiExpiredSub": "no fill in time",
+      "filterAll": "All",
+      "filterPosted": "Posted",
+      "filterAccepted": "Accepted",
+      "filterDeclined": "Declined",
+      "filterAssigned": "Assigned",
+      "filterCompleted": "Completed",
+      "filterCancelled": "Cancelled",
+      "filterExpired": "Expired",
+      "filterInvited": "Invited",
+      "emptyBody": "No activity recorded for this filter.",
+      "loadFailed": "Failed to load older activity",
+      "system": "System",
+      "reason": "Reason: {reason}",
+      "by": "by {name}",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "event": "Event",
+      "actorRoles": {
+        "worker": "substitute",
+        "org_admin": "coordinator",
+        "network_admin": "network admin",
+        "platform_admin": "platform admin"
+      },
+      "actions": {
+        "staffing_request_created": {
+          "label": "Request created",
+          "verb": "drafted",
+          "kind": "Draft"
+        },
+        "staffing_request_published": {
+          "label": "Request published",
+          "verb": "posted",
+          "kind": "Posted"
+        },
+        "staffing_request_cancelled": {
+          "label": "Request cancelled",
+          "verb": "cancelled the request",
+          "kind": "Cancelled"
+        },
+        "staffing_request_completed": {
+          "label": "Request completed",
+          "verb": "completed",
+          "kind": "Completed"
+        },
+        "staffing_request_renotified": {
+          "label": "Request re-notified",
+          "verb": "re-notified",
+          "kind": "Re-notified"
+        },
+        "request_response_accepted": {
+          "label": "Response accepted",
+          "verb": "accepted",
+          "kind": "Accepted"
+        },
+        "request_response_declined": {
+          "label": "Response declined",
+          "verb": "declined",
+          "kind": "Declined"
+        },
+        "request_response_viewed": {
+          "label": "Response viewed",
+          "verb": "viewed",
+          "kind": "Viewed"
+        },
+        "request_response_withdrawn": {
+          "label": "Response withdrawn",
+          "verb": "withdrew",
+          "kind": "Withdrawn"
+        },
+        "request_response_no_response": {
+          "label": "No response"
+        },
+        "assignment_confirmed": {
+          "label": "Assignment confirmed",
+          "verb": "assigned",
+          "kind": "Assigned"
+        },
+        "assignment_cancelled": {
+          "label": "Assignment cancelled",
+          "verb": "cancelled the assignment",
+          "kind": "Cancelled"
+        },
+        "assignment_checked_in": {
+          "label": "Checked in",
+          "verb": "checked in",
+          "kind": "Checked in"
+        },
+        "coordinator_invited": {
+          "label": "Coordinator invited",
+          "verb": "invited a coordinator",
+          "kind": "Invited"
+        },
+        "worker_invited": {
+          "label": "Substitute invited",
+          "verb": "invited a substitute",
+          "kind": "Invited"
+        },
+        "worker_onboarded": {
+          "label": "Substitute onboarded"
+        },
+        "worker_availability_updated": {
+          "label": "Availability updated"
+        },
+        "tenant_created": {
+          "label": "Network created"
+        },
+        "tenant_removed": {
+          "label": "Network removed"
+        },
+        "user_removed": {
+          "label": "User removed"
+        },
+        "replacement_unfilled": {
+          "label": "Expired unfilled",
+          "verb": "expired unfilled",
+          "kind": "Expired"
+        },
+        "replacement_escalated": {
+          "label": "Escalated",
+          "verb": "escalated",
+          "kind": "Escalated"
+        },
+        "assignment_no_show_alerted": {
+          "label": "No-show alert sent",
+          "verb": "no-show alert sent",
+          "kind": "No-show"
+        },
+        "assignment_checkin_reminder_sent": {
+          "label": "Check-in reminder",
+          "verb": "check-in reminder sent",
+          "kind": "Reminder"
+        },
+        "assignment_checkout_reminder_sent": {
+          "label": "Check-out reminder",
+          "verb": "check-out reminder sent",
+          "kind": "Reminder"
+        }
+      }
+    },
+    "substitutes": {
+      "eyebrow": "The pool",
+      "titleRanked": "Ranked against a request",
+      "description": "Browse the substitute pool. Open a request and choose 'Rank substitutes' to score everyone against it.",
+      "descriptionRanked": "Workers in your network ranked by match against an open request — language, qualifications, city, availability.",
+      "backToRequest": "Back to request",
+      "rankingAgainst": "Ranking by match against",
+      "clear": "Clear",
+      "factors": "Ranking factors: language · qualifications · certifications · city match · availability.",
+      "colSubstitute": "Substitute",
+      "colCity": "City",
+      "colAvailability": "Availability",
+      "colLanguages": "Languages",
+      "colMatch": "Match",
+      "empty": "No substitutes in the pool yet.",
+      "top": "Top",
+      "available": "Available",
+      "unavailable": "Unavailable",
+      "notify": "Notify",
+      "notified": "Notified",
+      "notifyTitle": "Add to this request's notification batch",
+      "notifyTitleNoRequest": "Open from a request to notify",
+      "notifyAria": "Notify {name}",
+      "whyAria": "Why {name} scores {score}"
+    },
+    "organizations": {
+      "eyebrow": "Your sites",
+      "description": "The physical reality of the sites you run — enrollment, coordinators, hours, and fill rate per location.",
+      "types": {
+        "childcare": "Childcare",
+        "long_term_care": "Long-term care",
+        "community_care": "Community care",
+        "home_care": "Home care",
+        "assisted_living": "Assisted living",
+        "other": "Other"
+      },
+      "noSitesLead": "No sites",
+      "noSitesEm": "yet",
+      "noSitesBody": "You haven't been added to a site yet. Ask your network admin.",
+      "countWords": "zero,One,Two,Three,Four,Five,Six,Seven,Eight",
+      "locations": "locations",
+      "inactive": "Inactive",
+      "enrolled": "Enrolled",
+      "fill30d": "Fill 30d",
+      "requests": "Requests",
+      "kpiFillRate": "Fill rate",
+      "kpiRequests30d": "Requests 30d",
+      "kpiFilled30d": "Filled 30d",
+      "kpiEnrollment": "Enrollment",
+      "siteDetails": "Site details",
+      "type": "Type",
+      "hours": "Hours",
+      "phone": "Phone",
+      "language": "Language",
+      "capacity": "Capacity",
+      "coordinators": "Coordinators",
+      "noneAssigned": "None assigned",
+      "roster": "Roster today: <b>{onSite}</b> on site · <b>{arriving}</b> arriving",
+      "recentActivity": "Recent activity",
+      "openLog": "Open activity log →",
+      "noRecent": "No recent activity at this site.",
+      "saveFailed": "Save failed",
+      "editLead": "Edit",
+      "editEm": "site",
+      "name": "Name",
+      "address": "Address",
+      "saveChanges": "Save changes"
+    },
+    "replacements": {
+      "eyebrow": "Self-serve replacement",
+      "titleLead": "Shifts",
+      "titleEm": "filled by the pool",
+      "description": "Every shift released by a substitute or reported as an absence by staff. You see everything — without being the bottleneck.",
+      "kpiReleased": "Released (7 d)",
+      "kpiFilled": "Filled by the pool",
+      "kpiAvg": "Average time",
+      "kpiUnfilled": "Unfilled",
+      "colPerson": "Person",
+      "colShift": "Shift",
+      "colStatus": "Status",
+      "colTakenBy": "Taken by",
+      "colTime": "Time",
+      "empty": "No released shifts yet.",
+      "absence": "Absence",
+      "status": {
+        "searching": "Searching",
+        "filled": "Filled",
+        "unfilled": "Unfilled",
+        "cancelled": "Cancelled"
+      },
+      "policy": {
+        "title": "Replacement policy",
+        "auto": "Automatic",
+        "managed": "Managed by the coordinator",
+        "autoSub": "Sent to the pool · first come, first served",
+        "managedSub": "Sent to the pool · the coordinator picks who to assign",
+        "rolesLabel": "Roles allowed to release a shift",
+        "noticeLabel": "Minimum notice (minutes before the shift)",
+        "loadFailed": "Load failed",
+        "saveFailed": "Save failed",
+        "roles": {
+          "educator": "Educator",
+          "assistant_educator": "Assistant educator",
+          "psw": "PSW",
+          "nurse": "Nurse",
+          "food_handler": "Kitchen",
+          "other": "Other"
+        }
+      }
     }
   },
   "platform": {

@@ -1,19 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { fetchReplacementPolicy, updateReplacementPolicy } from "../lib/browser-api";
 import type { ReplacementPolicy } from "../lib/types";
 import { useReadOnlyVisit } from "./read-only-visit";
 import { SaveFlash, useSaveFlash } from "./ui";
 
-const ROLES: { value: string; label: string }[] = [
-  { value: "educator", label: "Éducatrice" },
-  { value: "assistant_educator", label: "Aide-éducatrice" },
-  { value: "psw", label: "PAB / PSW" },
-  { value: "nurse", label: "Infirmière" },
-  { value: "food_handler", label: "Cuisine" },
-  { value: "other", label: "Autre" },
-];
+// Labels live under admin.replacements.policy.roles.
+const ROLES = ["educator", "assistant_educator", "psw", "nurse", "food_handler", "other"].map((value) => ({ value }));
 
 /** Per-org self-serve policy (§5): auto vs approval, which roles may release,
  * and the release lead-time. Auto-saves each control. */
@@ -29,12 +24,14 @@ export function ReplacementPolicyCard({
   const flash = useSaveFlash();
   // The policy stays visible to a read-only visitor; the switches are inert.
   const readOnlyVisit = useReadOnlyVisit();
+  const t = useTranslations("admin.replacements.policy");
+  const tCommon = useTranslations("common");
 
   useEffect(() => {
     let alive = true;
     fetchReplacementPolicy(organizationId)
       .then((p) => alive && setPolicy(p))
-      .catch((e) => alive && setError(e instanceof Error ? e.message : "Load failed"));
+      .catch((e) => alive && setError(e instanceof Error ? e.message : t("loadFailed")));
     return () => { alive = false; };
   }, [organizationId]);
 
@@ -45,7 +42,7 @@ export function ReplacementPolicyCard({
       setPolicy(updated);
       flash.succeed();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Save failed");
+      setError(e instanceof Error ? e.message : t("saveFailed"));
       flash.fail();
     }
   }
@@ -53,7 +50,7 @@ export function ReplacementPolicyCard({
   if (!policy) {
     return (
       <div style={card}>
-        <div style={{ fontSize: 13, color: "var(--ink-3)" }}>{error ?? "Chargement…"}</div>
+        <div style={{ fontSize: 13, color: "var(--ink-3)" }}>{error ?? tCommon("loading")}</div>
       </div>
     );
   }
@@ -69,7 +66,7 @@ export function ReplacementPolicyCard({
   return (
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-        <div style={{ fontSize: 13, fontWeight: 600 }}>Politique de suppléance</div>
+        <div style={{ fontSize: 13, fontWeight: 600 }}>{t("title")}</div>
         <SaveFlash state={flash.state} />
       </div>
       <p style={{ margin: "0 0 16px", fontSize: 12, color: "var(--ink-3)", lineHeight: 1.5 }}>
@@ -98,12 +95,12 @@ export function ReplacementPolicyCard({
               }}
             >
               <div style={{ fontSize: 13, fontWeight: 600, color: active ? "var(--terra-ink)" : "var(--ink)" }}>
-                {mode === "auto" ? "Automatique" : "Géré par le coordonnateur"}
+                {mode === "auto" ? t("auto") : t("managed")}
               </div>
               <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 3, lineHeight: 1.4 }}>
                 {mode === "auto"
-                  ? "Diffusé au bassin · premier arrivé, premier servi"
-                  : "Diffusé au bassin · le coordonnateur choisit qui assigner"}
+                  ? t("autoSub")
+                  : t("managedSub")}
               </div>
             </button>
           );
@@ -112,7 +109,7 @@ export function ReplacementPolicyCard({
 
       {/* allowed roles */}
       <div style={{ fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--ink-3)", fontWeight: 500, marginBottom: 8 }}>
-        Rôles autorisés à libérer un quart
+        {t("rolesLabel")}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 18 }}>
         {ROLES.map((r) => {
@@ -134,7 +131,7 @@ export function ReplacementPolicyCard({
                 fontFamily: "inherit",
               }}
             >
-              {r.label}
+              {t(`roles.${r.value}`)}
             </button>
           );
         })}
@@ -142,7 +139,7 @@ export function ReplacementPolicyCard({
 
       {/* lead time */}
       <label style={{ display: "block", fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--ink-3)", fontWeight: 500, marginBottom: 8 }}>
-        Préavis minimum (minutes avant le quart)
+        {t("noticeLabel")}
       </label>
       <input
         type="number"

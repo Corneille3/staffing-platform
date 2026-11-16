@@ -1,11 +1,10 @@
+import { getTranslations } from "next-intl/server";
 import { Link } from "../../../../i18n/navigation";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { PageFrame } from "../../../../components/page-frame";
 import { AdminSubstitutesTable } from "../../../../components/admin-substitutes-table";
 import { Mono } from "../../../../components/ui";
 import { getAdminSubstitutes } from "../../../../lib/api";
-
-const LANG_LABEL: Record<string, string> = { fr: "French", en: "English", bilingual: "Bilingual" };
 
 function singleString(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -16,6 +15,9 @@ export default async function SubstitutesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const t = await getTranslations("admin");
+  const tCred = await getTranslations("worker.credentials");
+  const cred = (code: string) => (tCred.has(code) ? tCred(code) : code);
   const params = await searchParams;
   const rankAgainstRequestId = singleString(params.rank_against_request_id);
 
@@ -25,12 +27,12 @@ export default async function SubstitutesPage({
 
   return (
     <PageFrame
-      eyebrow="The pool"
-      title={ranked ? "Ranked against a request" : "Substitutes"}
+      eyebrow={t("substitutes.eyebrow")}
+      title={ranked ? t("substitutes.titleRanked") : t("nav.substitutes")}
       description={
         ranked
-          ? "Workers in your network ranked by match against an open request — language, qualifications, city, availability."
-          : "Browse the substitute pool. Open a request and choose 'Rank substitutes' to score everyone against it."
+          ? t("substitutes.descriptionRanked")
+          : t("substitutes.description")
       }
     >
       {ranked && rank_against && (
@@ -48,7 +50,7 @@ export default async function SubstitutesPage({
           }}
         >
           <ArrowLeft size={15} strokeWidth={1.8} />
-          Back to request
+          {t("substitutes.backToRequest")}
         </Link>
       )}
 
@@ -79,7 +81,7 @@ export default async function SubstitutesPage({
             }}
           >
             <Sparkles size={14} strokeWidth={1.6} />
-            Ranking by match against
+            {t("substitutes.rankingAgainst")}
           </div>
           <div
             style={{
@@ -106,13 +108,13 @@ export default async function SubstitutesPage({
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             <DarkChip>{rank_against.city}</DarkChip>
             {rank_against.language_requirement && (
-              <DarkChip>{LANG_LABEL[rank_against.language_requirement] ?? rank_against.language_requirement}</DarkChip>
+              <DarkChip>{t.has(`languageNames.${rank_against.language_requirement}`) ? t(`languageNames.${rank_against.language_requirement}`) : rank_against.language_requirement}</DarkChip>
             )}
             {rank_against.required_qualifications.slice(0, 2).map((q) => (
-              <DarkChip key={q}>{q}</DarkChip>
+              <DarkChip key={q}>{cred(q)}</DarkChip>
             ))}
             {rank_against.required_certifications.slice(0, 2).map((c) => (
-              <DarkChip key={c}>{c}</DarkChip>
+              <DarkChip key={c}>{cred(c)}</DarkChip>
             ))}
           </div>
           <div style={{ flex: 1 }} />
@@ -128,7 +130,7 @@ export default async function SubstitutesPage({
               textDecoration: "none",
             }}
           >
-            Clear
+            {t("substitutes.clear")}
           </Link>
         </div>
       ) : null}
@@ -136,7 +138,7 @@ export default async function SubstitutesPage({
       <AdminSubstitutesTable rows={items} ranked={ranked} requestId={rank_against?.id} />
 
       <p style={{ marginTop: 16, color: "var(--ink-3)", fontSize: 12 }}>
-        Ranking factors: language · qualifications · certifications · city match · availability.
+        {t("substitutes.factors")}
       </p>
     </PageFrame>
   );
