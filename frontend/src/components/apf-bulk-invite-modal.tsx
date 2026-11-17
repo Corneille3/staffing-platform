@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { bulkInviteSubstitutes } from "../lib/browser-api";
 import type { BulkInviteEntry, BulkInviteResult } from "../lib/types";
 
@@ -28,6 +29,7 @@ const FIELD: React.CSSProperties = {
 
 export function ApfBulkInviteModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
+  const t = useTranslations("apf.bulk");
   const [, startTransition] = useTransition();
   const [rows, setRows] = useState<BulkInviteEntry[]>([emptyRow()]);
   const [submitting, setSubmitting] = useState(false);
@@ -64,7 +66,7 @@ export function ApfBulkInviteModal({ onClose }: { onClose: () => void }) {
         }))
         .filter((r) => r.email);
       if (filled.length === 0) {
-        setError("Add at least one row with an email.");
+        setError(t("needEmail"));
         return;
       }
       const res = await bulkInviteSubstitutes(filled);
@@ -73,7 +75,7 @@ export function ApfBulkInviteModal({ onClose }: { onClose: () => void }) {
         startTransition(() => router.refresh());
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Bulk invite failed");
+      setError(err instanceof Error ? err.message : t("failed"));
     } finally {
       setSubmitting(false);
     }
@@ -121,7 +123,7 @@ export function ApfBulkInviteModal({ onClose }: { onClose: () => void }) {
                 color: "var(--ink)",
               }}
             >
-              {result.invited_count} invited · {result.skipped_count} skipped
+              {t("result", { invited: result.invited_count, skipped: result.skipped_count })}
             </h2>
             <div style={{ display: "grid", gap: 6, marginBottom: 20 }}>
               {result.outcomes.map((o) => (
@@ -148,7 +150,7 @@ export function ApfBulkInviteModal({ onClose }: { onClose: () => void }) {
                       fontWeight: 500,
                     }}
                   >
-                    {o.status}
+                    {t.has(`status.${o.status}`) ? t(`status.${o.status}`) : o.status}
                     {o.reason ? ` · ${o.reason}` : ""}
                   </span>
                 </div>
@@ -169,7 +171,7 @@ export function ApfBulkInviteModal({ onClose }: { onClose: () => void }) {
                   cursor: "pointer",
                 }}
               >
-                Done
+                {t("done")}
               </button>
             </div>
           </>
@@ -184,10 +186,10 @@ export function ApfBulkInviteModal({ onClose }: { onClose: () => void }) {
                 color: "var(--ink)",
               }}
             >
-              Bulk invite <em style={{ fontStyle: "italic" }}>substitutes</em>
+              {t("titleLead")} <em style={{ fontStyle: "italic" }}>{t("titleEm")}</em>
             </h2>
             <p style={{ margin: "0 0 20px", color: "var(--ink-2)", fontSize: 14, lineHeight: 1.5 }}>
-              Add a row per person. They&apos;ll receive an email invitation and can sign up with this email address.
+              {t("body")}
             </p>
 
             <div
@@ -205,11 +207,11 @@ export function ApfBulkInviteModal({ onClose }: { onClose: () => void }) {
                 borderBottom: "0.5px solid var(--line)",
               }}
             >
-              <span>First name</span>
-              <span>Last name</span>
-              <span>Email</span>
-              <span>Phone</span>
-              <span>Lang</span>
+              <span>{t("firstName")}</span>
+              <span>{t("lastName")}</span>
+              <span>{t("email")}</span>
+              <span>{t("phone")}</span>
+              <span>{t("lang")}</span>
               <span></span>
             </div>
 
@@ -273,7 +275,7 @@ export function ApfBulkInviteModal({ onClose }: { onClose: () => void }) {
                       opacity: rows.length === 1 ? 0.4 : 1,
                       padding: "4px 0",
                     }}
-                    aria-label="Remove row"
+                    aria-label={t("removeRow")}
                   >
                     ×
                   </button>
@@ -295,7 +297,7 @@ export function ApfBulkInviteModal({ onClose }: { onClose: () => void }) {
                 cursor: "pointer",
               }}
             >
-              + Add another
+              {t("addAnother")}
             </button>
 
             {error && <p style={{ margin: "16px 0 0", color: "var(--rose)", fontSize: 13 }}>{error}</p>}
@@ -316,7 +318,7 @@ export function ApfBulkInviteModal({ onClose }: { onClose: () => void }) {
                   cursor: submitting ? "not-allowed" : "pointer",
                 }}
               >
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -334,7 +336,7 @@ export function ApfBulkInviteModal({ onClose }: { onClose: () => void }) {
                   opacity: submitting ? 0.6 : 1,
                 }}
               >
-                {submitting ? "Inviting…" : "Send invitations"}
+                {submitting ? t("inviting") : t("send")}
               </button>
             </div>
           </>

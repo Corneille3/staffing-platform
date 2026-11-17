@@ -1,17 +1,9 @@
+import { getTranslations } from "next-intl/server";
 import { Link } from "../../../../i18n/navigation";
 import { HideOnReadOnlyVisit } from "../../../../components/read-only-visit";
 import { RemoveOrganizationButton } from "../../../../components/remove-organization-button";
 import { Eyebrow, Mono } from "../../../../components/ui";
 import { getOrganizations } from "../../../../lib/api";
-
-const ORG_TYPE_LABEL: Record<string, string> = {
-  childcare: "Childcare",
-  long_term_care: "Long-term Care",
-  community_care: "Community Care",
-  home_care: "Home Care",
-  assisted_living: "Assisted Living",
-  other: "Other",
-};
 
 const CARD_STYLE: React.CSSProperties = {
   background: "var(--card)",
@@ -20,11 +12,14 @@ const CARD_STYLE: React.CSSProperties = {
 
 export default async function OrganizationsPage() {
   const organizations = await getOrganizations();
+  const t = await getTranslations("apf.organizations");
+  const tl = await getTranslations("apf.lists");
+  const tAdmin = await getTranslations("admin");
 
   return (
     <>
       <section style={{ marginBottom: 32 }}>
-        <Eyebrow style={{ marginBottom: 12 }}>Network Management</Eyebrow>
+        <Eyebrow style={{ marginBottom: 12 }}>{tl("eyebrow")}</Eyebrow>
         <h1
           style={{
             margin: 0,
@@ -35,7 +30,7 @@ export default async function OrganizationsPage() {
             color: "var(--ink)",
           }}
         >
-          <em style={{ fontStyle: "italic" }}>Organizations</em>
+          <em style={{ fontStyle: "italic" }}>{t("title")}</em>
         </h1>
         <div
           style={{
@@ -48,7 +43,7 @@ export default async function OrganizationsPage() {
           }}
         >
           <p style={{ margin: 0, maxWidth: 640, color: "var(--ink-2)", lineHeight: 1.55, fontSize: 15 }}>
-            Member organizations registered under this network. Each organization can have one or more coordinators.
+            {t("description")}
           </p>
           <HideOnReadOnlyVisit>
           <Link
@@ -66,7 +61,7 @@ export default async function OrganizationsPage() {
               flexShrink: 0,
             }}
           >
-            + New organization
+            {t("new")}
           </Link>
           </HideOnReadOnlyVisit>
         </div>
@@ -88,10 +83,10 @@ export default async function OrganizationsPage() {
           }}
         >
           <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: "var(--ink)" }}>
-            All organizations
+            {t("all")}
           </h2>
           <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
-            <Mono>{organizations.length}</Mono> {organizations.length === 1 ? "record" : "records"}
+            {tl.rich("records", { count: organizations.length, m: (chunks) => <Mono>{chunks}</Mono> })}
           </span>
         </div>
 
@@ -109,11 +104,11 @@ export default async function OrganizationsPage() {
             borderBottom: "0.5px solid var(--line)",
           }}
         >
-          <span>Name</span>
-          <span>Type</span>
-          <span>City</span>
-          <span>Language</span>
-          <span>Status</span>
+          <span>{tl("colName")}</span>
+          <span>{tl("colType")}</span>
+          <span>{tl("colCity")}</span>
+          <span>{tl("colLanguage")}</span>
+          <span>{tl("colStatus")}</span>
           <span />
         </div>
 
@@ -142,7 +137,7 @@ export default async function OrganizationsPage() {
                 )}
               </Link>
               <span style={{ fontSize: 13, color: "var(--ink)" }}>
-                {ORG_TYPE_LABEL[org.type] ?? org.type}
+                {tAdmin.has(`organizations.types.${org.type}`) ? tAdmin(`organizations.types.${org.type}`) : org.type}
               </span>
               <span style={{ fontSize: 13, color: "var(--ink)" }}>{org.city}</span>
               <span
@@ -175,7 +170,7 @@ export default async function OrganizationsPage() {
                   border: `0.5px solid ${org.is_active ? "var(--moss)" : "var(--rose)"}`,
                 }}
               >
-                {org.is_active ? "Active" : "Inactive"}
+                {org.is_active ? tl("active") : tl("inactive")}
               </span>
               <HideOnReadOnlyVisit fallback={<span />}>
                 <RemoveOrganizationButton organizationId={org.id} organizationName={org.name} />
@@ -184,7 +179,7 @@ export default async function OrganizationsPage() {
           ))}
           {organizations.length === 0 && (
             <p style={{ margin: "12px 0 0", color: "var(--ink-3)" }}>
-              No organizations yet. Add the first one.
+              {t("empty")}
             </p>
           )}
         </div>

@@ -1,11 +1,10 @@
+import { getTranslations } from "next-intl/server";
 import { Link } from "../../../../i18n/navigation";
 import { Eyebrow, Mono } from "../../../../components/ui";
 import { getCoordinators } from "../../../../lib/api";
 import { RemoveUserButton } from "../../../../components/remove-user-button";
 import { HideOnReadOnlyVisit } from "../../../../components/read-only-visit";
 import { CoordinatorPhoneCell } from "../../../../components/coordinator-phone-cell";
-
-const LANG_LABEL: Record<string, string> = { fr: "FR", en: "EN", bilingual: "Bilingual" };
 
 const CARD_STYLE: React.CSSProperties = {
   background: "var(--card)",
@@ -14,11 +13,14 @@ const CARD_STYLE: React.CSSProperties = {
 
 export default async function CoordinatorsPage() {
   const coordinators = await getCoordinators();
+  const t = await getTranslations("apf.coordinators");
+  const tl = await getTranslations("apf.lists");
+  const tAdmin = await getTranslations("admin");
 
   return (
     <>
       <section style={{ marginBottom: 32 }}>
-        <Eyebrow style={{ marginBottom: 12 }}>Network Management</Eyebrow>
+        <Eyebrow style={{ marginBottom: 12 }}>{tl("eyebrow")}</Eyebrow>
         <h1
           style={{
             margin: 0,
@@ -29,7 +31,7 @@ export default async function CoordinatorsPage() {
             color: "var(--ink)",
           }}
         >
-          <em style={{ fontStyle: "italic" }}>Coordinators</em>
+          <em style={{ fontStyle: "italic" }}>{t("title")}</em>
         </h1>
         <div
           style={{
@@ -42,7 +44,7 @@ export default async function CoordinatorsPage() {
           }}
         >
           <p style={{ margin: 0, maxWidth: 640, color: "var(--ink-2)", lineHeight: 1.55, fontSize: 15 }}>
-            Coordinators manage coverage requests for their assigned organizations. A coordinator can be assigned to multiple organizations.
+            {t("description")}
           </p>
           <HideOnReadOnlyVisit>
           <Link
@@ -60,7 +62,7 @@ export default async function CoordinatorsPage() {
               flexShrink: 0,
             }}
           >
-            + Invite coordinator
+            {t("invite")}
           </Link>
           </HideOnReadOnlyVisit>
         </div>
@@ -82,10 +84,10 @@ export default async function CoordinatorsPage() {
           }}
         >
           <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: "var(--ink)" }}>
-            All coordinators
+            {t("all")}
           </h2>
           <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
-            <Mono>{coordinators.length}</Mono> {coordinators.length === 1 ? "record" : "records"}
+            {tl.rich("records", { count: coordinators.length, m: (chunks) => <Mono>{chunks}</Mono> })}
           </span>
         </div>
 
@@ -103,11 +105,11 @@ export default async function CoordinatorsPage() {
             borderBottom: "0.5px solid var(--line)",
           }}
         >
-          <span>Name</span>
-          <span>Lang</span>
-          <span>Phone</span>
-          <span>Assigned organizations</span>
-          <span>Status</span>
+          <span>{tl("colName")}</span>
+          <span>{tl("colLang")}</span>
+          <span>{tl("colPhone")}</span>
+          <span>{t("colOrgs")}</span>
+          <span>{tl("colStatus")}</span>
           <span></span>
         </div>
 
@@ -145,7 +147,7 @@ export default async function CoordinatorsPage() {
                   width: "fit-content",
                 }}
               >
-                {LANG_LABEL[coord.preferred_language] ?? coord.preferred_language.toUpperCase()}
+                {tAdmin.has(`languages.${coord.preferred_language}`) ? tAdmin(`languages.${coord.preferred_language}`) : coord.preferred_language.toUpperCase()}
               </span>
 
               <CoordinatorPhoneCell coordinatorId={coord.id} initialPhone={coord.phone} />
@@ -169,7 +171,7 @@ export default async function CoordinatorsPage() {
                     </span>
                   ))
                 ) : (
-                  <span style={{ fontSize: 12, color: "var(--ink-3)" }}>No organizations assigned</span>
+                  <span style={{ fontSize: 12, color: "var(--ink-3)" }}>{t("noOrgs")}</span>
                 )}
               </div>
 
@@ -187,7 +189,7 @@ export default async function CoordinatorsPage() {
                   border: `0.5px solid ${coord.is_active ? "var(--moss)" : "var(--rose)"}`,
                 }}
               >
-                {coord.is_active ? "Active" : "Inactive"}
+                {coord.is_active ? tl("active") : tl("inactive")}
               </span>
 
               <div style={{ justifySelf: "end" }}>
@@ -204,7 +206,7 @@ export default async function CoordinatorsPage() {
 
           {coordinators.length === 0 && (
             <p style={{ margin: "12px 0 0", color: "var(--ink-3)" }}>
-              No coordinators yet. Invite the first one.
+              {t("empty")}
             </p>
           )}
         </div>

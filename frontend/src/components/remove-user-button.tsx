@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { removeUser } from "../lib/browser-api";
 
 export function RemoveUserButton({
@@ -14,6 +15,7 @@ export function RemoveUserButton({
   isActive: boolean;
 }) {
   const router = useRouter();
+  const t = useTranslations("apf.remove");
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -21,7 +23,7 @@ export function RemoveUserButton({
   if (!isActive) {
     return (
       <span style={{ fontSize: 11, opacity: 0.45, fontStyle: "italic" }}>
-        removed
+        {t("removed")}
       </span>
     );
   }
@@ -33,7 +35,7 @@ export function RemoveUserButton({
       setOpen(false);
       startTransition(() => router.refresh());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Removal failed");
+      setError(err instanceof Error ? err.message : t("failed"));
     }
   }
 
@@ -55,7 +57,7 @@ export function RemoveUserButton({
           cursor: "pointer",
         }}
       >
-        Remove
+        {t("button")}
       </button>
 
       {open ? (
@@ -87,12 +89,10 @@ export function RemoveUserButton({
             }}
           >
             <h2 style={{ margin: "0 0 12px", fontSize: 22 }}>
-              Remove {userName}?
+              {t("title", { name: userName })}
             </h2>
             <p style={{ margin: "0 0 20px", lineHeight: 1.5, color: "#3d564c", fontSize: 14 }}>
-              This deactivates their account immediately. They will be signed out
-              and cannot sign back in. Their data and audit history are preserved.
-              Re-inviting them later will require a new invitation.
+              {t("userBody")}
             </p>
 
             {error ? (
@@ -126,7 +126,7 @@ export function RemoveUserButton({
                   cursor: isPending ? "not-allowed" : "pointer",
                 }}
               >
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -143,7 +143,7 @@ export function RemoveUserButton({
                   cursor: isPending ? "not-allowed" : "pointer",
                 }}
               >
-                {isPending ? "Removing…" : "Remove"}
+                {isPending ? t("removing") : t("button")}
               </button>
             </div>
           </div>
