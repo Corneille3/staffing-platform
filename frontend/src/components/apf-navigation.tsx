@@ -2,20 +2,23 @@
 
 import { Link } from "../i18n/navigation";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 export function ApfNavigation() {
   const pathname = usePathname();
+  const t = useTranslations("apf.nav");
   const strippedPath = pathname.replace(/^\/(?:en|fr)(?=\/|$)/, "") || "/";
 
   // Tenant-admin workspace nav. (Cross-tenant management lives in the platform
   // OS surface at /platform — no "Networks" link here anymore.)
   const links = [
-    { href: "/apf", label: "Overview" },
-    { href: "/apf/organizations", label: "Organizations" },
-    { href: "/apf/coordinators", label: "Coordinators" },
-    { href: "/apf/substitutes", label: "Substitutes" },
-    { href: "/apf/activity", label: "Activity" },
-    { href: "/apf/export", label: "Export" },
+    // label = key under apf.nav
+    { href: "/apf", label: "overview" },
+    { href: "/apf/organizations", label: "organizations" },
+    { href: "/apf/coordinators", label: "coordinators" },
+    { href: "/apf/substitutes", label: "substitutes" },
+    { href: "/apf/activity", label: "activity" },
+    { href: "/apf/export", label: "export" },
   ];
 
   return (
@@ -46,7 +49,7 @@ export function ApfNavigation() {
               transition: "color .12s, background .12s",
             }}
           >
-            {link.label}
+            {t(link.label)}
           </Link>
         );
       })}

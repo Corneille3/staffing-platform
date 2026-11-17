@@ -1526,5 +1526,92 @@
         }
       }
     }
+  },
+  "apf": {
+    "shell": {
+      "badge": "Réseau",
+      "network": "Réseau",
+      "yourNetwork": "Votre réseau",
+      "orgCount": "{count, plural, one {# organisation} other {# organisations}}",
+      "readOnlyGrant": "Lecture seule · accès accordé",
+      "workspace": "Espace de travail",
+      "coordinatorView": "Vue coordination",
+      "readOnly": "lecture seule",
+      "platformConsole": "Console de la plateforme",
+      "footer": "Votre espace — gérez vos emplacements, vos coordonnateurs et vos remplaçant·e·s.",
+      "topSupport": "Accès du soutien · lecture seule",
+      "topNetwork": "Votre réseau"
+    },
+    "nav": {
+      "overview": "Vue d'ensemble",
+      "organizations": "Organisations",
+      "coordinators": "Coordonnateurs",
+      "substitutes": "Remplaçant·e·s",
+      "activity": "Activité",
+      "export": "Export"
+    },
+    "dashboard": {
+      "eyebrow": "Portrait du réseau",
+      "titleLead": "La santé du remplacement,",
+      "titleEm": "à l'échelle du réseau",
+      "description": "Une vue d'ensemble de toutes les organisations affiliées à Staffig. Des indicateurs en lecture seule pour le suivi, la reddition de comptes et le repérage des tendances — pas pour la répartition au quotidien.",
+      "fillRate": "Taux de comblement",
+      "fillRateSub": "{filled} demandes pourvues sur {total}",
+      "avgFill": "Délai moyen pour pourvoir",
+      "avgFillValue": "{hours} h",
+      "avgFillSub": "heures entre la création et l'assignation",
+      "activeSubs": "Remplaçant·e·s actifs",
+      "activeSubsSub": "disponibles en ce moment",
+      "unfilled": "Demandes non pourvues",
+      "unfilledSub": "ouvertes, avisées ou en attente de réponse",
+      "total": "Total des demandes",
+      "totalSub": "depuis le début, toutes organisations confondues",
+      "orgs": "Organisations",
+      "orgsSub": "affiliées à ce réseau",
+      "breakdown": "Répartition des demandes par statut",
+      "noRequests": "Aucune demande pour l'instant.",
+      "shortage": "Villes en pénurie",
+      "flagged": "{count, plural, one {# signalée} other {# signalées}}",
+      "noShortage": "Chaque ville ayant une demande ouverte compte au moins une personne disponible.",
+      "noSubstitute": "personne de disponible",
+      "shortageNote": "Villes ayant des demandes ouvertes mais personne de disponible.",
+      "orgActivity": "Activité par organisation",
+      "orgsShort": "{count} org.",
+      "statTotal": "Total",
+      "statFilled": "Pourvues",
+      "statOpen": "Ouvertes",
+      "noOrgs": "Aucune organisation pour l'instant.",
+      "recentClosed": "Demandes fermées récemment",
+      "last8": "8 dernières",
+      "unknownOrg": "Organisation inconnue"
+    },
+    "activity": {
+      "eyebrow": "Historique de l'activité",
+      "titleLead": "Le fil d'audit du",
+      "titleEm": "réseau",
+      "export": "Exporter →",
+      "description": "Chaque geste important dans le réseau — demandes créées, personnes avisées, réponses reçues, assignations confirmées et annulées. En lecture seule, du plus récent au plus ancien.",
+      "inOrg": "Dans <b>{name}</b>",
+      "filterAll": "Tout",
+      "filterAssigned": "Assignées",
+      "filterCancelled": "Annulées",
+      "filterEscalated": "Escaladées",
+      "filterInvitations": "Invitations",
+      "filterRemovals": "Retraits",
+      "empty": "Aucune activité pour ce filtre.",
+      "loadFailed": "Échec du chargement de l'activité plus ancienne",
+      "loading": "Chargement…",
+      "loadOlder": "Charger plus ancien →",
+      "today": "Aujourd'hui",
+      "yesterday": "Hier"
+    },
+    "access": {
+      "title": "Accès du soutien StaffiG",
+      "body": "Un opérateur de la plateforme demande à consulter votre espace. L'accès est en lecture seule, expire automatiquement, et chaque étape est consignée.",
+      "failed": "L'action a échoué",
+      "deny": "Refuser",
+      "approve": "Approuver",
+      "activeUntil": "Actif jusqu'à {time}"
+    }
   }
 }

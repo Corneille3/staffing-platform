@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { Link } from "../../../i18n/navigation";
 import { TenantAccessRequestsCard } from "../../../components/tenant-access-requests-card";
 import { Eyebrow, Mono } from "../../../components/ui";
@@ -7,17 +8,6 @@ const STATUS_ORDER = [
   "draft", "open", "notified", "responses_received",
   "assigned", "completed", "cancelled", "expired",
 ];
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: "Draft",
-  open: "Open",
-  notified: "Notified",
-  responses_received: "Responses received",
-  assigned: "Assigned",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  expired: "Expired",
-};
 
 const STATUS_ACCENT: Record<string, string> = {
   draft: "var(--ink-3)",
@@ -30,21 +20,18 @@ const STATUS_ACCENT: Record<string, string> = {
   expired: "var(--ink-3)",
 };
 
-const ORG_TYPE_LABELS: Record<string, string> = {
-  childcare: "Childcare",
-  long_term_care: "Long-term care",
-  community_care: "Community care",
-  home_care: "Home care",
-  assisted_living: "Assisted living",
-  other: "Other",
-};
-
 const CARD_STYLE: React.CSSProperties = {
   background: "var(--card)",
   border: "0.5px solid var(--line)",
 };
 
 export default async function ApfHomePage() {
+  const t = await getTranslations("apf.dashboard");
+  const tAdmin = await getTranslations("admin");
+  const statusLabel = (status: string) =>
+    tAdmin.has(`status.${status}`) ? tAdmin(`status.${status}`) : status.replace(/_/g, " ");
+  const orgTypeLabel = (type: string) =>
+    tAdmin.has(`organizations.types.${type}`) ? tAdmin(`organizations.types.${type}`) : type;
   const [snapshot, accessGrants] = await Promise.all([
     getApfSnapshot(),
     getTenantAccessGrants(), // null-safe; renders nothing unless a request is pending/active
@@ -55,7 +42,7 @@ export default async function ApfHomePage() {
     <>
       {accessGrants && <TenantAccessRequestsCard grants={accessGrants.grants} />}
       <section style={{ marginBottom: 32 }}>
-        <Eyebrow style={{ marginBottom: 12 }}>Network Snapshot</Eyebrow>
+        <Eyebrow style={{ marginBottom: 12 }}>{t("eyebrow")}</Eyebrow>
         <h1
           style={{
             margin: 0,
@@ -66,11 +53,10 @@ export default async function ApfHomePage() {
             color: "var(--ink)",
           }}
         >
-          Network-wide staffing <em style={{ fontStyle: "italic" }}>health</em>.
+          {t("titleLead")} <em style={{ fontStyle: "italic" }}>{t("titleEm")}</em>.
         </h1>
         <p style={{ margin: "12px 0 0", maxWidth: 720, color: "var(--ink-2)", lineHeight: 1.55, fontSize: 15 }}>
-          Aggregate visibility across every Staffig-affiliated organization. Read-only metrics for
-          oversight, accountability, and pattern detection — not for day-to-day dispatch.
+          {t("description")}
         </p>
       </section>
 
@@ -83,29 +69,29 @@ export default async function ApfHomePage() {
         }}
       >
         <MetricCard
-          label="Fill rate"
+          label={t("fillRate")}
           value={`${kpis.fill_rate}%`}
           accent="var(--moss)"
-          sub={`${kpis.filled_count} of ${kpis.total_requests} requests filled`}
+          sub={t("fillRateSub", { filled: kpis.filled_count, total: kpis.total_requests })}
         />
         <MetricCard
-          label="Avg time to fill"
-          value={kpis.avg_fill_hours != null ? `${kpis.avg_fill_hours}h` : "—"}
-          sub="hours from creation to assignment"
+          label={t("avgFill")}
+          value={kpis.avg_fill_hours != null ? t("avgFillValue", { hours: String(kpis.avg_fill_hours) }) : "—"}
+          sub={t("avgFillSub")}
         />
         <MetricCard
-          label="Active substitutes"
+          label={t("activeSubs")}
           value={kpis.active_substitutes}
-          sub="currently available"
+          sub={t("activeSubsSub")}
         />
         <MetricCard
-          label="Unfilled requests"
+          label={t("unfilled")}
           value={kpis.unfilled_count}
           accent={kpis.unfilled_count > 0 ? "var(--rose)" : "var(--moss)"}
-          sub="open, notified, or awaiting response"
+          sub={t("unfilledSub")}
         />
-        <MetricCard label="Total requests" value={kpis.total_requests} sub="all time across all organizations" />
-        <MetricCard label="Organizations" value={kpis.organizations_count} sub="affiliated with this network" />
+        <MetricCard label={t("total")} value={kpis.total_requests} sub={t("totalSub")} />
+        <MetricCard label={t("orgs")} value={kpis.organizations_count} sub={t("orgsSub")} />
       </section>
 
       <section
@@ -116,7 +102,7 @@ export default async function ApfHomePage() {
           marginBottom: 28,
         }}
       >
-        <Panel title="Request status breakdown">
+        <Panel title={t("breakdown")}>
           <div style={{ display: "grid", gap: 12 }}>
             {STATUS_ORDER.filter((s) => status_breakdown[s]).map((status) => {
               const count = status_breakdown[status] || 0;
@@ -126,7 +112,7 @@ export default async function ApfHomePage() {
               return (
                 <div key={status} style={{ display: "grid", gap: 6 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                    <span style={{ color: "var(--ink)" }}>{STATUS_LABELS[status] ?? status}</span>
+                    <span style={{ color: "var(--ink)" }}>{statusLabel(status)}</span>
                     <span style={{ color: STATUS_ACCENT[status] ?? "var(--ink)" }}>
                       <Mono>{count}</Mono>
                     </span>
@@ -153,15 +139,15 @@ export default async function ApfHomePage() {
               );
             })}
             {Object.keys(status_breakdown).length === 0 && (
-              <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>No requests yet.</p>
+              <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>{t("noRequests")}</p>
             )}
           </div>
         </Panel>
 
-        <Panel title="Shortage cities" subtitle={`${shortage_cities.length} flagged`}>
+        <Panel title={t("shortage")} subtitle={t("flagged", { count: shortage_cities.length })}>
           {shortage_cities.length === 0 ? (
             <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>
-              All open-request cities have at least one available substitute.
+              {t("noShortage")}
             </p>
           ) : (
             <div style={{ display: "grid", gap: 8 }}>
@@ -189,12 +175,12 @@ export default async function ApfHomePage() {
                   />
                   <span style={{ fontSize: 14, color: "var(--ink)" }}>{city}</span>
                   <span style={{ fontSize: 12, color: "var(--ink-2)", marginLeft: "auto" }}>
-                    no available substitute
+                    {t("noSubstitute")}
                   </span>
                 </div>
               ))}
               <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--ink-3)" }}>
-                Cities with open requests but zero available substitutes.
+                {t("shortageNote")}
               </p>
             </div>
           )}
@@ -202,7 +188,7 @@ export default async function ApfHomePage() {
       </section>
 
       <section style={{ marginBottom: 28 }}>
-        <Panel title="Organization activity" subtitle={`${kpis.organizations_count} orgs`}>
+        <Panel title={t("orgActivity")} subtitle={t("orgsShort", { count: kpis.organizations_count })}>
           <div style={{ display: "grid", gap: 8 }}>
             {org_activity.map((row) => (
               <Link
@@ -226,20 +212,20 @@ export default async function ApfHomePage() {
                   <div style={{ marginTop: 3, fontSize: 12, color: "var(--ink-3)" }}>
                     {row.city}
                     {row.region ? `, ${row.region}` : ""} ·{" "}
-                    {ORG_TYPE_LABELS[row.type] ?? row.type}
+                    {orgTypeLabel(row.type)}
                   </div>
                 </div>
-                <Stat label="Total" value={row.total} />
-                <Stat label="Filled" value={row.filled} accent="var(--moss)" />
+                <Stat label={t("statTotal")} value={row.total} />
+                <Stat label={t("statFilled")} value={row.filled} accent="var(--moss)" />
                 <Stat
-                  label="Open"
+                  label={t("statOpen")}
                   value={row.open}
                   accent={row.open > 0 ? "var(--rose)" : undefined}
                 />
               </Link>
             ))}
             {org_activity.length === 0 && (
-              <p style={{ margin: 0, color: "var(--ink-3)" }}>No organizations yet.</p>
+              <p style={{ margin: 0, color: "var(--ink-3)" }}>{t("noOrgs")}</p>
             )}
           </div>
         </Panel>
@@ -247,7 +233,7 @@ export default async function ApfHomePage() {
 
       {recent_closed_requests.length > 0 && (
         <section>
-          <Panel title="Recent closed requests" subtitle="last 8">
+          <Panel title={t("recentClosed")} subtitle={t("last8")}>
             <div style={{ display: "grid", gap: 8 }}>
               {recent_closed_requests.map((r) => {
                 const accent = STATUS_ACCENT[r.status] ?? "var(--ink-3)";
@@ -270,7 +256,7 @@ export default async function ApfHomePage() {
                         {r.title}
                       </div>
                       <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
-                        {r.organization_name ?? "Unknown org"} · {r.city} · {r.work_date}
+                        {r.organization_name ?? t("unknownOrg")} · {r.city} · {r.work_date}
                       </div>
                     </div>
                     <span
@@ -287,7 +273,7 @@ export default async function ApfHomePage() {
                         border: `0.5px solid ${accent}`,
                       }}
                     >
-                      {STATUS_LABELS[r.status] ?? r.status}
+                      {statusLabel(r.status)}
                     </span>
                   </div>
                 );

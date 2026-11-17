@@ -1,4 +1,4 @@
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "../../../i18n/navigation";
 import React from "react";
 import { redirect } from "next/navigation";
@@ -55,7 +55,8 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
     orgCount = null;
   }
 
-  const networkName = tenant?.name ?? "Your network";
+  const t = await getTranslations("apf.shell");
+  const networkName = tenant?.name ?? t("yourNetwork");
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--paper)", color: "var(--ink)" }}>
@@ -100,7 +101,7 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
               textTransform: "uppercase",
             }}
           >
-            Network
+            {t("badge")}
           </span>
         </div>
 
@@ -116,11 +117,11 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
             marginBottom: 16,
           }}
         >
-          <Eyebrow style={{ color: "rgba(246, 244, 238, 0.5)" }}>Network</Eyebrow>
+          <Eyebrow style={{ color: "rgba(246, 244, 238, 0.5)" }}>{t("network")}</Eyebrow>
           <div style={{ fontSize: 13, fontWeight: 500, color: "var(--paper)" }}>{networkName}</div>
           <div style={{ fontSize: 11, color: "rgba(246, 244, 238, 0.5)" }}>
             {tenant?.slug ? `${tenant.slug} · ` : ""}
-            {orgCount != null ? `${orgCount} ${orgCount === 1 ? "organization" : "organizations"}` : "—"}
+            {orgCount != null ? t("orgCount", { count: orgCount }) : "—"}
           </div>
           {tenant?.via_grant ? (
             <div
@@ -139,12 +140,12 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
                 letterSpacing: ".04em",
               }}
             >
-              <Eye size={11} /> Read-only · access grant
+              <Eye size={11} /> {t("readOnlyGrant")}
             </div>
           ) : null}
         </div>
 
-        <Eyebrow style={{ color: "rgba(246, 244, 238, 0.5)", padding: "0 12px 8px" }}>Workspace</Eyebrow>
+        <Eyebrow style={{ color: "rgba(246, 244, 238, 0.5)", padding: "0 12px 8px" }}>{t("workspace")}</Eyebrow>
         <ApfNavigation />
 
         <div style={{ flex: 1 }} />
@@ -171,10 +172,10 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
                 }}
               >
                 <ClipboardList size={13} style={{ color: "var(--terra)" }} />
-                Coordinator view
+                {t("coordinatorView")}
                 {tenant?.via_grant ? (
                   <span style={{ marginLeft: "auto", fontSize: 9.5, color: "rgba(246,244,238,.45)" }}>
-                    read-only
+                    {t("readOnly")}
                   </span>
                 ) : null}
               </div>
@@ -196,7 +197,7 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
                 }}
               >
                 <ArrowLeft size={13} style={{ color: "var(--terra)" }} />
-                Platform console
+                {t("platformConsole")}
               </div>
             </Link>
           </>
@@ -213,7 +214,7 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
             color: "rgba(246, 244, 238, 0.65)",
           }}
         >
-          Your workspace — manage your sites, coordinators, and substitutes.
+          {t("footer")}
         </div>
       </aside>
 
@@ -232,7 +233,7 @@ export default async function ApfLayout({ children }: { children: React.ReactNod
             gap: 16,
           }}
         >
-          <Eyebrow>{tenant?.via_grant ? "Support access · read-only" : "Your Network"}</Eyebrow>
+          <Eyebrow>{tenant?.via_grant ? t("topSupport") : t("topNetwork")}</Eyebrow>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <LanguageSwitcher />
             {CLERK_ENABLED ? <HeaderSignOutButton /> : null}

@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { Link } from "../../../../i18n/navigation";
 import { HideOnReadOnlyVisit } from "../../../../components/read-only-visit";
 import { Eyebrow, Mono } from "../../../../components/ui";
@@ -6,12 +7,13 @@ import { getApfActivity, getOrganizations } from "../../../../lib/api";
 import type { ApfActivityFilter } from "../../../../lib/types";
 
 const FILTERS: { key: ApfActivityFilter; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "assigned", label: "Assigned" },
-  { key: "cancelled", label: "Cancelled" },
-  { key: "escalated", label: "Escalated" },
-  { key: "invitations", label: "Invitations" },
-  { key: "removals", label: "Removals" },
+  // label = key under apf.activity
+  { key: "all", label: "filterAll" },
+  { key: "assigned", label: "filterAssigned" },
+  { key: "cancelled", label: "filterCancelled" },
+  { key: "escalated", label: "filterEscalated" },
+  { key: "invitations", label: "filterInvitations" },
+  { key: "removals", label: "filterRemovals" },
 ];
 
 function normalizeFilter(value: string | string[] | undefined): ApfActivityFilter {
@@ -35,6 +37,7 @@ export default async function ActivityPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const t = await getTranslations("apf.activity");
   const params = await searchParams;
   const filter = normalizeFilter(params.filter);
   const orgId = singleString(params.org_id);
@@ -49,7 +52,7 @@ export default async function ActivityPage({
   return (
     <>
       <section style={{ marginBottom: 24 }}>
-        <Eyebrow style={{ marginBottom: 12 }}>Activity History</Eyebrow>
+        <Eyebrow style={{ marginBottom: 12 }}>{t("eyebrow")}</Eyebrow>
         <div
           style={{
             display: "flex",
@@ -69,7 +72,7 @@ export default async function ActivityPage({
               color: "var(--ink)",
             }}
           >
-            Network-wide audit <em style={{ fontStyle: "italic" }}>feed</em>.
+            {t("titleLead")} <em style={{ fontStyle: "italic" }}>{t("titleEm")}</em>.
           </h1>
           <HideOnReadOnlyVisit>
           <Link
@@ -86,13 +89,12 @@ export default async function ActivityPage({
               whiteSpace: "nowrap",
             }}
           >
-            Export →
+            {t("export")}
           </Link>
           </HideOnReadOnlyVisit>
         </div>
         <p style={{ margin: "12px 0 0", maxWidth: 720, color: "var(--ink-2)", lineHeight: 1.55, fontSize: 15 }}>
-          Every significant action across the network — requests created, workers notified, responses
-          received, assignments confirmed and cancelled. Read-only, newest first.
+          {t("description")}
         </p>
       </section>
 
@@ -113,7 +115,10 @@ export default async function ActivityPage({
           }}
         >
           <span>
-            In <strong style={{ fontWeight: 500 }}>{scopeOrg.name}</strong>
+            {t.rich("inOrg", {
+              name: scopeOrg.name,
+              b: (chunks) => <strong style={{ fontWeight: 500 }}>{chunks}</strong>,
+            })}
           </span>
           <Link
             href={filter === "all" ? "/apf/activity" : `/apf/activity?filter=${filter}`}
@@ -160,7 +165,7 @@ export default async function ActivityPage({
                 textDecoration: "none",
               }}
             >
-              {f.label}
+              {t(f.label)}
               <span
                 style={{
                   fontSize: 11,
