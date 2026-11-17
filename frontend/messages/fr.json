@@ -1525,6 +1525,117 @@
           "status_not_importable": "le statut « {value} » ne s'importe pas (gagné exige un espace actif, perdu exige une raison)"
         }
       }
+    },
+    "shell": {
+      "operator": "Opérateur StaffiG",
+      "scope": "Plateforme · toutes les régions",
+      "operate": "Exploitation",
+      "workspace": "Espace de travail",
+      "grantedReadOnly": "Accès accordé · lecture seule",
+      "openYours": "Ouvrir votre espace",
+      "isolation": "Cloisonnement",
+      "isolationMarketing": "Prospects seulement. Les leads décrivent des organisations qui ne sont pas encore des tenants.",
+      "isolationOperator": "Des chiffres agrégés seulement. L'opérateur ne voit jamais les données d'un tenant.",
+      "topMarketing": "Plateforme · Marketing",
+      "topOperator": "Opérateur de la plateforme"
+    },
+    "nav": {
+      "overview": "Vue d'ensemble",
+      "tenants": "Tenants",
+      "leads": "Leads",
+      "billing": "Facturation",
+      "settings": "Paramètres"
+    },
+    "tenants": {
+      "eyebrow": "Plateforme · tous les espaces",
+      "headline": "{count, plural, one {# réseau} other {# réseaux}} <em>sur StaffiG</em>",
+      "description": "Chaque réseau est un tenant isolé. Invitez-en un nouveau, suivez son adoption — sans jamais voir ses données.",
+      "summary": {
+        "active": "{count, plural, one {# actif} other {# actifs}}",
+        "pending": "{count, plural, one {# invité} other {# invités}}",
+        "onboarding": "{count} en configuration",
+        "suspended": "{count, plural, one {# suspendu} other {# suspendus}}"
+      },
+      "invite": "Inviter un réseau",
+      "kpi": {
+        "active": "Réseaux actifs",
+        "activeSub": "espaces en service",
+        "orgs": "Organisations",
+        "orgsSub": "tous tenants confondus",
+        "subs": "Remplaçant·e·s",
+        "subsSub": "identités au total",
+        "fill": "Quarts pourvus (réseaux)",
+        "fillSub": "moyenne pondérée"
+      },
+      "col": {
+        "network": "Réseau",
+        "region": "Région",
+        "orgs": "Org.",
+        "subs": "Rempl.",
+        "fill": "Pourvus",
+        "status": "Statut"
+      },
+      "empty": "Aucun réseau pour l'instant. Invitez le premier.",
+      "footnote": "Le nombre d'organisations et de remplaçant·e·s et le taux de quarts pourvus sont les seuls chiffres que voit l'opérateur. Les noms, les quarts et les données des personnes restent dans chaque tenant.",
+      "status": {
+        "active": "Actif",
+        "pending": "Invitation envoyée",
+        "onboarding": "Configuration",
+        "suspended": "Suspendu"
+      },
+      "actionFailed": "L'action a échoué",
+      "resend": "Renvoyer",
+      "revoke": "Révoquer",
+      "openWorkspace": "Ouvrir l'espace",
+      "grantTitle": "Vous avez un accès accordé à cet espace (lecture seule)",
+      "ownTitle": "C'est votre propre espace",
+      "endVisitTitle": "Renoncer à votre accès maintenant au lieu d'attendre son expiration",
+      "endVisit": "Terminer la visite",
+      "requestAccessTitle": "Demander à l'admin du tenant un accès en lecture seule, limité dans le temps",
+      "requestAccess": "Demander l'accès",
+      "suspend": "Suspendre",
+      "remove": "Supprimer",
+      "reactivate": "Réactiver",
+      "suspendModal": {
+        "eyebrow": "Réversible — mais immédiat",
+        "title": "Suspendre <em>{name}</em> ?",
+        "body": "Tous les membres — admin, coordonnateurs, remplaçant·e·s — perdent l'accès <b>immédiatement</b> et voient un écran « espace suspendu ». Rien n'est supprimé : Réactiver rétablit l'espace tel qu'il était.",
+        "suspending": "Suspension…",
+        "confirm": "Suspendre le réseau"
+      },
+      "removeModal": {
+        "eyebrow": "Action destructive",
+        "title": "Supprimer <em>{name}</em> ?",
+        "body": "Ceci désactive le réseau et <b>tous ses membres</b> — l'admin du réseau, tous les coordonnateurs, tous les remplaçant·e·s. Ils sont déconnectés immédiatement et ne peuvent plus se connecter. Leurs adresses courriel sont libérées : les mêmes personnes pourront être réinvitées plus tard avec un nouveau compte.",
+        "note": "L'historique d'audit est conservé. Cette action ne peut pas être annulée depuis la console.",
+        "failed": "La suppression a échoué",
+        "removing": "Suppression…",
+        "confirm": "Supprimer le réseau"
+      },
+      "accessModal": {
+        "needReason": "Donnez une vraie raison à l'admin du tenant (5 caractères au minimum).",
+        "granted": "Accès accordé — lecture seule, expiration automatique.",
+        "sent": "Demande envoyée — l'admin du tenant doit l'approuver.",
+        "failed": "La demande a échoué",
+        "eyebrow": "Exception de confidentialité",
+        "title": "Demander l'accès à <em>{name}</em>",
+        "body": "L'admin du tenant voit votre nom et cette raison. Si la demande est approuvée, vous obtenez un accès en <b>lecture seule</b> qui expire automatiquement — chaque étape est consignée dans les deux journaux d'audit.",
+        "reason": "Raison",
+        "placeholder": "ex. Billet de soutien no 42 — une demande ne se publie pas",
+        "done": "Terminé",
+        "sending": "Envoi…",
+        "send": "Envoyer la demande"
+      },
+      "inviteModal": {
+        "required": "Le nom du réseau, l'adresse, le nom de l'admin et son courriel sont obligatoires.",
+        "failed": "L'envoi de l'invitation a échoué",
+        "eyebrow": "Nouveau tenant",
+        "title": "Inviter un <em>réseau</em>",
+        "body": "Un espace vide est créé et l'admin reçoit un lien d'inscription par courriel. C'est l'admin qui nomme son réseau et le construit.",
+        "namePlaceholder": "ex. Réseau Laurentides",
+        "sending": "Envoi…",
+        "send": "Envoyer l'invitation"
+      }
     }
   },
   "apf": {

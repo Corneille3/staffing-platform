@@ -2,7 +2,7 @@
 
 import { Link, usePathname, useRouter } from "../i18n/navigation";
 import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { ArrowRight, ArrowUpRight, Eye, Plus, Shield, Trash2, X } from "lucide-react";
 import {
   invitePlatformTenant,
@@ -13,19 +13,20 @@ import {
 } from "../lib/browser-api";
 import type { PlatformTenantRow, PlatformTenantsResponse, TenantProfile } from "../lib/types";
 
-const STATUS_META: Record<string, { chip: string; bg: string; c: string }> = {
-  active: { chip: "Active", bg: "var(--moss-soft)", c: "var(--moss)" },
-  pending: { chip: "Invite sent", bg: "var(--sand-soft)", c: "#8C6B14" },
-  onboarding: { chip: "Onboarding", bg: "var(--terra-soft)", c: "var(--terra-ink)" },
-  suspended: { chip: "Suspended", bg: "var(--rose-soft)", c: "var(--rose)" },
+// Colours only — the chip's wording comes from `platform.tenants.status`.
+const STATUS_META: Record<string, { bg: string; c: string }> = {
+  active: { bg: "var(--moss-soft)", c: "var(--moss)" },
+  pending: { bg: "var(--sand-soft)", c: "#8C6B14" },
+  onboarding: { bg: "var(--terra-soft)", c: "var(--terra-ink)" },
+  suspended: { bg: "var(--rose-soft)", c: "var(--rose)" },
 };
 
 const GRID = "2.2fr 1fr 0.6fr 0.6fr 0.8fr 1.1fr 1.2fr 1.4fr";
 
-function fmtSince(value: string | null): string {
+function fmtSince(value: string | null, locale: string): string {
   if (!value) return "—";
   try {
-    return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    return new Date(value).toLocaleDateString(locale === "fr" ? "fr-CA" : "en-CA", { year: "numeric", month: "short", day: "numeric" });
   } catch {
     return value;
   }
@@ -56,6 +57,7 @@ export function PlatformTenantsView({
   callerOperatorRole?: "owner" | "operator" | "support" | "marketing" | null;
 }) {
   const tLeads = useTranslations("platform.leads");
+  const tt = useTranslations("platform.tenants");
   const router = useRouter();
   const [inviteOpen, setInviteOpen] = useState(false);
   const readOnlyOperator = callerOperatorRole === "support";
@@ -72,10 +74,10 @@ export function PlatformTenantsView({
     {} as Record<string, number>,
   );
   const summary = [
-    counts.active ? `${counts.active} active` : null,
-    counts.pending ? `${counts.pending} invited` : null,
-    counts.onboarding ? `${counts.onboarding} onboarding` : null,
-    counts.suspended ? `${counts.suspended} suspended` : null,
+    counts.active ? tt("summary.active", { count: counts.active }) : null,
+    counts.pending ? tt("summary.pending", { count: counts.pending }) : null,
+    counts.onboarding ? tt("summary.onboarding", { count: counts.onboarding }) : null,
+    counts.suspended ? tt("summary.suspended", { count: counts.suspended }) : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -84,28 +86,28 @@ export function PlatformTenantsView({
     <div style={{ padding: "32px 36px", maxWidth: 1280 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, gap: 16, flexWrap: "wrap" }}>
         <div>
-          <div className="stf-h-eyebrow" style={eyebrow}>Platform · every workspace</div>
+          <div className="stf-h-eyebrow" style={eyebrow}>{tt("eyebrow")}</div>
           <h1 style={{ fontFamily: "var(--serif)", fontSize: "clamp(2rem, 4vw, 2.75rem)", lineHeight: 1.02, margin: "6px 0 0", letterSpacing: "-0.02em" }}>
-            {tenants.length} {tenants.length === 1 ? "network" : "networks"} <em style={{ fontStyle: "italic" }}>on StaffiG</em>
+            {tt.rich("headline", { count: tenants.length, em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em> })}
           </h1>
           <p style={{ margin: "8px 0 0", color: "var(--ink-2)", fontSize: 14, maxWidth: 600 }}>
-            Each network is an isolated tenant. Invite a new one, watch their adoption — but never see inside their data.
+            {tt("description")}
           </p>
           {summary ? <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-3)" }}>{summary}</div> : null}
         </div>
         {!readOnlyOperator && (
           <button type="button" onClick={() => setInviteOpen(true)} style={primaryBtn}>
-            <Plus size={15} /> Invite a network
+            <Plus size={15} /> {tt("invite")}
           </button>
         )}
       </div>
 
       {/* Aggregate KPIs — privacy-safe (counts only) */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
-        <PlatKpi label="Active networks" value={String(kpis.active_tenants)} sub="live workspaces" />
-        <PlatKpi label="Organizations" value={String(kpis.total_orgs)} sub="across all tenants" />
-        <PlatKpi label="Substitutes" value={String(kpis.total_substitutes)} sub="total identities" />
-        <PlatKpi label="Network fill rate" value={kpis.weighted_fill_rate == null ? "—" : String(kpis.weighted_fill_rate)} unit={kpis.weighted_fill_rate == null ? undefined : "%"} sub="weighted average" tone="moss" />
+        <PlatKpi label={tt("kpi.active")} value={String(kpis.active_tenants)} sub={tt("kpi.activeSub")} />
+        <PlatKpi label={tt("kpi.orgs")} value={String(kpis.total_orgs)} sub={tt("kpi.orgsSub")} />
+        <PlatKpi label={tt("kpi.subs")} value={String(kpis.total_substitutes)} sub={tt("kpi.subsSub")} />
+        <PlatKpi label={tt("kpi.fill")} value={kpis.weighted_fill_rate == null ? "—" : String(kpis.weighted_fill_rate)} unit={kpis.weighted_fill_rate == null ? undefined : "%"} sub={tt("kpi.fillSub")} tone="moss" />
       </div>
 
       {focusTenantId ? (
@@ -122,11 +124,11 @@ export function PlatformTenantsView({
       {/* Tenant table */}
       <div style={{ ...card, padding: 0, overflow: "hidden" }}>
         <div style={{ display: "grid", gridTemplateColumns: GRID, padding: "12px 22px", borderBottom: "0.5px solid var(--line)", fontSize: 10, color: "var(--ink-3)", letterSpacing: ".1em", textTransform: "uppercase", fontWeight: 500 }}>
-          <div>Network</div><div>Region</div><div>Orgs</div><div>Subs</div><div>Fill rate</div><div>{tLeads("tenants.origin")}</div><div>Status</div><div />
+          <div>{tt("col.network")}</div><div>{tt("col.region")}</div><div>{tt("col.orgs")}</div><div>{tt("col.subs")}</div><div>{tt("col.fill")}</div><div>{tLeads("tenants.origin")}</div><div>{tt("col.status")}</div><div />
         </div>
         {tenants.length === 0 ? (
           <div style={{ padding: "28px 22px", fontSize: 13, color: "var(--ink-3)" }}>
-            No networks yet. Invite your first one.
+            {tt("empty")}
           </div>
         ) : (
           rows.map((t, i) => (
@@ -143,7 +145,7 @@ export function PlatformTenantsView({
       </div>
 
       <div style={{ marginTop: 16, fontSize: 12, color: "var(--ink-3)", display: "flex", alignItems: "center", gap: 6 }}>
-        <Shield size={13} /> Org / sub counts and fill rate are the only figures the operator sees. Names, shifts, and worker data stay inside each tenant.
+        <Shield size={13} /> {tt("footnote")}
       </div>
 
       {inviteOpen && <InviteTenantModal onClose={() => setInviteOpen(false)} onCreated={() => { setInviteOpen(false); router.refresh(); }} />}
@@ -166,6 +168,8 @@ function TenantRow({
   readOnlyOperator: boolean;
   onAction: () => void;
 }) {
+  const tt = useTranslations("platform.tenants");
+  const locale = useLocale();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accessOpen, setAccessOpen] = useState(false);
@@ -183,7 +187,7 @@ function TenantRow({
       await platformTenantAction(t.id, action);
       onAction();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Action failed");
+      setError(err instanceof Error ? err.message : tt("actionFailed"));
     } finally {
       setBusy(false);
     }
@@ -211,16 +215,16 @@ function TenantRow({
       <LeadOrigin segment={t.lead_segment} source={t.lead_source} />
       <div>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 500, background: s.bg, color: s.c }}>
-          <span style={{ width: 5, height: 5, borderRadius: 99, background: s.c }} />{s.chip}
+          <span style={{ width: 5, height: 5, borderRadius: 99, background: s.c }} />{tt.has(`status.${t.status}`) ? tt(`status.${t.status}`) : t.status}
         </span>
-        <div style={{ fontSize: 10, color: "var(--ink-3)", marginTop: 4 }}>{fmtSince(t.since)}</div>
+        <div style={{ fontSize: 10, color: "var(--ink-3)", marginTop: 4 }}>{fmtSince(t.since, locale)}</div>
       </div>
       <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
         {error ? <span style={{ fontSize: 10, color: "var(--rose)" }}>{error}</span> : null}
         {t.status === "pending" && !readOnlyOperator && (
           <>
-            <button type="button" disabled={busy} onClick={() => run("resend")} style={rowBtn}>Resend</button>
-            <button type="button" disabled={busy} onClick={() => run("revoke")} style={rowBtn}>Revoke</button>
+            <button type="button" disabled={busy} onClick={() => run("resend")} style={rowBtn}>{tt("resend")}</button>
+            <button type="button" disabled={busy} onClick={() => run("revoke")} style={rowBtn}>{tt("revoke")}</button>
           </>
         )}
         {t.status === "active" && (
@@ -231,18 +235,18 @@ function TenantRow({
                   href="/apf"
                   title={
                     workspace.via_grant
-                      ? "You hold an active access grant for this workspace (read-only)"
-                      : "This is your own workspace"
+                      ? tt("grantTitle")
+                      : tt("ownTitle")
                   }
                   style={{ ...rowBtn, textDecoration: "none", borderColor: "var(--terra)", color: "var(--terra-ink)" }}
                 >
-                  <ArrowUpRight size={12} /> Open workspace
+                  <ArrowUpRight size={12} /> {tt("openWorkspace")}
                 </Link>
                 {workspace.via_grant ? (
                   <button
                     type="button"
                     disabled={busy}
-                    title="Give up your access grant now instead of waiting for it to expire"
+                    title={tt("endVisitTitle")}
                     onClick={async () => {
                       setBusy(true);
                       setError(null);
@@ -250,14 +254,14 @@ function TenantRow({
                         await releaseTenantAccessGrant();
                         onAction();
                       } catch (err) {
-                        setError(err instanceof Error ? err.message : "Action failed");
+                        setError(err instanceof Error ? err.message : tt("actionFailed"));
                       } finally {
                         setBusy(false);
                       }
                     }}
                     style={rowBtn}
                   >
-                    <X size={12} /> End visit
+                    <X size={12} /> {tt("endVisit")}
                   </button>
                 ) : null}
               </>
@@ -266,28 +270,28 @@ function TenantRow({
                 type="button"
                 disabled={busy}
                 onClick={() => setAccessOpen(true)}
-                title="Ask the tenant admin for time-boxed read-only access (PLATFORM_HANDOFF §2.2)"
+                title={tt("requestAccessTitle")}
                 style={rowBtn}
               >
-                <Eye size={12} /> Request access
+                <Eye size={12} /> {tt("requestAccess")}
               </button>
             )}
             {!readOnlyOperator && (
-              <button type="button" disabled={busy} onClick={() => setSuspendOpen(true)} style={rowBtn}>Suspend</button>
+              <button type="button" disabled={busy} onClick={() => setSuspendOpen(true)} style={rowBtn}>{tt("suspend")}</button>
             )}
             {canRemove && (
               <button type="button" disabled={busy} onClick={() => setRemoveOpen(true)} style={dangerBtn}>
-                <Trash2 size={12} /> Remove
+                <Trash2 size={12} /> {tt("remove")}
               </button>
             )}
           </>
         )}
         {t.status === "suspended" && !readOnlyOperator && (
           <>
-            <button type="button" disabled={busy} onClick={() => run("reactivate")} style={rowBtn}>Reactivate</button>
+            <button type="button" disabled={busy} onClick={() => run("reactivate")} style={rowBtn}>{tt("reactivate")}</button>
             {canRemove && (
               <button type="button" disabled={busy} onClick={() => setRemoveOpen(true)} style={dangerBtn}>
-                <Trash2 size={12} /> Remove
+                <Trash2 size={12} /> {tt("remove")}
               </button>
             )}
           </>
@@ -339,14 +343,16 @@ function SuspendTenantModal({
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const tt = useTranslations("platform.tenants");
+  const tc = useTranslations("common");
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(21,20,15,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 20 }} onClick={() => !busy && onClose()}>
       <div style={{ ...card, width: 460, maxWidth: "100%", padding: "28px 30px", background: "#fff", boxShadow: "0 30px 80px -20px rgba(0,0,0,.4)" }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
           <div>
-            <div className="stf-h-eyebrow" style={{ ...eyebrow, color: "var(--terra)" }}>Reversible — but immediate</div>
+            <div className="stf-h-eyebrow" style={{ ...eyebrow, color: "var(--terra)" }}>{tt("suspendModal.eyebrow")}</div>
             <h2 style={{ fontFamily: "var(--serif)", fontSize: 26, lineHeight: 1.05, margin: "4px 0 0" }}>
-              Suspend <em style={{ fontStyle: "italic" }}>{tenant.name}</em>?
+              {tt.rich("suspendModal.title", { name: tenant.name, em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em> })}
             </h2>
           </div>
           <button type="button" onClick={onClose} style={{ ...rowBtn, width: 32, height: 32, borderRadius: 99, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
@@ -354,19 +360,17 @@ function SuspendTenantModal({
           </button>
         </div>
         <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
-          Every member — admin, coordinators, substitutes — is locked out <strong>immediately</strong> and
-          sees a &quot;workspace suspended&quot; screen. Nothing is deleted: Reactivate restores
-          the workspace exactly as it was.
+          {tt.rich("suspendModal.body", { b: (chunks) => <strong>{chunks}</strong> })}
         </p>
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} disabled={busy} style={rowBtn}>Cancel</button>
+          <button type="button" onClick={onClose} disabled={busy} style={rowBtn}>{tc("cancel")}</button>
           <button
             type="button"
             onClick={onConfirm}
             disabled={busy}
             style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}
           >
-            {busy ? "Suspending…" : "Suspend network"}
+            {busy ? tt("suspendModal.suspending") : tt("suspendModal.confirm")}
           </button>
         </div>
       </div>
@@ -383,6 +387,8 @@ function RemoveTenantModal({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const tt = useTranslations("platform.tenants");
+  const tc = useTranslations("common");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -393,7 +399,7 @@ function RemoveTenantModal({
       await removeNetwork(tenant.id);
       onDone();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Removal failed");
+      setError(err instanceof Error ? err.message : tt("removeModal.failed"));
       setBusy(false);
     }
   }
@@ -403,9 +409,9 @@ function RemoveTenantModal({
       <div style={{ ...card, width: 460, maxWidth: "100%", padding: "28px 30px", background: "#fff", boxShadow: "0 30px 80px -20px rgba(0,0,0,.4)" }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
           <div>
-            <div className="stf-h-eyebrow" style={{ ...eyebrow, color: "var(--rose)" }}>Destructive action</div>
+            <div className="stf-h-eyebrow" style={{ ...eyebrow, color: "var(--rose)" }}>{tt("removeModal.eyebrow")}</div>
             <h2 style={{ fontFamily: "var(--serif)", fontSize: 26, lineHeight: 1.05, margin: "4px 0 0" }}>
-              Remove <em style={{ fontStyle: "italic" }}>{tenant.name}</em>?
+              {tt.rich("removeModal.title", { name: tenant.name, em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em> })}
             </h2>
           </div>
           <button type="button" onClick={onClose} style={{ ...rowBtn, width: 32, height: 32, borderRadius: 99, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
@@ -413,24 +419,21 @@ function RemoveTenantModal({
           </button>
         </div>
         <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
-          This deactivates the network and <strong>every member</strong> in it — the network
-          admin, all coordinators, all substitutes. They are signed out immediately and cannot
-          sign back in. Their email addresses are released, so the same people can be
-          re-invited later under a fresh account.
+          {tt.rich("removeModal.body", { b: (chunks) => <strong>{chunks}</strong> })}
         </p>
         <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
-          Audit history is preserved. This cannot be undone from the console.
+          {tt("removeModal.note")}
         </p>
         {error ? <p style={{ margin: "0 0 12px", color: "var(--rose)", fontSize: 12 }}>{error}</p> : null}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} disabled={busy} style={rowBtn}>Cancel</button>
+          <button type="button" onClick={onClose} disabled={busy} style={rowBtn}>{tc("cancel")}</button>
           <button
             type="button"
             onClick={confirm}
             disabled={busy}
             style={{ ...primaryBtn, background: "var(--rose)", opacity: busy ? 0.6 : 1 }}
           >
-            <Trash2 size={14} /> {busy ? "Removing…" : "Remove network"}
+            <Trash2 size={14} /> {busy ? tt("removeModal.removing") : tt("removeModal.confirm")}
           </button>
         </div>
       </div>
@@ -447,6 +450,8 @@ function RequestAccessModal({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const tt = useTranslations("platform.tenants");
+  const tc = useTranslations("common");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -454,7 +459,7 @@ function RequestAccessModal({
 
   async function submit() {
     if (reason.trim().length < 5) {
-      setError("Give the tenant admin a real reason (min 5 characters).");
+      setError(tt("accessModal.needReason"));
       return;
     }
     setBusy(true);
@@ -463,11 +468,11 @@ function RequestAccessModal({
       const grant = await requestTenantAccess(tenant.id, reason.trim());
       setResult(
         grant.status === "active"
-          ? "Access granted — read-only, auto-expires."
-          : "Request sent — the tenant admin must approve it.",
+          ? tt("accessModal.granted")
+          : tt("accessModal.sent"),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Request failed");
+      setError(err instanceof Error ? err.message : tt("accessModal.failed"));
       setBusy(false);
     }
   }
@@ -477,9 +482,9 @@ function RequestAccessModal({
       <div style={{ ...card, width: 440, maxWidth: "100%", padding: "28px 30px", background: "#fff", boxShadow: "0 30px 80px -20px rgba(0,0,0,.4)" }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
           <div>
-            <div className="stf-h-eyebrow" style={eyebrow}>Privacy exception</div>
+            <div className="stf-h-eyebrow" style={eyebrow}>{tt("accessModal.eyebrow")}</div>
             <h2 style={{ fontFamily: "var(--serif)", fontSize: 26, lineHeight: 1.05, margin: "4px 0 0" }}>
-              Request access to <em style={{ fontStyle: "italic" }}>{tenant.name}</em>
+              {tt.rich("accessModal.title", { name: tenant.name, em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em> })}
             </h2>
           </div>
           <button type="button" onClick={onClose} style={{ ...rowBtn, width: 32, height: 32, borderRadius: 99, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
@@ -490,28 +495,28 @@ function RequestAccessModal({
           <>
             <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--moss)", lineHeight: 1.5 }}>{result}</p>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button type="button" onClick={onDone} style={primaryBtn}>Done</button>
+              <button type="button" onClick={onDone} style={primaryBtn}>{tt("accessModal.done")}</button>
             </div>
           </>
         ) : (
           <>
             <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
-              The tenant admin sees your name and this reason. If approved, you get <strong>read-only</strong> access that auto-expires — every step is logged in both audit trails.
+              {tt.rich("accessModal.body", { b: (chunks) => <strong>{chunks}</strong> })}
             </p>
-            <ModalField label="Reason">
+            <ModalField label={tt("accessModal.reason")}>
               <textarea
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. Investigating support ticket #42 — a request won't publish"
+                placeholder={tt("accessModal.placeholder")}
                 rows={3}
                 style={{ ...inputStyle, resize: "vertical", fontFamily: "var(--ui)" }}
               />
             </ModalField>
             {error ? <p style={{ margin: "4px 0 0", color: "var(--rose)", fontSize: 12 }}>{error}</p> : null}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-              <button type="button" onClick={onClose} style={rowBtn}>Cancel</button>
+              <button type="button" onClick={onClose} style={rowBtn}>{tc("cancel")}</button>
               <button type="button" onClick={submit} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>
-                <ArrowRight size={14} /> {busy ? "Sending…" : "Send request"}
+                <ArrowRight size={14} /> {busy ? tt("accessModal.sending") : tt("accessModal.send")}
               </button>
             </div>
           </>
@@ -549,6 +554,10 @@ function PlatKpi({ label, value, unit, sub, tone }: { label: string; value: stri
 }
 
 function InviteTenantModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const tt = useTranslations("platform.tenants");
+  const tc = useTranslations("common");
+  const tLeads = useTranslations("platform.leads.inviteModal");
+  const tLang = useTranslations("admin.languageNames");
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
@@ -561,7 +570,7 @@ function InviteTenantModal({ onClose, onCreated }: { onClose: () => void; onCrea
 
   async function submit() {
     if (!name.trim() || !slug.trim() || !adminEmail.trim() || !adminFirst.trim() || !adminLast.trim()) {
-      setError("Network name, address, admin name, and email are required.");
+      setError(tt("inviteModal.required"));
       return;
     }
     setBusy(true);
@@ -578,7 +587,7 @@ function InviteTenantModal({ onClose, onCreated }: { onClose: () => void; onCrea
       });
       onCreated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send invite");
+      setError(err instanceof Error ? err.message : tt("inviteModal.failed"));
       setBusy(false);
     }
   }
@@ -588,38 +597,38 @@ function InviteTenantModal({ onClose, onCreated }: { onClose: () => void; onCrea
       <div style={{ ...card, width: 480, maxWidth: "100%", padding: "28px 30px", background: "#fff", boxShadow: "0 30px 80px -20px rgba(0,0,0,.4)" }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
           <div>
-            <div className="stf-h-eyebrow" style={eyebrow}>New tenant</div>
-            <h2 style={{ fontFamily: "var(--serif)", fontSize: 28, lineHeight: 1.05, margin: "4px 0 0" }}>Invite a <em style={{ fontStyle: "italic" }}>network</em></h2>
+            <div className="stf-h-eyebrow" style={eyebrow}>{tt("inviteModal.eyebrow")}</div>
+            <h2 style={{ fontFamily: "var(--serif)", fontSize: 28, lineHeight: 1.05, margin: "4px 0 0" }}>{tt.rich("inviteModal.title", { em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em> })}</h2>
           </div>
           <button type="button" onClick={onClose} style={{ ...rowBtn, width: 32, height: 32, borderRadius: 99, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><X size={15} /></button>
         </div>
         <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
-          We&apos;ll create an empty workspace and email the admin a sign-up link. They name their network and build it themselves.
+          {tt("inviteModal.body")}
         </p>
 
-        <ModalField label="Network name">
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Réseau Laurentides" style={inputStyle} />
+        <ModalField label={tLeads("name")}>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={tt("inviteModal.namePlaceholder")} style={inputStyle} />
         </ModalField>
-        <ModalField label="Workspace address (slug)">
+        <ModalField label={tLeads("slug")}>
           <input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="reseau-laurentides" style={inputStyle} />
         </ModalField>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <ModalField label="Admin first name">
+          <ModalField label={tLeads("firstName")}>
             <input value={adminFirst} onChange={(e) => setAdminFirst(e.target.value)} placeholder="Marie" style={inputStyle} />
           </ModalField>
-          <ModalField label="Admin last name">
+          <ModalField label={tLeads("lastName")}>
             <input value={adminLast} onChange={(e) => setAdminLast(e.target.value)} placeholder="Tremblay" style={inputStyle} />
           </ModalField>
         </div>
-        <ModalField label="Admin email">
+        <ModalField label={tLeads("email")}>
           <input type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} placeholder="directrice@reseau.ca" style={inputStyle} />
         </ModalField>
-        <ModalField label="Region (optional)">
+        <ModalField label={tLeads("region")}>
           <input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="Laurentides" style={inputStyle} />
         </ModalField>
-        <ModalField label="Admin language">
+        <ModalField label={tLeads("language")}>
           <div style={{ display: "flex", gap: 8 }}>
-            {([["fr", "Français"], ["en", "English"], ["bilingual", "Bilingue"]] as const).map(([code, label]) => {
+            {(["fr", "en", "bilingual"] as const).map((code) => {
               const active = language === code;
               return (
                 <button
@@ -638,7 +647,7 @@ function InviteTenantModal({ onClose, onCreated }: { onClose: () => void; onCrea
                     border: `0.5px solid ${active ? "transparent" : "var(--line)"}`,
                   }}
                 >
-                  {label}
+                  {tLang(code)}
                 </button>
               );
             })}
@@ -648,9 +657,9 @@ function InviteTenantModal({ onClose, onCreated }: { onClose: () => void; onCrea
         {error ? <p style={{ margin: "4px 0 0", color: "var(--rose)", fontSize: 12 }}>{error}</p> : null}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24 }}>
-          <button type="button" onClick={onClose} style={rowBtn}>Cancel</button>
+          <button type="button" onClick={onClose} style={rowBtn}>{tc("cancel")}</button>
           <button type="button" onClick={submit} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>
-            <ArrowRight size={14} /> {busy ? "Sending…" : "Send invite"}
+            <ArrowRight size={14} /> {busy ? tt("inviteModal.sending") : tt("inviteModal.send")}
           </button>
         </div>
       </div>
