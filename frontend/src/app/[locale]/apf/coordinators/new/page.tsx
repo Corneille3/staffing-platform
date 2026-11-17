@@ -1,6 +1,7 @@
 "use client";
 
 import { Link, useRouter } from "../../../../../i18n/navigation";
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { Eyebrow } from "../../../../../components/ui";
 import { HideOnReadOnlyVisit, ReadOnlyVisitNotice } from "../../../../../components/read-only-visit";
@@ -63,6 +64,10 @@ export default function InviteCoordinatorPage() {
 
 function InviteCoordinatorPageForm() {
   const router = useRouter();
+  const t = useTranslations("apf.coordForm");
+  const tf = useTranslations("apf.forms");
+  const tl = useTranslations("apf.lists");
+  const tc = useTranslations("common");
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
@@ -93,7 +98,7 @@ function InviteCoordinatorPageForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (selectedOrgIds.length === 0) {
-      setError("Assign at least one organization.");
+      setError(t("needOrg"));
       return;
     }
     setError(null);
@@ -109,7 +114,7 @@ function InviteCoordinatorPageForm() {
       });
       setCreated(coordinator);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to invite coordinator");
+      setError(err instanceof Error ? err.message : t("failed"));
     } finally {
       setSubmitting(false);
     }
@@ -126,7 +131,7 @@ function InviteCoordinatorPageForm() {
             padding: "32px 28px",
           }}
         >
-          <Eyebrow style={{ color: "var(--moss)", marginBottom: 10 }}>Coordinator invited</Eyebrow>
+          <Eyebrow style={{ color: "var(--moss)", marginBottom: 10 }}>{t("createdEyebrow")}</Eyebrow>
           <h2
             style={{
               margin: "0 0 8px",
@@ -167,10 +172,10 @@ function InviteCoordinatorPageForm() {
               }}
               style={SECONDARY_BTN}
             >
-              Invite another
+              {t("inviteAnother")}
             </button>
             <button type="button" onClick={() => router.push("/apf/coordinators")} style={PRIMARY_BTN}>
-              Back to coordinators
+              {t("back")}
             </button>
           </div>
         </div>
@@ -180,7 +185,7 @@ function InviteCoordinatorPageForm() {
 
   return (
     <div style={{ maxWidth: 560, margin: "0 auto", padding: "20px 0" }}>
-      <Eyebrow style={{ marginBottom: 12 }}>Network Management</Eyebrow>
+      <Eyebrow style={{ marginBottom: 12 }}>{tl("eyebrow")}</Eyebrow>
       <h1
         style={{
           margin: 0,
@@ -191,16 +196,16 @@ function InviteCoordinatorPageForm() {
           color: "var(--ink)",
         }}
       >
-        Invite a <em style={{ fontStyle: "italic" }}>coordinator</em>
+        {t.rich("title", { em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em> })}
       </h1>
       <p style={{ margin: "12px 0 36px", color: "var(--ink-2)", lineHeight: 1.55, fontSize: 15 }}>
-        Coordinators manage coverage requests for their organizations. They&apos;ll sign in with this email to access their dashboard.
+        {t("body")}
       </p>
 
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: 20 }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <div>
-            <label style={LABEL}>First name</label>
+            <label style={LABEL}>{tf("firstName")}</label>
             <input
               required
               style={FIELD}
@@ -209,7 +214,7 @@ function InviteCoordinatorPageForm() {
             />
           </div>
           <div>
-            <label style={LABEL}>Last name</label>
+            <label style={LABEL}>{tf("lastName")}</label>
             <input
               required
               style={FIELD}
@@ -220,7 +225,7 @@ function InviteCoordinatorPageForm() {
         </div>
 
         <div>
-          <label style={LABEL}>Email address</label>
+          <label style={LABEL}>{tf("email")}</label>
           <input
             required
             type="email"
@@ -231,7 +236,7 @@ function InviteCoordinatorPageForm() {
         </div>
 
         <div>
-          <label style={LABEL}>Phone (optional)</label>
+          <label style={LABEL}>{tf("phoneOptional")}</label>
           <input
             type="tel"
             style={FIELD}
@@ -242,21 +247,21 @@ function InviteCoordinatorPageForm() {
         </div>
 
         <div>
-          <label style={LABEL}>Preferred language</label>
+          <label style={LABEL}>{tf("preferredLanguage")}</label>
           <select
             style={{ ...FIELD, appearance: "none" }}
             value={form.preferred_language}
             onChange={(e) => set("preferred_language", e.target.value)}
           >
-            <option value="fr">French (FR)</option>
-            <option value="en">English (EN)</option>
+            <option value="fr">{tf("french")}</option>
+            <option value="en">{tf("english")}</option>
           </select>
         </div>
 
         <div>
-          <label style={LABEL}>Assign to organizations</label>
+          <label style={LABEL}>{t("assign")}</label>
           <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--ink-3)" }}>
-            Select one or more organizations this coordinator will manage.
+            {t("assignHint")}
           </p>
           {orgs.length === 0 ? (
             <p
@@ -269,9 +274,9 @@ function InviteCoordinatorPageForm() {
                 background: "var(--card)",
               }}
             >
-              No organizations yet.{" "}
+              {t("noOrgs")}{" "}
               <Link href="/apf/organizations/new" style={{ color: "var(--terra)", textDecoration: "none" }}>
-                Create one first →
+                {t("createFirst")}
               </Link>
             </p>
           ) : (
@@ -332,14 +337,14 @@ function InviteCoordinatorPageForm() {
 
         <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
           <button type="button" onClick={() => router.push("/apf/coordinators")} style={SECONDARY_BTN}>
-            Cancel
+            {tc("cancel")}
           </button>
           <button
             type="submit"
             disabled={submitting}
             style={{ ...PRIMARY_BTN, flex: 1, opacity: submitting ? 0.6 : 1, cursor: submitting ? "not-allowed" : "pointer" }}
           >
-            {submitting ? "Inviting…" : "Invite coordinator"}
+            {submitting ? t("inviting") : t("submit")}
           </button>
         </div>
       </form>

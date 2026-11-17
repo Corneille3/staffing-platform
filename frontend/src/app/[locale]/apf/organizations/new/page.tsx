@@ -1,20 +1,15 @@
 "use client";
 
 import { useRouter } from "../../../../../i18n/navigation";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Eyebrow } from "../../../../../components/ui";
 import { HideOnReadOnlyVisit, ReadOnlyVisitNotice } from "../../../../../components/read-only-visit";
 import { createOrganization } from "../../../../../lib/browser-api";
 import { Organization } from "../../../../../lib/types";
 
-const ORG_TYPES = [
-  { value: "childcare", label: "Childcare" },
-  { value: "long_term_care", label: "Long-term Care" },
-  { value: "community_care", label: "Community Care" },
-  { value: "home_care", label: "Home Care" },
-  { value: "assisted_living", label: "Assisted Living" },
-  { value: "other", label: "Other" },
-];
+// Values only — the labels come from `admin.organizations.types`.
+const ORG_TYPES = ["childcare", "long_term_care", "community_care", "home_care", "assisted_living", "other"];
 
 const FIELD: React.CSSProperties = {
   display: "block",
@@ -72,6 +67,12 @@ export default function NewOrganizationPage() {
 
 function NewOrganizationPageForm() {
   const router = useRouter();
+  const t = useTranslations("apf.orgForm");
+  const tf = useTranslations("apf.forms");
+  const tl = useTranslations("apf.lists");
+  const tc = useTranslations("common");
+  const tTypes = useTranslations("admin.organizations.types");
+  const typeLabel = (type: string) => (tTypes.has(type) ? tTypes(type) : type);
   const [form, setForm] = useState({
     name: "",
     type: "childcare",
@@ -105,7 +106,7 @@ function NewOrganizationPageForm() {
       });
       setCreated(org);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create organization");
+      setError(err instanceof Error ? err.message : t("failed"));
     } finally {
       setSubmitting(false);
     }
@@ -122,7 +123,7 @@ function NewOrganizationPageForm() {
             padding: "32px 28px",
           }}
         >
-          <Eyebrow style={{ color: "var(--moss)", marginBottom: 10 }}>Organization created</Eyebrow>
+          <Eyebrow style={{ color: "var(--moss)", marginBottom: 10 }}>{t("createdEyebrow")}</Eyebrow>
           <h2
             style={{
               margin: "0 0 8px",
@@ -135,7 +136,7 @@ function NewOrganizationPageForm() {
             {created.name}
           </h2>
           <p style={{ margin: "0 0 24px", color: "var(--ink-2)" }}>
-            {created.city} · {created.type}
+            {created.city} · {typeLabel(created.type)}
           </p>
           <div style={{ display: "flex", gap: 12 }}>
             <button
@@ -154,10 +155,10 @@ function NewOrganizationPageForm() {
               }}
               style={SECONDARY_BTN}
             >
-              Add another
+              {tf("addAnother")}
             </button>
             <button type="button" onClick={() => router.push("/apf/organizations")} style={PRIMARY_BTN}>
-              Back to organizations
+              {t("back")}
             </button>
           </div>
         </div>
@@ -167,7 +168,7 @@ function NewOrganizationPageForm() {
 
   return (
     <div style={{ maxWidth: 560, margin: "0 auto", padding: "20px 0" }}>
-      <Eyebrow style={{ marginBottom: 12 }}>Network Management</Eyebrow>
+      <Eyebrow style={{ marginBottom: 12 }}>{tl("eyebrow")}</Eyebrow>
       <h1
         style={{
           margin: 0,
@@ -178,55 +179,55 @@ function NewOrganizationPageForm() {
           color: "var(--ink)",
         }}
       >
-        New <em style={{ fontStyle: "italic" }}>organization</em>
+        {t.rich("title", { em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em> })}
       </h1>
       <p style={{ margin: "12px 0 36px", color: "var(--ink-2)", lineHeight: 1.55, fontSize: 15 }}>
-        Add a member organization to your network. You can assign coordinators to it once it&apos;s created.
+        {t("body")}
       </p>
 
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: 20 }}>
         <div>
-          <label style={LABEL}>Organization name</label>
+          <label style={LABEL}>{t("name")}</label>
           <input
             required
             style={FIELD}
             value={form.name}
             onChange={(e) => set("name", e.target.value)}
-            placeholder="e.g. Garderie Les Étoiles"
+            placeholder={t("namePlaceholder")}
           />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <div>
-            <label style={LABEL}>Type</label>
+            <label style={LABEL}>{t("type")}</label>
             <select
               style={{ ...FIELD, appearance: "none" }}
               value={form.type}
               onChange={(e) => set("type", e.target.value)}
             >
-              {ORG_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
+              {ORG_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {typeLabel(type)}
                 </option>
               ))}
             </select>
           </div>
           <div>
-            <label style={LABEL}>Language</label>
+            <label style={LABEL}>{t("language")}</label>
             <select
               style={{ ...FIELD, appearance: "none" }}
               value={form.preferred_language}
               onChange={(e) => set("preferred_language", e.target.value)}
             >
-              <option value="fr">French (FR)</option>
-              <option value="en">English (EN)</option>
+              <option value="fr">{tf("french")}</option>
+              <option value="en">{tf("english")}</option>
             </select>
           </div>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <div>
-            <label style={LABEL}>City</label>
+            <label style={LABEL}>{t("city")}</label>
             <input
               required
               style={FIELD}
@@ -236,7 +237,7 @@ function NewOrganizationPageForm() {
             />
           </div>
           <div>
-            <label style={LABEL}>Region (optional)</label>
+            <label style={LABEL}>{t("regionOptional")}</label>
             <input
               style={FIELD}
               value={form.region}
@@ -247,7 +248,7 @@ function NewOrganizationPageForm() {
         </div>
 
         <div>
-          <label style={LABEL}>Contact email (optional)</label>
+          <label style={LABEL}>{t("contactEmailOptional")}</label>
           <input
             type="email"
             style={FIELD}
@@ -257,7 +258,7 @@ function NewOrganizationPageForm() {
         </div>
 
         <div>
-          <label style={LABEL}>Contact phone (optional)</label>
+          <label style={LABEL}>{t("contactPhoneOptional")}</label>
           <input
             type="tel"
             style={FIELD}
@@ -271,14 +272,14 @@ function NewOrganizationPageForm() {
 
         <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
           <button type="button" onClick={() => router.push("/apf/organizations")} style={SECONDARY_BTN}>
-            Cancel
+            {tc("cancel")}
           </button>
           <button
             type="submit"
             disabled={submitting}
             style={{ ...PRIMARY_BTN, flex: 1, opacity: submitting ? 0.6 : 1, cursor: submitting ? "not-allowed" : "pointer" }}
           >
-            {submitting ? "Creating…" : "Create organization"}
+            {submitting ? t("creating") : t("submit")}
           </button>
         </div>
       </form>
