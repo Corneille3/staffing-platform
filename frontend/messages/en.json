@@ -1526,5 +1526,92 @@
         }
       }
     }
+  },
+  "apf": {
+    "shell": {
+      "badge": "Network",
+      "network": "Network",
+      "yourNetwork": "Your network",
+      "orgCount": "{count, plural, one {# organization} other {# organizations}}",
+      "readOnlyGrant": "Read-only · access grant",
+      "workspace": "Workspace",
+      "coordinatorView": "Coordinator view",
+      "readOnly": "read-only",
+      "platformConsole": "Platform console",
+      "footer": "Your workspace — manage your sites, coordinators, and substitutes.",
+      "topSupport": "Support access · read-only",
+      "topNetwork": "Your Network"
+    },
+    "nav": {
+      "overview": "Overview",
+      "organizations": "Organizations",
+      "coordinators": "Coordinators",
+      "substitutes": "Substitutes",
+      "activity": "Activity",
+      "export": "Export"
+    },
+    "dashboard": {
+      "eyebrow": "Network Snapshot",
+      "titleLead": "Network-wide staffing",
+      "titleEm": "health",
+      "description": "Aggregate visibility across every Staffig-affiliated organization. Read-only metrics for oversight, accountability, and pattern detection — not for day-to-day dispatch.",
+      "fillRate": "Fill rate",
+      "fillRateSub": "{filled} of {total} requests filled",
+      "avgFill": "Avg time to fill",
+      "avgFillValue": "{hours}h",
+      "avgFillSub": "hours from creation to assignment",
+      "activeSubs": "Active substitutes",
+      "activeSubsSub": "currently available",
+      "unfilled": "Unfilled requests",
+      "unfilledSub": "open, notified, or awaiting response",
+      "total": "Total requests",
+      "totalSub": "all time across all organizations",
+      "orgs": "Organizations",
+      "orgsSub": "affiliated with this network",
+      "breakdown": "Request status breakdown",
+      "noRequests": "No requests yet.",
+      "shortage": "Shortage cities",
+      "flagged": "{count} flagged",
+      "noShortage": "All open-request cities have at least one available substitute.",
+      "noSubstitute": "no available substitute",
+      "shortageNote": "Cities with open requests but zero available substitutes.",
+      "orgActivity": "Organization activity",
+      "orgsShort": "{count} orgs",
+      "statTotal": "Total",
+      "statFilled": "Filled",
+      "statOpen": "Open",
+      "noOrgs": "No organizations yet.",
+      "recentClosed": "Recent closed requests",
+      "last8": "last 8",
+      "unknownOrg": "Unknown org"
+    },
+    "activity": {
+      "eyebrow": "Activity History",
+      "titleLead": "Network-wide audit",
+      "titleEm": "feed",
+      "export": "Export →",
+      "description": "Every significant action across the network — requests created, workers notified, responses received, assignments confirmed and cancelled. Read-only, newest first.",
+      "inOrg": "In <b>{name}</b>",
+      "filterAll": "All",
+      "filterAssigned": "Assigned",
+      "filterCancelled": "Cancelled",
+      "filterEscalated": "Escalated",
+      "filterInvitations": "Invitations",
+      "filterRemovals": "Removals",
+      "empty": "No activity recorded for this filter.",
+      "loadFailed": "Failed to load older activity",
+      "loading": "Loading…",
+      "loadOlder": "Load older →",
+      "today": "Today",
+      "yesterday": "Yesterday"
+    },
+    "access": {
+      "title": "StaffiG support access",
+      "body": "A platform operator is asking to look inside your workspace. Access is read-only, expires automatically, and every step is logged.",
+      "failed": "Action failed",
+      "deny": "Deny",
+      "approve": "Approve",
+      "activeUntil": "Active until {time}"
+    }
   }
 }

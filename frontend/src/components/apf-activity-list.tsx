@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import type { ApfActivityFilter, ApfActivityRow } from "../lib/types";
 import { fetchApfActivity } from "../lib/browser-api";
 import { ActivityRowCard, ActivityDateHeader, groupByDate } from "./apf-activity-row";
@@ -17,6 +18,8 @@ export function ApfActivityList({ filter, initialRows, initialCursor, orgId }: P
   const [cursor, setCursor] = useState<string | null>(initialCursor);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const t = useTranslations("apf.activity");
+  const locale = useLocale();
 
   async function loadOlder() {
     if (!cursor || loading) return;
@@ -27,17 +30,21 @@ export function ApfActivityList({ filter, initialRows, initialCursor, orgId }: P
       setRows((prev) => [...prev, ...page.items]);
       setCursor(page.next_cursor);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load older activity");
+      setError(err instanceof Error ? err.message : t("loadFailed"));
     } finally {
       setLoading(false);
     }
   }
 
   if (rows.length === 0) {
-    return <p style={{ color: "var(--ink-3)" }}>No activity recorded for this filter.</p>;
+    return <p style={{ color: "var(--ink-3)" }}>{t("empty")}</p>;
   }
 
-  const groups = groupByDate(rows);
+  const groups = groupByDate(rows, {
+    today: t("today"),
+    yesterday: t("yesterday"),
+    locale: locale === "fr" ? "fr-CA" : "en-CA",
+  });
 
   return (
     <>
@@ -75,7 +82,7 @@ export function ApfActivityList({ filter, initialRows, initialCursor, orgId }: P
               fontFamily: "var(--ui)",
             }}
           >
-            {loading ? "Loading…" : "Load older →"}
+            {loading ? t("loading") : t("loadOlder")}
           </button>
         </div>
       )}

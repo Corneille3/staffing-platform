@@ -2,15 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { approveTenantAccessGrant, denyTenantAccessGrant } from "../lib/browser-api";
 import type { TenantAccessGrant } from "../lib/types";
 import { useReadOnlyVisit } from "./read-only-visit";
 
-function fmtExpiry(value: string | null): string {
+function fmtExpiry(value: string | null, locale: string): string {
   if (!value) return "";
   try {
-    return new Date(value).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    return new Date(value).toLocaleTimeString(locale === "fr" ? "fr-CA" : "en-CA", { hour: "2-digit", minute: "2-digit" });
   } catch {
     return value;
   }
@@ -20,6 +21,7 @@ function fmtExpiry(value: string | null): string {
  * dashboard only while there is a pending or active platform access request. */
 export function TenantAccessRequestsCard({ grants }: { grants: TenantAccessGrant[] }) {
   const router = useRouter();
+  const t = useTranslations("apf.access");
   const relevant = grants.filter((g) => g.status === "requested" || g.status === "active");
   if (relevant.length === 0) return null;
 
@@ -36,11 +38,10 @@ export function TenantAccessRequestsCard({ grants }: { grants: TenantAccessGrant
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
         <ShieldAlert size={15} style={{ color: "var(--terra)" }} />
-        <span style={{ fontSize: 13.5, fontWeight: 600 }}>StaffiG support access</span>
+        <span style={{ fontSize: 13.5, fontWeight: 600 }}>{t("title")}</span>
       </div>
       <p style={{ margin: "0 0 14px", fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.5 }}>
-        A platform operator is asking to look inside your workspace. Access is read-only,
-        expires automatically, and every step is logged.
+        {t("body")}
       </p>
       {relevant.map((g) => (
         <GrantRow key={g.id} grant={g} onChanged={() => router.refresh()} />
@@ -54,6 +55,8 @@ function GrantRow({ grant, onChanged }: { grant: TenantAccessGrant; onChanged: (
   const [error, setError] = useState<string | null>(null);
   // A visiting operator can see the request but never rule on it.
   const readOnlyVisit = useReadOnlyVisit();
+  const t = useTranslations("apf.access");
+  const locale = useLocale();
 
   async function run(action: "approve" | "deny") {
     setBusy(true);
@@ -63,7 +66,7 @@ function GrantRow({ grant, onChanged }: { grant: TenantAccessGrant; onChanged: (
       else await denyTenantAccessGrant(grant.id);
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Action failed");
+      setError(err instanceof Error ? err.message : t("failed"));
       setBusy(false);
     }
   }
@@ -96,7 +99,7 @@ function GrantRow({ grant, onChanged }: { grant: TenantAccessGrant; onChanged: (
             onClick={() => run("deny")}
             style={{ ...btn, color: "var(--rose)" }}
           >
-            Deny
+            {t("deny")}
           </button>
           <button
             type="button"
@@ -104,13 +107,13 @@ function GrantRow({ grant, onChanged }: { grant: TenantAccessGrant; onChanged: (
             onClick={() => run("approve")}
             style={{ ...btn, background: "var(--ink)", color: "var(--paper)", borderColor: "transparent" }}
           >
-            {busy ? "…" : "Approve"}
+            {busy ? "…" : t("approve")}
           </button>
         </div>
         )
       ) : (
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--moss)", fontWeight: 500 }}>
-          <ShieldCheck size={13} /> Active until {fmtExpiry(grant.expires_at)}
+          <ShieldCheck size={13} /> {t("activeUntil", { time: fmtExpiry(grant.expires_at, locale) })}
         </span>
       )}
     </div>
