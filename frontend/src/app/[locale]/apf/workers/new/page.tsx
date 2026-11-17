@@ -1,6 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter } from "../../../../../i18n/navigation";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Eyebrow } from "../../../../../components/ui";
 import { HideOnReadOnlyVisit, ReadOnlyVisitNotice } from "../../../../../components/read-only-visit";
@@ -63,6 +64,10 @@ export default function InviteWorkerPage() {
 
 function InviteWorkerPageForm() {
   const router = useRouter();
+  const t = useTranslations("apf.workerForm");
+  const tf = useTranslations("apf.forms");
+  const tp = useTranslations("apf.pool");
+  const tc = useTranslations("common");
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
@@ -94,7 +99,7 @@ function InviteWorkerPageForm() {
       });
       setCreated(worker);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to invite worker");
+      setError(err instanceof Error ? err.message : t("failed"));
     } finally {
       setSubmitting(false);
     }
@@ -111,7 +116,7 @@ function InviteWorkerPageForm() {
             padding: "32px 28px",
           }}
         >
-          <Eyebrow style={{ color: "var(--moss)", marginBottom: 10 }}>Substitute added</Eyebrow>
+          <Eyebrow style={{ color: "var(--moss)", marginBottom: 10 }}>{t("createdEyebrow")}</Eyebrow>
           <h2
             style={{
               margin: "0 0 8px",
@@ -124,7 +129,7 @@ function InviteWorkerPageForm() {
             {created.first_name} {created.last_name}
           </h2>
           <p style={{ margin: "0 0 24px", color: "var(--ink-2)", lineHeight: 1.55 }}>
-            {created.email} — they can now sign up at the platform URL using this email address. Once they sign in, they&apos;ll be prompted to complete their profile.
+            {t("createdBody", { email: created.email })}
           </p>
           <div style={{ display: "flex", gap: 12 }}>
             <button
@@ -135,10 +140,10 @@ function InviteWorkerPageForm() {
               }}
               style={SECONDARY_BTN}
             >
-              Add another
+              {tf("addAnother")}
             </button>
             <button type="button" onClick={() => router.push("/apf/substitutes")} style={PRIMARY_BTN}>
-              Back to pool
+              {t("back")}
             </button>
           </div>
         </div>
@@ -148,7 +153,7 @@ function InviteWorkerPageForm() {
 
   return (
     <div style={{ maxWidth: 560, margin: "0 auto", padding: "20px 0" }}>
-      <Eyebrow style={{ marginBottom: 12 }}>Substitute Pool</Eyebrow>
+      <Eyebrow style={{ marginBottom: 12 }}>{tp("eyebrow")}</Eyebrow>
       <h1
         style={{
           margin: 0,
@@ -159,16 +164,16 @@ function InviteWorkerPageForm() {
           color: "var(--ink)",
         }}
       >
-        Add a <em style={{ fontStyle: "italic" }}>substitute</em>
+        {t.rich("title", { em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em> })}
       </h1>
       <p style={{ margin: "12px 0 36px", color: "var(--ink-2)", lineHeight: 1.55, fontSize: 15 }}>
-        Enter the substitute&apos;s details. They&apos;ll be added to your network and can sign in with this email to complete their profile.
+        {t("body")}
       </p>
 
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: 20 }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <div>
-            <label style={LABEL}>First name</label>
+            <label style={LABEL}>{tf("firstName")}</label>
             <input
               required
               style={FIELD}
@@ -177,7 +182,7 @@ function InviteWorkerPageForm() {
             />
           </div>
           <div>
-            <label style={LABEL}>Last name</label>
+            <label style={LABEL}>{tf("lastName")}</label>
             <input
               required
               style={FIELD}
@@ -188,7 +193,7 @@ function InviteWorkerPageForm() {
         </div>
 
         <div>
-          <label style={LABEL}>Email address</label>
+          <label style={LABEL}>{tf("email")}</label>
           <input
             required
             type="email"
@@ -199,7 +204,7 @@ function InviteWorkerPageForm() {
         </div>
 
         <div>
-          <label style={LABEL}>Phone (optional)</label>
+          <label style={LABEL}>{tf("phoneOptional")}</label>
           <input
             type="tel"
             style={FIELD}
@@ -210,29 +215,29 @@ function InviteWorkerPageForm() {
         </div>
 
         <div>
-          <label style={LABEL}>Preferred language</label>
+          <label style={LABEL}>{tf("preferredLanguage")}</label>
           <select
             style={{ ...FIELD, appearance: "none" }}
             value={form.preferred_language}
             onChange={(e) => set("preferred_language", e.target.value)}
           >
-            <option value="fr">French (FR)</option>
-            <option value="en">English (EN)</option>
+            <option value="fr">{tf("french")}</option>
+            <option value="en">{tf("english")}</option>
           </select>
         </div>
 
         <div>
-          <label style={LABEL}>Employment type</label>
+          <label style={LABEL}>{t("employmentType")}</label>
           <select
             style={{ ...FIELD, appearance: "none" }}
             value={form.employment_type}
             onChange={(e) => set("employment_type", e.target.value)}
           >
-            <option value="contractor">Contractor / on-call — releases held shifts</option>
-            <option value="permanent">Permanent staff — reports absences</option>
+            <option value="contractor">{t("contractor")}</option>
+            <option value="permanent">{t("permanent")}</option>
           </select>
           <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--ink-3)", lineHeight: 1.4 }}>
-            Drives how they self-serve a replacement. Editable later on their profile.
+            {t("employmentHint")}
           </p>
         </div>
 
@@ -240,14 +245,14 @@ function InviteWorkerPageForm() {
 
         <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
           <button type="button" onClick={() => router.push("/apf/substitutes")} style={SECONDARY_BTN}>
-            Cancel
+            {tc("cancel")}
           </button>
           <button
             type="submit"
             disabled={submitting}
             style={{ ...PRIMARY_BTN, flex: 1, opacity: submitting ? 0.6 : 1, cursor: submitting ? "not-allowed" : "pointer" }}
           >
-            {submitting ? "Adding…" : "Add substitute"}
+            {submitting ? t("adding") : t("submit")}
           </button>
         </div>
       </form>

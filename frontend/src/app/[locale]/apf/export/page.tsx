@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { Eyebrow } from "../../../../components/ui";
 import { HideOnReadOnlyVisit, ReadOnlyVisitNotice } from "../../../../components/read-only-visit";
 import { ApfExportForm } from "../../../../components/apf-export-form";
@@ -15,11 +16,12 @@ export default async function ApfExportPage({
   const params = await searchParams;
   const initialOrgId = singleString(params.org_id);
   const orgs = await getOrganizations();
+  const t = await getTranslations("apf.export");
 
   return (
     <>
       <section style={{ marginBottom: 32 }}>
-        <Eyebrow style={{ marginBottom: 12 }}>Compliance & Reporting</Eyebrow>
+        <Eyebrow style={{ marginBottom: 12 }}>{t("eyebrow")}</Eyebrow>
         <h1
           style={{
             margin: 0,
@@ -30,12 +32,10 @@ export default async function ApfExportPage({
             color: "var(--ink)",
           }}
         >
-          Export <em style={{ fontStyle: "italic" }}>activity</em>
+          {t.rich("title", { em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em> })}
         </h1>
         <p style={{ margin: "12px 0 0", maxWidth: 720, color: "var(--ink-2)", lineHeight: 1.55, fontSize: 15 }}>
-          Pick a date range and (optionally) limit to specific organizations. We&apos;ll generate a CSV
-          of every staffing request that falls in the window, along with its assignment outcome and time-to-fill.
-          The link is downloadable here and is also emailed to you.
+          {t("body")}
         </p>
       </section>
 

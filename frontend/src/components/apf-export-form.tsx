@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { createApfExport, downloadApfExportCsv, getApfExportJob } from "../lib/browser-api";
 import type { ApfExportJob, Organization } from "../lib/types";
@@ -50,6 +51,8 @@ function defaultRange(): { from: string; to: string } {
 }
 
 export function ApfExportForm({ orgs, initialOrgId }: Props) {
+  const t = useTranslations("apf.export");
+  const locale = useLocale();
   const range = defaultRange();
   const [dateFrom, setDateFrom] = useState(range.from);
   const [dateTo, setDateTo] = useState(range.to);
@@ -78,7 +81,7 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Download failed");
+      setError(e instanceof Error ? e.message : t("downloadFailed"));
     } finally {
       setDownloading(false);
     }
@@ -103,7 +106,7 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
         }
       } catch (err) {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Polling failed");
+        setError(err instanceof Error ? err.message : t("pollingFailed"));
       }
     }
     pollRef.current = window.setTimeout(poll, 1200);
@@ -126,7 +129,7 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
       });
       setJob(created);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Export failed");
+      setError(err instanceof Error ? err.message : t("exportFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -150,7 +153,7 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div>
               <label style={LABEL} htmlFor="date_from">
-                From
+                {t("from")}
               </label>
               <input
                 id="date_from"
@@ -163,7 +166,7 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
             </div>
             <div>
               <label style={LABEL} htmlFor="date_to">
-                To
+                {t("to")}
               </label>
               <input
                 id="date_to"
@@ -177,12 +180,12 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
           </div>
 
           <div>
-            <label style={LABEL}>Organizations</label>
+            <label style={LABEL}>{t("organizations")}</label>
             <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--ink-3)" }}>
-              Leave empty to include every organization in your network.
+              {t("orgsHint")}
             </p>
             {orgs.length === 0 ? (
-              <p style={{ fontSize: 13, color: "var(--ink-3)" }}>No organizations yet.</p>
+              <p style={{ fontSize: 13, color: "var(--ink-3)" }}>{t("noOrgs")}</p>
             ) : (
               <div style={{ display: "grid", gap: 6 }}>
                 {orgs.map((org) => {
@@ -237,12 +240,12 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
           </div>
 
           <div>
-            <label style={LABEL}>View</label>
+            <label style={LABEL}>{t("view")}</label>
             <div style={{ display: "grid", gap: 6 }}>
               {(
                 [
-                  { value: "requests", label: "Requests", hint: "One row per staffing request — status, assignment, time to fill." },
-                  { value: "worked_hours", label: "Worked hours (payroll)", hint: "One row per assignment — scheduled vs actual times, derived hours, corrections." },
+                  { value: "requests", label: t("viewRequests"), hint: t("viewRequestsHint") },
+                  { value: "worked_hours", label: t("viewHours"), hint: t("viewHoursHint") },
                 ] as const
               ).map((opt) => {
                 const selected = view === opt.value;
@@ -275,7 +278,7 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
           </div>
 
           <div>
-            <label style={LABEL}>Format</label>
+            <label style={LABEL}>{t("format")}</label>
             <div
               style={{
                 display: "inline-flex",
@@ -310,7 +313,7 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
                 opacity: submitting ? 0.6 : 1,
               }}
             >
-              {submitting ? "Submitting…" : "Generate export"}
+              {submitting ? t("submitting") : t("generate")}
             </button>
           </div>
         </form>
@@ -347,7 +350,7 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
               marginBottom: 8,
             }}
           >
-            Export · {job.status}
+            {t("statusLine", { status: t.has(`status.${job.status}`) ? t(`status.${job.status}`) : job.status })}
           </Eyebrow>
           {job.status === "pending" && (
             <>
@@ -360,11 +363,14 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
                   color: "var(--ink)",
                 }}
               >
-                Generating your CSV…
+                {t("generating")}
               </h2>
               <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--ink-3)" }}>
-                Job <Mono>{job.id.slice(0, 8)}</Mono> · started{" "}
-                {new Date(job.created_at).toLocaleTimeString()}
+                {t.rich("jobLine", {
+                  id: job.id.slice(0, 8),
+                  time: new Date(job.created_at).toLocaleTimeString(locale === "fr" ? "fr-CA" : "en-CA"),
+                  m: (chunks) => <Mono>{chunks}</Mono>,
+                })}
               </p>
             </>
           )}
@@ -379,10 +385,10 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
                   color: "var(--ink)",
                 }}
               >
-                {job.row_count} {job.row_count === 1 ? "row" : "rows"} ready
+                {t("rows", { count: job.row_count ?? 0 })}
               </h2>
               <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--ink-2)" }}>
-                The CSV is also being emailed to you.
+                {t("emailed")}
               </p>
               <div style={{ display: "flex", gap: 10 }}>
                 <button
@@ -402,7 +408,7 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
                     fontFamily: "inherit",
                   }}
                 >
-                  {downloading ? "Downloading…" : "Download CSV"}
+                  {downloading ? t("downloading") : t("download")}
                 </button>
                 <button
                   type="button"
@@ -418,7 +424,7 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
                     cursor: "pointer",
                   }}
                 >
-                  Run another
+                  {t("runAnother")}
                 </button>
               </div>
             </>
@@ -434,10 +440,10 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
                   color: "var(--ink)",
                 }}
               >
-                Export failed
+                {t("failedTitle")}
               </h2>
               <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--ink-2)" }}>
-                {job.error ?? "Unknown error"}
+                {job.error ?? t("unknownError")}
               </p>
               <button
                 type="button"
@@ -453,7 +459,7 @@ export function ApfExportForm({ orgs, initialOrgId }: Props) {
                   cursor: "pointer",
                 }}
               >
-                Try again
+                {t("tryAgain")}
               </button>
             </>
           )}
