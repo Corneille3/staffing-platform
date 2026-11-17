@@ -1,5 +1,6 @@
 import { Link } from "../../../i18n/navigation";
 import React from "react";
+import { getTranslations } from "next-intl/server";
 import { ArrowUpRight, Shield } from "lucide-react";
 import { HeaderSignOutButton } from "../../../components/header-sign-out-button";
 import { PlatformNav } from "../../../components/platform-nav";
@@ -22,6 +23,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
     operatorRole = session.platform_operator_role;
   }
   const marketing = operatorRole === "marketing";
+  const t = await getTranslations("platform.shell");
 
   // The operator's path into a tenant workspace, when they have one: their
   // own tenant (membership — e.g. the bootstrap admin) or a §2.2 access
@@ -94,8 +96,8 @@ export default async function PlatformLayout({ children }: { children: React.Rea
             S
           </div>
           <div style={{ flex: 1, lineHeight: 1.15 }}>
-            <div style={{ fontSize: 12, fontWeight: 500 }}>StaffiG Operator</div>
-            <div style={{ fontSize: 10, color: "rgba(246,244,238,.5)" }}>Platform · all regions</div>
+            <div style={{ fontSize: 12, fontWeight: 500 }}>{t("operator")}</div>
+            <div style={{ fontSize: 10, color: "rgba(246,244,238,.5)" }}>{t("scope")}</div>
           </div>
         </div>
 
@@ -108,7 +110,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
             padding: "8px 10px 6px",
           }}
         >
-          Operate
+          {t("operate")}
         </div>
         <PlatformNav operatorRole={operatorRole} />
 
@@ -123,7 +125,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
                 padding: "16px 10px 6px",
               }}
             >
-              Workspace
+              {t("workspace")}
             </div>
             <Link href="/apf" style={{ textDecoration: "none" }}>
               <div
@@ -151,7 +153,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
                     {workspace.name}
                   </div>
                   <div style={{ fontSize: 10, color: "rgba(246,244,238,.5)" }}>
-                    {workspace.via_grant ? "Granted access · read-only" : "Open your workspace"}
+                    {workspace.via_grant ? t("grantedReadOnly") : t("openYours")}
                   </div>
                 </div>
                 <ArrowUpRight size={14} style={{ color: "var(--terra)", flexShrink: 0 }} />
@@ -182,12 +184,10 @@ export default async function PlatformLayout({ children }: { children: React.Rea
             }}
           >
             <Shield size={11} />
-            Isolation
+            {t("isolation")}
           </div>
           <div style={{ fontSize: 11, color: "rgba(246,244,238,.6)", lineHeight: 1.4 }}>
-            {marketing
-              ? "Prospects only. Leads describe organizations that are not tenants yet."
-              : "Aggregate metrics only. The operator never sees inside a tenant\u2019s data."}
+            {marketing ? t("isolationMarketing") : t("isolationOperator")}
           </div>
         </div>
       </aside>
@@ -207,7 +207,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
             gap: 16,
           }}
         >
-          <span style={{ fontSize: 12, color: "var(--ink-3)" }}>{marketing ? "Platform · Marketing" : "Platform Operator"}</span>
+          <span style={{ fontSize: 12, color: "var(--ink-3)" }}>{marketing ? t("topMarketing") : t("topOperator")}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <LanguageSwitcher />
             {CLERK_ENABLED ? <HeaderSignOutButton /> : null}

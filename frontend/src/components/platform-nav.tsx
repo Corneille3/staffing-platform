@@ -2,18 +2,20 @@
 
 import { Link } from "../i18n/navigation";
 import React from "react";
+import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { Activity, Briefcase, Settings, Sparkles, Target } from "lucide-react";
 import type { PlatformOperatorRole } from "../lib/types";
 
 // Tier-0 operator nav (MULTITENANCY_HANDOFF §5.1 / PLATFORM_HANDOFF). Items
-// without an href are not built yet and render disabled.
-const NAV: { key: string; label: string; href?: string; icon: React.ReactNode }[] = [
-  { key: "overview", label: "Overview", icon: <Activity size={16} /> },
-  { key: "tenants", label: "Tenants", href: "/platform/tenants", icon: <Briefcase size={16} /> },
-  { key: "leads", label: "Leads", href: "/platform/leads", icon: <Target size={16} /> },
-  { key: "billing", label: "Billing", icon: <Sparkles size={16} /> },
-  { key: "settings", label: "Settings", href: "/platform/settings", icon: <Settings size={16} /> },
+// without an href are not built yet and render disabled. Labels come from
+// `platform.nav.<key>`.
+const NAV: { key: string; href?: string; icon: React.ReactNode }[] = [
+  { key: "overview", icon: <Activity size={16} /> },
+  { key: "tenants", href: "/platform/tenants", icon: <Briefcase size={16} /> },
+  { key: "leads", href: "/platform/leads", icon: <Target size={16} /> },
+  { key: "billing", icon: <Sparkles size={16} /> },
+  { key: "settings", href: "/platform/settings", icon: <Settings size={16} /> },
 ];
 
 /** Which entries a tier-0 role gets. The sales pipeline belongs to owner +
@@ -26,6 +28,7 @@ function visibleFor(role: PlatformOperatorRole | null, key: string): boolean {
 
 export function PlatformNav({ operatorRole = null }: { operatorRole?: PlatformOperatorRole | null }) {
   const pathname = usePathname();
+  const t = useTranslations("platform.nav");
 
   return (
     <>
@@ -49,7 +52,7 @@ export function PlatformNav({ operatorRole = null }: { operatorRole?: PlatformOp
             }}
           >
             <span style={{ color: active ? "var(--terra)" : "rgba(246,244,238,.45)" }}>{item.icon}</span>
-            {item.label}
+            {t(item.key)}
           </div>
         );
         return item.href ? (

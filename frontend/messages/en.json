@@ -1525,6 +1525,117 @@
           "status_not_importable": "the status “{value}” cannot be imported (won needs an active workspace, lost needs a reason)"
         }
       }
+    },
+    "shell": {
+      "operator": "StaffiG Operator",
+      "scope": "Platform · all regions",
+      "operate": "Operate",
+      "workspace": "Workspace",
+      "grantedReadOnly": "Granted access · read-only",
+      "openYours": "Open your workspace",
+      "isolation": "Isolation",
+      "isolationMarketing": "Prospects only. Leads describe organizations that are not tenants yet.",
+      "isolationOperator": "Aggregate metrics only. The operator never sees inside a tenant’s data.",
+      "topMarketing": "Platform · Marketing",
+      "topOperator": "Platform Operator"
+    },
+    "nav": {
+      "overview": "Overview",
+      "tenants": "Tenants",
+      "leads": "Leads",
+      "billing": "Billing",
+      "settings": "Settings"
+    },
+    "tenants": {
+      "eyebrow": "Platform · every workspace",
+      "headline": "{count, plural, one {# network} other {# networks}} <em>on StaffiG</em>",
+      "description": "Each network is an isolated tenant. Invite a new one, watch their adoption — but never see inside their data.",
+      "summary": {
+        "active": "{count} active",
+        "pending": "{count} invited",
+        "onboarding": "{count} onboarding",
+        "suspended": "{count} suspended"
+      },
+      "invite": "Invite a network",
+      "kpi": {
+        "active": "Active networks",
+        "activeSub": "live workspaces",
+        "orgs": "Organizations",
+        "orgsSub": "across all tenants",
+        "subs": "Substitutes",
+        "subsSub": "total identities",
+        "fill": "Network fill rate",
+        "fillSub": "weighted average"
+      },
+      "col": {
+        "network": "Network",
+        "region": "Region",
+        "orgs": "Orgs",
+        "subs": "Subs",
+        "fill": "Fill rate",
+        "status": "Status"
+      },
+      "empty": "No networks yet. Invite your first one.",
+      "footnote": "Org / sub counts and fill rate are the only figures the operator sees. Names, shifts, and worker data stay inside each tenant.",
+      "status": {
+        "active": "Active",
+        "pending": "Invite sent",
+        "onboarding": "Onboarding",
+        "suspended": "Suspended"
+      },
+      "actionFailed": "Action failed",
+      "resend": "Resend",
+      "revoke": "Revoke",
+      "openWorkspace": "Open workspace",
+      "grantTitle": "You hold an active access grant for this workspace (read-only)",
+      "ownTitle": "This is your own workspace",
+      "endVisitTitle": "Give up your access grant now instead of waiting for it to expire",
+      "endVisit": "End visit",
+      "requestAccessTitle": "Ask the tenant admin for time-boxed read-only access",
+      "requestAccess": "Request access",
+      "suspend": "Suspend",
+      "remove": "Remove",
+      "reactivate": "Reactivate",
+      "suspendModal": {
+        "eyebrow": "Reversible — but immediate",
+        "title": "Suspend <em>{name}</em>?",
+        "body": "Every member — admin, coordinators, substitutes — is locked out <b>immediately</b> and sees a \"workspace suspended\" screen. Nothing is deleted: Reactivate restores the workspace exactly as it was.",
+        "suspending": "Suspending…",
+        "confirm": "Suspend network"
+      },
+      "removeModal": {
+        "eyebrow": "Destructive action",
+        "title": "Remove <em>{name}</em>?",
+        "body": "This deactivates the network and <b>every member</b> in it — the network admin, all coordinators, all substitutes. They are signed out immediately and cannot sign back in. Their email addresses are released, so the same people can be re-invited later under a fresh account.",
+        "note": "Audit history is preserved. This cannot be undone from the console.",
+        "failed": "Removal failed",
+        "removing": "Removing…",
+        "confirm": "Remove network"
+      },
+      "accessModal": {
+        "needReason": "Give the tenant admin a real reason (min 5 characters).",
+        "granted": "Access granted — read-only, auto-expires.",
+        "sent": "Request sent — the tenant admin must approve it.",
+        "failed": "Request failed",
+        "eyebrow": "Privacy exception",
+        "title": "Request access to <em>{name}</em>",
+        "body": "The tenant admin sees your name and this reason. If approved, you get <b>read-only</b> access that auto-expires — every step is logged in both audit trails.",
+        "reason": "Reason",
+        "placeholder": "e.g. Investigating support ticket #42 — a request won't publish",
+        "done": "Done",
+        "sending": "Sending…",
+        "send": "Send request"
+      },
+      "inviteModal": {
+        "required": "Network name, address, admin name, and email are required.",
+        "failed": "Failed to send invite",
+        "eyebrow": "New tenant",
+        "title": "Invite a <em>network</em>",
+        "body": "We'll create an empty workspace and email the admin a sign-up link. They name their network and build it themselves.",
+        "namePlaceholder": "e.g. Réseau Laurentides",
+        "sending": "Sending…",
+        "send": "Send invite"
+      }
     }
   },
   "apf": {
