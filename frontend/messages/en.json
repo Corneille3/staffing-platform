@@ -17,7 +17,33 @@
     "confirm": "Confirm",
     "decline": "Decline",
     "urgent": "Urgent",
-    "filled": "Filled"
+    "filled": "Filled",
+    "reasons": {
+      "profileInactive": "Missing: active worker profile",
+      "profileMissing": "Missing: worker profile",
+      "orgNotSelected": "Organization not selected",
+      "alreadyBooked": "Already booked",
+      "slotNotInGrid": "Slot not in weekly grid",
+      "available": "Available",
+      "unavailable": "Missing: availability",
+      "cityMatch": "City match",
+      "farShift": "Far shift accepted: {item}",
+      "missingItem": "Missing: {item}",
+      "languageMatch": "Language match",
+      "noQualification": "No qualification required",
+      "noCertification": "No certification required",
+      "qualificationMatch": "Qualification match",
+      "certificationMatch": "Certification match",
+      "languages": {
+        "fr": "French",
+        "en": "English",
+        "bilingual": "Bilingual"
+      }
+    },
+    "compactTime": {
+      "now": "now",
+      "justNow": "just now"
+    }
   },
   "time": {
     "justNow": "just now",

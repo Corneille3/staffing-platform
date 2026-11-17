@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Calendar, Check, MapPin, RefreshCw, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { useReasonLabel } from "../../../../../hooks/use-reason-label";
 import { Link, useRouter } from "../../../../../i18n/navigation";
 import {
   acceptRequest,
@@ -36,6 +37,7 @@ export default function WorkerRequestDetailPage() {
   const locale = useLocale() as "fr" | "en";
   const t = useTranslations("worker.requestDetail");
   const tCommon = useTranslations("common");
+  const reasonLabel = useReasonLabel();
 
   const [request, setRequest] = useState<StaffingRequest | null>(null);
   const [eligibility, setEligibility] = useState<EligibilityResult | null>(null);
@@ -324,7 +326,7 @@ export default function WorkerRequestDetailPage() {
                 }}>
                   {reason.status === "matched" ? <Check size={12} strokeWidth={2.5} /> : <X size={12} strokeWidth={2.5} />}
                 </div>
-                <span style={{ fontSize: 13, color: "var(--ink)" }}>{reason.label}</span>
+                <span style={{ fontSize: 13, color: "var(--ink)" }}>{reasonLabel.full(reason)}</span>
               </div>
             ))}
           </div>

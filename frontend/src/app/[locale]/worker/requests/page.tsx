@@ -3,6 +3,7 @@
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { Calendar, MapPin, Check, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { useReasonLabel } from "../../../../hooks/use-reason-label";
 import {
   acceptRequest,
   declineRequest,
@@ -444,6 +445,7 @@ function RequestCard({
 }
 
 function EligibilityList({ eligibility }: { eligibility: EligibilityResult }) {
+  const reasonLabel = useReasonLabel();
   return (
     <div style={{ background: "var(--paper)", borderRadius: 12, padding: "4px 10px", marginBottom: 10 }}>
       {eligibility.reasons.map((reason, i) => (
@@ -461,7 +463,7 @@ function EligibilityList({ eligibility }: { eligibility: EligibilityResult }) {
           }}>
             {reason.status === "matched" ? <Check size={11} strokeWidth={2.5} /> : <X size={11} strokeWidth={2.5} />}
           </div>
-          <span style={{ fontSize: 12, color: "var(--ink-2)" }}>{reason.label}</span>
+          <span style={{ fontSize: 12, color: "var(--ink-2)" }}>{reasonLabel.full(reason)}</span>
         </div>
       ))}
     </div>
