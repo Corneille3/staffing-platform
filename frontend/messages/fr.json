@@ -17,7 +17,33 @@
     "confirm": "Confirmer",
     "decline": "Refuser",
     "urgent": "Urgent",
-    "filled": "Pourvu"
+    "filled": "Pourvu",
+    "reasons": {
+      "profileInactive": "Manquant : profil actif",
+      "profileMissing": "Manquant : profil",
+      "orgNotSelected": "Organisation non sélectionnée",
+      "alreadyBooked": "Déjà réservé·e",
+      "slotNotInGrid": "Plage absente de la grille de la semaine",
+      "available": "Disponible",
+      "unavailable": "Manquant : disponibilité",
+      "cityMatch": "Ville : correspond",
+      "farShift": "Quart éloigné accepté : {item}",
+      "missingItem": "Manquant : {item}",
+      "languageMatch": "Langue : correspond",
+      "noQualification": "Aucune qualification requise",
+      "noCertification": "Aucune certification requise",
+      "qualificationMatch": "Qualification : correspond",
+      "certificationMatch": "Certification : correspond",
+      "languages": {
+        "fr": "Français",
+        "en": "Anglais",
+        "bilingual": "Bilingue"
+      }
+    },
+    "compactTime": {
+      "now": "maintenant",
+      "justNow": "à l'instant"
+    }
   },
   "time": {
     "justNow": "à l'instant",

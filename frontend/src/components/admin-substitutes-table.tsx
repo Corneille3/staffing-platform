@@ -6,6 +6,7 @@ import { useReadOnlyVisit } from "./read-only-visit";
 import { Mono } from "./ui";
 import { notifyWorkers } from "../lib/browser-api";
 import { reasonChips } from "../lib/eligibility-chips";
+import { useReasonLabel } from "../hooks/use-reason-label";
 import type { AdminSubstituteRow } from "../lib/types";
 
 type SortKey = "name" | "city" | "availability" | "match";
@@ -37,6 +38,7 @@ export function AdminSubstitutesTable({ rows, ranked, requestId }: Props) {
   const [notified, setNotified] = useState<Record<string, "busy" | "done">>({});
   const readOnlyVisit = useReadOnlyVisit();
   const t = useTranslations("admin.substitutes");
+  const reasonLabel = useReasonLabel();
   const tLang = useTranslations("admin.languages");
 
   async function notify(workerId: string) {
@@ -334,7 +336,7 @@ export function AdminSubstitutesTable({ rows, ranked, requestId }: Props) {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {c.text}
+                      {reasonLabel.chip(c.reason)}
                     </span>
                   ))}
                 </div>

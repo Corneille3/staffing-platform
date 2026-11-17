@@ -5,9 +5,10 @@ import { useReadOnlyVisit } from "./read-only-visit";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Mono } from "./ui";
 import { assignWorker } from "../lib/browser-api";
+import { compactDuration } from "../lib/compact-time";
 import type { AdminDashboardUrgent } from "../lib/types";
 
 function duration(start: string, end: string): string {
@@ -31,6 +32,8 @@ export function AdminDashboardUrgentCard({
   const readOnlyVisit = useReadOnlyVisit();
   const t = useTranslations("admin.dashboard");
   const tAdmin = useTranslations("admin");
+  const tTime = useTranslations("common.compactTime");
+  const locale = useLocale();
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,11 +54,12 @@ export function AdminDashboardUrgentCard({
   }
 
   const role = urgent.role ? (tAdmin.has(`roles.${urgent.role}`) ? tAdmin(`roles.${urgent.role}`) : urgent.role) : tAdmin("roles.other");
+  const timeWords = { now: tTime("now"), justNow: tTime("justNow") };
   const stats = [
     { label: t("statResponded"), value: `${urgent.metrics.responses}` },
     { label: t("statAccepted"), value: `${urgent.metrics.accepted}` },
-    { label: t("statElapsed"), value: urgent.elapsed.replace(" ago", "") },
-    { label: t("statStarts"), value: urgent.starts_in.replace("in ", "") },
+    { label: t("statElapsed"), value: compactDuration(urgent.elapsed, locale, timeWords) },
+    { label: t("statStarts"), value: compactDuration(urgent.starts_in, locale, timeWords) },
   ];
 
   return (

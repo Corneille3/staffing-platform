@@ -1,5 +1,6 @@
 import { useTranslations } from "next-intl";
 import { getTranslations } from "next-intl/server";
+import { roleKeyFromLabel } from "../../../lib/compact-time";
 import { Link } from "../../../i18n/navigation";
 import { Eyebrow, Mono } from "../../../components/ui";
 import { ActivityRowCard } from "../../../components/apf-activity-row";
@@ -34,6 +35,11 @@ function greetingKey(h: number): "greetingMorning" | "greetingAfternoon" | "gree
 export default async function AdminDashboardPage() {
   const t = await getTranslations("admin.dashboard");
   const tAdmin = await getTranslations("admin");
+  // The roster carries the role's English label; word it from admin.roles.
+  const rosterRole = (label: string | null | undefined) => {
+    const key = roleKeyFromLabel(label);
+    return key ? tAdmin(`roles.${key}`) : label ?? tAdmin("roles.other");
+  };
   const DAYS = t("weekdays").split(",");
   const [dash, sites] = await Promise.all([getAdminDashboard(), getAdminOrganizations()]);
   const siteNames = Object.fromEntries(sites.map((s) => [s.id, s.name]));
@@ -173,7 +179,7 @@ export default async function AdminDashboardPage() {
                 <div key={i} style={{ background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: 12, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>{p.name}</div>
-                    <div style={{ fontSize: 12, color: "var(--ink-3)" }}>{p.role ?? tAdmin("roles.other")} · <Mono style={{ fontSize: 12 }}>{p.starts_at.slice(0, 5)}→{p.ends_at.slice(0, 5)}</Mono></div>
+                    <div style={{ fontSize: 12, color: "var(--ink-3)" }}>{rosterRole(p.role)} · <Mono style={{ fontSize: 12 }}>{p.starts_at.slice(0, 5)}→{p.ends_at.slice(0, 5)}</Mono></div>
                   </div>
                   <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: p.status === "on_site" || p.status === "done" ? "var(--moss)" : p.status === "not_checked_in" ? "var(--rose)" : "var(--sand)" }}>
                     {p.status === "on_site" ? t("rosterOnSite") : p.status === "done" ? t("rosterDone") : p.status === "not_checked_in" ? t("rosterNotCheckedIn") : p.status === "en_route" ? t("rosterEnRoute") : t("rosterArriving")}

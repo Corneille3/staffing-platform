@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reasonChips } from "./eligibility-chips";
+import { reasonChips, reasonWording } from "./eligibility-chips";
 import type { EligibilityReason } from "./types";
 
 const r = (
@@ -46,8 +46,40 @@ describe("reasonChips", () => {
   });
 
   it("keeps a hard stop like 'Already booked' as the only chip", () => {
-    expect(reasonChips([r("availability", "missing", "Already booked")])).toEqual([
-      { key: "availability-0", text: "Already booked", missing: true },
+    const booked = r("availability", "missing", "Already booked");
+    expect(reasonChips([booked])).toEqual([
+      { key: "availability-0", text: "Already booked", missing: true, reason: booked },
     ]);
+  });
+});
+
+describe("reasonWording", () => {
+  it("recognises the fixed sentences", () => {
+    expect(reasonWording(r("availability", "missing", "Already booked"))).toEqual({ key: "alreadyBooked" });
+    expect(reasonWording(r("availability", "missing", "Slot not in weekly grid"))).toEqual({ key: "slotNotInGrid" });
+    expect(reasonWording(r("availability", "missing", "Missing: availability", "unavailable"))).toEqual({ key: "unavailable" });
+    expect(reasonWording(r("qualification", "matched", "No qualification required"))).toEqual({ key: "noQualification" });
+  });
+
+  it("names the city of a far shift", () => {
+    expect(reasonWording(r("city", "matched", "Far shift accepted: Laval"))).toEqual({
+      key: "farShift", item: "Laval", itemKind: "city",
+    });
+  });
+
+  it("says what is missing, by kind", () => {
+    expect(reasonWording(r("city", "missing", "Missing: Laval", "Laval"))).toEqual({
+      key: "missingItem", item: "Laval", itemKind: "city",
+    });
+    expect(reasonWording(r("language", "missing", "Missing: FR", "fr"))).toEqual({
+      key: "missingItem", item: "fr", itemKind: "language",
+    });
+    expect(reasonWording(r("certification", "missing", "Missing: FIRST_AID", "FIRST_AID"))).toEqual({
+      key: "missingItem", item: "FIRST_AID", itemKind: "credential",
+    });
+  });
+
+  it("is null for a sentence it does not know", () => {
+    expect(reasonWording(r("profile", "missing", "Some new rule"))).toBeNull();
   });
 });
