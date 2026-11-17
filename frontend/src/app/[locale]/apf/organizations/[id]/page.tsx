@@ -1,5 +1,7 @@
 import { Link } from "../../../../../i18n/navigation";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 import { Eyebrow, Mono } from "../../../../../components/ui";
 import { getApfOrgSnapshot } from "../../../../../lib/api";
 import type { OrgRequestRow } from "../../../../../lib/types";
@@ -8,17 +10,6 @@ const STATUS_ORDER = [
   "draft", "open", "notified", "responses_received",
   "assigned", "completed", "cancelled", "expired",
 ];
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: "Draft",
-  open: "Open",
-  notified: "Notified",
-  responses_received: "Responses received",
-  assigned: "Assigned",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  expired: "Expired",
-};
 
 const STATUS_ACCENT: Record<string, string> = {
   draft: "var(--ink-3)",
@@ -29,15 +20,6 @@ const STATUS_ACCENT: Record<string, string> = {
   completed: "var(--moss)",
   cancelled: "var(--rose)",
   expired: "var(--ink-3)",
-};
-
-const ORG_TYPE_LABELS: Record<string, string> = {
-  childcare: "Childcare",
-  long_term_care: "Long-term care",
-  community_care: "Community care",
-  home_care: "Home care",
-  assisted_living: "Assisted living",
-  other: "Other",
 };
 
 const CARD_STYLE: React.CSSProperties = {
@@ -51,6 +33,11 @@ export default async function OrgDrillInPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const t = await getTranslations("apf.orgDetail");
+  const tDash = await getTranslations("apf.dashboard");
+  const tAdmin = await getTranslations("admin");
+  const statusLabel = (status: string) =>
+    tAdmin.has(`status.${status}`) ? tAdmin(`status.${status}`) : status.replace(/_/g, " ");
 
   let snapshot;
   try {
@@ -68,12 +55,12 @@ export default async function OrgDrillInPage({
           href="/apf/organizations"
           style={{ fontSize: 13, color: "var(--ink-3)", textDecoration: "none" }}
         >
-          ← All organizations
+          {t("back")}
         </Link>
       </div>
 
       <section style={{ marginBottom: 32 }}>
-        <Eyebrow style={{ marginBottom: 12 }}>Organization</Eyebrow>
+        <Eyebrow style={{ marginBottom: 12 }}>{t("eyebrow")}</Eyebrow>
         <h1
           style={{
             margin: 0,
@@ -97,7 +84,7 @@ export default async function OrgDrillInPage({
           }}
         >
           <p style={{ margin: 0, color: "var(--ink-2)", lineHeight: 1.55, fontSize: 15 }}>
-            {ORG_TYPE_LABELS[snapshot.type] ?? snapshot.type} · {snapshot.city}
+            {tAdmin.has(`organizations.types.${snapshot.type}`) ? tAdmin(`organizations.types.${snapshot.type}`) : snapshot.type} · {snapshot.city}
             {snapshot.region ? `, ${snapshot.region}` : ""}
             {snapshot.contact_email ? ` · ${snapshot.contact_email}` : ""}
           </p>
@@ -115,7 +102,7 @@ export default async function OrgDrillInPage({
               whiteSpace: "nowrap",
             }}
           >
-            View full activity →
+            {t("viewActivity")}
           </Link>
         </div>
       </section>
@@ -129,26 +116,26 @@ export default async function OrgDrillInPage({
         }}
       >
         <MetricCard
-          label="Fill rate"
+          label={tDash("fillRate")}
           value={`${kpis.fill_rate}%`}
           accent="var(--moss)"
-          sub={`${kpis.filled_count} of ${kpis.total_requests} requests filled`}
+          sub={tDash("fillRateSub", { filled: kpis.filled_count, total: kpis.total_requests })}
         />
         <MetricCard
-          label="Avg time to fill"
-          value={kpis.avg_fill_hours != null ? `${kpis.avg_fill_hours}h` : "—"}
-          sub="hours from creation to assignment"
+          label={tDash("avgFill")}
+          value={kpis.avg_fill_hours != null ? tDash("avgFillValue", { hours: String(kpis.avg_fill_hours) }) : "—"}
+          sub={tDash("avgFillSub")}
         />
         <MetricCard
-          label="Unfilled requests"
+          label={tDash("unfilled")}
           value={kpis.unfilled_count}
           accent={kpis.unfilled_count > 0 ? "var(--rose)" : "var(--moss)"}
-          sub="open, notified, or awaiting response"
+          sub={tDash("unfilledSub")}
         />
         <MetricCard
-          label="Substitutes in city"
+          label={t("subsInCity")}
           value={kpis.active_substitutes_in_city}
-          sub={`currently available in ${snapshot.city}`}
+          sub={t("subsInCitySub", { city: snapshot.city })}
         />
       </section>
 
@@ -160,7 +147,7 @@ export default async function OrgDrillInPage({
           marginBottom: 28,
         }}
       >
-        <Panel title="Status breakdown" subtitle={`${kpis.total_requests} total`}>
+        <Panel title={t("breakdown")} subtitle={t("totalCount", { count: kpis.total_requests })}>
           <div style={{ display: "grid", gap: 12 }}>
             {STATUS_ORDER.filter((s) => status_breakdown[s]).map((status) => {
               const count = status_breakdown[status] || 0;
@@ -170,7 +157,7 @@ export default async function OrgDrillInPage({
               return (
                 <div key={status} style={{ display: "grid", gap: 6 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                    <span style={{ color: "var(--ink)" }}>{STATUS_LABELS[status] ?? status}</span>
+                    <span style={{ color: "var(--ink)" }}>{statusLabel(status)}</span>
                     <span style={{ color: STATUS_ACCENT[status] ?? "var(--ink)" }}>
                       <Mono>{count}</Mono>
                     </span>
@@ -197,16 +184,16 @@ export default async function OrgDrillInPage({
             })}
             {Object.keys(status_breakdown).length === 0 && (
               <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>
-                No requests yet for this organization.
+                {t("noRequests")}
               </p>
             )}
           </div>
         </Panel>
 
-        <Panel title="Upcoming open" subtitle={`${upcoming_open_requests.length}`}>
+        <Panel title={t("upcoming")} subtitle={`${upcoming_open_requests.length}`}>
           {upcoming_open_requests.length === 0 ? (
             <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>
-              No open requests scheduled.
+              {t("noUpcoming")}
             </p>
           ) : (
             <div style={{ display: "grid", gap: 8 }}>
@@ -220,7 +207,7 @@ export default async function OrgDrillInPage({
 
       {recent_closed_requests.length > 0 && (
         <section>
-          <Panel title="Recent closed" subtitle="last 8">
+          <Panel title={t("recentClosed")} subtitle={tDash("last8")}>
             <div style={{ display: "grid", gap: 8 }}>
               {recent_closed_requests.map((r) => (
                 <RequestRow key={r.id} row={r} />
@@ -235,6 +222,7 @@ export default async function OrgDrillInPage({
 
 function RequestRow({ row }: { row: OrgRequestRow }) {
   const accent = STATUS_ACCENT[row.status] ?? "var(--ink-3)";
+  const tAdmin = useTranslations("admin");
   return (
     <div
       style={{
@@ -268,7 +256,7 @@ function RequestRow({ row }: { row: OrgRequestRow }) {
           border: `0.5px solid ${accent}`,
         }}
       >
-        {STATUS_LABELS[row.status] ?? row.status}
+        {tAdmin.has(`status.${row.status}`) ? tAdmin(`status.${row.status}`) : row.status.replace(/_/g, " ")}
       </span>
     </div>
   );

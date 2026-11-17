@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { removeOrganization } from "../lib/browser-api";
 
 export function RemoveOrganizationButton({
@@ -12,6 +13,7 @@ export function RemoveOrganizationButton({
   organizationName: string;
 }) {
   const router = useRouter();
+  const t = useTranslations("apf.remove");
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -23,7 +25,7 @@ export function RemoveOrganizationButton({
       setOpen(false);
       startTransition(() => router.refresh());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Removal failed");
+      setError(err instanceof Error ? err.message : t("failed"));
     }
   }
 
@@ -46,7 +48,7 @@ export function RemoveOrganizationButton({
           width: "fit-content",
         }}
       >
-        Remove
+        {t("button")}
       </button>
 
       {open ? (
@@ -78,15 +80,13 @@ export function RemoveOrganizationButton({
             }}
           >
             <h2 style={{ margin: "0 0 12px", fontSize: 22 }}>
-              Remove {organizationName}?
+              {t("title", { name: organizationName })}
             </h2>
             <p style={{ margin: "0 0 14px", lineHeight: 1.5, color: "#3d564c", fontSize: 14 }}>
-              This deactivates the organization and unlinks its coordinators —
-              the people stay active and keep any other organizations they
-              serve. Requests, assignments, and audit history are preserved.
+              {t("orgBody")}
             </p>
             <p style={{ margin: "0 0 20px", lineHeight: 1.5, color: "#3d564c", fontSize: 14 }}>
-              Removal is refused while the organization still has live requests.
+              {t("orgNote")}
             </p>
 
             {error ? (
@@ -120,7 +120,7 @@ export function RemoveOrganizationButton({
                   cursor: isPending ? "not-allowed" : "pointer",
                 }}
               >
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -137,7 +137,7 @@ export function RemoveOrganizationButton({
                   cursor: isPending ? "not-allowed" : "pointer",
                 }}
               >
-                {isPending ? "Removing…" : "Remove"}
+                {isPending ? t("removing") : t("button")}
               </button>
             </div>
           </div>

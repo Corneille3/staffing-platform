@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { ApfBulkInviteModal } from "./apf-bulk-invite-modal";
 
 export function ApfBulkInviteButton() {
   const [open, setOpen] = useState(false);
+  const t = useTranslations("apf.pool");
   return (
     <>
       <button
@@ -23,7 +25,7 @@ export function ApfBulkInviteButton() {
           whiteSpace: "nowrap",
         }}
       >
-        + Bulk invite
+        {t("bulkInvite")}
       </button>
       {open && <ApfBulkInviteModal onClose={() => setOpen(false)} />}
     </>

@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 import { Link } from "../../../../i18n/navigation";
 import { HideOnReadOnlyVisit } from "../../../../components/read-only-visit";
 import { Eyebrow, Mono } from "../../../../components/ui";
@@ -5,8 +7,6 @@ import { ApfBulkInviteButton } from "../../../../components/apf-bulk-invite-butt
 import { getApfNetworkPool, getAssignments, getWorkers } from "../../../../lib/api";
 import { Assignment, ContributorRow, Worker } from "../../../../lib/types";
 import { RemoveUserButton } from "../../../../components/remove-user-button";
-
-const LANG_LABEL: Record<string, string> = { fr: "FR", en: "EN", bilingual: "Bilingual" };
 
 const CARD_STYLE: React.CSSProperties = {
   background: "var(--card)",
@@ -19,10 +19,10 @@ function coverageAccent(pct: number): string {
   return "var(--rose)";
 }
 
-function utilizationLabel(count: number): { text: string; color: string } {
-  if (count === 0) return { text: "No assignments", color: "var(--ink-3)" };
-  if (count === 1) return { text: "1 assignment", color: "var(--sand)" };
-  return { text: `${count} assignments`, color: "var(--moss)" };
+function utilizationColor(count: number): string {
+  if (count === 0) return "var(--ink-3)";
+  if (count === 1) return "var(--sand)";
+  return "var(--moss)";
 }
 
 function assignmentStats(worker: Worker, assignments: Assignment[]): { count: number; active: number } {
@@ -38,6 +38,11 @@ export default async function SubstitutePoolPage() {
     getAssignments(),
   ]);
   const { kpis, distribution, top_contributors } = pool;
+  const t = await getTranslations("apf.pool");
+  const tl = await getTranslations("apf.lists");
+  const tAdmin = await getTranslations("admin");
+  const tCred = await getTranslations("worker.credentials");
+  const mono = (chunks: React.ReactNode) => <Mono>{chunks}</Mono>;
 
   const enriched = workers
     .map((w) => ({ worker: w, ...assignmentStats(w, assignments) }))
@@ -54,7 +59,7 @@ export default async function SubstitutePoolPage() {
   return (
     <>
       <section style={{ marginBottom: 32 }}>
-        <Eyebrow style={{ marginBottom: 12 }}>Substitute Pool</Eyebrow>
+        <Eyebrow style={{ marginBottom: 12 }}>{t("eyebrow")}</Eyebrow>
         <h1
           style={{
             margin: 0,
@@ -65,8 +70,10 @@ export default async function SubstitutePoolPage() {
             color: "var(--ink)",
           }}
         >
-          {kpis.total} <em style={{ fontStyle: "italic" }}>{kpis.total === 1 ? "substitute" : "substitutes"}</em>{" "}
-          {kpis.total === 1 ? "covers" : "cover"} the network.
+          {t.rich("headline", {
+            count: kpis.total,
+            em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em>,
+          })}
         </h1>
         <div
           style={{
@@ -79,8 +86,7 @@ export default async function SubstitutePoolPage() {
           }}
         >
           <p style={{ margin: 0, maxWidth: 640, color: "var(--ink-2)", lineHeight: 1.55, fontSize: 15 }}>
-            Distribution by city, top contributors over the last 30 days, and bulk invitations into the network pool.
-            Per-org assignment and removal still live in the detail table below.
+            {t("description")}
           </p>
           <HideOnReadOnlyVisit>
           <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
@@ -99,7 +105,7 @@ export default async function SubstitutePoolPage() {
                 whiteSpace: "nowrap",
               }}
             >
-              + Add one
+              {t("addOne")}
             </Link>
             <ApfBulkInviteButton />
           </div>
@@ -131,15 +137,15 @@ export default async function SubstitutePoolPage() {
             }}
           >
             <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: "var(--ink)" }}>
-              Distribution by city
+              {t("distribution")}
             </h2>
             <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
-              <Mono>{distribution.length}</Mono> cities
+              {t.rich("cities", { count: distribution.length, m: mono })}
             </span>
           </div>
           {distribution.length === 0 ? (
             <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>
-              No coverage cities yet. Substitutes add cities during onboarding.
+              {t("noCities")}
             </p>
           ) : (
             <div style={{ display: "grid", gap: 12 }}>
@@ -189,10 +195,10 @@ export default async function SubstitutePoolPage() {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <BentoCard label="Total in pool" value={kpis.total} />
-          <BentoCard label="Available now" value={kpis.available_now} accent="var(--moss)" />
-          <BentoCard label="Multi-org %" value={`${kpis.multi_org_pct}%`} />
-          <BentoCard label="Avg reliability" value={`${kpis.avg_reliability}/100`} />
+          <BentoCard label={t("total")} value={kpis.total} />
+          <BentoCard label={t("availableNow")} value={kpis.available_now} accent="var(--moss)" />
+          <BentoCard label={t("multiOrg")} value={`${kpis.multi_org_pct}%`} />
+          <BentoCard label={t("avgReliability")} value={`${kpis.avg_reliability}/100`} />
           {kpis.shortage_cities_count > 0 && (
             <div
               style={{
@@ -205,8 +211,10 @@ export default async function SubstitutePoolPage() {
                 color: "var(--ink)",
               }}
             >
-              <strong style={{ fontWeight: 500 }}>Network risk:</strong> {kpis.shortage_cities_count}{" "}
-              {kpis.shortage_cities_count === 1 ? "city has" : "cities have"} open requests with no available substitute.
+              {t.rich("risk", {
+                count: kpis.shortage_cities_count,
+                b: (chunks) => <strong style={{ fontWeight: 500 }}>{chunks}</strong>,
+              })}
             </div>
           )}
         </div>
@@ -229,15 +237,18 @@ export default async function SubstitutePoolPage() {
             }}
           >
             <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: "var(--ink)" }}>
-              Top contributors · last 30 days
+              {t("top")}
             </h2>
             <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
-              <Mono>{Math.min(top_contributors.length, 7)}</Mono> of{" "}
-              <Mono>{top_contributors.length}</Mono> shown
+              {t.rich("shown", {
+                shown: Math.min(top_contributors.length, 7),
+                total: top_contributors.length,
+                m: mono,
+              })}
             </span>
           </div>
           <p style={{ margin: "0 0 16px", color: "var(--ink-3)", fontSize: 12 }}>
-            sorted by shifts taken
+            {t("sortedBy")}
           </p>
 
           <ContributorsTable rows={top_contributors.slice(0, 7)} />
@@ -260,10 +271,10 @@ export default async function SubstitutePoolPage() {
           }}
         >
           <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: "var(--ink)" }}>
-            All substitutes
+            {t("all")}
           </h2>
           <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
-            <Mono>{enriched.length}</Mono> {enriched.length === 1 ? "record" : "records"}
+            {tl.rich("records", { count: enriched.length, m: mono })}
           </span>
         </div>
 
@@ -281,12 +292,12 @@ export default async function SubstitutePoolPage() {
             borderBottom: "0.5px solid var(--line)",
           }}
         >
-          <span>Name</span>
-          <span>Lang</span>
-          <span>Status</span>
-          <span>Cities</span>
-          <span>Qualifications</span>
-          <span>Utilization</span>
+          <span>{tl("colName")}</span>
+          <span>{tl("colLang")}</span>
+          <span>{tl("colStatus")}</span>
+          <span>{t("colCities")}</span>
+          <span>{t("colQualifications")}</span>
+          <span>{t("colUtilization")}</span>
           <span></span>
         </div>
 
@@ -294,7 +305,6 @@ export default async function SubstitutePoolPage() {
           {enriched.map(({ worker, count, active }) => {
             const profile = worker.profile;
             const available = profile?.availability_status === "available";
-            const util = utilizationLabel(count);
             return (
               <div
                 key={worker.id}
@@ -328,16 +338,16 @@ export default async function SubstitutePoolPage() {
                     width: "fit-content",
                   }}
                 >
-                  {LANG_LABEL[worker.preferred_language] ?? worker.preferred_language.toUpperCase()}
+                  {tAdmin.has(`languages.${worker.preferred_language}`) ? tAdmin(`languages.${worker.preferred_language}`) : worker.preferred_language.toUpperCase()}
                 </span>
 
                 {worker.is_active ? (
                   <StatusBadge
-                    label={available ? "Available" : "Unavailable"}
+                    label={available ? t("available") : t("unavailable")}
                     accent={available ? "var(--moss)" : "var(--rose)"}
                   />
                 ) : (
-                  <StatusBadge label="Removed" accent="var(--rose)" />
+                  <StatusBadge label={t("removed")} accent="var(--rose)" />
                 )}
 
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -376,7 +386,7 @@ export default async function SubstitutePoolPage() {
                           fontSize: 11,
                         }}
                       >
-                        {q}
+                        {tCred.has(q) ? tCred(q) : q}
                       </span>
                     ))
                   ) : (
@@ -385,10 +395,10 @@ export default async function SubstitutePoolPage() {
                 </div>
 
                 <div>
-                  <div style={{ fontSize: 13, color: util.color, fontWeight: 500 }}>{util.text}</div>
+                  <div style={{ fontSize: 13, color: utilizationColor(count), fontWeight: 500 }}>{t("assignments", { count })}</div>
                   {active > 0 && (
                     <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>
-                      <Mono>{active}</Mono> active
+                      {t.rich("activeCount", { count: active, m: mono })}
                     </div>
                   )}
                 </div>
@@ -407,7 +417,7 @@ export default async function SubstitutePoolPage() {
           })}
 
           {enriched.length === 0 && (
-            <p style={{ margin: "12px 0 0", color: "var(--ink-3)" }}>No substitutes registered yet.</p>
+            <p style={{ margin: "12px 0 0", color: "var(--ink-3)" }}>{t("empty")}</p>
           )}
         </div>
       </div>
@@ -416,10 +426,13 @@ export default async function SubstitutePoolPage() {
 }
 
 function ContributorsTable({ rows }: { rows: ContributorRow[] }) {
+  const t = useTranslations("apf.pool");
+  const tl = useTranslations("apf.lists");
+  const tAdmin = useTranslations("admin");
   if (rows.length === 0) {
     return (
       <p style={{ margin: 0, color: "var(--ink-3)", fontSize: 13 }}>
-        No assignments in the last 30 days yet.
+        {t("noContributors")}
       </p>
     );
   }
@@ -439,12 +452,12 @@ function ContributorsTable({ rows }: { rows: ContributorRow[] }) {
           borderBottom: "0.5px solid var(--line)",
         }}
       >
-        <span>Name</span>
-        <span>City</span>
-        <span># orgs</span>
-        <span>Shifts</span>
-        <span>Langs</span>
-        <span>Reliability</span>
+        <span>{tl("colName")}</span>
+        <span>{tl("colCity")}</span>
+        <span>{t("colOrgCount")}</span>
+        <span>{t("colShifts")}</span>
+        <span>{t("colLangs")}</span>
+        <span>{t("colReliability")}</span>
       </div>
       <div style={{ display: "grid" }}>
         {rows.map((r) => (
@@ -487,7 +500,7 @@ function ContributorsTable({ rows }: { rows: ContributorRow[] }) {
                     textTransform: "uppercase",
                   }}
                 >
-                  {LANG_LABEL[lang] ?? lang.toUpperCase()}
+                  {tAdmin.has(`languages.${lang}`) ? tAdmin(`languages.${lang}`) : lang.toUpperCase()}
                 </span>
               ))}
             </div>
