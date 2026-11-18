@@ -1639,7 +1639,7 @@
     },
     "settings": {
       "eyebrow": "Plateforme · faire tourner StaffiG",
-      "title": "Paramètres de l'<em>opérateur</em>",
+      "title": "Paramètres de l''<em>opérateur</em>",
       "description": "Qui exploite le niveau 0, ce dont héritent les nouveaux tenants, et quelles adresses d'espace restent réservées.",
       "saveFailed": "L'enregistrement a échoué",
       "actionFailed": "L'action a échoué",
@@ -2018,7 +2018,7 @@
     },
     "export": {
       "eyebrow": "Conformité et rapports",
-      "title": "Exporter l'<em>activité</em>",
+      "title": "Exporter l''<em>activité</em>",
       "body": "Choisissez une période et, au besoin, limitez l'export à certaines organisations. Nous produisons un fichier CSV de toutes les demandes de remplacement de la période, avec le résultat de l'assignation et le délai pour pourvoir le quart. Le fichier se télécharge ici et vous est aussi envoyé par courriel.",
       "from": "Du",
       "to": "Au",
