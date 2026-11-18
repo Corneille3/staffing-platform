@@ -2,11 +2,13 @@
 
 import { FormEvent, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Trash2 } from "lucide-react";
 import { removeUserByEmail } from "../lib/browser-api";
 
 export function OrphanUserCleanup() {
   const router = useRouter();
+  const t = useTranslations("platform.housekeeping.force");
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -19,13 +21,11 @@ export function OrphanUserCleanup() {
     setSuccess(null);
     try {
       await removeUserByEmail(email.trim());
-      setSuccess(
-        `Removed ${email.trim()} — DB row tombstoned, Clerk identity deleted, all memberships deactivated. The address is free for re-invitation.`,
-      );
+      setSuccess(t("success", { email: email.trim() }));
       setEmail("");
       startTransition(() => router.refresh());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Cleanup failed");
+      setError(err instanceof Error ? err.message : t("failed"));
     }
   }
 
@@ -50,7 +50,7 @@ export function OrphanUserCleanup() {
         }}
       >
         <Trash2 size={12} />
-        Force-remove orphan user
+        {t("button")}
       </button>
 
       {open && (
@@ -65,9 +65,7 @@ export function OrphanUserCleanup() {
           }}
         >
           <p style={{ margin: "0 0 14px", fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.5 }}>
-            For accounts whose email is bound in the database but don&apos;t
-            appear in any management list. Removes the DB row, deletes the
-            Clerk identity, and frees the email for re-invitation.
+            {t("body")}
           </p>
 
           <form onSubmit={submit} style={{ display: "grid", gap: 10 }}>
@@ -82,7 +80,7 @@ export function OrphanUserCleanup() {
                 color: "var(--ink-3)",
               }}
             >
-              Email
+              {t("email")}
               <input
                 type="email"
                 value={email}
@@ -153,7 +151,7 @@ export function OrphanUserCleanup() {
                 }}
               >
                 <Trash2 size={12} />
-                {isPending ? "Removing…" : "Force remove"}
+                {isPending ? t("removing") : t("submit")}
               </button>
             </div>
           </form>

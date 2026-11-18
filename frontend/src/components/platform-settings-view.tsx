@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { ArrowRight, Check, Lock, Plus, Shield, ShieldCheck, ShieldOff, X } from "lucide-react";
 import { HousekeepingCard } from "./housekeeping-card";
 import { SaveFlash, useSaveFlash } from "./ui";
@@ -19,39 +20,22 @@ import type {
   TenantAccessGrantsResponse,
 } from "../lib/types";
 
-const ROLE_LEGEND: { role: string; title: string; blurb: string; tone: string }[] = [
-  {
-    role: "owner",
-    title: "Owner",
-    blurb: "Everything — operators, billing & plans, tenants, access requests.",
-    tone: "var(--terra)",
-  },
-  {
-    role: "operator",
-    title: "Operator",
-    blurb: "Invite & suspend tenants, request tenant access. No operator or billing edits.",
-    tone: "var(--moss)",
-  },
-  {
-    role: "support",
-    title: "Support",
-    blurb: "Read-only. Can request time-boxed tenant access with approval.",
-    tone: "var(--ink-3)",
-  },
-  {
-    role: "marketing",
-    title: "Marketing",
-    blurb: "The sales pipeline only — leads, nothing else. No tenants, no settings, no tenant access.",
-    tone: "#8C6B14",
-  },
-];
+// Roles and their dot colour — names and blurbs come from
+// `platform.settings.roles` / `roleBlurb`.
+const ROLES = ["owner", "operator", "support", "marketing"] as const;
+const ROLE_TONE: Record<(typeof ROLES)[number], string> = {
+  owner: "var(--terra)",
+  operator: "var(--moss)",
+  support: "var(--ink-3)",
+  marketing: "#8C6B14",
+};
 
 const GRID = "2.2fr 1fr 1fr 1fr 1.6fr";
 
-function fmtDate(value: string | null): string {
+function fmtDate(value: string | null, locale: string): string {
   if (!value) return "—";
   try {
-    return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    return new Date(value).toLocaleDateString(locale === "fr" ? "fr-CA" : "en-CA", { year: "numeric", month: "short", day: "numeric" });
   } catch {
     return value;
   }
@@ -69,48 +53,49 @@ export function PlatformSettingsView({
   viewerEmail: string | null;
 }) {
   const router = useRouter();
+  const tt = useTranslations("platform.settings");
   const [inviteOpen, setInviteOpen] = useState(false);
   const isOwner = operators?.viewer_role === "owner";
 
   return (
     <div style={{ padding: "32px 36px", maxWidth: 1100 }}>
       <div style={{ marginBottom: 26 }}>
-        <div className="stf-h-eyebrow" style={eyebrow}>Platform · running StaffiG</div>
+        <div className="stf-h-eyebrow" style={eyebrow}>{tt("eyebrow")}</div>
         <h1 style={{ fontFamily: "var(--serif)", fontSize: "clamp(2rem, 4vw, 2.75rem)", lineHeight: 1.02, margin: "6px 0 0", letterSpacing: "-0.02em" }}>
-          Settings for the <em style={{ fontStyle: "italic" }}>operator</em>
+          {tt.rich("title", { em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em> })}
         </h1>
         <p style={{ margin: "8px 0 0", color: "var(--ink-2)", fontSize: 14, maxWidth: 620 }}>
-          Who runs tier 0, what new tenants inherit, and which workspace addresses stay reserved.
+          {tt("description")}
         </p>
       </div>
 
       {/* ── §2.1 Operators & access ─────────────────────────────────────── */}
       <SectionHead
-        title="Operators & access"
-        sub="Every tier-0 account. Keep this list short — each row can see aggregate data across all tenants."
+        title={tt("operators.title")}
+        sub={tt("operators.sub")}
         action={
           operators ? (
             <button
               type="button"
               onClick={() => setInviteOpen(true)}
               disabled={!isOwner}
-              title={isOwner ? undefined : "Only an owner can add operators"}
+              title={isOwner ? undefined : tt("operators.onlyOwnerAdd")}
               style={{ ...primaryBtn, opacity: isOwner ? 1 : 0.45, cursor: isOwner ? "pointer" : "not-allowed" }}
             >
-              <Plus size={15} /> Add operator
+              <Plus size={15} /> {tt("operators.add")}
             </button>
           ) : null
         }
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14, marginBottom: 16 }}>
-        {ROLE_LEGEND.map((r) => (
-          <div key={r.role} style={{ ...card, padding: "16px 18px" }}>
+        {ROLES.map((role) => (
+          <div key={role} style={{ ...card, padding: "16px 18px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 99, background: r.tone }} />
-              <span style={{ fontSize: 13, fontWeight: 600 }}>{r.title}</span>
+              <span style={{ width: 8, height: 8, borderRadius: 99, background: ROLE_TONE[role] }} />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{tt(`roles.${role}`)}</span>
             </div>
-            <div style={{ fontSize: 12, color: "var(--ink-2)", lineHeight: 1.45 }}>{r.blurb}</div>
+            <div style={{ fontSize: 12, color: "var(--ink-2)", lineHeight: 1.45 }}>{tt(`roleBlurb.${role}`)}</div>
           </div>
         ))}
       </div>
@@ -118,7 +103,7 @@ export function PlatformSettingsView({
       {operators ? (
         <div style={{ ...card, padding: 0, overflow: "hidden", marginBottom: 36 }}>
           <div style={{ display: "grid", gridTemplateColumns: GRID, padding: "12px 22px", borderBottom: "0.5px solid var(--line)", fontSize: 10, color: "var(--ink-3)", letterSpacing: ".1em", textTransform: "uppercase", fontWeight: 500 }}>
-            <div>Person</div><div>Role</div><div>2FA</div><div>Last active</div><div />
+            <div>{tt("operators.colPerson")}</div><div>{tt("operators.colRole")}</div><div>{tt("operators.col2fa")}</div><div>{tt("operators.colLastActive")}</div><div />
           </div>
           {operators.operators.map((op, i) => (
             <OperatorRow
@@ -133,14 +118,14 @@ export function PlatformSettingsView({
         </div>
       ) : (
         <div style={{ ...card, padding: "22px 24px", marginBottom: 36, fontSize: 13, color: "var(--ink-3)" }}>
-          The operator list is visible to owners and operators only.
+          {tt("operators.hidden")}
         </div>
       )}
 
       {/* ── §2.2 Tenant access (the privacy exception) ──────────────────── */}
       <SectionHead
-        title="Tenant access"
-        sub="How an operator may look inside a tenant when support requires it. Logged, consented, time-boxed."
+        title={tt("access.title")}
+        sub={tt("access.sub")}
       />
       <TenantAccessCard
         settings={settings}
@@ -151,27 +136,27 @@ export function PlatformSettingsView({
 
       {/* ── §2.3 New-tenant defaults ────────────────────────────────────── */}
       <SectionHead
-        title="New-tenant defaults"
-        sub="Applied when a tenant is invited. Tenants can change most of these inside their own workspace."
+        title={tt("defaults.title")}
+        sub={tt("defaults.sub")}
       />
       <DefaultsCard settings={settings} isOwner={isOwner} onSaved={() => router.refresh()} />
 
       {/* ── §2.4 Reserved slugs ─────────────────────────────────────────── */}
       <SectionHead
-        title="Reserved workspace addresses"
-        sub="A tenant invite whose slug is on this list is rejected — protects system routes."
+        title={tt("slugs.title")}
+        sub={tt("slugs.sub")}
       />
       <ReservedSlugsCard settings={settings} isOwner={isOwner} onSaved={() => router.refresh()} />
 
       {/* ── Housekeeping ────────────────────────────────────────────────── */}
       <SectionHead
-        title="Housekeeping"
-        sub="Orphan accounts — stuck in Clerk without a database row, or in the database without a reachable listing."
+        title={tt("housekeeping.title")}
+        sub={tt("housekeeping.sub")}
       />
       <HousekeepingCard canScan={operators != null} />
 
       <div style={{ marginTop: 28, fontSize: 12, color: "var(--ink-3)", display: "flex", alignItems: "center", gap: 6 }}>
-        <Shield size={13} /> Every change on this page is written to the platform audit trail.
+        <Shield size={13} /> {tt("auditNote")}
       </div>
 
       {inviteOpen && (
@@ -202,6 +187,8 @@ function OperatorRow({
   last: boolean;
   onChanged: () => void;
 }) {
+  const tt = useTranslations("platform.settings");
+  const locale = useLocale();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingRole, setPendingRole] = useState<string | null>(null);
@@ -221,7 +208,7 @@ function OperatorRow({
       await fn();
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Action failed");
+      setError(err instanceof Error ? err.message : tt("actionFailed"));
     } finally {
       setBusy(false);
     }
@@ -239,7 +226,7 @@ function OperatorRow({
     } catch (err) {
       setPendingRole(null);
       roleFlash.fail();
-      setError(err instanceof Error ? err.message : "Action failed");
+      setError(err instanceof Error ? err.message : tt("actionFailed"));
     } finally {
       setBusy(false);
     }
@@ -256,7 +243,7 @@ function OperatorRow({
             {op.first_name} {op.last_name}
             {pending && (
               <span style={{ marginLeft: 8, fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "var(--sand-soft)", color: "#8C6B14", fontWeight: 500 }}>
-                Pending
+                {tt("operators.pending")}
               </span>
             )}
           </div>
@@ -274,34 +261,35 @@ function OperatorRow({
               onChange={(e) => changeRole(e.target.value)}
               style={{ ...inputStyle, width: "auto", padding: "6px 10px", fontSize: 12 }}
             >
-              <option value="owner">Owner</option>
-              <option value="operator">Operator</option>
-              <option value="support">Support</option>
-              <option value="marketing">Marketing</option>
+              {ROLES.map((role) => (
+                <option key={role} value={role}>
+                  {tt(`roles.${role}`)}
+                </option>
+              ))}
             </select>
             <SaveFlash state={roleFlash.state} style={{ fontSize: 10.5 }} />
           </div>
         ) : (
-          <span style={{ fontSize: 13, textTransform: "capitalize" }}>{op.role}</span>
+          <span style={{ fontSize: 13 }}>{tt.has(`roles.${op.role}`) ? tt(`roles.${op.role}`) : op.role}</span>
         )}
       </div>
       <div>
         {op.mfa_enabled ? (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, color: "var(--moss)", fontWeight: 500 }}>
-            <ShieldCheck size={13} /> On
+            <ShieldCheck size={13} /> {tt("operators.mfaOn")}
           </span>
         ) : (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, color: "var(--rose)", fontWeight: 500 }}>
-            <ShieldOff size={13} /> Off
+            <ShieldOff size={13} /> {tt("operators.mfaOff")}
           </span>
         )}
       </div>
-      <div style={{ fontSize: 12.5, color: "var(--ink-2)" }}>{pending ? `Invited ${fmtDate(op.invited_at)}` : fmtDate(op.last_active_at)}</div>
+      <div style={{ fontSize: 12.5, color: "var(--ink-2)" }}>{pending ? tt("operators.invited", { date: fmtDate(op.invited_at, locale) }) : fmtDate(op.last_active_at, locale)}</div>
       <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
         {error ? <span style={{ fontSize: 10, color: "var(--rose)" }}>{error}</span> : null}
         {isOwner && pending && (
           <button type="button" disabled={busy} onClick={() => run(() => resendPlatformOperatorInvite(op.id))} style={rowBtn}>
-            Resend
+            {tt("operators.resend")}
           </button>
         )}
         {isOwner && !isSelf && (
@@ -309,13 +297,13 @@ function OperatorRow({
             type="button"
             disabled={busy}
             onClick={() => {
-              if (window.confirm(`Remove ${op.first_name} ${op.last_name} from tier 0?`)) {
+              if (window.confirm(tt("operators.confirmRemove", { name: `${op.first_name} ${op.last_name}` }))) {
                 run(() => removePlatformOperator(op.id));
               }
             }}
             style={{ ...rowBtn, color: "var(--rose)", borderColor: "var(--rose-soft)" }}
           >
-            Remove
+            {tt("operators.remove")}
           </button>
         )}
       </div>
@@ -325,11 +313,12 @@ function OperatorRow({
 
 // ── §2.2 tenant access controls ───────────────────────────────────────────────
 
-const GRANT_STATUS_META: Record<string, { label: string; bg: string; c: string }> = {
-  requested: { label: "Awaiting tenant", bg: "var(--sand-soft)", c: "#8C6B14" },
-  active: { label: "Active", bg: "var(--moss-soft)", c: "var(--moss)" },
-  expired: { label: "Expired", bg: "var(--paper-2)", c: "var(--ink-3)" },
-  denied: { label: "Denied", bg: "var(--rose-soft)", c: "var(--rose)" },
+// Colours only — the wording comes from `platform.settings.access.status`.
+const GRANT_STATUS_META: Record<string, { bg: string; c: string }> = {
+  requested: { bg: "var(--sand-soft)", c: "#8C6B14" },
+  active: { bg: "var(--moss-soft)", c: "var(--moss)" },
+  expired: { bg: "var(--paper-2)", c: "var(--ink-3)" },
+  denied: { bg: "var(--rose-soft)", c: "var(--rose)" },
 };
 
 function TenantAccessCard({
@@ -343,6 +332,7 @@ function TenantAccessCard({
   isOwner: boolean;
   onSaved: () => void;
 }) {
+  const tt = useTranslations("platform.settings");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingApproval, setPendingApproval] = useState<boolean | null>(null);
@@ -367,7 +357,7 @@ function TenantAccessCard({
       return true;
     } catch (err) {
       flash.fail();
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : tt("saveFailed"));
       return false;
     } finally {
       setBusy(false);
@@ -384,7 +374,7 @@ function TenantAccessCard({
   return (
     <div style={{ ...card, padding: "22px 24px", marginBottom: 36 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr", gap: "14px 24px", alignItems: "start" }}>
-        <SettingField label="Require tenant approval" flash={<SaveFlash state={approvalFlash.state} />}>
+        <SettingField label={tt("access.requireApproval")} flash={<SaveFlash state={approvalFlash.state} />}>
           <button
             type="button"
             disabled={!isOwner || busy}
@@ -412,10 +402,10 @@ function TenantAccessCard({
                 }}
               />
             </span>
-            {approvalOn ? "On — tenant admin approves each request" : "Off — requests activate immediately"}
+            {approvalOn ? tt("access.approvalOn") : tt("access.approvalOff")}
           </button>
         </SettingField>
-        <SettingField label="Access window (hours)" flash={<SaveFlash state={windowFlash.state} />}>
+        <SettingField label={tt("access.window")} flash={<SaveFlash state={windowFlash.state} />}>
           <input
             type="number"
             min={1}
@@ -429,7 +419,7 @@ function TenantAccessCard({
             style={inputStyle}
           />
         </SettingField>
-        <SettingField label="Active grants">
+        <SettingField label={tt("access.activeGrants")}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             <span
               style={{
@@ -440,7 +430,7 @@ function TenantAccessCard({
               {grants ? grants.active_count : "—"}
             </span>
             <span style={{ fontSize: 11, color: "var(--ink-3)" }}>
-              {(grants?.active_count ?? 0) > 0 ? "operators inside a tenant" : "should usually be 0"}
+              {(grants?.active_count ?? 0) > 0 ? tt("access.inside") : tt("access.usuallyZero")}
             </span>
           </div>
         </SettingField>
@@ -449,7 +439,7 @@ function TenantAccessCard({
       {recent.length > 0 && (
         <div style={{ marginTop: 18, borderTop: "0.5px solid var(--line)", paddingTop: 14 }}>
           <div style={{ fontSize: 10, color: "var(--ink-3)", letterSpacing: ".1em", textTransform: "uppercase", fontWeight: 500, marginBottom: 10 }}>
-            Recent requests
+            {tt("access.recent")}
           </div>
           {recent.map((g) => {
             const meta = GRANT_STATUS_META[g.status] ?? GRANT_STATUS_META.expired;
@@ -461,7 +451,7 @@ function TenantAccessCard({
                   “{g.reason}”
                 </span>
                 <span style={{ padding: "2px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 500, background: meta.bg, color: meta.c, flexShrink: 0 }}>
-                  {meta.label}
+                  {tt.has(`access.status.${g.status}`) ? tt(`access.status.${g.status}`) : g.status}
                 </span>
               </div>
             );
@@ -484,6 +474,9 @@ function DefaultsCard({
   isOwner: boolean;
   onSaved: () => void;
 }) {
+  const tt = useTranslations("platform.settings");
+  const tc = useTranslations("common");
+  const tLang = useTranslations("admin.languageNames");
   const [language, setLanguage] = useState(settings.default_language);
   const [trial, setTrial] = useState(String(settings.trial_length_days));
   const [inviteExpiry, setInviteExpiry] = useState(String(settings.invite_expiry_days));
@@ -512,7 +505,7 @@ function DefaultsCard({
       setSaved(true);
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : tt("saveFailed"));
     } finally {
       setBusy(false);
     }
@@ -521,26 +514,26 @@ function DefaultsCard({
   return (
     <div style={{ ...card, padding: "22px 24px", marginBottom: 36 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "14px 24px" }}>
-        <SettingField label="Default language">
+        <SettingField label={tt("defaults.language")}>
           <select value={language} onChange={(e) => setLanguage(e.target.value)} disabled={!isOwner} style={inputStyle}>
-            <option value="fr">Français</option>
-            <option value="en">English</option>
-            <option value="bilingual">Bilingue</option>
+            <option value="fr">{tLang("fr")}</option>
+            <option value="en">{tLang("en")}</option>
+            <option value="bilingual">{tLang("bilingual")}</option>
           </select>
         </SettingField>
-        <SettingField label="Trial length (days)">
+        <SettingField label={tt("defaults.trial")}>
           <input type="number" min={0} max={365} value={trial} onChange={(e) => setTrial(e.target.value)} disabled={!isOwner} style={inputStyle} />
         </SettingField>
-        <SettingField label="Invite expiry (days)">
+        <SettingField label={tt("defaults.inviteExpiry")}>
           <input type="number" min={1} max={90} value={inviteExpiry} onChange={(e) => setInviteExpiry(e.target.value)} disabled={!isOwner} style={inputStyle} />
         </SettingField>
-        <SettingField label="Orphan cleanup retention (days)">
+        <SettingField label={tt("defaults.retention")}>
           <input type="number" min={1} max={3650} value={retention} onChange={(e) => setRetention(e.target.value)} disabled={!isOwner} style={inputStyle} />
         </SettingField>
-        <SettingField label="Data residency">
+        <SettingField label={tt("defaults.residency")}>
           <div style={{ ...inputStyle, display: "flex", alignItems: "center", gap: 8, background: "var(--paper-2)", color: "var(--ink-2)" }}>
             <Lock size={13} /> Canada · {settings.data_residency}
-            <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--ink-3)" }}>Law 25 — locked</span>
+            <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--ink-3)" }}>{tt("defaults.locked")}</span>
           </div>
         </SettingField>
       </div>
@@ -548,17 +541,17 @@ function DefaultsCard({
         {error ? <span style={{ fontSize: 12, color: "var(--rose)" }}>{error}</span> : null}
         {saved && !dirty ? (
           <span style={{ fontSize: 12, color: "var(--moss)", display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <Check size={13} /> Saved
+            <Check size={13} /> {tc("saved")}
           </span>
         ) : null}
         <button
           type="button"
           onClick={save}
           disabled={!isOwner || !dirty || busy}
-          title={isOwner ? undefined : "Only an owner can edit defaults"}
+          title={isOwner ? undefined : tt("defaults.onlyOwnerEdit")}
           style={{ ...primaryBtn, opacity: !isOwner || !dirty || busy ? 0.45 : 1, cursor: !isOwner || !dirty ? "not-allowed" : "pointer" }}
         >
-          {busy ? "Saving…" : "Save defaults"}
+          {busy ? tt("defaults.saving") : tt("defaults.save")}
         </button>
       </div>
     </div>
@@ -576,6 +569,8 @@ function ReservedSlugsCard({
   isOwner: boolean;
   onSaved: () => void;
 }) {
+  const tt = useTranslations("platform.settings");
+  const tc = useTranslations("common");
   const [slugs, setSlugs] = useState<string[]>(settings.reserved_slugs);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -593,7 +588,7 @@ function ReservedSlugsCard({
       onSaved();
     } catch (err) {
       flash.fail();
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : tt("saveFailed"));
     } finally {
       setBusy(false);
     }
@@ -620,7 +615,7 @@ function ReservedSlugsCard({
                 type="button"
                 disabled={busy}
                 onClick={() => void persist(slugs.filter((s) => s !== slug))}
-                aria-label={`Remove ${slug}`}
+                aria-label={tt("slugs.removeAria", { slug })}
                 style={{ border: 0, background: "transparent", cursor: "pointer", color: "var(--ink-3)", display: "inline-flex", padding: 2 }}
               >
                 <X size={12} />
@@ -637,11 +632,11 @@ function ReservedSlugsCard({
             onKeyDown={(e) => {
               if (e.key === "Enter") add();
             }}
-            placeholder="add a reserved slug…"
+            placeholder={tt("slugs.placeholder")}
             style={inputStyle}
           />
           <button type="button" onClick={add} disabled={busy || !draft.trim()} style={{ ...primaryBtn, opacity: busy || !draft.trim() ? 0.45 : 1 }}>
-            <Plus size={14} /> Add
+            <Plus size={14} /> {tc("add")}
           </button>
           <SaveFlash state={flash.state} />
         </div>
@@ -654,6 +649,8 @@ function ReservedSlugsCard({
 // ── invite modal ──────────────────────────────────────────────────────────────
 
 function InviteOperatorModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const tt = useTranslations("platform.settings");
+  const tc = useTranslations("common");
   const [email, setEmail] = useState("");
   const [first, setFirst] = useState("");
   const [last, setLast] = useState("");
@@ -663,7 +660,7 @@ function InviteOperatorModal({ onClose, onCreated }: { onClose: () => void; onCr
 
   async function submit() {
     if (!email.trim() || !first.trim() || !last.trim()) {
-      setError("Name and email are required.");
+      setError(tt("invite.required"));
       return;
     }
     setBusy(true);
@@ -677,7 +674,7 @@ function InviteOperatorModal({ onClose, onCreated }: { onClose: () => void; onCr
       });
       onCreated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send invite");
+      setError(err instanceof Error ? err.message : tt("invite.failed"));
       setBusy(false);
     }
   }
@@ -687,9 +684,9 @@ function InviteOperatorModal({ onClose, onCreated }: { onClose: () => void; onCr
       <div style={{ ...card, width: 440, maxWidth: "100%", padding: "28px 30px", background: "#fff", boxShadow: "0 30px 80px -20px rgba(0,0,0,.4)" }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
           <div>
-            <div className="stf-h-eyebrow" style={eyebrow}>Tier 0</div>
+            <div className="stf-h-eyebrow" style={eyebrow}>{tt("invite.eyebrow")}</div>
             <h2 style={{ fontFamily: "var(--serif)", fontSize: 28, lineHeight: 1.05, margin: "4px 0 0" }}>
-              Add an <em style={{ fontStyle: "italic" }}>operator</em>
+              {tt.rich("invite.title", { em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em> })}
             </h2>
           </div>
           <button type="button" onClick={onClose} style={{ ...rowBtn, width: 32, height: 32, borderRadius: 99, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
@@ -697,23 +694,23 @@ function InviteOperatorModal({ onClose, onCreated }: { onClose: () => void; onCr
           </button>
         </div>
         <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
-          They&apos;ll get a sign-up link by email. Until they enable 2FA, sensitive actions stay blocked.
+          {tt("invite.body")}
         </p>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <ModalField label="First name">
+          <ModalField label={tt("invite.firstName")}>
             <input value={first} onChange={(e) => setFirst(e.target.value)} placeholder="Josy" style={inputStyle} />
           </ModalField>
-          <ModalField label="Last name">
+          <ModalField label={tt("invite.lastName")}>
             <input value={last} onChange={(e) => setLast(e.target.value)} placeholder="Corneille" style={inputStyle} />
           </ModalField>
         </div>
-        <ModalField label="Email">
+        <ModalField label={tt("invite.email")}>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ops@staffig.ca" style={inputStyle} />
         </ModalField>
-        <ModalField label="Role">
+        <ModalField label={tt("invite.role")}>
           <div style={{ display: "flex", gap: 8 }}>
-            {(["owner", "operator", "support", "marketing"] as const).map((code) => {
+            {ROLES.map((code) => {
               const active = role === code;
               return (
                 <button
@@ -727,13 +724,12 @@ function InviteOperatorModal({ onClose, onCreated }: { onClose: () => void; onCr
                     cursor: "pointer",
                     fontFamily: "var(--ui)",
                     fontSize: 13,
-                    textTransform: "capitalize",
                     background: active ? "var(--ink)" : "#fff",
                     color: active ? "var(--paper)" : "var(--ink)",
                     border: `0.5px solid ${active ? "transparent" : "var(--line)"}`,
                   }}
                 >
-                  {code}
+                  {tt(`roles.${code}`)}
                 </button>
               );
             })}
@@ -743,9 +739,9 @@ function InviteOperatorModal({ onClose, onCreated }: { onClose: () => void; onCr
         {error ? <p style={{ margin: "4px 0 0", color: "var(--rose)", fontSize: 12 }}>{error}</p> : null}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24 }}>
-          <button type="button" onClick={onClose} style={rowBtn}>Cancel</button>
+          <button type="button" onClick={onClose} style={rowBtn}>{tc("cancel")}</button>
           <button type="button" onClick={submit} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>
-            <ArrowRight size={14} /> {busy ? "Sending…" : "Send invite"}
+            <ArrowRight size={14} /> {busy ? tt("invite.sending") : tt("invite.send")}
           </button>
         </div>
       </div>

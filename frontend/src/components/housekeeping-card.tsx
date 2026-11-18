@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { ScanSearch, Trash2 } from "lucide-react";
 import { OrphanUserCleanup } from "./orphan-user-cleanup";
 import { removeOrphan, scanOrphans } from "../lib/browser-api";
 import type { OrphanAccount, OrphanScanResult } from "../lib/types";
 
-function fmtDateTime(value: string | null): string {
+function fmtDateTime(value: string | null, locale: string): string {
   if (!value) return "—";
   try {
-    return new Date(value).toLocaleString(undefined, {
+    return new Date(value).toLocaleString(locale === "fr" ? "fr-CA" : "en-CA", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -25,6 +26,8 @@ function fmtDateTime(value: string | null): string {
  * clean them up one click at a time. The manual force-remove-by-email form
  * stays below as the fallback for anything the scan can't see. */
 export function HousekeepingCard({ canScan }: { canScan: boolean }) {
+  const t = useTranslations("platform.housekeeping");
+  const locale = useLocale();
   const [result, setResult] = useState<OrphanScanResult | null>(null);
   const [scanning, setScanning] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -38,7 +41,7 @@ export function HousekeepingCard({ canScan }: { canScan: boolean }) {
     try {
       setResult(await scanOrphans());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Scan failed");
+      setError(err instanceof Error ? err.message : t("scanFailed"));
     } finally {
       setScanning(false);
     }
@@ -53,7 +56,7 @@ export function HousekeepingCard({ canScan }: { canScan: boolean }) {
       setResult(await removeOrphan(orphan.kind, orphan.id));
       setLastRemoved(orphan.email ?? orphan.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Removal failed");
+      setError(err instanceof Error ? err.message : t("removeFailed"));
     } finally {
       setRemoving(null);
     }
@@ -67,44 +70,41 @@ export function HousekeepingCard({ canScan }: { canScan: boolean }) {
         <div style={card}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <p style={{ margin: 0, fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.5, maxWidth: 560 }}>
-              Diffs Clerk accounts against the database. Finds uninvited sign-ups
-              (Clerk account, no database row) and database rows reachable in no
-              management list.
+              {t("intro")}
             </p>
             <button type="button" onClick={runScan} disabled={scanning} style={{ ...scanBtn, opacity: scanning ? 0.6 : 1 }}>
               <ScanSearch size={13} />
-              {scanning ? "Scanning…" : result ? "Rescan" : "Scan for orphans"}
+              {scanning ? t("scanning") : result ? t("rescan") : t("scan")}
             </button>
           </div>
 
           {error && <p style={errorNote}>{error}</p>}
-          {lastRemoved && <p style={successNote}>Removed {lastRemoved}.</p>}
+          {lastRemoved && <p style={successNote}>{t("removed", { who: lastRemoved })}</p>}
 
           {result && (
             <div style={{ marginTop: 16 }}>
               {!result.clerk_available && (
                 <p style={warnNote}>
-                  Clerk scan unavailable (Backend API unreachable or no secret key) —
-                  only database-side orphans are shown.
+                  {t("clerkUnavailable")}
                 </p>
               )}
 
               {total === 0 ? (
                 <p style={successNote}>
-                  No orphans found — {result.clerk_available ? "Clerk and the database agree" : "the database is clean"}.
+                  {result.clerk_available ? t("noneClerk") : t("noneDb")}
                 </p>
               ) : (
                 <>
                   <OrphanGroup
-                    title="Only in Clerk"
-                    sub="Signed up but never invited, or left behind by a failed delete. No database row — removing deletes the Clerk account."
+                    title={t("clerkTitle")}
+                    sub={t("clerkSub")}
                     orphans={result.clerk_only}
                     removing={removing}
                     onRemove={remove}
                   />
                   <OrphanGroup
-                    title="Only in the database"
-                    sub="Holds an email but appears in no management list. Removing tombstones the row and frees the email for re-invitation."
+                    title={t("dbTitle")}
+                    sub={t("dbSub")}
                     orphans={result.db_only}
                     removing={removing}
                     onRemove={remove}
@@ -113,14 +113,14 @@ export function HousekeepingCard({ canScan }: { canScan: boolean }) {
               )}
 
               <p style={{ margin: "12px 0 0", fontSize: 11, color: "var(--ink-3)" }}>
-                Scanned {fmtDateTime(result.scanned_at)}
+                {t("scanned", { time: fmtDateTime(result.scanned_at, locale) })}
               </p>
             </div>
           )}
         </div>
       ) : (
         <div style={{ ...card, fontSize: 13, color: "var(--ink-3)" }}>
-          The orphan scan is available to owners and operators only.
+          {t("hidden")}
         </div>
       )}
 
@@ -142,6 +142,8 @@ function OrphanGroup({
   removing: string | null;
   onRemove: (orphan: OrphanAccount) => void;
 }) {
+  const t = useTranslations("platform.housekeeping");
+  const locale = useLocale();
   if (orphans.length === 0) return null;
   return (
     <div style={{ marginTop: 14 }}>
@@ -169,20 +171,20 @@ function OrphanGroup({
             >
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {orphan.email ?? <span style={{ color: "var(--ink-3)" }}>no email on record</span>}
+                  {orphan.email ?? <span style={{ color: "var(--ink-3)" }}>{t("noEmail")}</span>}
                 </div>
                 <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>
                   {[
                     orphan.name,
                     orphan.role,
-                    orphan.created_at ? `created ${fmtDateTime(orphan.created_at)}` : null,
+                    orphan.created_at ? t("created", { time: fmtDateTime(orphan.created_at, locale) }) : null,
                     orphan.kind === "clerk"
                       ? orphan.last_sign_in_at
-                        ? `last sign-in ${fmtDateTime(orphan.last_sign_in_at)}`
-                        : "never signed in"
+                        ? t("lastSignIn", { time: fmtDateTime(orphan.last_sign_in_at, locale) })
+                        : t("neverSignedIn")
                       : orphan.clerk_linked
-                        ? "Clerk-linked"
-                        : "never signed up",
+                        ? t("clerkLinked")
+                        : t("neverSignedUp"),
                   ]
                     .filter(Boolean)
                     .join(" · ")}
@@ -195,7 +197,7 @@ function OrphanGroup({
                 style={{ ...removeBtn, opacity: removing !== null && !busy ? 0.45 : 1, cursor: removing !== null ? "not-allowed" : "pointer" }}
               >
                 <Trash2 size={12} />
-                {busy ? "Removing…" : "Remove"}
+                {busy ? t("removing") : t("remove")}
               </button>
             </div>
           );
