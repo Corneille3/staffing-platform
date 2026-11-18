@@ -1636,6 +1636,133 @@
         "sending": "Envoi…",
         "send": "Envoyer l'invitation"
       }
+    },
+    "settings": {
+      "eyebrow": "Plateforme · faire tourner StaffiG",
+      "title": "Paramètres de l'<em>opérateur</em>",
+      "description": "Qui exploite le niveau 0, ce dont héritent les nouveaux tenants, et quelles adresses d'espace restent réservées.",
+      "saveFailed": "L'enregistrement a échoué",
+      "actionFailed": "L'action a échoué",
+      "auditNote": "Chaque changement fait sur cette page est consigné dans le journal d'audit de la plateforme.",
+      "roles": {
+        "owner": "Owner",
+        "operator": "Opérateur",
+        "support": "Soutien",
+        "marketing": "Marketing"
+      },
+      "roleBlurb": {
+        "owner": "Tout — opérateurs, facturation et forfaits, tenants, demandes d'accès.",
+        "operator": "Inviter et suspendre des tenants, demander l'accès à un tenant. Aucune modification des opérateurs ni de la facturation.",
+        "support": "Lecture seule. Peut demander un accès à un tenant, limité dans le temps et soumis à approbation.",
+        "marketing": "Le pipeline de vente seulement — les leads, rien d'autre. Ni tenants, ni paramètres, ni accès aux tenants."
+      },
+      "operators": {
+        "title": "Opérateurs et accès",
+        "sub": "Tous les comptes de niveau 0. Gardez cette liste courte — chaque compte voit les chiffres agrégés de tous les tenants.",
+        "onlyOwnerAdd": "Seul un owner peut ajouter des opérateurs",
+        "add": "Ajouter un opérateur",
+        "colPerson": "Personne",
+        "colRole": "Rôle",
+        "col2fa": "2FA",
+        "colLastActive": "Dernière activité",
+        "hidden": "La liste des opérateurs n'est visible que par les owners et les opérateurs.",
+        "pending": "En attente",
+        "mfaOn": "Activée",
+        "mfaOff": "Désactivée",
+        "invited": "Invité·e le {date}",
+        "resend": "Renvoyer",
+        "remove": "Retirer",
+        "confirmRemove": "Retirer {name} du niveau 0 ?"
+      },
+      "access": {
+        "title": "Accès aux tenants",
+        "sub": "Comment un opérateur peut consulter un tenant quand le soutien l'exige. Consigné, consenti, limité dans le temps.",
+        "requireApproval": "Exiger l'approbation du tenant",
+        "approvalOn": "Activé — l'admin du tenant approuve chaque demande",
+        "approvalOff": "Désactivé — les demandes s'activent tout de suite",
+        "window": "Durée de l'accès (heures)",
+        "activeGrants": "Accès en cours",
+        "inside": "opérateurs dans un tenant",
+        "usuallyZero": "devrait normalement être 0",
+        "recent": "Demandes récentes",
+        "status": {
+          "requested": "En attente du tenant",
+          "active": "En cours",
+          "expired": "Expiré",
+          "denied": "Refusé"
+        }
+      },
+      "defaults": {
+        "title": "Valeurs par défaut des nouveaux tenants",
+        "sub": "Appliquées à l'invitation d'un tenant. Les tenants peuvent changer la plupart d'entre elles dans leur propre espace.",
+        "language": "Langue par défaut",
+        "trial": "Durée de l'essai (jours)",
+        "inviteExpiry": "Expiration de l'invitation (jours)",
+        "retention": "Conservation avant nettoyage des orphelins (jours)",
+        "residency": "Résidence des données",
+        "locked": "Loi 25 — verrouillé",
+        "onlyOwnerEdit": "Seul un owner peut modifier ces valeurs",
+        "saving": "Enregistrement…",
+        "save": "Enregistrer les valeurs"
+      },
+      "slugs": {
+        "title": "Adresses d'espace réservées",
+        "sub": "Une invitation de tenant dont le slug figure dans cette liste est refusée — cela protège les routes du système.",
+        "removeAria": "Retirer {slug}",
+        "placeholder": "ajouter un slug réservé…"
+      },
+      "housekeeping": {
+        "title": "Entretien",
+        "sub": "Les comptes orphelins — restés dans Clerk sans ligne dans la base de données, ou dans la base sans apparaître dans aucune liste."
+      },
+      "invite": {
+        "required": "Le nom et le courriel sont obligatoires.",
+        "failed": "L'envoi de l'invitation a échoué",
+        "eyebrow": "Niveau 0",
+        "title": "Ajouter un <em>opérateur</em>",
+        "body": "La personne reçoit un lien d'inscription par courriel. Tant qu'elle n'a pas activé la 2FA, les actions sensibles restent bloquées.",
+        "firstName": "Prénom",
+        "lastName": "Nom",
+        "email": "Courriel",
+        "role": "Rôle",
+        "sending": "Envoi…",
+        "send": "Envoyer l'invitation"
+      }
+    },
+    "housekeeping": {
+      "scanFailed": "L'analyse a échoué",
+      "removeFailed": "Le retrait a échoué",
+      "intro": "Compare les comptes Clerk à la base de données. Trouve les inscriptions sans invitation (compte Clerk, aucune ligne dans la base) et les lignes de la base qui n'apparaissent dans aucune liste de gestion.",
+      "scanning": "Analyse…",
+      "rescan": "Relancer l'analyse",
+      "scan": "Chercher les orphelins",
+      "removed": "{who} a été retiré.",
+      "clerkUnavailable": "L'analyse de Clerk n'est pas disponible (API inaccessible ou clé secrète absente) — seuls les orphelins de la base de données sont affichés.",
+      "noneClerk": "Aucun orphelin — Clerk et la base de données concordent.",
+      "noneDb": "Aucun orphelin — la base de données est propre.",
+      "clerkTitle": "Seulement dans Clerk",
+      "clerkSub": "Inscrit sans avoir été invité, ou resté après une suppression ratée. Aucune ligne dans la base — le retrait supprime le compte Clerk.",
+      "dbTitle": "Seulement dans la base de données",
+      "dbSub": "Détient un courriel mais n'apparaît dans aucune liste de gestion. Le retrait neutralise la ligne et libère le courriel pour une nouvelle invitation.",
+      "scanned": "Analyse du {time}",
+      "hidden": "L'analyse des orphelins est réservée aux owners et aux opérateurs.",
+      "noEmail": "aucun courriel au dossier",
+      "created": "créé le {time}",
+      "lastSignIn": "dernière connexion le {time}",
+      "neverSignedIn": "jamais connecté",
+      "clerkLinked": "lié à Clerk",
+      "neverSignedUp": "jamais inscrit",
+      "removing": "Retrait…",
+      "remove": "Retirer",
+      "force": {
+        "button": "Retrait forcé d'un compte orphelin",
+        "body": "Pour les comptes dont le courriel est pris dans la base de données mais qui n'apparaissent dans aucune liste de gestion. Retire la ligne de la base, supprime l'identité Clerk et libère le courriel pour une nouvelle invitation.",
+        "email": "Courriel",
+        "success": "{email} a été retiré — ligne neutralisée dans la base, identité Clerk supprimée, toutes les adhésions désactivées. L'adresse est libre pour une nouvelle invitation.",
+        "failed": "Le nettoyage a échoué",
+        "removing": "Retrait…",
+        "submit": "Forcer le retrait"
+      }
     }
   },
   "apf": {

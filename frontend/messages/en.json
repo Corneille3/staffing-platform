@@ -1636,6 +1636,133 @@
         "sending": "Sending…",
         "send": "Send invite"
       }
+    },
+    "settings": {
+      "eyebrow": "Platform · running StaffiG",
+      "title": "Settings for the <em>operator</em>",
+      "description": "Who runs tier 0, what new tenants inherit, and which workspace addresses stay reserved.",
+      "saveFailed": "Save failed",
+      "actionFailed": "Action failed",
+      "auditNote": "Every change on this page is written to the platform audit trail.",
+      "roles": {
+        "owner": "Owner",
+        "operator": "Operator",
+        "support": "Support",
+        "marketing": "Marketing"
+      },
+      "roleBlurb": {
+        "owner": "Everything — operators, billing & plans, tenants, access requests.",
+        "operator": "Invite & suspend tenants, request tenant access. No operator or billing edits.",
+        "support": "Read-only. Can request time-boxed tenant access with approval.",
+        "marketing": "The sales pipeline only — leads, nothing else. No tenants, no settings, no tenant access."
+      },
+      "operators": {
+        "title": "Operators & access",
+        "sub": "Every tier-0 account. Keep this list short — each row can see aggregate data across all tenants.",
+        "onlyOwnerAdd": "Only an owner can add operators",
+        "add": "Add operator",
+        "colPerson": "Person",
+        "colRole": "Role",
+        "col2fa": "2FA",
+        "colLastActive": "Last active",
+        "hidden": "The operator list is visible to owners and operators only.",
+        "pending": "Pending",
+        "mfaOn": "On",
+        "mfaOff": "Off",
+        "invited": "Invited {date}",
+        "resend": "Resend",
+        "remove": "Remove",
+        "confirmRemove": "Remove {name} from tier 0?"
+      },
+      "access": {
+        "title": "Tenant access",
+        "sub": "How an operator may look inside a tenant when support requires it. Logged, consented, time-boxed.",
+        "requireApproval": "Require tenant approval",
+        "approvalOn": "On — tenant admin approves each request",
+        "approvalOff": "Off — requests activate immediately",
+        "window": "Access window (hours)",
+        "activeGrants": "Active grants",
+        "inside": "operators inside a tenant",
+        "usuallyZero": "should usually be 0",
+        "recent": "Recent requests",
+        "status": {
+          "requested": "Awaiting tenant",
+          "active": "Active",
+          "expired": "Expired",
+          "denied": "Denied"
+        }
+      },
+      "defaults": {
+        "title": "New-tenant defaults",
+        "sub": "Applied when a tenant is invited. Tenants can change most of these inside their own workspace.",
+        "language": "Default language",
+        "trial": "Trial length (days)",
+        "inviteExpiry": "Invite expiry (days)",
+        "retention": "Orphan cleanup retention (days)",
+        "residency": "Data residency",
+        "locked": "Law 25 — locked",
+        "onlyOwnerEdit": "Only an owner can edit defaults",
+        "saving": "Saving…",
+        "save": "Save defaults"
+      },
+      "slugs": {
+        "title": "Reserved workspace addresses",
+        "sub": "A tenant invite whose slug is on this list is rejected — protects system routes.",
+        "removeAria": "Remove {slug}",
+        "placeholder": "add a reserved slug…"
+      },
+      "housekeeping": {
+        "title": "Housekeeping",
+        "sub": "Orphan accounts — stuck in Clerk without a database row, or in the database without a reachable listing."
+      },
+      "invite": {
+        "required": "Name and email are required.",
+        "failed": "Failed to send invite",
+        "eyebrow": "Tier 0",
+        "title": "Add an <em>operator</em>",
+        "body": "They'll get a sign-up link by email. Until they enable 2FA, sensitive actions stay blocked.",
+        "firstName": "First name",
+        "lastName": "Last name",
+        "email": "Email",
+        "role": "Role",
+        "sending": "Sending…",
+        "send": "Send invite"
+      }
+    },
+    "housekeeping": {
+      "scanFailed": "Scan failed",
+      "removeFailed": "Removal failed",
+      "intro": "Diffs Clerk accounts against the database. Finds uninvited sign-ups (Clerk account, no database row) and database rows reachable in no management list.",
+      "scanning": "Scanning…",
+      "rescan": "Rescan",
+      "scan": "Scan for orphans",
+      "removed": "Removed {who}.",
+      "clerkUnavailable": "Clerk scan unavailable (Backend API unreachable or no secret key) — only database-side orphans are shown.",
+      "noneClerk": "No orphans found — Clerk and the database agree.",
+      "noneDb": "No orphans found — the database is clean.",
+      "clerkTitle": "Only in Clerk",
+      "clerkSub": "Signed up but never invited, or left behind by a failed delete. No database row — removing deletes the Clerk account.",
+      "dbTitle": "Only in the database",
+      "dbSub": "Holds an email but appears in no management list. Removing tombstones the row and frees the email for re-invitation.",
+      "scanned": "Scanned {time}",
+      "hidden": "The orphan scan is available to owners and operators only.",
+      "noEmail": "no email on record",
+      "created": "created {time}",
+      "lastSignIn": "last sign-in {time}",
+      "neverSignedIn": "never signed in",
+      "clerkLinked": "Clerk-linked",
+      "neverSignedUp": "never signed up",
+      "removing": "Removing…",
+      "remove": "Remove",
+      "force": {
+        "button": "Force-remove orphan user",
+        "body": "For accounts whose email is bound in the database but don't appear in any management list. Removes the DB row, deletes the Clerk identity, and frees the email for re-invitation.",
+        "email": "Email",
+        "success": "Removed {email} — DB row tombstoned, Clerk identity deleted, all memberships deactivated. The address is free for re-invitation.",
+        "failed": "Cleanup failed",
+        "removing": "Removing…",
+        "submit": "Force remove"
+      }
     }
   },
   "apf": {
