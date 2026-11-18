@@ -617,3 +617,76 @@ def test_import_refusals_carry_codes(platform_admin_client, seed):
         ('unknown_segment', {'value': 'Usines (QC)'}),
     ]
     assert all(row['reason'] for row in result['skipped'])  # the English sentence stays
+
+
+# ── deleting a lead (owner only) ─────────────────────────────────────────────
+
+def test_owner_deletes_a_lead_with_its_feed(platform_admin_client, db_session):
+    from app.models.platform_audit_log import PlatformAuditLog
+
+    lead = _create(platform_admin_client, external_ref='L900')
+    keep = _create(platform_admin_client, org_name='Stays')
+    platform_admin_client.post(f"{LEADS}/{lead['id']}/events", json={'type': 'note', 'body': 'Test row'})
+    assert len(_events(db_session, lead['id'])) == 2
+
+    res = platform_admin_client.delete(f"{LEADS}/{lead['id']}")
+    assert res.status_code == 204 and res.content == b''
+
+    db_session.expire_all()
+    assert db_session.get(PlatformLead, lead['id']) is None
+    assert _events(db_session, lead['id']) == []
+    assert platform_admin_client.get(f"{LEADS}/{lead['id']}").status_code == 404
+    assert [row['id'] for row in platform_admin_client.get(LEADS).json()['items']] == [keep['id']]
+
+    # The audit trail keeps what the pipeline no longer shows.
+    audit = db_session.scalar(
+        select(PlatformAuditLog).where(
+            PlatformAuditLog.action == 'lead.deleted', PlatformAuditLog.target_id == lead['id'],
+        )
+    )
+    assert audit is not None
+    assert audit.payload['org_name'] == 'Résidence Test'
+    assert audit.payload['external_ref'] == 'L900'
+    assert audit.payload['event_count'] == 2
+
+    # The reference is free again, and a second delete finds nothing.
+    assert platform_admin_client.post(LEADS, json={**NEW_LEAD, 'external_ref': 'L900'}).status_code == 201
+    assert platform_admin_client.delete(f"{LEADS}/{lead['id']}").status_code == 404
+
+
+def test_delete_is_owner_only(platform_admin_client, db_session, seed):
+    lead = _create(platform_admin_client)
+    operator, _user = _add_operator(db_session, PlatformOperatorRole.MARKETING, clerk_sub='int-op-mk-delete')
+    operator.mfa_enabled = True
+    db_session.flush()
+    with _client_for(db_session, 'int-op-mk-delete') as marketing:
+        assert marketing.delete(f"{LEADS}/{lead['id']}").status_code == 403
+    _add_operator(db_session, PlatformOperatorRole.OPERATOR, clerk_sub='int-op-op-delete')
+    with _client_for(db_session, 'int-op-op-delete') as operator_client:
+        assert operator_client.delete(f"{LEADS}/{lead['id']}").status_code == 403
+    assert db_session.get(PlatformLead, lead['id']) is not None
+
+
+def test_a_lead_with_a_workspace_is_kept_until_the_workspace_is_removed(platform_admin_client, db_session, seed):
+    from app.models.enums import TenantStatus
+    from app.models.tenant import Tenant
+
+    lead = _create(platform_admin_client, status='contacted')
+    assert _invite(platform_admin_client, lead['id']).status_code == 201
+
+    refused = platform_admin_client.delete(f"{LEADS}/{lead['id']}")
+    assert refused.status_code == 409
+    detail = refused.json()['detail']
+    assert detail['code'] == 'lead.delete_has_live_tenant'
+    assert detail['params'] == {'name': 'Résidence Test'}
+    assert db_session.get(PlatformLead, lead['id']) is not None
+
+    tenant = db_session.scalar(select(Tenant).where(Tenant.slug == 'residence-test'))
+    tenant.status = TenantStatus.REMOVED
+    db_session.flush()
+
+    assert platform_admin_client.delete(f"{LEADS}/{lead['id']}").status_code == 204
+    db_session.expire_all()
+    assert db_session.get(PlatformLead, lead['id']) is None
+    # The workspace row is untouched by the lead's deletion.
+    assert db_session.get(Tenant, tenant.id).status == TenantStatus.REMOVED

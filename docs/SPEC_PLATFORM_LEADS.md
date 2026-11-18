@@ -269,7 +269,7 @@ Lignes sans `org_name` → `skipped`. Un `external_ref` déjà présent → mise
 ### Reste à faire
 
 - **Session frontend** : onglet Leads, liste, fiche, i18n, option Marketing dans l'écran des opérateurs, redirection d'un compte marketing vers `/platform/leads`, export CSV.
-- Rien : les trois sessions sont livrées. Idées non construites : suppression d'un lead (owner), rappel automatique des actions en retard.
+- Rien : les trois sessions sont livrées. Idée non construite : rappel automatique des actions en retard. La suppression d'un lead est livrée (voir « Suppression »).
 
 ### Intake public (2026-11-15)
 
@@ -308,3 +308,11 @@ Le pilote se déroule dans le vrai espace du prospect : il n'existe pas d'enviro
 - Un pilote qui échoue se clôt en `lost` avec une raison, comme toute autre étape ouverte.
 - Quand la facturation existera, `won` pourra redevenir automatique au premier paiement.
 - `/platform/tenants` affiche une colonne « Origine » (segment + source du lead) ; la fiche du lead affiche le tenant lié et son état.
+
+### Suppression d'un lead (2026-11-17)
+
+- `DELETE /api/v1/platform/leads/{id}`, **owner seulement** (`require_platform_owner`, 2FA quand elle est exigée) ; marketing, operator et support reçoivent 403. Réponse 204.
+- Suppression **réelle** : le lead et tout son fil partent ensemble (`ON DELETE CASCADE`). Le §9 dit que le fil est append-only ; cela reste vrai pour un événement pris seul (ni PATCH ni DELETE d'un événement), mais un lead entier peut disparaître — le but est de retirer les leads de test et les erreurs de saisie.
+- **Trace** : une ligne `lead.deleted` dans `platform_audit_log` (acteur, nom de l'organisation, référence, segment, statut, source, tenant lié, nombre d'événements).
+- **Refus** : 409 `lead.delete_has_live_tenant` tant que l'espace lié existe (pending, onboarding, active ou suspended) — un lead devenu un espace est l'histoire de cet espace. Une fois l'espace supprimé, le lead peut l'être aussi.
+- Écran : bouton « Supprimer » sur la fiche, visible de l'owner seulement et caché tant que l'espace existe ; confirmation, puis retour à la liste.

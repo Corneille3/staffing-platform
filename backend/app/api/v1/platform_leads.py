@@ -3,7 +3,7 @@
 Mounted at /api/v1/platform/leads. Tier-0 `owner` and `marketing` only:
 `operator`, `support` and every tenant-side identity get the same 403, with
 no hint whether a lead exists. Writes add the 2FA gate (when enforced).
-« Invite as a network » is the owner's alone.
+« Invite as a network » and deleting a lead are the owner's alone.
 
 Not in this module yet: the public intake.
 """
@@ -11,7 +11,7 @@ from datetime import date
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
@@ -110,6 +110,18 @@ def update_lead(
     db: Session = Depends(get_db_session),
 ) -> LeadOut:
     return LeadOut.model_validate(PlatformLeadService(db).update(lead_id, payload, scope))
+
+
+@router.delete('/{lead_id}', status_code=status.HTTP_204_NO_CONTENT)
+def delete_lead(
+    lead_id: UUID,
+    # Destructive and irreversible: the owner's call, like the invite.
+    scope: AccessScope = Depends(require_platform_owner),
+    db: Session = Depends(get_db_session),
+) -> Response:
+    """Delete a lead and its activity feed. 409 while its workspace exists."""
+    PlatformLeadService(db).delete(lead_id, scope)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post('/{lead_id}/events', status_code=status.HTTP_201_CREATED, response_model=LeadEventOut)

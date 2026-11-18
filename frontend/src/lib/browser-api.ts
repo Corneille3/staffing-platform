@@ -801,6 +801,16 @@ export async function createLead(payload: LeadPatch & { org_name: string; segmen
   return postJson<Lead>("/api/v1/platform/leads", payload);
 }
 
+/** Owner only. 204 on success — there is no body to read. 409 (coded) while
+ * the lead's workspace still exists. */
+export async function deleteLead(id: string): Promise<void> {
+  const path = `/api/v1/platform/leads/${id}`;
+  const response = await fetch(`${BASE}${path}`, { method: "DELETE", headers: await authHeaders() });
+  if (!response.ok) {
+    throw await apiErrorFromResponse(response, `DELETE ${path} failed (${response.status})`);
+  }
+}
+
 export async function updateLead(id: string, patch: LeadPatch): Promise<Lead> {
   return patchJson<Lead>(`/api/v1/platform/leads/${id}`, patch);
 }

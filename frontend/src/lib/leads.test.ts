@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canDeleteLead,
   canInviteLead,
   canMoveLead,
   daysBetween,
@@ -200,5 +201,23 @@ describe("leadTenantBanner", () => {
 
   it("keeps a won lead won, whatever happened to the tenant since", () => {
     expect(leadTenantBanner({ status: "won", converted_at: "2026-11-15T10:00:00Z" }, "removed")).toBe("won");
+  });
+});
+
+describe("canDeleteLead", () => {
+  it("allows a lead that never became a workspace", () => {
+    expect(canDeleteLead({ tenant_id: null }, null)).toBe(true);
+  });
+
+  it("refuses while the workspace exists, whatever its state", () => {
+    for (const status of ["pending", "onboarding", "active", "suspended"]) {
+      expect(canDeleteLead({ tenant_id: "t1" }, status)).toBe(false);
+    }
+    // Linked, but the tenant summary has not loaded: stay on the safe side.
+    expect(canDeleteLead({ tenant_id: "t1" }, null)).toBe(false);
+  });
+
+  it("allows it again once the workspace is removed", () => {
+    expect(canDeleteLead({ tenant_id: "t1" }, "removed")).toBe(true);
   });
 });
