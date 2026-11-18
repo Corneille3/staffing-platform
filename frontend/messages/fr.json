@@ -2053,5 +2053,77 @@
       "pollingFailed": "Le suivi de l'export a échoué",
       "exportFailed": "L'export a échoué"
     }
+  },
+  "welcome": {
+    "steps": {
+      "name": "Nommer votre réseau",
+      "org": "Ajouter votre première organisation",
+      "coordinator": "Inviter un coordonnateur",
+      "substitutes": "Inviter des remplaçant·e·s"
+    },
+    "loading": "Chargement de votre espace…",
+    "loadFailed": "Le chargement de votre espace a échoué",
+    "saveFailed": "L'enregistrement a échoué",
+    "orgRequired": "Le nom et la ville de l'organisation sont obligatoires (ou « Passer pour l'instant »).",
+    "orgFailed": "La création de l'organisation a échoué",
+    "coordRequired": "Le nom, le courriel et l'organisation du coordonnateur sont obligatoires (ou « Passer pour l'instant »).",
+    "coordFailed": "L'invitation du coordonnateur a échoué",
+    "finishFailed": "La configuration n'a pas pu être terminée",
+    "eyebrow": "Bienvenue à bord",
+    "title": "Configurons <em>{name}</em>.",
+    "intro": "Quatre étapes et vos coordonnateurs peuvent commencer à pourvoir des quarts. Tout peut être modifié plus tard.",
+    "slugNote": "{slug} · votre espace privé",
+    "stepOf": "Étape {n} de {total}",
+    "s1": {
+      "title": "Confirmez votre <em>réseau</em>",
+      "blurb": "Ces champs viennent de votre invitation. Corrigez ce qui ne convient pas — c'est sous ce nom que votre espace sera connu.",
+      "name": "Nom du réseau",
+      "address": "Adresse de l'espace",
+      "region": "Région",
+      "language": "Langue principale"
+    },
+    "s2": {
+      "title": "Ajoutez votre première <em>organisation</em>",
+      "blurb": "Une organisation est un lieu physique — une garderie, une résidence, un centre de soins. Vous pourrez en ajouter d'autres plus tard.",
+      "name": "Nom de l'organisation",
+      "type": "Type",
+      "city": "Ville",
+      "language": "Langue par défaut",
+      "address": "Adresse"
+    },
+    "s3": {
+      "title": "Invitez un <em>coordonnateur</em>",
+      "blurb": "Les coordonnateurs gèrent le quotidien d'un emplacement — ils publient les quarts et assignent les remplaçant·e·s. Nous leur envoyons un lien d'inscription par courriel.",
+      "firstName": "Prénom",
+      "lastName": "Nom",
+      "email": "Courriel du coordonnateur",
+      "which": "Quelle organisation ?",
+      "needOrg": "Ajoutez d'abord une organisation (étape 2) pour y assigner un coordonnateur.",
+      "selfNote": "Vous pouvez aussi être votre propre coordonnateur — bien des petits réseaux gèrent eux-mêmes un seul emplacement."
+    },
+    "s4": {
+      "title": "Invitez vos <em>remplaçant·e·s</em>",
+      "blurb": "Ce sont les personnes qui prendront les quarts. Collez des courriels — un par ligne, au besoin sous la forme « Prénom Nom, courriel ». Chaque personne complète son profil à l'inscription.",
+      "emails": "Courriels (un par ligne)",
+      "ready": "{count, plural, one {# invitation prête.} other {# invitations prêtes.}}",
+      "paste": "Collez des courriels pour inviter des remplaçant·e·s.",
+      "profileNote": "Chaque personne ajoutera ses qualifications et ses disponibilités à l'inscription."
+    },
+    "back": "Retour",
+    "skip": "Passer pour l'instant",
+    "finishing": "Finalisation…",
+    "finish": "Terminer la configuration",
+    "saving": "Enregistrement…",
+    "continue": "Continuer",
+    "saveContinue": "Enregistrer et continuer",
+    "done": {
+      "eyebrow": "Tout est prêt",
+      "title": "{name} <em>est en service</em>.",
+      "body": "Votre espace est prêt. Dès que vos remplaçant·e·s acceptent, vous pouvez publier votre premier quart.",
+      "org": "Organisation",
+      "coordinator": "Coordonnateur",
+      "subs": "{count, plural, one {Remplaçant·e invité·e} other {Remplaçant·e·s invité·e·s}}",
+      "go": "Aller à mon réseau"
+    }
   }
 }
