@@ -1458,7 +1458,8 @@
         "removedTitle": "Espace supprimé",
         "removedBody": "L'espace de {name} a été supprimé.",
         "lostLiveTitle": "Espace toujours présent",
-        "lostLiveBody": "Ce prospect est perdu, mais l'espace de {name} existe toujours. Supprimez-le depuis Tenants si le pilote est terminé."
+        "lostLiveBody": "Ce prospect est perdu, mais l'espace de {name} existe toujours. Supprimez-le depuis Tenants si le pilote est terminé.",
+        "delete": "Supprimer"
       },
       "inviteModal": {
         "eyebrow": "Conversion",
@@ -1523,7 +1524,16 @@
           "bad_province": "province manquante ou invalide (2 lettres)",
           "unknown_status": "statut inconnu « {value} »",
           "status_not_importable": "le statut « {value} » ne s'importe pas (gagné exige un espace actif, perdu exige une raison)"
-        }
+        },
+        "delete_has_live_tenant": "Ce prospect est lié à l'espace « {name} ». Supprimez l'espace depuis Tenants avant de supprimer le prospect."
+      },
+      "deleteModal": {
+        "eyebrow": "Action destructive",
+        "title": "Supprimer ce",
+        "titleEm": "prospect",
+        "body": "<b>{name}</b> et tout son fil d'activité sont supprimés pour de bon. Cette action ne peut pas être annulée.",
+        "confirm": "Supprimer le prospect",
+        "deleting": "Suppression…"
       }
     },
     "shell": {

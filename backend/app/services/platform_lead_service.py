@@ -15,6 +15,9 @@ State machine (§4, as settled with the product owner):
 - `won` is the owner's call, made once the client commits: it needs a
   linked tenant that is active, stamps `converted_at`, and is terminal.
 - Every transition writes a `status_changed` event with from/to.
+- Deleting a lead is the owner's alone and takes its feed with it; the
+  platform audit trail keeps who removed which organization. A lead whose
+  workspace still exists cannot be deleted — remove the workspace first.
 - Conversion (§7): « Invite as a network » stages the tenant and links it in
   one transaction (`invited` event); the tenant finishing its onboarding
   moves the lead to `pilot` (`tenant_activated` event, written by the
@@ -36,6 +39,7 @@ from app.models.enums import TenantStatus
 from app.models.platform_lead import PlatformLead, PlatformLeadEvent
 from app.models.tenant import Tenant
 from app.models.user import User
+from app.services.platform_audit_service import PlatformAuditService
 from app.schemas.platform_leads import (
     LeadCreate, LeadEventCreate, LeadEventOut, LeadStats, LeadUpdate, PublicLeadIntake,
     SegmentWaveCount,
@@ -346,6 +350,36 @@ class PlatformLeadService:
         self.db.commit()
         self.db.refresh(lead)
         return lead
+
+    def delete(self, lead_id: UUID, scope: AccessScope) -> None:
+        """Remove a lead and its feed for good (owner only — the route gates it).
+
+        Meant for test rows and mistakes: a lead that became a workspace is
+        that workspace's history, so it stays until the workspace is removed.
+        The events go with the row (FK ON DELETE CASCADE); the platform audit
+        trail keeps what was deleted and by whom."""
+        lead = self._get_or_404(lead_id)
+        tenant = self.db.get(Tenant, lead.tenant_id) if lead.tenant_id else None
+        if tenant is not None and tenant.status != TenantStatus.REMOVED:
+            raise coded(
+                status.HTTP_409_CONFLICT, 'lead.delete_has_live_tenant',
+                f'This lead is linked to the workspace "{tenant.name}". Remove the workspace before deleting the lead.',
+                name=tenant.name,
+            )
+        event_count = self.db.scalar(
+            select(func.count()).select_from(PlatformLeadEvent).where(PlatformLeadEvent.lead_id == lead.id)
+        )
+        PlatformAuditService(self.db).log(
+            scope.user.id, 'lead.deleted', target_type='platform_lead', target_id=str(lead.id),
+            payload={
+                'org_name': lead.org_name, 'external_ref': lead.external_ref,
+                'segment': lead.segment, 'status': lead.status.value, 'source': lead.source,
+                'tenant_id': str(lead.tenant_id) if lead.tenant_id else None,
+                'event_count': event_count,
+            },
+        )
+        self.db.delete(lead)
+        self.db.commit()
 
     def add_event(self, lead_id: UUID, payload: LeadEventCreate, scope: AccessScope) -> LeadEventOut:
         lead = self._get_or_404(lead_id)

@@ -1458,7 +1458,8 @@
         "removedTitle": "Workspace removed",
         "removedBody": "{name}'s workspace has been removed.",
         "lostLiveTitle": "Workspace still there",
-        "lostLiveBody": "This lead is lost, but {name}'s workspace still exists. Remove it from Tenants if the pilot is over."
+        "lostLiveBody": "This lead is lost, but {name}'s workspace still exists. Remove it from Tenants if the pilot is over.",
+        "delete": "Delete"
       },
       "inviteModal": {
         "eyebrow": "Conversion",
@@ -1523,7 +1524,16 @@
           "bad_province": "missing or invalid province (2 letters)",
           "unknown_status": "unknown status “{value}”",
           "status_not_importable": "the status “{value}” cannot be imported (won needs an active workspace, lost needs a reason)"
-        }
+        },
+        "delete_has_live_tenant": "This lead is linked to the workspace “{name}”. Remove the workspace from Tenants before deleting the lead."
+      },
+      "deleteModal": {
+        "eyebrow": "Destructive action",
+        "title": "Delete this",
+        "titleEm": "lead",
+        "body": "<b>{name}</b> and its whole activity feed are removed for good. This cannot be undone.",
+        "confirm": "Delete the lead",
+        "deleting": "Deleting…"
       }
     },
     "shell": {

@@ -209,6 +209,12 @@ export function canInviteLead(lead: Pick<Lead, "status" | "tenant_id">): boolean
   return !lead.tenant_id && !isClosedLeadStatus(lead.status);
 }
 
+/** A lead can be deleted unless it became a workspace that still exists —
+ * mirrors the API's 409 (`lead.delete_has_live_tenant`). */
+export function canDeleteLead(lead: Pick<Lead, "tenant_id">, tenantStatus: string | null): boolean {
+  return !lead.tenant_id || tenantStatus === "removed";
+}
+
 export type LeadTenantBanner = "won" | "removed" | "lost_live" | "pilot" | "invited";
 
 /** What the lead page says about the linked tenant. A removed tenant and a

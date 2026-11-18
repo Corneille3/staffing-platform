@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowLeft, ArrowUpRight, Check, ExternalLink, Info, Send } from "lucide-react";
-import { Link } from "../i18n/navigation";
-import { addLeadEvent, fetchLead, inviteLead, updateLead } from "../lib/browser-api";
+import { ArrowLeft, ArrowUpRight, Check, ExternalLink, Info, Send, Trash2 } from "lucide-react";
+import { Link, useRouter } from "../i18n/navigation";
+import { addLeadEvent, deleteLead, fetchLead, inviteLead, updateLead } from "../lib/browser-api";
 import {
   LEAD_BAN_PHASES,
   LEAD_EVENT_TYPES,
@@ -13,6 +13,7 @@ import {
   LEAD_SOURCES,
   LEAD_STATUSES,
   LEAD_WAVES,
+  canDeleteLead,
   canInviteLead,
   canMoveLead,
   daysBetween,
@@ -50,8 +51,9 @@ export function PlatformLeadDetail({
 }: {
   initial: LeadDetail;
   todayKey: string;
-  // Only an owner can invite the lead as a network and open the tenants
-  // console; marketing runs the pipeline up to the hand-over.
+  // Only an owner can invite the lead as a network, open the tenants
+  // console and delete the lead; marketing runs the pipeline up to the
+  // hand-over.
   isOwner: boolean;
 }) {
   const t = useTranslations("platform.leads");
@@ -60,6 +62,7 @@ export function PlatformLeadDetail({
   const [events, setEvents] = useState<LeadEvent[]>(initial.events);
   const [tenant, setTenant] = useState<LeadTenantSummary | null>(initial.tenant);
   const [inviting, setInviting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   async function reloadFeed() {
     try {
@@ -118,14 +121,23 @@ export function PlatformLeadDetail({
             <span>· {t("detail.created", { date: formatDay(shiftDateKey(lead.created_at), locale) })}</span>
           </div>
         </div>
-        {isOwner && canInviteLead(lead) ? (
-          <button type="button" onClick={() => setInviting(true)} style={leadPrimaryBtn}>
-            <Send size={14} /> {t("detail.invite")}
-          </button>
-        ) : null}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {/* Hidden while the lead's workspace exists — the API refuses it too. */}
+          {isOwner && canDeleteLead(lead, tenant?.status ?? null) ? (
+            <button type="button" onClick={() => setDeleting(true)} style={{ ...leadGhostBtn, color: "var(--rose)", borderColor: "var(--rose)" }}>
+              <Trash2 size={14} /> {t("detail.delete")}
+            </button>
+          ) : null}
+          {isOwner && canInviteLead(lead) ? (
+            <button type="button" onClick={() => setInviting(true)} style={leadPrimaryBtn}>
+              <Send size={14} /> {t("detail.invite")}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {inviting ? <InviteModal lead={lead} onClose={() => setInviting(false)} onInvited={onInvited} /> : null}
+      {deleting ? <DeleteModal lead={lead} onClose={() => setDeleting(false)} /> : null}
 
       <StatusBar lead={lead} canWin={isOwner && tenant?.status === "active"} onMove={(status, reason) => patch(reason ? { status, lost_reason: reason } : { status })} />
 
@@ -665,6 +677,44 @@ const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
 
 /** Owner only. Pre-filled from the lead; the operator supplies what a tenant
  * needs on top — an address and a named admin. */
+/** Owner only. Deleting is final: the lead and its feed go, and the list is
+ * the only place left to land on. */
+function DeleteModal({ lead, onClose }: { lead: Lead; onClose: () => void }) {
+  const leadError = useLeadError();
+  const t = useTranslations("platform.leads");
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function confirm() {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteLead(lead.id);
+      router.push("/platform/leads");
+      router.refresh();
+    } catch (err) {
+      setError(leadError(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <LeadModal eyebrow={t("deleteModal.eyebrow")} title={t("deleteModal.title")} titleEm={t("deleteModal.titleEm")} width={460} onClose={busy ? () => {} : onClose}>
+      <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
+        {t.rich("deleteModal.body", { name: lead.org_name, b: (chunks) => <strong>{chunks}</strong> })}
+      </p>
+      {error ? <p role="alert" style={{ margin: "0 0 12px", color: "var(--rose)", fontSize: 12.5 }}>{error}</p> : null}
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+        <button type="button" onClick={onClose} disabled={busy} style={leadGhostBtn}>{t("detail.cancel")}</button>
+        <button type="button" onClick={confirm} disabled={busy} style={{ ...leadPrimaryBtn, background: "var(--rose)", opacity: busy ? 0.6 : 1 }}>
+          <Trash2 size={14} /> {busy ? t("deleteModal.deleting") : t("deleteModal.confirm")}
+        </button>
+      </div>
+    </LeadModal>
+  );
+}
+
 function InviteModal({
   lead,
   onClose,
