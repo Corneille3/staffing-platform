@@ -2053,5 +2053,77 @@
       "pollingFailed": "Polling failed",
       "exportFailed": "Export failed"
     }
+  },
+  "welcome": {
+    "steps": {
+      "name": "Name your network",
+      "org": "Add your first organization",
+      "coordinator": "Invite a coordinator",
+      "substitutes": "Invite substitutes"
+    },
+    "loading": "Loading your workspace…",
+    "loadFailed": "Failed to load your workspace",
+    "saveFailed": "Save failed",
+    "orgRequired": "Organization name and city are required (or Skip for now).",
+    "orgFailed": "Could not create organization",
+    "coordRequired": "Coordinator name, email, and organization are required (or Skip for now).",
+    "coordFailed": "Could not invite coordinator",
+    "finishFailed": "Could not finish setup",
+    "eyebrow": "Welcome aboard",
+    "title": "Let’s set up <em>{name}</em>.",
+    "intro": "Four steps and your coordinators can start filling shifts. You can change everything later.",
+    "slugNote": "{slug} · your private workspace",
+    "stepOf": "Step {n} of {total}",
+    "s1": {
+      "title": "Confirm your <em>network</em>",
+      "blurb": "We pre-filled this from your invitation. Adjust anything that isn't quite right — this is how your workspace will be known.",
+      "name": "Network name",
+      "address": "Workspace address",
+      "region": "Region",
+      "language": "Primary language"
+    },
+    "s2": {
+      "title": "Add your first <em>organization</em>",
+      "blurb": "An organization is a physical site — a garderie, a residence, a care centre. You can add more later.",
+      "name": "Organization name",
+      "type": "Type",
+      "city": "City",
+      "language": "Default language",
+      "address": "Address"
+    },
+    "s3": {
+      "title": "Invite a <em>coordinator</em>",
+      "blurb": "Coordinators run the day-to-day at a site — they post shifts and assign substitutes. We'll email them a sign-up link.",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Coordinator email",
+      "which": "Which organization?",
+      "needOrg": "Add an organization first (step 2) to assign a coordinator.",
+      "selfNote": "You can also be your own coordinator — many small networks run a single site themselves."
+    },
+    "s4": {
+      "title": "Invite your <em>substitutes</em>",
+      "blurb": "These are the people who'll pick up shifts. Paste emails — one per line, optionally “First Last, email”. They complete their own profile when they sign up.",
+      "emails": "Emails (one per line)",
+      "ready": "{count, plural, one {# invitation ready.} other {# invitations ready.}}",
+      "paste": "Paste emails to invite substitutes.",
+      "profileNote": "They'll add their qualifications and availability during their own sign-up."
+    },
+    "back": "Back",
+    "skip": "Skip for now",
+    "finishing": "Finishing…",
+    "finish": "Finish setup",
+    "saving": "Saving…",
+    "continue": "Continue",
+    "saveContinue": "Save & continue",
+    "done": {
+      "eyebrow": "You're all set",
+      "title": "{name} <em>is live</em>.",
+      "body": "Your workspace is ready. As soon as your substitutes accept, you can post your first shift.",
+      "org": "Organization",
+      "coordinator": "Coordinator",
+      "subs": "{count, plural, one {Substitute invited} other {Substitutes invited}}",
+      "go": "Go to my network"
+    }
   }
 }

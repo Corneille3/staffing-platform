@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "../../../i18n/navigation";
+import { useTranslations } from "next-intl";
 import { ArrowLeft, ArrowRight, Bell, Check } from "lucide-react";
 import {
   bulkInviteSubstitutes,
@@ -15,22 +16,13 @@ import {
 } from "../../../lib/browser-api";
 import type { Organization, TenantProfile } from "../../../lib/types";
 
-const STEPS = ["Name your network", "Add your first organization", "Invite a coordinator", "Invite substitutes"];
+// Values only — step names come from `welcome.steps`, organization types
+// from `admin.organizations.types`, languages from `admin.languageNames`.
+const STEPS = ["name", "org", "coordinator", "substitutes"] as const;
 
-const ORG_TYPES: { value: string; label: string }[] = [
-  { value: "childcare", label: "Garderie / CPE" },
-  { value: "long_term_care", label: "CHSLD" },
-  { value: "assisted_living", label: "RPA" },
-  { value: "home_care", label: "Soins à domicile" },
-  { value: "community_care", label: "Centre communautaire" },
-  { value: "other", label: "Autre" },
-];
+const ORG_TYPES = ["childcare", "long_term_care", "assisted_living", "home_care", "community_care", "other"];
 
-const LANGS: { value: "fr" | "en" | "bilingual"; label: string }[] = [
-  { value: "fr", label: "Français" },
-  { value: "en", label: "English" },
-  { value: "bilingual", label: "Bilingue" },
-];
+const LANG_CODES = ["fr", "en", "bilingual"] as const;
 
 // Parse a pasted substitute line: "First Last, email", "Name <email>", or just
 // "email" (name derived from the local part). Lines without an email are skipped.
@@ -51,6 +43,11 @@ function parseSubLine(line: string): { first_name: string; last_name: string; em
 
 export default function WelcomeWizard() {
   const router = useRouter();
+  const t = useTranslations("welcome");
+  const tTypes = useTranslations("admin.organizations.types");
+  const tLang = useTranslations("admin.languageNames");
+  const em = (chunks: React.ReactNode) => <em style={emItal}>{chunks}</em>;
+  const LANGS = LANG_CODES.map((value) => ({ value, label: tLang(value) }));
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<TenantProfile | null>(null);
   const [orgs, setOrgs] = useState<Organization[]>([]);
@@ -95,7 +92,7 @@ export default function WelcomeWizard() {
         setOrgCity("");
         setOrgs(await fetchOrganizationsForTenant().catch(() => []));
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load your workspace");
+        setError(err instanceof Error ? err.message : t("loadFailed"));
       } finally {
         setLoading(false);
       }
@@ -119,7 +116,7 @@ export default function WelcomeWizard() {
       await patchTenantProfile({ name: name.trim(), region: region.trim() || null, preferred_language: language });
       next();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("saveFailed"));
     } finally {
       setBusy(false);
     }
@@ -127,7 +124,7 @@ export default function WelcomeWizard() {
 
   async function saveStep2() {
     if (!orgName.trim() || !orgCity.trim()) {
-      setError("Organization name and city are required (or Skip for now).");
+      setError(t("orgRequired"));
       return;
     }
     setBusy(true);
@@ -158,7 +155,7 @@ export default function WelcomeWizard() {
       }
       next();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create organization");
+      setError(err instanceof Error ? err.message : t("orgFailed"));
     } finally {
       setBusy(false);
     }
@@ -166,7 +163,7 @@ export default function WelcomeWizard() {
 
   async function saveStep3() {
     if (!coordFirst.trim() || !coordLast.trim() || !coordEmail.trim() || !coordOrgId) {
-      setError("Coordinator name, email, and organization are required (or Skip for now).");
+      setError(t("coordRequired"));
       return;
     }
     setBusy(true);
@@ -178,7 +175,7 @@ export default function WelcomeWizard() {
       });
       next();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not invite coordinator");
+      setError(err instanceof Error ? err.message : t("coordFailed"));
     } finally {
       setBusy(false);
     }
@@ -195,14 +192,14 @@ export default function WelcomeWizard() {
       await completeTenantOnboarding();
       setFinished(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not finish setup");
+      setError(err instanceof Error ? err.message : t("finishFailed"));
     } finally {
       setBusy(false);
     }
   }
 
   if (loading) {
-    return <Centered>Loading your workspace…</Centered>;
+    return <Centered>{t("loading")}</Centered>;
   }
   if (error && !profile) {
     return <Centered>{error}</Centered>;
@@ -221,12 +218,12 @@ export default function WelcomeWizard() {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 48 }}>
           <span style={{ fontFamily: "var(--serif)", fontSize: 20, fontWeight: 400 }}>Staffig</span>
         </div>
-        <div style={eyebrowDark}>Welcome aboard</div>
+        <div style={eyebrowDark}>{t("eyebrow")}</div>
         <h1 style={{ fontFamily: "var(--serif)", fontSize: 32, lineHeight: 1.1, margin: "10px 0 14px" }}>
-          Let&apos;s set up <em style={{ fontStyle: "italic" }}>{name || profile?.name}</em>.
+          {t.rich("title", { name: name || profile?.name || "", em })}
         </h1>
         <p style={{ fontSize: 14, color: "rgba(246,244,238,.65)", lineHeight: 1.55, marginBottom: 40 }}>
-          Four steps and your coordinators can start filling shifts. You can change everything later.
+          {t("intro")}
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {STEPS.map((s, i) => {
@@ -237,76 +234,76 @@ export default function WelcomeWizard() {
                 <div style={{ width: 28, height: 28, borderRadius: 99, flexShrink: 0, background: done ? "var(--moss)" : active ? "var(--terra)" : "rgba(255,255,255,.08)", border: !done && !active ? "0.5px solid rgba(255,255,255,.2)" : "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: "#fff" }}>
                   {done ? <Check size={14} strokeWidth={2.4} /> : i + 1}
                 </div>
-                <span style={{ fontSize: 14, fontWeight: active ? 600 : 400 }}>{s}</span>
+                <span style={{ fontSize: 14, fontWeight: active ? 600 : 400 }}>{t(`steps.${s}`)}</span>
               </button>
             );
           })}
         </div>
         <div style={{ flex: 1 }} />
         <div style={{ fontSize: 11, color: "rgba(246,244,238,.4)", lineHeight: 1.5 }}>
-          {profile?.slug} · your private workspace
+          {t("slugNote", { slug: profile?.slug ?? "" })}
         </div>
       </aside>
 
       {/* Right — current step */}
       <main style={{ flex: 1, minWidth: 0, padding: "56px 64px", display: "flex", flexDirection: "column" }}>
         <div style={{ maxWidth: 560, width: "100%" }}>
-          <div style={eyebrow}>Step {step + 1} of {STEPS.length}</div>
+          <div style={eyebrow}>{t("stepOf", { n: step + 1, total: STEPS.length })}</div>
 
           {step === 0 && (
-            <StepWrap title={<>Confirm your <em style={emItal}>network</em></>} blurb="We pre-filled this from your invitation. Adjust anything that isn't quite right — this is how your workspace will be known.">
-              <Field label="Network name"><input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} /></Field>
+            <StepWrap title={t.rich("s1.title", { em })} blurb={t("s1.blurb")}>
+              <Field label={t("s1.name")}><input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} /></Field>
               <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16 }}>
-                <Field label="Workspace address">
+                <Field label={t("s1.address")}>
                   <input value={profile?.slug ?? ""} readOnly style={{ ...inputStyle, color: "var(--ink-3)", background: "var(--paper-2)" }} />
                 </Field>
-                <Field label="Region"><input value={region} onChange={(e) => setRegion(e.target.value)} style={inputStyle} /></Field>
+                <Field label={t("s1.region")}><input value={region} onChange={(e) => setRegion(e.target.value)} style={inputStyle} /></Field>
               </div>
-              <Field label="Primary language"><Toggle options={LANGS} value={language} onChange={setLanguage} /></Field>
+              <Field label={t("s1.language")}><Toggle options={LANGS} value={language} onChange={setLanguage} /></Field>
             </StepWrap>
           )}
 
           {step === 1 && (
-            <StepWrap title={<>Add your first <em style={emItal}>organization</em></>} blurb="An organization is a physical site — a garderie, a residence, a care centre. You can add more later.">
-              <Field label="Organization name"><input value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="CPE La Clairière" style={inputStyle} /></Field>
-              <Field label="Type"><ChipRow options={ORG_TYPES} value={orgType} onChange={setOrgType} pill /></Field>
+            <StepWrap title={t.rich("s2.title", { em })} blurb={t("s2.blurb")}>
+              <Field label={t("s2.name")}><input value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="CPE La Clairière" style={inputStyle} /></Field>
+              <Field label={t("s2.type")}><ChipRow options={ORG_TYPES.map((value) => ({ value, label: tTypes(value) }))} value={orgType} onChange={setOrgType} pill /></Field>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                <Field label="City"><input value={orgCity} onChange={(e) => setOrgCity(e.target.value)} placeholder="Saint-Jérôme" style={inputStyle} /></Field>
-                <Field label="Default language"><Toggle options={LANGS.map((l) => ({ ...l, label: l.value.toUpperCase() }))} value={orgLang} onChange={setOrgLang} /></Field>
+                <Field label={t("s2.city")}><input value={orgCity} onChange={(e) => setOrgCity(e.target.value)} placeholder="Saint-Jérôme" style={inputStyle} /></Field>
+                <Field label={t("s2.language")}><Toggle options={LANGS.map((l) => ({ ...l, label: l.value.toUpperCase() }))} value={orgLang} onChange={setOrgLang} /></Field>
               </div>
-              <Field label="Address"><input value={orgAddress} onChange={(e) => setOrgAddress(e.target.value)} placeholder="123 rue Principale" style={inputStyle} /></Field>
+              <Field label={t("s2.address")}><input value={orgAddress} onChange={(e) => setOrgAddress(e.target.value)} placeholder="123 rue Principale" style={inputStyle} /></Field>
             </StepWrap>
           )}
 
           {step === 2 && (
-            <StepWrap title={<>Invite a <em style={emItal}>coordinator</em></>} blurb="Coordinators run the day-to-day at a site — they post shifts and assign substitutes. We'll email them a sign-up link.">
+            <StepWrap title={t.rich("s3.title", { em })} blurb={t("s3.blurb")}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                <Field label="First name"><input value={coordFirst} onChange={(e) => setCoordFirst(e.target.value)} style={inputStyle} /></Field>
-                <Field label="Last name"><input value={coordLast} onChange={(e) => setCoordLast(e.target.value)} style={inputStyle} /></Field>
+                <Field label={t("s3.firstName")}><input value={coordFirst} onChange={(e) => setCoordFirst(e.target.value)} style={inputStyle} /></Field>
+                <Field label={t("s3.lastName")}><input value={coordLast} onChange={(e) => setCoordLast(e.target.value)} style={inputStyle} /></Field>
               </div>
-              <Field label="Coordinator email"><input type="email" value={coordEmail} onChange={(e) => setCoordEmail(e.target.value)} placeholder="coordonnatrice@cpe.ca" style={inputStyle} /></Field>
-              <Field label="Which organization?">
+              <Field label={t("s3.email")}><input type="email" value={coordEmail} onChange={(e) => setCoordEmail(e.target.value)} placeholder="coordonnatrice@cpe.ca" style={inputStyle} /></Field>
+              <Field label={t("s3.which")}>
                 {orgs.length === 0 ? (
-                  <div style={{ fontSize: 13, color: "var(--ink-3)" }}>Add an organization first (step 2) to assign a coordinator.</div>
+                  <div style={{ fontSize: 13, color: "var(--ink-3)" }}>{t("s3.needOrg")}</div>
                 ) : (
                   <ChipRow options={orgs.map((o) => ({ value: o.id, label: o.name }))} value={coordOrgId} onChange={setCoordOrgId} pill />
                 )}
               </Field>
               <div style={{ marginTop: 4, fontSize: 12.5, color: "var(--ink-3)", lineHeight: 1.5 }}>
-                You can also be your own coordinator — many small networks run a single site themselves.
+                {t("s3.selfNote")}
               </div>
             </StepWrap>
           )}
 
           {step === 3 && (
-            <StepWrap title={<>Invite your <em style={emItal}>substitutes</em></>} blurb="These are the people who'll pick up shifts. Paste emails — one per line, optionally 'First Last, email'. They complete their own profile when they sign up.">
-              <Field label="Emails (one per line)">
+            <StepWrap title={t.rich("s4.title", { em })} blurb={t("s4.blurb")}>
+              <Field label={t("s4.emails")}>
                 <textarea value={subsText} onChange={(e) => setSubsText(e.target.value)} rows={6} placeholder={"amelie.tremblay@gmail.com\nNoor Khan, noor.k@outlook.com"} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6, fontFamily: "var(--mono)", fontSize: 13 }} />
               </Field>
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: "var(--sand-soft)", borderRadius: 12, marginTop: 6 }}>
                 <Bell size={16} strokeWidth={1.6} color="#7C5C12" />
                 <div style={{ fontSize: 12.5, color: "#7C5C12", lineHeight: 1.4 }}>
-                  {subInviteCount > 0 ? `${subInviteCount} invitation${subInviteCount === 1 ? "" : "s"} ready.` : "Paste emails to invite substitutes."} They&apos;ll add their qualifications and availability during their own sign-up.
+                  {subInviteCount > 0 ? t("s4.ready", { count: subInviteCount }) : t("s4.paste")} {t("s4.profileNote")}
                 </div>
               </div>
             </StepWrap>
@@ -318,11 +315,11 @@ export default function WelcomeWizard() {
         <div style={{ flex: 1 }} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 560, marginTop: 40 }}>
           <button onClick={back} style={{ ...ghostBtn, opacity: step === 0 ? 0.4 : 1, pointerEvents: step === 0 ? "none" : "auto" }}>
-            <ArrowLeft size={14} /> Back
+            <ArrowLeft size={14} /> {t("back")}
           </button>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             {step >= 1 && step < STEPS.length - 1 && (
-              <button onClick={next} style={{ background: "transparent", border: "none", color: "var(--ink-3)", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>Skip for now</button>
+              <button onClick={next} style={{ background: "transparent", border: "none", color: "var(--ink-3)", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>{t("skip")}</button>
             )}
             <button
               onClick={step === 0 ? saveStep1 : step === 1 ? saveStep2 : step === 2 ? saveStep3 : finish}
@@ -330,8 +327,8 @@ export default function WelcomeWizard() {
               style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}
             >
               {step === STEPS.length - 1
-                ? <>{busy ? "Finishing…" : "Finish setup"} <Check size={14} strokeWidth={2.2} /></>
-                : <>{busy ? "Saving…" : step === 0 ? "Continue" : "Save & continue"} <ArrowRight size={14} /></>}
+                ? <>{busy ? t("finishing") : t("finish")} <Check size={14} strokeWidth={2.2} /></>
+                : <>{busy ? t("saving") : step === 0 ? t("continue") : t("saveContinue")} <ArrowRight size={14} /></>}
             </button>
           </div>
         </div>
@@ -341,28 +338,29 @@ export default function WelcomeWizard() {
 }
 
 function FinishScreen({ networkName, subCount, hasOrg, onGo }: { networkName: string; subCount: number; hasOrg: boolean; onGo: () => void }) {
+  const t = useTranslations("welcome.done");
   return (
     <div style={{ minHeight: "100vh", background: "var(--paper)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--ui)", color: "var(--ink)", padding: 40 }}>
       <div style={{ textAlign: "center", maxWidth: 520 }}>
         <div style={{ width: 76, height: 76, borderRadius: 99, margin: "0 auto 26px", background: "var(--moss-soft)", color: "var(--moss)", display: "flex", alignItems: "center", justifyContent: "center", border: "0.5px solid #C8DCC1" }}>
           <Check size={32} strokeWidth={1.8} />
         </div>
-        <div style={eyebrow}>You&apos;re all set</div>
+        <div style={eyebrow}>{t("eyebrow")}</div>
         <h1 style={{ fontFamily: "var(--serif)", fontSize: 44, lineHeight: 1.05, margin: "10px 0 16px", letterSpacing: "-0.02em" }}>
-          {networkName} <em style={emItal}>is live</em>.
+          {t.rich("title", { name: networkName, em: (chunks) => <em style={emItal}>{chunks}</em> })}
         </h1>
         <p style={{ margin: "0 auto 32px", maxWidth: 420, color: "var(--ink-2)", fontSize: 15, lineHeight: 1.55 }}>
-          Your workspace is ready. As soon as your substitutes accept, you can post your first shift.
+          {t("body")}
         </p>
         <div style={{ display: "flex", gap: 16, justifyContent: "center", marginBottom: 32, flexWrap: "wrap" }}>
-          {[[hasOrg ? "1" : "0", "Organization"], ["—", "Coordinator"], [String(subCount), subCount === 1 ? "Substitute invited" : "Substitutes invited"]].map(([n, l]) => (
+          {[[hasOrg ? "1" : "0", t("org")], ["—", t("coordinator")], [String(subCount), t("subs", { count: subCount })]].map(([n, l]) => (
             <div key={l} style={{ padding: "14px 20px", background: "var(--card)", borderRadius: 14, border: "0.5px solid var(--line)", minWidth: 120 }}>
               <div style={{ fontFamily: "var(--serif)", fontSize: 32, lineHeight: 1 }}>{n}</div>
               <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 6 }}>{l}</div>
             </div>
           ))}
         </div>
-        <button onClick={onGo} style={{ ...primaryBtn, padding: "14px 24px" }}>Go to my network <ArrowRight size={15} /></button>
+        <button onClick={onGo} style={{ ...primaryBtn, padding: "14px 24px" }}>{t("go")} <ArrowRight size={15} /></button>
       </div>
     </div>
   );

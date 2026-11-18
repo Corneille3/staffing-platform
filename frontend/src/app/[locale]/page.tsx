@@ -2,11 +2,13 @@
 
 import { useRouter } from "../../i18n/navigation";
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { ROLE_HOME, useRole } from "../../lib/role-context";
 
 export default function RootPage() {
   const router = useRouter();
   const { role, ready } = useRole();
+  const t = useTranslations("common");
 
   useEffect(() => {
     if (ready) {
@@ -25,7 +27,7 @@ export default function RootPage() {
         opacity: 0.7,
       }}
     >
-      Loading…
+      {t("loading")}
     </div>
   );
 }
