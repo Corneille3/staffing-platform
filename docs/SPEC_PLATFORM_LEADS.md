@@ -269,7 +269,7 @@ Lignes sans `org_name` → `skipped`. Un `external_ref` déjà présent → mise
 ### Reste à faire
 
 - **Session frontend** : onglet Leads, liste, fiche, i18n, option Marketing dans l'écran des opérateurs, redirection d'un compte marketing vers `/platform/leads`, export CSV.
-- Rien : les trois sessions sont livrées. Idée non construite : rappel automatique des actions en retard. La suppression d'un lead est livrée (voir « Suppression »).
+- Rien : les trois sessions sont livrées. La suppression d'un lead et le rappel des suivis sont livrés (voir « Suppression » et « Rappel des suivis »).
 
 ### Intake public (2026-11-15)
 
@@ -316,3 +316,13 @@ Le pilote se déroule dans le vrai espace du prospect : il n'existe pas d'enviro
 - **Trace** : une ligne `lead.deleted` dans `platform_audit_log` (acteur, nom de l'organisation, référence, segment, statut, source, tenant lié, nombre d'événements).
 - **Refus** : 409 `lead.delete_has_live_tenant` tant que l'espace lié existe (pending, onboarding, active ou suspended) — un lead devenu un espace est l'histoire de cet espace. Une fois l'espace supprimé, le lead peut l'être aussi.
 - Écran : bouton « Supprimer » sur la fiche, visible de l'owner seulement et caché tant que l'espace existe ; confirmation, puis retour à la liste.
+
+### Rappel des suivis (2026-11-19)
+
+- **Quoi** : un courriel par jour liste les leads ouverts dont la prochaine action est prévue aujourd'hui ou avant (« En retard », puis « Aujourd'hui », la date la plus ancienne d'abord), avec l'action, la date, le nombre de jours de retard et un lien vers la fiche. Au-delà de 25 leads, le courriel indique combien il en reste et renvoie à la liste.
+- **Quand** : à partir de 8 h, heure de Toronto (`lead_reminder_hour_local`), au premier passage du planificateur (toutes les 5 minutes). Si l'API était arrêtée le matin, le courriel part au premier passage après son redémarrage.
+- **À qui** : l'owner et les comptes marketing actifs qui ont déjà créé leur compte, chacun dans sa langue (`preferred_language` ; « bilingual » reçoit les deux).
+- **Jour sans rien à faire** : aucun courriel.
+- **Une fois par jour** : le jour d'envoi est écrit dans `platform_settings.lead_reminder_sent_on` (migration `0028`) *avant* l'envoi — un redéploiement ne renvoie pas le courriel. Contrepartie : un envoi échoué n'est pas retenté le jour même (il est journalisé). Une date saisie après l'envoi du jour attend le courriel du lendemain.
+- Le compteur « Actions en retard » de la liste ne change pas : il compte les dates strictement passées ; le courriel ajoute celles du jour.
+- Code : `services/platform_lead_reminder.py`, appelé par `scheduler.py`. Aucune route, aucun changement d'écran.

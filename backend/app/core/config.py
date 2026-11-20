@@ -108,6 +108,10 @@ class Settings(BaseSettings):
     # shift starts within this many minutes (one email per request).
     replacement_escalation_lead_minutes: int = 60
     reliability_recompute_hour_utc: int = 7  # ~02:00–03:00 in Québec
+    # Daily lead follow-up reminder (owner + marketing): sent once the local
+    # clock (shift_timezone) reaches this hour. After downtime the first tick
+    # of the day catches up, whatever the time.
+    lead_reminder_hour_local: int = 8
     # Shift work_date/start_time are stored naive — Québec wall clock as
     # entered. Every "how soon is this shift" comparison interprets them in
     # this zone (treating them as UTC would skew expiry/escalation by ~4-5 h).

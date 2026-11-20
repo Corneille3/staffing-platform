@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, Integer, String, func
+from sqlalchemy import Boolean, Date, DateTime, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -26,4 +26,7 @@ class PlatformSettings(Base):
     access_requires_approval: Mapped[bool] = mapped_column(Boolean, default=True, server_default='true')
     access_window_hours: Mapped[int] = mapped_column(Integer, default=4, server_default='4')
     reserved_slugs: Mapped[list] = mapped_column(JSONB, default=list)
+    # Local day (shift timezone) the lead follow-up reminder last ran — written
+    # by the scheduler, never by the API.
+    lead_reminder_sent_on: Mapped[date | None] = mapped_column(Date)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
