@@ -1773,6 +1773,57 @@
         "removing": "Removing…",
         "submit": "Force remove"
       }
+    },
+    "audit": {
+      "title": "Audit trail",
+      "sub": "Who did what on the platform, newest first. Visible to the owner only.",
+      "filterAll": "All",
+      "categories": {
+        "tenant": "Tenants",
+        "operator": "Operators",
+        "access": "Tenant access",
+        "settings": "Settings",
+        "lead": "Leads",
+        "housekeeping": "Housekeeping"
+      },
+      "actions": {
+        "tenant_invited": "Tenant invited",
+        "tenant_suspended": "Tenant suspended",
+        "tenant_reactivated": "Tenant reactivated",
+        "operator_invited": "Operator invited",
+        "operator_role_changed": "Role changed",
+        "operator_removed": "Operator removed",
+        "operator_invite_resent": "Invitation resent",
+        "access_requested": "Access requested",
+        "access_approved": "Access approved",
+        "access_denied": "Access denied",
+        "access_released": "Visit ended",
+        "settings_updated": "Settings changed",
+        "lead_deleted": "Lead deleted",
+        "housekeeping_clerk_orphan_removed": "Orphan account removed"
+      },
+      "detail": {
+        "roleChange": "{from} → {to}",
+        "role": "Role: {role}",
+        "reason": "Reason: “{text}”"
+      },
+      "settingNames": {
+        "default_language": "Default language",
+        "trial_length_days": "Trial length (days)",
+        "invite_expiry_days": "Invitation expiry (days)",
+        "orphan_retention_days": "Orphan retention (days)",
+        "access_requires_approval": "Approval required",
+        "access_window_hours": "Visit length (hours)",
+        "reserved_slugs": "Reserved addresses"
+      },
+      "removedActor": "Removed account",
+      "count": "{shown} of {total, plural, one {# entry} other {# entries}}",
+      "loadMore": "Show more",
+      "loading": "Loading…",
+      "retry": "Retry",
+      "loadFailed": "The audit trail could not be loaded.",
+      "empty": "No action recorded yet.",
+      "emptyFiltered": "No action in this category."
     }
   },
   "apf": {

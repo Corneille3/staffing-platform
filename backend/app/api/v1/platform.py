@@ -7,7 +7,7 @@ delegate to TenantService.
 """
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
@@ -24,6 +24,7 @@ from app.models.user import User
 from app.schemas.platform import (
     OrphanRemovePayload,
     OrphanScanResponse,
+    PlatformAuditResponse,
     PlatformOperatorInvite,
     PlatformOperatorRead,
     PlatformOperatorRoleUpdate,
@@ -39,6 +40,7 @@ from app.schemas.platform import (
 )
 from app.schemas.tenant import TenantNetworkCreate
 from app.services.housekeeping_service import HousekeepingService
+from app.services.platform_audit_service import AUDIT_CATEGORIES, PlatformAuditService
 from app.services.platform_operator_service import PlatformOperatorService
 from app.services.platform_service import PlatformService
 from app.services.platform_settings_service import PlatformSettingsService
@@ -233,6 +235,31 @@ def revoke_invite(
 ) -> PlatformTenantCreated:
     tenant = TenantService(db).revoke_invite(tenant_id, scope)
     return PlatformTenantCreated(id=tenant.id, slug=tenant.slug, status=tenant.status.value)
+
+@router.get('/audit-log', response_model=PlatformAuditResponse)
+def list_audit_log(
+    category: str | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    scope: AccessScope = Depends(require_platform_operator),
+    db: Session = Depends(get_db_session),
+) -> PlatformAuditResponse:
+    """The tier-0 audit trail, newest first — **owner only**: it names every
+    operator, what they did and to which network. A read, so no 2FA gate
+    (same policy as the operator list)."""
+    if not scope.is_platform_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='Only a platform owner can read the audit trail.',
+        )
+    if category is not None and category not in AUDIT_CATEGORIES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f'Unknown category "{category}".',
+        )
+    rows, total = PlatformAuditService(db).list_rows(category, limit, offset)
+    return PlatformAuditResponse(rows=rows, total=total)
+
 
 @router.get('/housekeeping/orphans', response_model=OrphanScanResponse)
 def scan_orphans(

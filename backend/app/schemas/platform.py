@@ -185,3 +185,23 @@ class OrphanScanResponse(BaseModel):
 class OrphanRemovePayload(BaseModel):
     kind: Literal['clerk', 'db']
     id: str = Field(min_length=1, max_length=255)
+
+
+class PlatformAuditRow(BaseModel):
+    """One line of the tier-0 audit trail, ready to display. `target_label`
+    is the human name of what was touched (a network, an email, a lead's
+    organization) when one can be found; `details` is the stored payload."""
+    id: UUID
+    created_at: datetime
+    action: str
+    actor_name: str | None
+    actor_email: str | None
+    target_type: str | None
+    target_id: str | None
+    target_label: str | None
+    details: dict
+
+
+class PlatformAuditResponse(BaseModel):
+    rows: list[PlatformAuditRow]
+    total: int

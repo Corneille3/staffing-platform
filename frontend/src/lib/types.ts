@@ -765,6 +765,24 @@ export type TenantAccessGrantsResponse = {
   active_count: number;
 };
 
+// ── Tier-0 audit trail (owner only) ───────────────────────────────────────────
+export type PlatformAuditRow = {
+  id: string;
+  created_at: string;
+  action: string; // "tenant.suspended", "operator.role_changed", ...
+  actor_name: string | null; // null when the account no longer exists
+  actor_email: string | null;
+  target_type: string | null;
+  target_id: string | null;
+  target_label: string | null; // network name, email, lead's organization
+  details: Record<string, unknown>;
+};
+
+export type PlatformAuditResponse = {
+  rows: PlatformAuditRow[];
+  total: number;
+};
+
 // ── Housekeeping orphan scan ──────────────────────────────────────────────────
 export type OrphanAccount = {
   /** "clerk" → id is the Clerk user id (no DB row). "db" → id is users.id. */
