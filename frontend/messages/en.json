@@ -1595,6 +1595,8 @@
       },
       "actionFailed": "Action failed",
       "resend": "Resend",
+      "resending": "Sending…",
+      "resent": "Invitation resent",
       "revoke": "Revoke",
       "openWorkspace": "Open workspace",
       "grantTitle": "You hold an active access grant for this workspace (read-only)",
@@ -1681,6 +1683,8 @@
         "mfaOff": "Off",
         "invited": "Invited {date}",
         "resend": "Resend",
+        "resending": "Sending…",
+        "resent": "Invitation resent",
         "remove": "Remove",
         "confirmRemove": "Remove {name} from tier 0?"
       },

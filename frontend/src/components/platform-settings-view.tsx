@@ -207,6 +207,25 @@ function OperatorRow({
   const [error, setError] = useState<string | null>(null);
   const [pendingRole, setPendingRole] = useState<string | null>(null);
   const roleFlash = useSaveFlash();
+  // Same reason as on the tenants table: a re-sent invite changes nothing
+  // on the row, so the row has to say it happened.
+  const resendFlash = useSaveFlash(4000);
+
+  async function resend() {
+    setBusy(true);
+    setError(null);
+    resendFlash.start();
+    try {
+      await resendPlatformOperatorInvite(op.id);
+      resendFlash.succeed();
+      onChanged();
+    } catch (err) {
+      resendFlash.fail();
+      setError(err instanceof Error ? err.message : tt("actionFailed"));
+    } finally {
+      setBusy(false);
+    }
+  }
   const initials = `${op.first_name[0] ?? ""}${op.last_name[0] ?? ""}`;
   const pending = op.status === "pending";
 
@@ -301,8 +320,11 @@ function OperatorRow({
       <div style={{ fontSize: 12.5, color: "var(--ink-2)" }}>{pending ? tt("operators.invited", { date: fmtDate(op.invited_at, locale) }) : fmtDate(op.last_active_at, locale)}</div>
       <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
         {error ? <span style={{ fontSize: 10, color: "var(--rose)" }}>{error}</span> : null}
+        <span role="status">
+          <SaveFlash state={resendFlash.state} savingLabel={tt("operators.resending")} savedLabel={tt("operators.resent")} style={{ fontSize: 11 }} />
+        </span>
         {isOwner && pending && (
-          <button type="button" disabled={busy} onClick={() => run(() => resendPlatformOperatorInvite(op.id))} style={rowBtn}>
+          <button type="button" disabled={busy} onClick={resend} style={rowBtn}>
             {tt("operators.resend")}
           </button>
         )}

@@ -4,6 +4,7 @@ import { Link, usePathname, useRouter } from "../i18n/navigation";
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { ArrowRight, ArrowUpRight, Eye, Plus, Shield, Trash2, X } from "lucide-react";
+import { SaveFlash, useSaveFlash } from "./ui";
 import {
   invitePlatformTenant,
   platformTenantAction,
@@ -180,13 +181,20 @@ function TenantRow({
   const canRemove = !readOnlyOperator && !(workspace && !workspace.via_grant);
   const initials = t.name.split(" ").map((p) => p[0]).slice(0, 2).join("");
 
+  // Re-sending an invite changes nothing on the row, so it says so itself —
+  // without this the button looked inert (user's finding, 2026-11-19).
+  const resendFlash = useSaveFlash(4000);
+
   async function run(action: "suspend" | "reactivate" | "resend" | "revoke") {
     setBusy(true);
     setError(null);
+    if (action === "resend") resendFlash.start();
     try {
       await platformTenantAction(t.id, action);
+      if (action === "resend") resendFlash.succeed();
       onAction();
     } catch (err) {
+      if (action === "resend") resendFlash.fail();
       setError(err instanceof Error ? err.message : tt("actionFailed"));
     } finally {
       setBusy(false);
@@ -219,8 +227,11 @@ function TenantRow({
         </span>
         <div style={{ fontSize: 10, color: "var(--ink-3)", marginTop: 4 }}>{fmtSince(t.since, locale)}</div>
       </div>
-      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
         {error ? <span style={{ fontSize: 10, color: "var(--rose)" }}>{error}</span> : null}
+        <span role="status">
+          <SaveFlash state={resendFlash.state} savingLabel={tt("resending")} savedLabel={tt("resent")} style={{ fontSize: 11 }} />
+        </span>
         {t.status === "pending" && !readOnlyOperator && (
           <>
             <button type="button" disabled={busy} onClick={() => run("resend")} style={rowBtn}>{tt("resend")}</button>
