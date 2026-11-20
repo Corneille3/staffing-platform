@@ -240,3 +240,33 @@ def test_access_grants_list_hidden_from_support(platform_admin_client, db_sessio
     support_client = _make_test_client(db_session, support_user.clerk_user_id, 'platform_admin')
     resp = support_client.get('/api/v1/platform/access-grants')
     assert resp.status_code == 403, resp.text
+
+
+# ── removal and resend reach the operator's audit trail ──────────────────────
+
+def test_remove_and_resend_are_written_to_the_platform_trail(platform_admin_client, db_session, seed):
+    from app.models.platform_audit_log import PlatformAuditLog
+
+    pending = _make_tenant(db_session, TenantStatus.PENDING)
+    assert platform_admin_client.post(f'/api/v1/platform/tenants/{pending.id}/resend').status_code == 200
+    assert platform_admin_client.delete(f'/api/v1/networks/{pending.id}').status_code in (200, 204)
+
+    rows = {
+        row.action: row
+        for row in db_session.scalars(
+            select(PlatformAuditLog).where(PlatformAuditLog.target_id == str(pending.id))
+        )
+    }
+    assert set(rows) == {'tenant.invite_resent', 'tenant.removed'}
+    removed = rows['tenant.removed']
+    assert removed.actor_user_id == seed.apf.id and removed.target_type == 'tenant'
+    assert removed.payload == {
+        'slug': pending.slug, 'name': pending.name, 'status_before': 'pending', 'member_count': 0,
+    }
+
+    # ...and the reader names the network, even though it is now removed.
+    listed = platform_admin_client.get('/api/v1/platform/audit-log', params={'category': 'tenant'}).json()
+    mine = [row for row in listed['rows'] if row['target_id'] == str(pending.id)]
+    assert {row['action'] for row in mine} == {'tenant.invite_resent', 'tenant.removed'}
+    assert all(row['target_label'] == pending.name for row in mine)
+

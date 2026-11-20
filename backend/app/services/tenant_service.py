@@ -312,6 +312,11 @@ class TenantService:
             action='tenant.invite_resent', entity_type='tenant', entity_id=tenant.id,
             actor_user_id=scope.user.id, payload={'tenant_slug': tenant.slug},
         )
+        self.platform_audit.log(
+            actor_user_id=scope.user.id, action='tenant.invite_resent',
+            target_type='tenant', target_id=str(tenant.id),
+            payload={'slug': tenant.slug, 'name': tenant.name},
+        )
         self.db.commit()
         return tenant
 
@@ -424,6 +429,7 @@ class TenantService:
             .values(status=TenantAccessGrantStatus.DENIED)
         )
 
+        status_before = tenant.status.value
         tenant.is_active = False
         # Distinct terminal state (migration 0019): suspension also writes
         # is_active=False, so the console filters on status — without this a
@@ -440,6 +446,16 @@ class TenantService:
                 'tenant_name': tenant.name,
                 'tenant_slug': tenant.slug,
                 'cascaded_member_count': len(members),
+            },
+        )
+        # The operator's own trail too: until 2026-11-19 the heaviest action of
+        # the console was the one the tier-0 audit reader could not show.
+        self.platform_audit.log(
+            actor_user_id=scope.user.id, action='tenant.removed',
+            target_type='tenant', target_id=str(tenant.id),
+            payload={
+                'slug': tenant.slug, 'name': tenant.name,
+                'status_before': status_before, 'member_count': len(members),
             },
         )
 

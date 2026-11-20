@@ -98,6 +98,7 @@ export function PlatformAuditCard() {
     if (detail.kind === "role_change") return t("detail.roleChange", { from: roleName(detail.from), to: roleName(detail.to) });
     if (detail.kind === "role") return t("detail.role", { role: roleName(detail.role) });
     if (detail.kind === "reason") return t("detail.reason", { text: detail.text });
+    if (detail.kind === "members") return t("detail.members", { count: detail.count });
     return detail.pairs
       .map(([key, value]) => `${t.has(`settingNames.${key}`) ? t(`settingNames.${key}`) : key} : ${value}`)
       .join(" · ");

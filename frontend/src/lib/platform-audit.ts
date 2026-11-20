@@ -22,6 +22,7 @@ export type AuditDetail =
   | { kind: "role_change"; from: string; to: string }
   | { kind: "role"; role: string }
   | { kind: "reason"; text: string }
+  | { kind: "members"; count: number }
   | { kind: "settings"; pairs: [string, string][] };
 
 function text(value: unknown): string | null {
@@ -43,6 +44,12 @@ export function auditDetail(row: Pick<PlatformAuditRow, "action" | "details">): 
   if (row.action === "access.requested") {
     const reason = text(d.reason);
     return reason ? { kind: "reason", text: reason } : null;
+  }
+  if (row.action === "tenant.removed") {
+    // Rows written before 2026-11-19 do not exist; a count of 0 says nothing.
+    return typeof d.member_count === "number" && d.member_count > 0
+      ? { kind: "members", count: d.member_count }
+      : null;
   }
   if (row.action === "settings.updated") {
     const pairs = Object.entries(d).map(([key, value]): [string, string] => [
