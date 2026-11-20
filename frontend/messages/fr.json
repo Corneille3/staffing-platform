@@ -1595,6 +1595,8 @@
       },
       "actionFailed": "L'action a échoué",
       "resend": "Renvoyer",
+      "resending": "Envoi…",
+      "resent": "Invitation renvoyée",
       "revoke": "Révoquer",
       "openWorkspace": "Ouvrir l'espace",
       "grantTitle": "Vous avez un accès accordé à cet espace (lecture seule)",
@@ -1681,6 +1683,8 @@
         "mfaOff": "Désactivée",
         "invited": "Invité·e le {date}",
         "resend": "Renvoyer",
+        "resending": "Envoi…",
+        "resent": "Invitation renvoyée",
         "remove": "Retirer",
         "confirmRemove": "Retirer {name} du niveau 0 ?"
       },
