@@ -43,6 +43,14 @@ describe("auditDetail", () => {
     });
   });
 
+  it("shows how many accounts a removed tenant took with it", () => {
+    expect(auditDetail({ action: "tenant.removed", details: { slug: "x", member_count: 4 } })).toEqual({
+      kind: "members",
+      count: 4,
+    });
+    expect(auditDetail({ action: "tenant.removed", details: { slug: "x", member_count: 0 } })).toBeNull();
+  });
+
   it("has nothing to add for the other actions", () => {
     expect(auditDetail({ action: "tenant.suspended", details: { slug: "apf" } })).toBeNull();
     expect(auditDetail({ action: "lead.deleted", details: { org_name: "X" } })).toBeNull();

@@ -1790,6 +1790,8 @@
         "tenant_invited": "Tenant invited",
         "tenant_suspended": "Tenant suspended",
         "tenant_reactivated": "Tenant reactivated",
+        "tenant_removed": "Tenant removed",
+        "tenant_invite_resent": "Tenant invitation resent",
         "operator_invited": "Operator invited",
         "operator_role_changed": "Role changed",
         "operator_removed": "Operator removed",
@@ -1805,7 +1807,8 @@
       "detail": {
         "roleChange": "{from} → {to}",
         "role": "Role: {role}",
-        "reason": "Reason: “{text}”"
+        "reason": "Reason: “{text}”",
+        "members": "{count, plural, one {# account deactivated} other {# accounts deactivated}}"
       },
       "settingNames": {
         "default_language": "Default language",
