@@ -3,7 +3,7 @@
 Until 2026-06-10 the app only acted on clicks; nothing watched the clock, so
 an unfilled self-serve release was discovered only if a coordinator happened
 to look. This daemon thread is the decision (no new infra, no new deps) that
-closes that hole. Two jobs:
+closes that hole. Its jobs:
 
   - **replacement sweep** (every ``replacement_sweep_interval_seconds``):
     escalate-then-expire still-searching releases/absences across ALL orgs
@@ -12,6 +12,9 @@ closes that hole. Two jobs:
   - **reliability recompute** (nightly at ``reliability_recompute_hour_utc``):
     the cron ``WorkerService.recompute_reliability_all`` was always meant to
     have.
+  - **lead reminder** (daily from ``lead_reminder_hour_local``): one email to
+    the owner and the marketing operators listing the leads whose next action
+    is due (``LeadReminderService.tick``).
 
 Safety model: the docker entrypoint runs uvicorn with no ``--workers`` flag —
 a single process — so exactly one scheduler runs per container, and prod runs
@@ -80,6 +83,7 @@ class BackgroundScheduler:
             self._run_sweep()
             self._run_attendance_sweep()
             self._maybe_run_reliability()
+            self._maybe_run_lead_reminder()
             if self._stop.wait(settings.replacement_sweep_interval_seconds):
                 return
 
@@ -127,6 +131,22 @@ class BackgroundScheduler:
         except Exception:
             # Date marker not advanced — retried on the next tick.
             logger.exception('Reliability recompute failed')
+
+    def _maybe_run_lead_reminder(self) -> None:
+        # The service decides whether it is time: its "sent today" stamp lives
+        # in the database, so a deploy-time restart does not send twice.
+        try:
+            from app.services.platform_lead_reminder import LeadReminderService
+
+            with SessionLocal() as db:
+                result = LeadReminderService(db).tick()
+            if result['ran']:
+                logger.info(
+                    'Lead reminder: %s due, %s emailed',
+                    result['leads'], result['emailed'],
+                )
+        except Exception:
+            logger.exception('Lead reminder failed')
 
 
 scheduler = BackgroundScheduler()
