@@ -1773,6 +1773,57 @@
         "removing": "Retrait…",
         "submit": "Forcer le retrait"
       }
+    },
+    "audit": {
+      "title": "Journal d'audit",
+      "sub": "Qui a fait quoi sur la plateforme, du plus récent au plus ancien. Visible de l'owner seulement.",
+      "filterAll": "Tout",
+      "categories": {
+        "tenant": "Tenants",
+        "operator": "Opérateurs",
+        "access": "Accès aux tenants",
+        "settings": "Paramètres",
+        "lead": "Leads",
+        "housekeeping": "Entretien"
+      },
+      "actions": {
+        "tenant_invited": "Tenant invité",
+        "tenant_suspended": "Tenant suspendu",
+        "tenant_reactivated": "Tenant réactivé",
+        "operator_invited": "Opérateur invité",
+        "operator_role_changed": "Rôle modifié",
+        "operator_removed": "Opérateur retiré",
+        "operator_invite_resent": "Invitation renvoyée",
+        "access_requested": "Accès demandé",
+        "access_approved": "Accès approuvé",
+        "access_denied": "Accès refusé",
+        "access_released": "Visite terminée",
+        "settings_updated": "Paramètres modifiés",
+        "lead_deleted": "Lead supprimé",
+        "housekeeping_clerk_orphan_removed": "Compte orphelin supprimé"
+      },
+      "detail": {
+        "roleChange": "{from} → {to}",
+        "role": "Rôle : {role}",
+        "reason": "Motif : « {text} »"
+      },
+      "settingNames": {
+        "default_language": "Langue par défaut",
+        "trial_length_days": "Durée de l'essai (jours)",
+        "invite_expiry_days": "Expiration des invitations (jours)",
+        "orphan_retention_days": "Conservation des orphelins (jours)",
+        "access_requires_approval": "Approbation requise",
+        "access_window_hours": "Durée d'une visite (heures)",
+        "reserved_slugs": "Adresses réservées"
+      },
+      "removedActor": "Compte retiré",
+      "count": "{shown} sur {total, plural, one {# entrée} other {# entrées}}",
+      "loadMore": "Afficher la suite",
+      "loading": "Chargement…",
+      "retry": "Réessayer",
+      "loadFailed": "Le journal n'a pas pu être chargé.",
+      "empty": "Aucune action enregistrée pour l'instant.",
+      "emptyFiltered": "Aucune action dans cette catégorie."
     }
   },
   "apf": {

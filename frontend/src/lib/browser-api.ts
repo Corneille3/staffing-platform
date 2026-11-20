@@ -22,6 +22,7 @@ import {
   NotificationFeedItem,
   Organization,
   OrphanScanResult,
+  PlatformAuditResponse,
   PlatformOperator,
   ReplacementPolicy,
   PlatformSettings,
@@ -257,6 +258,17 @@ export async function requestTenantAccess(
  * no id needed, at most one grant is active). */
 export async function releaseTenantAccessGrant(): Promise<TenantAccessGrant> {
   return postJson<TenantAccessGrant>(`/api/v1/platform/access-grants/release`);
+}
+
+// ── Tier-0 audit trail (owner only) ───────────────────────────────────────────
+export async function fetchPlatformAudit(
+  category: string | null,
+  offset: number,
+  limit: number,
+): Promise<PlatformAuditResponse> {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (category) params.set("category", category);
+  return getJson<PlatformAuditResponse>(`/api/v1/platform/audit-log?${params}`);
 }
 
 // ── Housekeeping orphan scan ──────────────────────────────────────────────────

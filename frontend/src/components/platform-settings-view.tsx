@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { ArrowRight, Check, Lock, Plus, Shield, ShieldCheck, ShieldOff, X } from "lucide-react";
 import { HousekeepingCard } from "./housekeeping-card";
+import { PlatformAuditCard } from "./platform-audit-card";
 import { SaveFlash, useSaveFlash } from "./ui";
 import {
   changePlatformOperatorRole,
@@ -155,6 +156,9 @@ export function PlatformSettingsView({
       />
       <HousekeepingCard canScan={operators != null} />
 
+      {/* ── Audit trail — owner only (the API refuses anyone else) ────────── */}
+      {isOwner ? <AuditSection /> : null}
+
       <div style={{ marginTop: 28, fontSize: 12, color: "var(--ink-3)", display: "flex", alignItems: "center", gap: 6 }}>
         <Shield size={13} /> {tt("auditNote")}
       </div>
@@ -168,6 +172,16 @@ export function PlatformSettingsView({
           }}
         />
       )}
+    </div>
+  );
+}
+
+function AuditSection() {
+  const ta = useTranslations("platform.audit");
+  return (
+    <div style={{ marginTop: 36 }}>
+      <SectionHead title={ta("title")} sub={ta("sub")} />
+      <PlatformAuditCard />
     </div>
   );
 }
