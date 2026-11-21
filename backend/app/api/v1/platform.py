@@ -7,7 +7,7 @@ delegate to TenantService.
 """
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
@@ -38,7 +38,7 @@ from app.schemas.platform import (
     TenantAccessGrantsResponse,
     TenantAccessRequestCreate,
 )
-from app.schemas.tenant import TenantNetworkCreate
+from app.schemas.tenant import TenantNetworkCreate, TenantRemoval
 from app.services.housekeeping_service import HousekeepingService
 from app.services.platform_audit_service import AUDIT_CATEGORIES, PlatformAuditService
 from app.services.platform_operator_service import PlatformOperatorService
@@ -231,9 +231,11 @@ def resend_invite(
 def revoke_invite(
     tenant_id: UUID,
     scope: AccessScope = Depends(require_platform_operator_mfa),
+    # Same rule as the removal: a reason when the invite came from a lead.
+    payload: TenantRemoval | None = Body(default=None),
     db: Session = Depends(get_db_session),
 ) -> PlatformTenantCreated:
-    tenant = TenantService(db).revoke_invite(tenant_id, scope)
+    tenant = TenantService(db).revoke_invite(tenant_id, scope, payload.reason if payload else None)
     return PlatformTenantCreated(id=tenant.id, slug=tenant.slug, status=tenant.status.value)
 
 @router.get('/audit-log', response_model=PlatformAuditResponse)

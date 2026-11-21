@@ -26,6 +26,9 @@ State machine (§4, as settled with the product owner):
   lead is in `pilot`). A pilot past its end and an invitation older than
   7 days are what `/stats` flags.
 - Every transition writes a `status_changed` event with from/to.
+- Removing (or revoking the invite of) the workspace of a lead that is
+  `invited` or in `pilot` needs a reason and closes the lead as `lost`;
+  suspending a workspace leaves its lead alone.
 - Deleting a lead is the owner's alone and takes its feed with it; the
   platform audit trail keeps who removed which organization. A lead whose
   workspace still exists cannot be deleted — remove the workspace first.
@@ -114,6 +117,32 @@ def mark_lead_piloting(db: Session, tenant_id: UUID) -> PlatformLead | None:
         from_status=previous, to_status=LeadStatus.PILOT,
     ))
     return lead
+
+
+def lead_awaiting_tenant(db: Session, tenant_id: UUID) -> PlatformLead | None:
+    """The lead still riding on this tenant — invited or in pilot. Any other
+    lead (reopened to an earlier stage, lost, won) no longer depends on it."""
+    return db.scalar(
+        select(PlatformLead).where(
+            PlatformLead.tenant_id == tenant_id,
+            PlatformLead.status.in_(SYSTEM_STATUSES),
+        )
+    )
+
+
+def close_lead_of_removed_tenant(
+    db: Session, lead: PlatformLead, reason: str, actor_id: UUID,
+) -> None:
+    """The workspace is being removed: there is no invitation or pilot left,
+    so the lead is lost, with the operator's reason (spec v1.1 §4). No commit
+    — the removal's transaction carries it."""
+    previous = lead.status
+    lead.status = LeadStatus.LOST
+    lead.lost_reason = reason
+    db.add(PlatformLeadEvent(
+        lead_id=lead.id, type='status_changed', actor_id=actor_id,
+        from_status=previous, to_status=LeadStatus.LOST, body=reason,
+    ))
 
 
 def receive_public_intake(db: Session, payload: PublicLeadIntake) -> PlatformLead:

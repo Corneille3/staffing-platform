@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 from app.auth.clerk import delete_clerk_user
 from app.auth.scope import AccessScope
 from app.core.config import settings
+from app.core.errors import coded
 from app.models.enums import TenantAccessGrantStatus, TenantStatus, UserRole
 from app.models.organization_membership import OrganizationMembership
 from app.models.tenant import Tenant
@@ -40,7 +41,9 @@ from app.notifications.i18n import localized, localized_subject
 from app.schemas.tenant import TenantNetworkCreate
 from app.services.audit_service import AuditService
 from app.services.platform_audit_service import PlatformAuditService
-from app.services.platform_lead_service import mark_lead_piloting
+from app.services.platform_lead_service import (
+    close_lead_of_removed_tenant, lead_awaiting_tenant, mark_lead_piloting,
+)
 from app.services.platform_settings_service import reserved_slugs
 from app.services.user_service import REMOVED_EMAIL_MARKER
 
@@ -320,23 +323,28 @@ class TenantService:
         self.db.commit()
         return tenant
 
-    def revoke_invite(self, tenant_id: UUID, scope: AccessScope) -> Tenant:
+    def revoke_invite(self, tenant_id: UUID, scope: AccessScope, reason: str | None = None) -> Tenant:
         """Cancel a pending invite (hard-suspend; the admin never signed up).
-        Reuses the soft-delete cascade but guards on pending status."""
+        Reuses the soft-delete cascade but guards on pending status — and its
+        rule for a tenant that came from a sales lead (a reason is required)."""
         tenant = self._get_tenant_or_404(tenant_id)
         if tenant.status != TenantStatus.PENDING:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail='Only a pending invite can be revoked. Suspend an active tenant instead.',
             )
-        return self.remove_tenant(tenant_id, scope)
+        return self.remove_tenant(tenant_id, scope, reason)
 
-    def remove_tenant(self, tenant_id: UUID, scope: AccessScope) -> Tenant:
+    def remove_tenant(self, tenant_id: UUID, scope: AccessScope, reason: str | None = None) -> Tenant:
         """Soft-delete a tenant and cascade-deactivate every member.
 
         Refuses to delete the tenant the acting user is a member of
         (prevents the platform admin from locking themselves out of their
         primary tenant).
+
+        A tenant whose sales lead is still `invited` or in `pilot` needs a
+        `reason`: removing the workspace ends that invitation or pilot, so
+        the lead is closed as lost with it, in the same transaction.
         """
         tenant = self.db.get(Tenant, tenant_id)
         if tenant is None or tenant.status == TenantStatus.REMOVED:
@@ -354,6 +362,18 @@ class TenantService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail='You cannot remove your own network. Hand it off to another '
                        'platform admin first.',
+            )
+
+        reason = (reason or '').strip() or None
+        lead = lead_awaiting_tenant(self.db, tenant_id)
+        if lead is not None and reason is None:
+            # Checked before anything is touched (Clerk deletions below are
+            # not undone by a rollback).
+            raise coded(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, 'tenant.removal_needs_reason',
+                f'This workspace is the {lead.status.value} of the lead "{lead.org_name}": '
+                'give a reason, the lead will be closed as lost with it.',
+                lead=lead.org_name, lead_status=lead.status.value,
             )
 
         members = list(self.db.scalars(
@@ -450,13 +470,18 @@ class TenantService:
         )
         # The operator's own trail too: until 2026-11-19 the heaviest action of
         # the console was the one the tier-0 audit reader could not show.
+        trail = {
+            'slug': tenant.slug, 'name': tenant.name,
+            'status_before': status_before, 'member_count': len(members),
+        }
+        if lead is not None:
+            trail['lead_status_before'] = lead.status.value
+            trail['reason'] = reason
+            close_lead_of_removed_tenant(self.db, lead, reason, scope.user.id)
         self.platform_audit.log(
             actor_user_id=scope.user.id, action='tenant.removed',
             target_type='tenant', target_id=str(tenant.id),
-            payload={
-                'slug': tenant.slug, 'name': tenant.name,
-                'status_before': status_before, 'member_count': len(members),
-            },
+            payload=trail,
         )
 
         self.db.commit()

@@ -124,5 +124,5 @@ def test_platform_operator_sees_both_tenant_counts(two_tenants, db_session):
         assert set(row) == {
             "id", "name", "slug", "region", "status", "org_count",
             "substitute_count", "fill_rate_30d", "admin_name", "admin_email", "since",
-            "lead_segment", "lead_source",
+            "lead_segment", "lead_source", "lead_status",
         }

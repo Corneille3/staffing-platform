@@ -707,6 +707,9 @@ export type PlatformTenantRow = {
   // The sales lead this tenant was invited from, if any (/platform/leads).
   lead_segment: string | null;
   lead_source: string | null;
+  // That lead's pipeline stage. While it is `invited` or `pilot`, removing
+  // the tenant (or revoking its invite) needs a reason and loses the lead.
+  lead_status: string | null;
 };
 
 export type PlatformTenantsResponse = {

@@ -80,9 +80,9 @@ class PlatformService:
 
         # « Origine »: the sales lead a tenant was invited from, if any.
         origins = {
-            tenant_id: (segment, source)
-            for tenant_id, segment, source in self.db.execute(
-                select(PlatformLead.tenant_id, PlatformLead.segment, PlatformLead.source)
+            tenant_id: (segment, source, lead_status.value)
+            for tenant_id, segment, source, lead_status in self.db.execute(
+                select(PlatformLead.tenant_id, PlatformLead.segment, PlatformLead.source, PlatformLead.status)
                 .where(PlatformLead.tenant_id.in_([t.id for t in tenants]))
             )
         }
@@ -119,8 +119,9 @@ class PlatformService:
                 'admin_name': f'{admin.first_name} {admin.last_name}' if admin else None,
                 'admin_email': admin.email if admin else None,
                 'since': t.activated_at or t.created_at,
-                'lead_segment': origins.get(t.id, (None, None))[0],
-                'lead_source': origins.get(t.id, (None, None))[1],
+                'lead_segment': origins.get(t.id, (None, None, None))[0],
+                'lead_source': origins.get(t.id, (None, None, None))[1],
+                'lead_status': origins.get(t.id, (None, None, None))[2],
             })
 
         return {

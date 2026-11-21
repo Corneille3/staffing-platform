@@ -104,10 +104,13 @@ async function postJson<T>(path: string, body?: object): Promise<T> {
   return response.json();
 }
 
-async function deleteJson<T>(path: string): Promise<T> {
+async function deleteJson<T>(path: string, body?: object): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
     method: "DELETE",
-    headers: await authHeaders(),
+    headers: body
+      ? { "Content-Type": "application/json", ...(await authHeaders()) }
+      : await authHeaders(),
+    body: body ? JSON.stringify(body) : undefined,
   });
   if (!response.ok) {
     throw await apiErrorFromResponse(response, `DELETE ${path} failed (${response.status})`);
@@ -198,8 +201,13 @@ export async function invitePlatformTenant(
 export async function platformTenantAction(
   tenantId: string,
   action: "suspend" | "reactivate" | "resend" | "revoke",
+  // Revoke only: required when the invite came from a sales lead.
+  reason?: string,
 ): Promise<PlatformTenantCreated> {
-  return postJson<PlatformTenantCreated>(`/api/v1/platform/tenants/${tenantId}/${action}`);
+  return postJson<PlatformTenantCreated>(
+    `/api/v1/platform/tenants/${tenantId}/${action}`,
+    reason ? { reason } : undefined,
+  );
 }
 
 // ── Platform Settings (PLATFORM_HANDOFF §2) ──────────────────────────────────
@@ -728,8 +736,10 @@ export async function createNetwork(payload: {
   return postJson<TenantNetwork>("/api/v1/networks", payload);
 }
 
-export async function removeNetwork(tenantId: string): Promise<TenantNetwork> {
-  return deleteJson<TenantNetwork>(`/api/v1/networks/${tenantId}`);
+/** `reason` is required by the API when the tenant's sales lead is still
+ * invited or in pilot — the lead is then closed as lost with it. */
+export async function removeNetwork(tenantId: string, reason?: string): Promise<TenantNetwork> {
+  return deleteJson<TenantNetwork>(`/api/v1/networks/${tenantId}`, reason ? { reason } : undefined);
 }
 
 export async function inviteCoordinator(payload: {

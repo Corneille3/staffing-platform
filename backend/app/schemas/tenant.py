@@ -74,3 +74,10 @@ class TenantProfileUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     region: str | None = Field(default=None, max_length=100)
     preferred_language: str | None = Field(default=None, pattern=r'^(fr|en|bilingual)$')
+
+
+class TenantRemoval(BaseModel):
+    """Optional body of the remove / revoke routes. `reason` is required when
+    the tenant's sales lead is still invited or in pilot: the lead is closed
+    as lost with it (SPEC_PLATFORM_LEADS v1.1 §4)."""
+    reason: str | None = Field(default=None, max_length=1000)

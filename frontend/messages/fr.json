@@ -1628,7 +1628,18 @@
         "note": "L'historique d'audit est conservé. Cette action ne peut pas être annulée depuis la console.",
         "failed": "La suppression a échoué",
         "removing": "Suppression…",
-        "confirm": "Supprimer le réseau"
+        "confirm": "Supprimer le réseau",
+        "leadPilot": "Ce réseau est le pilote d'un prospect du pipeline. Le supprimer met fin au pilote : le prospect sera classé Perdu, avec la raison ci-dessous.",
+        "leadInvited": "Ce réseau vient d'une invitation envoyée à un prospect du pipeline. Le prospect sera classé Perdu, avec la raison ci-dessous.",
+        "reasonLabel": "Raison",
+        "reasonPlaceholder": "ex. Le client a choisi une agence",
+        "needReason": "Indiquez la raison : elle est enregistrée sur le prospect."
+      },
+      "revokeModal": {
+        "title": "Révoquer l'invitation de <em>{name}</em> ?",
+        "body": "L'invitation est annulée et le réseau <b>retiré de la console</b>. L'admin invité ne pourra plus créer son compte avec ce lien.",
+        "removing": "Révocation…",
+        "confirm": "Révoquer l'invitation"
       },
       "accessModal": {
         "needReason": "Donnez une vraie raison à l'admin du tenant (5 caractères au minimum).",

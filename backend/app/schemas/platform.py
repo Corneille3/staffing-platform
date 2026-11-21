@@ -34,6 +34,9 @@ class PlatformTenantRow(BaseModel):
     # Set when the tenant was invited from a sales lead (/platform/leads).
     lead_segment: str | None = None
     lead_source: str | None = None
+    # That lead's pipeline stage: `pilot` marks a trial in progress, and a
+    # lead still `invited` / `pilot` makes the removal ask for a reason.
+    lead_status: str | None = None
 
 
 class PlatformTenantsResponse(BaseModel):
