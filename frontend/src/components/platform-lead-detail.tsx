@@ -240,10 +240,10 @@ function TenantBanner({ lead, tenant, isOwner }: { lead: Lead; tenant: LeadTenan
     invited: "detail.invitedTitle",
   }[kind];
   const body =
-    kind === "won" && lead.converted_at
+    kind === "won" && lead.won_at
       ? t("detail.convertedBody", {
-          date: formatDay(shiftDateKey(lead.converted_at), locale),
-          days: daysBetween(lead.created_at, lead.converted_at),
+          date: formatDay(shiftDateKey(lead.won_at), locale),
+          days: daysBetween(lead.created_at, lead.won_at),
         })
       : t({ won: "detail.pilotBody", removed: "detail.removedBody", lost_live: "detail.lostLiveBody", pilot: "detail.pilotBody", invited: "detail.invitedBody" }[kind], { name });
   // The tenant's own state adds nothing once the title already says it.

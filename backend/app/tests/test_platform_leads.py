@@ -443,7 +443,9 @@ def test_stats_counts_overdue_open_actions_only(platform_admin_client):
     assert stats['open_pipeline'] == 5
     assert stats['in_demo_or_pilot'] == 2
     assert stats['by_status']['lost'] == 1 and stats['by_status']['won'] == 0
-    assert stats['conversion_rate'] == 0.0          # 3 leads past `new`, none won yet
+    assert stats['conversion_rate'] is None         # no pilot has started: nothing to measure
+    assert (stats['pilots_active'], stats['pilots_overdue'], stats['stale_invites']) == (0, 0, 0)
+    assert stats['avg_pilot_days'] is None
     assert {'segment': 'rpa_qc', 'wave': 'A', 'count': 1} in stats['by_segment_wave']
 
     late = platform_admin_client.get(LEADS, params={'next_action_before': str(today)}).json()
@@ -474,6 +476,7 @@ def test_invite_creates_the_tenant_and_links_the_lead(platform_admin_client, db_
     assert res.status_code == 201, res.text
     body = res.json()
     assert body['lead']['status'] == 'invited'
+    assert body['lead']['invited_at'] is not None and body['lead']['pilot_started_at'] is None
     assert body['tenant']['slug'] == 'residence-test'
     assert body['tenant']['status'] == 'pending'
     assert body['lead']['tenant_id'] == body['tenant']['id']
@@ -564,16 +567,22 @@ def test_tenant_activation_starts_the_pilot(platform_admin_client, db_session, s
     # The trial runs in the prospect's real workspace: active = pilot, not won.
     row = db_session.get(PlatformLead, lead['id'])
     db_session.refresh(row)
-    assert row.status == LeadStatus.PILOT and row.converted_at is None
+    assert row.status == LeadStatus.PILOT and row.won_at is None
     last = _events(db_session, lead['id'])[-1]
     assert (last.type, last.from_status, last.to_status, last.actor_id) == (
         'tenant_activated', LeadStatus.INVITED, LeadStatus.PILOT, None,
     )
+    # The pilot is dated: started now, planned to end 30 days later.
+    assert row.invited_at is not None and row.pilot_started_at >= row.invited_at
+    assert row.pilot_ends_at == shift_today() + timedelta(days=30)
 
-    # Idempotent: finishing again writes nothing more.
+    # Idempotent: finishing again writes nothing more and restarts no clock.
     count = len(_events(db_session, lead['id']))
+    started = row.pilot_started_at
     assert tenant_admin.post('/api/v1/tenant/onboarding/complete').status_code == 200
     assert len(_events(db_session, lead['id'])) == count
+    db_session.refresh(row)
+    assert row.pilot_started_at == started
 
 
 def test_owner_wins_the_lead_once_the_client_commits(platform_admin_client, db_session, seed):
@@ -608,7 +617,7 @@ def test_owner_wins_the_lead_once_the_client_commits(platform_admin_client, db_s
 
     won = platform_admin_client.post(f'{url}/won')
     assert won.status_code == 200, won.text
-    assert won.json()['status'] == 'won' and won.json()['converted_at'] is not None
+    assert won.json()['status'] == 'won' and won.json()['won_at'] is not None
     last = _events(db_session, lead['id'])[-1]
     assert (last.type, last.from_status, last.to_status) == ('status_changed', LeadStatus.PILOT, LeadStatus.WON)
     assert platform_admin_client.get(f'{LEADS}/stats').json()['by_status']['won'] == 1
@@ -635,7 +644,7 @@ def test_won_needs_the_pilot_whatever_the_tenant_state(platform_admin_client, db
         assert refused.json()['detail']['code'] == 'lead.win_needs_pilot'
     row = db_session.get(PlatformLead, lead['id'])
     db_session.refresh(row)
-    assert row.status == LeadStatus.CONTACTED and row.converted_at is None
+    assert row.status == LeadStatus.CONTACTED and row.won_at is None
 
     # A lost lead is not won either, and an unknown one is a 404.
     assert platform_admin_client.patch(url, json={'status': 'lost', 'lost_reason': 'Went silent'}).status_code == 200
@@ -690,7 +699,7 @@ def test_a_failed_pilot_can_be_lost(platform_admin_client, db_session, seed):
 
     lost = platform_admin_client.patch(url, json={'status': 'lost', 'lost_reason': 'Pilot dropped'})
     assert lost.status_code == 200 and lost.json()['status'] == 'lost'
-    assert lost.json()['converted_at'] is None
+    assert lost.json()['won_at'] is None
 
 
 def test_activation_leaves_a_closed_lead_alone(platform_admin_client, db_session, seed):
@@ -711,6 +720,135 @@ def test_activation_without_a_lead_changes_nothing(apf_client, seed, db_session)
     db_session.flush()
     assert apf_client.post('/api/v1/tenant/onboarding/complete').status_code == 200
     assert db_session.scalar(select(PlatformLead)) is None
+
+
+# ── the pilot's timeline (spec v1.1) ─────────────────────────────────────────
+
+def _pilot_lead(client, db_session, **overrides) -> tuple[str, PlatformLead]:
+    """A lead taken through the real flow: invite, then the wizard."""
+    lead = _create(client, status='demo_booked', **overrides)
+    assert _invite(client, lead['id']).status_code == 201
+    _activate_invited_tenant(db_session)
+    row = db_session.get(PlatformLead, lead['id'])
+    db_session.refresh(row)
+    return f"{LEADS}/{lead['id']}", row
+
+
+def test_pilot_end_is_edited_on_a_pilot_only(platform_admin_client, db_session, seed):
+    other = _create(platform_admin_client, org_name='Pas en pilote', status='contacted')
+    refused = platform_admin_client.patch(f"{LEADS}/{other['id']}", json={'pilot_ends_at': str(shift_today())})
+    assert refused.status_code == 422 and refused.json()['detail']['code'] == 'lead.pilot_end_needs_pilot'
+
+    url, row = _pilot_lead(platform_admin_client, db_session)
+    later = shift_today() + timedelta(days=45)
+    moved = platform_admin_client.patch(url, json={'pilot_ends_at': str(later)})
+    assert moved.status_code == 200 and moved.json()['pilot_ends_at'] == str(later)
+
+    before_start = platform_admin_client.patch(url, json={'pilot_ends_at': str(shift_today() - timedelta(days=1))})
+    assert before_start.status_code == 422
+    assert before_start.json()['detail']['code'] == 'lead.pilot_end_before_start'
+    emptied = platform_admin_client.patch(url, json={'pilot_ends_at': None})
+    assert emptied.status_code == 422 and emptied.json()['detail']['code'] == 'lead.field_required'
+    db_session.refresh(row)
+    assert row.pilot_ends_at == later
+
+
+def test_a_reopened_pilot_keeps_its_dates(platform_admin_client, db_session, seed):
+    url, row = _pilot_lead(platform_admin_client, db_session)
+    started, ends = row.pilot_started_at, row.pilot_ends_at
+
+    assert platform_admin_client.patch(url, json={'status': 'lost', 'lost_reason': 'Misclick'}).status_code == 200
+    assert platform_admin_client.patch(url, json={'status': 'contacted'}).status_code == 200
+    assert platform_admin_client.patch(url, json={'status': 'pilot'}).status_code == 200
+    db_session.refresh(row)
+    assert (row.pilot_started_at, row.pilot_ends_at) == (started, ends)
+
+
+def test_a_lead_lost_before_activation_gets_its_pilot_dated_on_return(platform_admin_client, db_session, seed):
+    """Closed while invited, the activation leaves the lead alone. Reopened
+    and put back in `pilot`, it takes the workspace's own activation date."""
+    from app.models.tenant import Tenant
+
+    lead = _create(platform_admin_client, status='contacted')
+    url = f"{LEADS}/{lead['id']}"
+    assert _invite(platform_admin_client, lead['id']).status_code == 201
+    assert platform_admin_client.patch(url, json={'status': 'lost', 'lost_reason': 'Went silent'}).status_code == 200
+    _activate_invited_tenant(db_session)
+    row = db_session.get(PlatformLead, lead['id'])
+    db_session.refresh(row)
+    assert row.status == LeadStatus.LOST and row.pilot_started_at is None
+
+    assert platform_admin_client.patch(url, json={'status': 'contacted'}).status_code == 200
+    assert platform_admin_client.patch(url, json={'status': 'pilot'}).status_code == 200
+    db_session.refresh(row)
+    tenant = db_session.get(Tenant, row.tenant_id)
+    assert row.pilot_started_at == tenant.activated_at
+    assert row.pilot_ends_at == shift_today() + timedelta(days=30)
+
+
+def test_stats_measure_conversion_on_the_pilots(platform_admin_client, db_session, seed):
+    """v1.1: won ÷ leads that reached the pilot — not ÷ leads contacted."""
+    from datetime import datetime, timezone
+
+    for name in ('Contactée 1', 'Contactée 2', 'Contactée 3'):
+        _create(platform_admin_client, org_name=name, status='contacted')
+    url, row = _pilot_lead(platform_admin_client, db_session)
+
+    stats = platform_admin_client.get(f'{LEADS}/stats').json()
+    assert (stats['pilots_active'], stats['pilots_overdue']) == (1, 0)
+    assert stats['conversion_rate'] == 0.0          # one pilot running, none won
+
+    # The pilot's planned end has passed: time for the closing call.
+    row.pilot_started_at = datetime.now(timezone.utc) - timedelta(days=40)
+    row.pilot_ends_at = shift_today() - timedelta(days=10)
+    db_session.flush()
+    assert platform_admin_client.get(f'{LEADS}/stats').json()['pilots_overdue'] == 1
+
+    assert platform_admin_client.post(f'{url}/won').status_code == 200
+    stats = platform_admin_client.get(f'{LEADS}/stats').json()
+    assert stats['conversion_rate'] == 1.0          # 1 won ÷ 1 pilot reached, 3 contacted leads ignored
+    assert (stats['pilots_active'], stats['pilots_overdue']) == (0, 0)
+    assert stats['avg_pilot_days'] == 40.0
+
+    # A second pilot that fails halves the rate: it reached the pilot too.
+    other = _create(platform_admin_client, org_name='Autre Résidence', status='demo_booked')
+    assert _invite(platform_admin_client, other['id'], slug='autre-residence',
+                   admin_email='admin@autre-residence.example').status_code == 201
+    other_row = db_session.get(PlatformLead, other['id'])
+    other_row.status = LeadStatus.PILOT
+    other_row.pilot_started_at = datetime.now(timezone.utc)
+    db_session.flush()
+    assert platform_admin_client.patch(
+        f"{LEADS}/{other['id']}", json={'status': 'lost', 'lost_reason': 'Pilot dropped'},
+    ).status_code == 200
+    assert platform_admin_client.get(f'{LEADS}/stats').json()['conversion_rate'] == 0.5
+
+
+def test_an_invitation_left_for_a_week_counts_as_late(platform_admin_client, db_session, seed):
+    from datetime import datetime, timezone
+
+    lead = _create(platform_admin_client, status='demo_booked')
+    assert _invite(platform_admin_client, lead['id']).status_code == 201
+    stats = platform_admin_client.get(f'{LEADS}/stats').json()
+    assert (stats['stale_invites'], stats['overdue_actions']) == (0, 0)
+
+    row = db_session.get(PlatformLead, lead['id'])
+    row.invited_at = datetime.now(timezone.utc) - timedelta(days=8)
+    db_session.flush()
+    stats = platform_admin_client.get(f'{LEADS}/stats').json()
+    assert (stats['stale_invites'], stats['overdue_actions']) == (1, 1)
+
+    # Late on both counts is still one lead.
+    row.next_action_at = shift_today() - timedelta(days=1)
+    db_session.flush()
+    assert platform_admin_client.get(f'{LEADS}/stats').json()['overdue_actions'] == 1
+
+    # The wizard finished: the invitation is no longer waiting.
+    row.next_action_at = None
+    db_session.flush()
+    _activate_invited_tenant(db_session)
+    stats = platform_admin_client.get(f'{LEADS}/stats').json()
+    assert (stats['stale_invites'], stats['overdue_actions']) == (0, 0)
 
 
 # ── errors carry a code the bilingual screens translate ──────────────────────

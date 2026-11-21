@@ -16,9 +16,13 @@ class PlatformLead(Base):
 
     Tier-0 data: organization-level contact details only, never anything from
     inside a tenant. `tenant_id` is the single link to the tenant this lead
-    became — set at invite, with `converted_at` stamped when that tenant goes
-    active (the spec's tenants.lead_id + converted_tenant_id pair, folded
-    into one column so the two sides cannot drift)."""
+    became — set at invite (the spec's tenants.lead_id + converted_tenant_id
+    pair, folded into one column so the two sides cannot drift).
+
+    The pilot's timeline (spec v1.1): `invited_at` when the tenant is created
+    from the lead, `pilot_started_at` when its admin finishes the setup
+    wizard, `pilot_ends_at` the planned end (+30 days, the operator edits
+    it), `won_at` when the owner records that the client committed."""
 
     __tablename__ = 'platform_leads'
     __table_args__ = (
@@ -30,6 +34,7 @@ class PlatformLead(Base):
             'ix_platform_leads_next_action_open', 'next_action_at',
             postgresql_where=text("status NOT IN ('won', 'lost')"),
         ),
+        Index('ix_platform_leads_pilot_ends', 'pilot_ends_at', postgresql_where=text("status = 'pilot'")),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -66,7 +71,10 @@ class PlatformLead(Base):
     tenant_id: Mapped[UUID | None] = mapped_column(
         ForeignKey('tenants.id', ondelete='SET NULL'), unique=True,
     )
-    converted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    invited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    pilot_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    pilot_ends_at: Mapped[date | None] = mapped_column(Date)
+    won_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # NULL for system-created leads (the public intake form).
     created_by: Mapped[UUID | None] = mapped_column(ForeignKey('users.id', ondelete='SET NULL'))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

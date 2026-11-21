@@ -242,10 +242,10 @@ export type LeadTenantBanner = "won" | "removed" | "lost_live" | "pilot" | "invi
 /** What the lead page says about the linked tenant. A removed tenant and a
  * lost lead whose workspace still exists must not read like progress. */
 export function leadTenantBanner(
-  lead: Pick<Lead, "status" | "converted_at">,
+  lead: Pick<Lead, "status" | "won_at">,
   tenantStatus: string | null,
 ): LeadTenantBanner {
-  if (lead.converted_at) return "won";
+  if (lead.won_at) return "won";
   if (tenantStatus === "removed") return "removed";
   if (lead.status === "lost") return "lost_live";
   return tenantStatus === "active" ? "pilot" : "invited";

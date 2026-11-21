@@ -896,7 +896,12 @@ export type Lead = {
   notes: string | null;
   source_url: string | null;
   tenant_id: string | null;
-  converted_at: string | null;
+  // The pilot's timeline: invite, wizard finished, planned end (YYYY-MM-DD),
+  // client committed.
+  invited_at: string | null;
+  pilot_started_at: string | null;
+  pilot_ends_at: string | null;
+  won_at: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -946,6 +951,14 @@ export type LeadStats = {
   in_demo_or_pilot: number;
   // Demo requests from a marketing site that are still `new`.
   new_website_requests: number;
+  // Invited for more than 7 days, setup wizard not finished (also counted
+  // in overdue_actions).
+  stale_invites: number;
+  pilots_active: number;
+  // In pilot, planned end already past.
+  pilots_overdue: number;
+  avg_pilot_days: number | null;
+  // won ÷ leads that reached the pilot.
   conversion_rate: number | null;
 };
 
@@ -965,5 +978,5 @@ export type LeadImportResult = {
 
 /** PATCH body: any editable column; `null` clears a nullable one. */
 export type LeadPatch = Partial<
-  Omit<Lead, "id" | "tenant_id" | "converted_at" | "created_by" | "created_at" | "updated_at">
+  Omit<Lead, "id" | "tenant_id" | "invited_at" | "pilot_started_at" | "won_at" | "created_by" | "created_at" | "updated_at">
 >;

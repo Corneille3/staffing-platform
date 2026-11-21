@@ -339,9 +339,17 @@ La v1.1 du spec (2026-11-15) a été relue contre le code : six écarts relevés
 - **Import** : `invited`, `pilot` et `won` sont refusés (ligne ignorée, `status_not_importable`). `lost` est accepté avec la colonne facultative « Raison de perte » ; sans raison la ligne est ignorée (`lost_needs_reason`). Ceci ne vaut qu'à la création : un ré-import ne touche toujours pas au statut d'un lead existant.
 - Écran : la barre de statut suit ces règles (`canMoveLead`), « Gagné » appelle la route `/won`.
 
+**PR 2 — chronologie du pilote et statistiques (fait, migration `0029`)**
+
+- Trois dates ajoutées au lead : `invited_at` (posée par l'invitation), `pilot_started_at` (posée quand l'admin du tenant termine l'assistant), `pilot_ends_at` (fin prévue, **+30 jours** par défaut). `converted_at` est renommée **`won_at`** : elle n'a jamais été écrite qu'au passage à `won`.
+- Les leads existants sont remplis depuis leur propre fil (premier événement `invited`, premier `tenant_activated`).
+- **Le pilote ne redémarre jamais** : terminer l'assistant une seconde fois, ou remettre en `pilot` un lead rouvert, ne touche pas aux dates déjà posées. Un lead clos pendant l'invitation puis remis en `pilot` prend la date d'activation de son tenant.
+- `pilot_ends_at` se modifie par PATCH, sur un lead en `pilot` seulement (422 `lead.pilot_end_needs_pilot`), jamais vide, jamais avant le début du pilote (422 `lead.pilot_end_before_start`).
+- `/stats` : **taux de conversion = gagnés ÷ leads ayant atteint le pilote** (`null` tant qu'aucun pilote n'a démarré) ; `pilots_active`, `pilots_overdue` (`pilot_ends_at < aujourd'hui` et statut `pilot`), `avg_pilot_days` (moyenne de `won_at − pilot_started_at`), `stale_invites` (lead `invited` depuis plus de **7 jours**, assistant non terminé). `overdue_actions` compte aussi ces invitations sans suite, sans compter deux fois un lead en retard sur les deux plans.
+- Non fait : le courriel quotidien des suivis ne liste pas encore les invitations sans suite ni les pilotes échus.
+
 **À venir**
 
-- PR 2 — chronologie du pilote (`invited_at`, `pilot_started_at`, `pilot_ends_at`, `converted_at` renommée `won_at`), taux de conversion = gagnés ÷ pilotes atteints, pilotes échus, invitation de plus de 7 jours comptée en retard.
 - PR 3 — retirer un tenant lié à un lead `invited` ou `pilot` exige une raison et clôt le lead en `lost` (remplace « un tenant supprimé laisse le lead tel quel »).
 - PR 4 — écrans : encart Pilote, tuiles, badge Pilote sur les tenants.
 

@@ -108,6 +108,8 @@ class LeadUpdate(_LeadFields):
     language: Language | None = None
     source: Source | None = None
     status: Status | None = None
+    # Planned end of the pilot — only on a lead in `pilot`.
+    pilot_ends_at: date | None = None
 
 
 class LeadEventCreate(BaseModel):
@@ -166,7 +168,10 @@ class LeadOut(BaseModel):
     notes: str | None
     source_url: str | None
     tenant_id: UUID | None
-    converted_at: datetime | None
+    invited_at: datetime | None
+    pilot_started_at: datetime | None
+    pilot_ends_at: date | None
+    won_at: datetime | None
     created_by: UUID | None
     created_at: datetime
     updated_at: datetime
@@ -231,10 +236,18 @@ class LeadStats(BaseModel):
     by_status: dict[str, int]
     by_segment_wave: list[SegmentWaveCount]
     open_pipeline: int        # everything that is neither won nor lost
-    overdue_actions: int      # next_action_at < today, still open
+    # Open leads late on their next action (next_action_at < today), plus
+    # the invitations nobody followed up (see stale_invites).
+    overdue_actions: int
     in_demo_or_pilot: int
     new_website_requests: int  # source website_form, still `new`
-    # won ÷ leads that got past `new`; None while nothing has been contacted.
+    # Invited for more than 7 days, setup wizard still not finished.
+    stale_invites: int
+    pilots_active: int         # status `pilot`
+    pilots_overdue: int        # status `pilot`, pilot_ends_at < today
+    # Mean of won_at − pilot_started_at over the won leads; None without one.
+    avg_pilot_days: float | None
+    # won ÷ leads that reached the pilot; None while no pilot has started.
     conversion_rate: float | None
 
 
