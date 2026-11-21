@@ -781,6 +781,39 @@ export type PlatformAuditRow = {
   details: Record<string, unknown>;
 };
 
+// ── /platform overview (GET /platform/overview) ─────────────────────────────
+
+export type OverviewAttentionKind =
+  | "new_website_requests"
+  | "overdue_followups"
+  | "pilot_overdue"
+  | "invite_stale"
+  | "onboarding_stuck"
+  | "tenant_suspended"
+  | "access_request_pending";
+
+/** One line of « to watch ». `kind` picks the wording and where it leads. */
+export type OverviewAttentionItem = {
+  kind: OverviewAttentionKind | string;
+  count: number;
+  name: string | null;
+  days: number | null;
+  tenant_id: string | null;
+  lead_id: string | null;
+  // Nothing to do but wait (an access request the client has not answered).
+  info_only: boolean;
+};
+
+export type PlatformOverview = {
+  generated_at: string;
+  attention: OverviewAttentionItem[];
+  tenants: { pending: number; onboarding: number; active: number; suspended: number };
+  activity: { days: number; published: number; filled: number; expired: number; fill_rate: number | null };
+  // Owner only — null for an operator or a support account.
+  leads: { total: number; open_pipeline: number; by_status: Record<LeadStatus, number> } | null;
+  audit: PlatformAuditRow[] | null;
+};
+
 export type PlatformAuditResponse = {
   rows: PlatformAuditRow[];
   total: number;

@@ -1875,6 +1875,50 @@
       "loadFailed": "The audit trail could not be loaded.",
       "empty": "No action recorded yet.",
       "emptyFiltered": "No action in this category."
+    },
+    "overview": {
+      "eyebrow": "Platform · Overview",
+      "headline": "What needs your <em>attention</em>",
+      "attention": {
+        "title": "To watch",
+        "emptyTitle": "Nothing to report",
+        "emptyBody": "No invitation left hanging, no follow-up overdue, no suspended network.",
+        "see": "View",
+        "kinds": {
+          "new_website_requests": "{count, plural, one {# new request from the website, not picked up yet} other {# new requests from the website, not picked up yet}}",
+          "overdue_followups": "{count, plural, one {# lead follow-up overdue} other {# lead follow-ups overdue}}",
+          "pilot_overdue": "Pilot past its end · {name} · {days, plural, one {# day ago} other {# days ago}} — closing call due",
+          "invite_stale": "Invitation without follow-up · {name} · {days, plural, one {# day} other {# days}}",
+          "onboarding_stuck": "Setup not finished · {name} · {days, plural, one {# day} other {# days}} since the invitation",
+          "tenant_suspended": "Network suspended · {name}",
+          "access_request_pending": "Access request waiting for the client's approval · {name}"
+        }
+      },
+      "tenants": {
+        "title": "Networks",
+        "open": "All networks",
+        "pending": "Pending",
+        "onboarding": "Setting up",
+        "active": "Active",
+        "suspended": "Suspended"
+      },
+      "activity": {
+        "title": "Activity · last {days} days",
+        "published": "Requests published",
+        "filled": "Filled",
+        "rate": "Fill rate",
+        "expired": "Expired without a substitute",
+        "note": "All networks together. Counts only: the operator never sees the requests themselves."
+      },
+      "leads": {
+        "title": "Sales pipeline · {count, plural, one {# open lead} other {# open leads}}",
+        "open": "Open the pipeline"
+      },
+      "audit": {
+        "title": "Audit trail · {count, plural, =0 {no action} one {last action} other {last # actions}}",
+        "open": "Full trail",
+        "empty": "No action recorded yet."
+      }
     }
   },
   "apf": {

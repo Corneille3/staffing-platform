@@ -1875,6 +1875,50 @@
       "loadFailed": "Le journal n'a pas pu être chargé.",
       "empty": "Aucune action enregistrée pour l'instant.",
       "emptyFiltered": "Aucune action dans cette catégorie."
+    },
+    "overview": {
+      "eyebrow": "Plateforme · Vue d'ensemble",
+      "headline": "Ce qui demande votre <em>attention</em>",
+      "attention": {
+        "title": "À surveiller",
+        "emptyTitle": "Rien à signaler",
+        "emptyBody": "Aucune invitation en souffrance, aucun suivi en retard, aucun réseau suspendu.",
+        "see": "Voir",
+        "kinds": {
+          "new_website_requests": "{count, plural, one {# nouvelle demande du site, pas encore prise en charge} other {# nouvelles demandes du site, pas encore prises en charge}}",
+          "overdue_followups": "{count, plural, one {# suivi de prospect en retard} other {# suivis de prospects en retard}}",
+          "pilot_overdue": "Pilote échu · {name} · {days, plural, one {depuis # jour} other {depuis # jours}} — appel de clôture à faire",
+          "invite_stale": "Invitation sans suite · {name} · {days, plural, one {# jour} other {# jours}}",
+          "onboarding_stuck": "Configuration non terminée · {name} · {days, plural, one {# jour} other {# jours}} depuis l'invitation",
+          "tenant_suspended": "Réseau suspendu · {name}",
+          "access_request_pending": "Demande d'accès en attente de l'accord du client · {name}"
+        }
+      },
+      "tenants": {
+        "title": "Réseaux",
+        "open": "Tous les réseaux",
+        "pending": "En attente",
+        "onboarding": "En configuration",
+        "active": "Actifs",
+        "suspended": "Suspendus"
+      },
+      "activity": {
+        "title": "Activité · {days} derniers jours",
+        "published": "Demandes publiées",
+        "filled": "Pourvues",
+        "rate": "Taux de quarts pourvus",
+        "expired": "Expirées sans remplaçant·e",
+        "note": "Tous réseaux confondus. Des comptes seulement : l'opérateur ne voit jamais les demandes elles-mêmes."
+      },
+      "leads": {
+        "title": "Pipeline de ventes · {count, plural, one {# prospect ouvert} other {# prospects ouverts}}",
+        "open": "Ouvrir le pipeline"
+      },
+      "audit": {
+        "title": "Journal d'audit · {count, plural, =0 {aucune action} one {dernière action} other {# dernières actions}}",
+        "open": "Tout le journal",
+        "empty": "Aucune action enregistrée pour l'instant."
+      }
     }
   },
   "apf": {
