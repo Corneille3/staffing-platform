@@ -28,7 +28,9 @@ logger = logging.getLogger(__name__)
 
 def _init_sentry() -> None:
     """Error tracking — only when a DSN is configured (prod). Local, dev and
-    test runs send nothing anywhere. Errors only: no performance tracing."""
+    test runs send nothing anywhere. Errors only: no performance tracing.
+    `send_default_pii` is deliberately left at its default (off): no IP
+    address, cookie or request body leaves for Sentry."""
     if not settings.sentry_dsn:
         logger.info('Sentry disabled (no SENTRY_DSN)')
         return

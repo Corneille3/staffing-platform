@@ -1,12 +1,14 @@
 # Observability + CI/CD
 
-Infra workstream for the prod backend (EC2 resolved by the tag `Name=apf-staffing-platform-prod-app` — `i-02a07a354daa4d16c` since 2026-11-15; the id changes whenever `user_data` does). Run in this order —
+Infra workstream for the prod backend. The EC2 instance is identified by its tag
+`Name=apf-staffing-platform-prod-app`, never by an id: it is replaceable, and its id changes whenever
+`user_data` does. Run in this order —
 each step depends on the one before.
 
 | # | Step | Spec | State (2026-11-21) |
 |---|------|------|--------------------|
 | 1 | Elastic IP — make the prod instance replaceable | [`SPEC_STEP0_ELASTIC_IP.md`](SPEC_STEP0_ELASTIC_IP.md) | **Done 2026-10-25** (PR #115, applied and rehearsed): EIP `15.175.98.103` behind `api.kouamvision.com`. The old worktree `~/STAFFIG-observability` / local branch `feature/observability` hold a superseded copy of that work — nothing `main` lacks. |
-| 2 | Observability — Grafana Cloud + Sentry, 4 sequential PRs | [`SPEC_OBSERVABILITY.md`](SPEC_OBSERVABILITY.md) | **PR1 (application instrumentation) built 2026-11-21** — see « PR1 as built » below. PR2 (Terraform: secret + alloy agent) replaces the instance: before its `apply`, check what the AMI filter resolves to (`aws ec2 describe-images`, name + snapshot size — the 2026-11-15 outage) and plan for the API being down from the first step. PR2 needs the Grafana Cloud and Sentry credentials from the user. |
+| 2 | Observability — Grafana Cloud + Sentry: PR1, PR2A, PR2B, PR3, PR4 | [`SPEC_OBSERVABILITY.md`](SPEC_OBSERVABILITY.md) (revised 2026-11-21) | **In progress.** PR1 (application instrumentation) shipped 2026-11-21 (#166) — see « PR1 as built » below. Next: PR2A (secret + IAM, no instance change), then the human fills the secret, then PR2B (alloy agent in `user_data` — replaces the instance, with the spec's mandatory pre-apply checklist). |
 | 3 | CI/CD overhaul | no spec yet — plan below | Not started. |
 
 ## CI/CD plan (from 2026-05-24, to turn into a spec)
