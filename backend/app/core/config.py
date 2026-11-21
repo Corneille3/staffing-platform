@@ -112,6 +112,15 @@ class Settings(BaseSettings):
     # clock (shift_timezone) reaches this hour. After downtime the first tick
     # of the day catches up, whatever the time.
     lead_reminder_hour_local: int = 8
+
+    # ── observability (docs/observability-cicd/SPEC_OBSERVABILITY.md) ──
+    # Prometheus metrics are served on their own port, never on the app's
+    # (which is public through Cloudflare). 0 disables the server.
+    metrics_port: int = 9091
+    # Error tracking. Empty = Sentry is not initialised at all (local, tests).
+    sentry_dsn: str = ''
+    # The image's commit, set at build time (Dockerfile ARG GIT_SHA).
+    git_sha: str = 'unknown'
     # Shift work_date/start_time are stored naive — Québec wall clock as
     # entered. Every "how soon is this shift" comparison interprets them in
     # this zone (treating them as UTC would skew expiry/escalation by ~4-5 h).

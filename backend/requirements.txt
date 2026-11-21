@@ -13,3 +13,8 @@ pytest==8.3.5
 boto3==1.38.6
 openpyxl==3.1.5
 python-multipart==0.0.20
+# Observability (docs/observability-cicd/SPEC_OBSERVABILITY.md, PR1).
+# instrumentator 8.x needs a newer Starlette than fastapi 0.115 allows.
+prometheus-fastapi-instrumentator==7.1.0
+prometheus-client==0.26.0
+sentry-sdk[fastapi]==2.75.0

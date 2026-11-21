@@ -29,6 +29,7 @@ import threading
 from datetime import date, datetime, timezone
 
 from app.core.config import settings
+from app.core.metrics import set_requests_unfilled, time_sweep
 from app.db.session import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,7 @@ class BackgroundScheduler:
             self._run_attendance_sweep()
             self._maybe_run_reliability()
             self._maybe_run_lead_reminder()
+            self._update_gauges()
             if self._stop.wait(settings.replacement_sweep_interval_seconds):
                 return
 
@@ -94,7 +96,8 @@ class BackgroundScheduler:
             # which must not happen as an import side effect of app startup.
             from app.services.replacement_admin_service import ReplacementAdminService
 
-            with SessionLocal() as db:
+            # job=expiry: escalation + expiry of unfilled requests.
+            with time_sweep('expiry'), SessionLocal() as db:
                 result = ReplacementAdminService(db).tick()
             if result['escalated'] or result['expired']:
                 logger.info(
@@ -108,7 +111,8 @@ class BackgroundScheduler:
         try:
             from app.services.attendance_sweep_service import AttendanceSweepService
 
-            with SessionLocal() as db:
+            # job=noshow: clock reminders + no-show alerts.
+            with time_sweep('noshow'), SessionLocal() as db:
                 result = AttendanceSweepService(db).tick()
             if any(result.values()):
                 logger.info('Attendance sweep: %s', result)
@@ -133,13 +137,36 @@ class BackgroundScheduler:
             # Date marker not advanced — retried on the next tick.
             logger.exception('Reliability recompute failed')
 
+    def _update_gauges(self) -> None:
+        """Recompute the gauges that are a state, not an event: how many
+        published requests still wait for a substitute."""
+        try:
+            from sqlalchemy import func, select
+
+            from app.models.enums import RequestStatus
+            from app.models.staffing_request import StaffingRequest
+
+            with SessionLocal() as db:
+                unfilled = db.scalar(
+                    select(func.count()).select_from(StaffingRequest).where(
+                        StaffingRequest.status.in_((
+                            RequestStatus.OPEN, RequestStatus.NOTIFIED, RequestStatus.RESPONSES_RECEIVED,
+                        ))
+                    )
+                ) or 0
+            set_requests_unfilled(unfilled)
+        except Exception:
+            logger.exception('Gauge refresh failed')
+
     def _maybe_run_lead_reminder(self) -> None:
         # The service decides whether it is time: its "sent today" stamp lives
         # in the database, so a deploy-time restart does not send twice.
         try:
             from app.services.platform_lead_reminder import LeadReminderService
 
-            with SessionLocal() as db:
+            # job=reminders: the daily sales-pipeline reminder (a no-op tick
+            # outside its hour — the heartbeat is the point).
+            with time_sweep('reminders'), SessionLocal() as db:
                 result = LeadReminderService(db).tick()
             if result['ran']:
                 logger.info(

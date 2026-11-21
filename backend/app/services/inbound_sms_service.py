@@ -18,6 +18,7 @@ from fastapi import HTTPException
 from sqlalchemy import select, or_
 from sqlalchemy.orm import Session
 
+from app.core.metrics import record_sms_reply
 from app.core.config import settings
 from app.core.phone import normalize_e164
 from app.core.timeutil import shift_start_utc
@@ -304,6 +305,9 @@ class InboundSmsService:
         action: str,
         request_id: UUID | None,
     ) -> None:
+        # Every reply ends here exactly once: the receipt and the metric
+        # cannot disagree.
+        record_sms_reply(action)
         self.db.add(InboundSms(
             id=uuid4(),
             from_number=normalize_e164(from_number) or from_number,
