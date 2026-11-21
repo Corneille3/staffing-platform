@@ -1478,6 +1478,11 @@
         "confirmWon": "Marquer comme gagné",
         "removedTitle": "Espace supprimé",
         "removedBody": "L'espace de {name} a été supprimé.",
+        "suspendedTitle": "Espace suspendu",
+        "suspendedBody": "L'espace de {name} est suspendu. Réactivez-le depuis Tenants pour reprendre, ou classez le prospect Perdu.",
+        "behindTitle": "Espace lié",
+        "behindPilotBody": "L'espace de {name} est actif, mais ce prospect n'est plus à l'étape Pilote. Remettez-le à Pilote pour suivre le pilote et pouvoir le marquer gagné.",
+        "behindInvitedBody": "{name} a été invité, mais ce prospect n'est plus à l'étape Invitation envoyée. Remettez-le à cette étape pour suivre l'invitation.",
         "lostLiveTitle": "Espace toujours présent",
         "lostLiveBody": "Ce prospect est perdu, mais l'espace de {name} existe toujours. Supprimez-le depuis Tenants si le pilote est terminé.",
         "delete": "Supprimer"

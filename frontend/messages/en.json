@@ -1478,6 +1478,11 @@
         "confirmWon": "Mark as won",
         "removedTitle": "Workspace removed",
         "removedBody": "{name}'s workspace has been removed.",
+        "suspendedTitle": "Workspace suspended",
+        "suspendedBody": "{name}'s workspace is suspended. Reactivate it from Tenants to resume, or mark the lead Lost.",
+        "behindTitle": "Linked workspace",
+        "behindPilotBody": "{name}'s workspace is active, but this lead is no longer at the Pilot stage. Put it back on Pilot to follow the pilot and be able to mark it won.",
+        "behindInvitedBody": "{name} has been invited, but this lead is no longer at the Invited stage. Put it back on that stage to follow the invitation.",
         "lostLiveTitle": "Workspace still there",
         "lostLiveBody": "This lead is lost, but {name}'s workspace still exists. Remove it from Tenants if the pilot is over.",
         "delete": "Delete"

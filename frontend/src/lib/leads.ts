@@ -312,10 +312,21 @@ export function canDeleteLead(lead: Pick<Lead, "tenant_id">, tenantStatus: strin
   return !lead.tenant_id || tenantStatus === "removed";
 }
 
-export type LeadTenantBanner = "won" | "removed" | "lost_live" | "pilot" | "invited";
+export type LeadTenantBanner =
+  | "won"
+  | "removed"
+  | "lost_live"
+  | "suspended"
+  | "behind_pilot"
+  | "behind_invited"
+  | "pilot"
+  | "invited";
 
 /** What the lead page says about the linked tenant. A removed tenant and a
- * lost lead whose workspace still exists must not read like progress. */
+ * lost lead whose workspace still exists must not read like progress — nor
+ * a lead moved back to an earlier stage: the banner follows the LEAD, and
+ * says so when the workspace is ahead of it (« behind »: put it back on
+ * Pilot / Invited) or suspended. */
 export function leadTenantBanner(
   lead: Pick<Lead, "status" | "won_at">,
   tenantStatus: string | null,
@@ -323,7 +334,10 @@ export function leadTenantBanner(
   if (lead.won_at) return "won";
   if (tenantStatus === "removed") return "removed";
   if (lead.status === "lost") return "lost_live";
-  return tenantStatus === "active" ? "pilot" : "invited";
+  if (tenantStatus === "suspended") return "suspended";
+  const stage = leadStageOfTenant(tenantStatus) ?? "invited";
+  if (lead.status === stage) return stage === "pilot" ? "pilot" : "invited";
+  return stage === "pilot" ? "behind_pilot" : "behind_invited";
 }
 
 /** The filter behind the « new requests from the website » banner. */
