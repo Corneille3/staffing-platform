@@ -52,3 +52,20 @@ resource "aws_secretsmanager_secret_version" "app_env" {
     VAPID_SUBJECT     = var.vapid_subject
   })
 }
+
+# ── Observability (docs/observability-cicd/SPEC_OBSERVABILITY.md, PR2A) ──────
+# The container for the Grafana Cloud and Sentry credentials the instance
+# reads at boot. Terraform creates the secret and NOTHING ELSE: there is no
+# aws_secretsmanager_secret_version here on purpose, so an `apply` can never
+# overwrite — or even see — what a human put in it. Expected value, one JSON
+# object: GRAFANA_PROM_URL, GRAFANA_PROM_USER, GRAFANA_LOKI_URL,
+# GRAFANA_LOKI_USER, GRAFANA_TOKEN, SENTRY_DSN.
+#
+# A fixed name (no random suffix, unlike app_env): the human fills it with
+# `aws secretsmanager put-secret-value --secret-id <name_prefix>-observability`.
+resource "aws_secretsmanager_secret" "observability" {
+  count       = var.create_observability_secret ? 1 : 0
+  name        = "${var.name_prefix}-observability"
+  description = "Grafana Cloud + Sentry credentials read by the app instance at boot. Value managed by hand, never by Terraform."
+  tags        = var.tags
+}

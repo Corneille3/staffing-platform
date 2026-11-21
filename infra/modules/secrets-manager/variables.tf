@@ -96,3 +96,11 @@ variable "leads_intake_secret" {
   default   = ""
   sensitive = true
 }
+
+# Observability secret (SPEC_OBSERVABILITY PR2A). Off by default so an
+# environment that does not ship metrics and logs gets nothing new.
+variable "create_observability_secret" {
+  type        = bool
+  default     = false
+  description = "Create the empty <name_prefix>-observability secret (Grafana Cloud + Sentry credentials, filled by hand)."
+}
