@@ -14,7 +14,8 @@ closes that hole. Its jobs:
     have.
   - **lead reminder** (daily from ``lead_reminder_hour_local``): one email to
     the owner and the marketing operators listing the leads whose next action
-    is due (``LeadReminderService.tick``).
+    is due, the pilots past their end and the invitations left for a week
+    (``LeadReminderService.tick``).
 
 Safety model: the docker entrypoint runs uvicorn with no ``--workers`` flag —
 a single process — so exactly one scheduler runs per container, and prod runs
@@ -142,8 +143,8 @@ class BackgroundScheduler:
                 result = LeadReminderService(db).tick()
             if result['ran']:
                 logger.info(
-                    'Lead reminder: %s due, %s emailed',
-                    result['leads'], result['emailed'],
+                    'Lead reminder: %s due, %s pilots past their end, %s stale invites, %s emailed',
+                    result['leads'], result['pilots'], result['invites'], result['emailed'],
                 )
         except Exception:
             logger.exception('Lead reminder failed')

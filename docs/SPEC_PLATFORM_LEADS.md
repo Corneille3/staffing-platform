@@ -326,6 +326,7 @@ Le pilote se déroule dans le vrai espace du prospect : il n'existe pas d'enviro
 - **Une fois par jour** : le jour d'envoi est écrit dans `platform_settings.lead_reminder_sent_on` (migration `0028`) *avant* l'envoi — un redéploiement ne renvoie pas le courriel. Contrepartie : un envoi échoué n'est pas retenté le jour même (il est journalisé). Une date saisie après l'envoi du jour attend le courriel du lendemain.
 - Le compteur « Actions en retard » de la liste ne change pas : il compte les dates strictement passées ; le courriel ajoute celles du jour.
 - Code : `services/platform_lead_reminder.py`, appelé par `scheduler.py`. Aucune route, aucun changement d'écran.
+- **Complément du 2026-11-21 (alignement v1.1)** : le courriel liste en tête deux retards qu'aucune date de prochaine action n'annonce — « Pilotes échus » (lead en `pilot`, `pilot_ends_at` passé : appel de clôture à faire) et « Invitations sans suite » (lead `invited` depuis plus de 7 jours). L'un ou l'autre suffit à déclencher l'envoi, même sans suivi dû. Quand une de ces sections est présente, l'objet devient « N points à traiter » (N = nombre de leads distincts : un lead en retard sur deux plans compte une fois, et figure sous les deux titres). Avec des suivis seulement, le courriel est inchangé.
 
 ### Alignement sur la v1.1 du spec (2026-11-21)
 
@@ -346,7 +347,7 @@ La v1.1 du spec (2026-11-15) a été relue contre le code : six écarts relevés
 - **Le pilote ne redémarre jamais** : terminer l'assistant une seconde fois, ou remettre en `pilot` un lead rouvert, ne touche pas aux dates déjà posées. Un lead clos pendant l'invitation puis remis en `pilot` prend la date d'activation de son tenant.
 - `pilot_ends_at` se modifie par PATCH, sur un lead en `pilot` seulement (422 `lead.pilot_end_needs_pilot`), jamais vide, jamais avant le début du pilote (422 `lead.pilot_end_before_start`).
 - `/stats` : **taux de conversion = gagnés ÷ leads ayant atteint le pilote** (`null` tant qu'aucun pilote n'a démarré) ; `pilots_active`, `pilots_overdue` (`pilot_ends_at < aujourd'hui` et statut `pilot`), `avg_pilot_days` (moyenne de `won_at − pilot_started_at`), `stale_invites` (lead `invited` depuis plus de **7 jours**, assistant non terminé). `overdue_actions` compte aussi ces invitations sans suite, sans compter deux fois un lead en retard sur les deux plans.
-- Non fait : le courriel quotidien des suivis ne liste pas encore les invitations sans suite ni les pilotes échus.
+- Le courriel quotidien des suivis liste aussi, depuis le 2026-11-21, les **pilotes échus** et les **invitations sans suite** (voir « Rappel des suivis », complément ci-dessous).
 
 **PR 3 — retirer un tenant clôt son lead (fait)**
 

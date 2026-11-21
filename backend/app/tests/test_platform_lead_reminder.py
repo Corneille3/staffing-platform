@@ -1,5 +1,7 @@
 """Daily reminder of due lead follow-ups (SPEC_PLATFORM_LEADS §14 « Rappel
-des suivis »): who receives it, what it lists, and that it goes out once."""
+des suivis »): who receives it, what it lists, and that it goes out once.
+Since the v1.1 alignment it also lists the pilots past their end and the
+invitations left for a week."""
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from zoneinfo import ZoneInfo
@@ -86,7 +88,7 @@ def test_owner_and_marketing_get_the_due_leads_in_their_language(db_session, see
 
     result = LeadReminderService(db_session).tick(MORNING)
 
-    assert result == {'ran': True, 'leads': 2, 'emailed': 2}
+    assert result == {'ran': True, 'leads': 2, 'pilots': 0, 'invites': 0, 'emailed': 2}
     by_recipient = {message.to_email: message for message in sent}
     assert set(by_recipient) == {owner.email, marketing.email}
 
@@ -122,7 +124,7 @@ def test_it_goes_out_once_a_day(db_session, seed, sent):
     assert len(sent) == 1
 
     # The next morning the lead is still due: a new reminder.
-    assert service.tick(MORNING + timedelta(days=1)) == {'ran': True, 'leads': 1, 'emailed': 1}
+    assert service.tick(MORNING + timedelta(days=1)) == {'ran': True, 'leads': 1, 'pilots': 0, 'invites': 0, 'emailed': 1}
     assert '2 jours de retard' in sent[1].body
 
 
@@ -144,7 +146,7 @@ def test_a_day_with_nothing_due_sends_nothing(db_session, seed, sent):
     _lead(db_session, 'Demain inc.', 1)
     service = LeadReminderService(db_session)
 
-    assert service.tick(MORNING) == {'ran': True, 'leads': 0, 'emailed': 0}
+    assert service.tick(MORNING) == {'ran': True, 'leads': 0, 'pilots': 0, 'invites': 0, 'emailed': 0}
     assert sent == []
     # Stamped all the same: a date typed at 14:00 waits for tomorrow's email.
     assert _stamp(db_session) == TODAY
@@ -191,9 +193,93 @@ def test_a_failed_delivery_is_not_retried_that_day(db_session, seed, monkeypatch
     monkeypatch.setattr(email_service.EmailNotificationService, 'send', failing_send)
     service = LeadReminderService(db_session)
 
-    assert service.tick(MORNING) == {'ran': True, 'leads': 1, 'emailed': 0}
+    assert service.tick(MORNING) == {'ran': True, 'leads': 1, 'pilots': 0, 'invites': 0, 'emailed': 0}
     assert service.tick(MORNING + timedelta(minutes=5))['ran'] is False
     assert len(attempts) == 1
+
+
+# ── pilots past their end, invitations left for a week (spec v1.1) ───────────
+
+def test_overdue_pilots_and_stale_invites_are_listed_first(db_session, seed, sent):
+    owner = _operator(db_session, PlatformOperatorRole.OWNER, 'fr')
+    marketing = _operator(db_session, PlatformOperatorRole.MARKETING, 'en')
+    pilot = _lead(
+        db_session, 'CPE Soleil', None, next_action=None, status=LeadStatus.PILOT,
+        pilot_started_at=MORNING - timedelta(days=35), pilot_ends_at=TODAY - timedelta(days=5),
+    )
+    invite = _lead(
+        db_session, 'Résidence Boréale', None, next_action=None, status=LeadStatus.INVITED,
+        invited_at=MORNING - timedelta(days=9),
+    )
+    followup = _lead(db_session, 'Garderie Étoile', -2)
+    # Not late: a pilot ending today, a pilot still running, a fresh invitation.
+    _lead(db_session, 'Pilote du jour', None, next_action=None, status=LeadStatus.PILOT,
+          pilot_started_at=MORNING - timedelta(days=30), pilot_ends_at=TODAY)
+    _lead(db_session, 'Pilote en cours', None, next_action=None, status=LeadStatus.PILOT,
+          pilot_started_at=MORNING, pilot_ends_at=TODAY + timedelta(days=30))
+    _lead(db_session, 'Invité hier', None, next_action=None, status=LeadStatus.INVITED,
+          invited_at=MORNING - timedelta(days=1))
+    # No longer waiting: the pilot was lost, the invitation became a pilot.
+    _lead(db_session, 'Pilote perdu', None, next_action=None, status=LeadStatus.LOST, lost_reason='x',
+          pilot_started_at=MORNING - timedelta(days=60), pilot_ends_at=TODAY - timedelta(days=30))
+
+    result = LeadReminderService(db_session).tick(MORNING)
+
+    assert result == {'ran': True, 'leads': 1, 'pilots': 1, 'invites': 1, 'emailed': 2}
+    by_recipient = {message.to_email: message for message in sent}
+
+    fr = by_recipient[owner.email]
+    assert fr.subject == 'StaffiG — 3 points à traiter'
+    assert '3 points demandent votre attention dans le pipeline StaffiG.' in fr.body
+    assert 'PILOTES ÉCHUS (1)' in fr.body and 'INVITATIONS SANS SUITE (1)' in fr.body and 'EN RETARD (1)' in fr.body
+    assert ('CPE Soleil — fin de pilote prévue le 14 novembre, échu depuis 5 jours '
+            '— appel de clôture à faire') in fr.body
+    assert ("Résidence Boréale — invité le 10 novembre, sans suite depuis 9 jours "
+            "— l'admin n'a pas terminé la configuration") in fr.body
+    assert f'/fr/platform/leads/{pilot.id}' in fr.body and f'/fr/platform/leads/{invite.id}' in fr.body
+    # The two that no next-action date announces come first.
+    assert fr.body.index('PILOTES ÉCHUS') < fr.body.index('INVITATIONS SANS SUITE') < fr.body.index('EN RETARD')
+    assert f'/fr/platform/leads/{followup.id}' in fr.body
+    for absent in ('Pilote du jour', 'Pilote en cours', 'Invité hier', 'Pilote perdu'):
+        assert absent not in fr.body
+
+    en = by_recipient[marketing.email]
+    assert en.subject == 'StaffiG — 3 items need attention'
+    assert 'PILOTS PAST THEIR END (1)' in en.body and 'INVITATIONS WITHOUT FOLLOW-UP (1)' in en.body
+    assert 'CPE Soleil — pilot due to end November 14, 5 days past its end — closing call due' in en.body
+    assert ('Résidence Boréale — invited November 10, no follow-up for 9 days '
+            '— the admin has not finished the setup') in en.body
+
+
+def test_an_overdue_pilot_alone_is_enough_to_send(db_session, seed, sent):
+    """Before, a day with no due next action sent nothing — a pilot past its
+    end with no next action on the lead went unannounced."""
+    _operator(db_session, PlatformOperatorRole.OWNER, 'fr')
+    _lead(db_session, 'CPE Soleil', None, next_action=None, status=LeadStatus.PILOT,
+          pilot_started_at=MORNING - timedelta(days=31), pilot_ends_at=TODAY - timedelta(days=1))
+
+    result = LeadReminderService(db_session).tick(MORNING)
+
+    assert result == {'ran': True, 'leads': 0, 'pilots': 1, 'invites': 0, 'emailed': 1}
+    [message] = sent
+    assert message.subject == 'StaffiG — 1 point à traiter'
+    assert '1 point demande votre attention' in message.body
+    assert 'échu depuis 1 jour —' in message.body
+    assert 'EN RETARD' not in message.body and "AUJOURD'HUI" not in message.body
+
+
+def test_a_lead_late_on_both_counts_is_one_item(db_session, seed, sent):
+    _operator(db_session, PlatformOperatorRole.OWNER, 'fr')
+    _lead(db_session, 'CPE Soleil', -3, status=LeadStatus.PILOT,
+          pilot_started_at=MORNING - timedelta(days=40), pilot_ends_at=TODAY - timedelta(days=10))
+
+    result = LeadReminderService(db_session).tick(MORNING)
+
+    assert result == {'ran': True, 'leads': 1, 'pilots': 1, 'invites': 0, 'emailed': 1}
+    [message] = sent
+    assert message.subject == 'StaffiG — 1 point à traiter'
+    # Listed under both headings: two different things are owed on it.
+    assert 'PILOTES ÉCHUS (1)' in message.body and 'EN RETARD (1)' in message.body
 
 
 def test_setting_hour_is_eight(db_session):
