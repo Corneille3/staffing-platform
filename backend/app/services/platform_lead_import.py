@@ -13,6 +13,11 @@ already worked. On an existing lead:
 - tracking fields (next action, its date, notes) are only filled when the
   lead has none — the operator's own text is never replaced;
 - status and lost_reason are never touched.
+
+A new lead takes the status of its row, within what a sheet can know:
+`new`, `contacted`, `demo_booked`, or `lost` with a « Raison de perte ».
+`invited`, `pilot` and `won` need a linked tenant, which only the invite
+flow creates — such a row is skipped with its reason (spec v1.1 §8).
 """
 import csv
 import io
@@ -58,6 +63,7 @@ HEADERS = {
     'score': 'score',
     'vague': 'wave',
     'statut': 'status',
+    'raison de perte': 'lost_reason',
     'source lead': 'source',
     'prochaine action': 'next_action',
     'date action': 'next_action_at',
@@ -205,12 +211,21 @@ def normalize_row(raw: dict[str, Any]) -> dict[str, Any]:
         status_code = STATUS_LABELS.get(status_text.lower(), status_text.lower())
         if status_code not in STATUS_LABELS.values():
             raise RowError('unknown_status', f'unknown status "{status_text}"', value=status_text)
-        if status_code in ('won', 'lost'):
+        if status_code in ('invited', 'pilot', 'won'):
             raise RowError(
                 'status_not_importable',
-                f'status "{status_text}" cannot be imported (won needs an active tenant, lost needs a reason)',
+                f'status "{status_text}" cannot be imported (it needs a linked workspace)',
                 value=status_text,
             )
+        if status_code == 'lost':
+            reason = _text(raw.get('lost_reason'))
+            if not reason:
+                raise RowError(
+                    'lost_needs_reason',
+                    f'status "{status_text}" needs a reason (column « Raison de perte »)',
+                    value=status_text,
+                )
+            out['lost_reason'] = reason
         out['status'] = status_code
 
     # « Recherche 2026-09 » -> source research, the label kept as the detail.

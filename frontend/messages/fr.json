@@ -1422,7 +1422,8 @@
         "secTracking": "Suivi",
         "created": "Créé le {date}",
         "statusTitle": "Étape",
-        "wonHint": "Seul un owner peut marquer un prospect comme gagné, une fois son espace actif.",
+        "wonHint": "Seul un owner peut marquer un prospect comme gagné, à partir de l'étape Pilote.",
+        "systemStageHint": "Cette étape est posée par l'invitation et par l'espace du prospect, pas à la main.",
         "lostReasonLabel": "Pourquoi ce prospect est-il perdu ?",
         "lostReasonPlaceholder": "ex. A signé avec une agence pour deux ans",
         "confirmLost": "Marquer comme perdu",
@@ -1497,6 +1498,8 @@
         "ref_exists": "Un autre prospect porte déjà la référence « {ref} ».",
         "win_owner_only": "Seul un owner de la plateforme peut marquer un prospect comme gagné.",
         "win_needs_active_tenant": "Un prospect ne peut être gagné qu'une fois son espace invité actif.",
+        "win_needs_pilot": "Un prospect ne peut être gagné qu'à partir de l'étape Pilote.",
+        "stage_set_by_system": "Cette étape est posée par l'invitation et par l'espace du prospect, pas à la main.",
         "new_cannot_be_won": "Un nouveau prospect ne peut pas être gagné : il n'a pas encore d'espace.",
         "lost_needs_reason": "Un prospect perdu doit avoir une raison.",
         "field_required": "« {field} » ne peut pas être vide.",
@@ -1523,7 +1526,8 @@
           "unknown_type": "type inconnu « {value} »",
           "bad_province": "province manquante ou invalide (2 lettres)",
           "unknown_status": "statut inconnu « {value} »",
-          "status_not_importable": "le statut « {value} » ne s'importe pas (gagné exige un espace actif, perdu exige une raison)"
+          "status_not_importable": "le statut « {value} » ne s'importe pas (il exige un espace lié au prospect)",
+          "lost_needs_reason": "le statut « {value} » exige une raison (colonne « Raison de perte »)"
         },
         "delete_has_live_tenant": "Ce prospect est lié à l'espace « {name} ». Supprimez l'espace depuis Tenants avant de supprimer le prospect."
       },

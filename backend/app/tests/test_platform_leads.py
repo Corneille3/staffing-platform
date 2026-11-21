@@ -5,6 +5,10 @@ owner/marketing), 2 (import, idempotent re-import that never clobbers the
 operator's work), 3 (lost needs a reason) and 7 (wave A × new = 30), plus the
 state machine of §4 and the "overdue actions" counter of criterion 8.
 
+Since the v1.1 alignment (spec §14, 2026-11-21): `invited` and `pilot` are
+never set by hand, `won` only comes from `pilot` (409 otherwise), and an
+import refuses `invited` / `pilot` / `won` while taking `lost` with a reason.
+
 The seed sheet has grown since the spec was written (101 rows -> 138, with
 two Saskatchewan segments); 30 wave-A leads is still the number.
 """
@@ -169,16 +173,35 @@ def test_lost_with_a_reason_then_reopen(platform_admin_client, db_session):
 
 def test_open_stages_move_both_ways_and_can_skip(platform_admin_client, db_session):
     lead = _create(platform_admin_client)
-    for target in ('demo_booked', 'contacted', 'pilot', 'invited', 'new'):
+    for target in ('demo_booked', 'contacted', 'new', 'contacted'):
         res = platform_admin_client.patch(f"{LEADS}/{lead['id']}", json={'status': target})
         assert res.status_code == 200, f'{target}: {res.text}'
         assert res.json()['status'] == target
     transitions = [(e.from_status.value, e.to_status.value)
                    for e in _events(db_session, lead['id']) if e.type == 'status_changed']
     assert transitions == [
-        ('new', 'demo_booked'), ('demo_booked', 'contacted'), ('contacted', 'pilot'),
-        ('pilot', 'invited'), ('invited', 'new'),
+        ('new', 'demo_booked'), ('demo_booked', 'contacted'), ('contacted', 'new'), ('new', 'contacted'),
     ]
+
+
+def test_invited_and_pilot_are_never_set_by_hand(platform_admin_client, db_session):
+    """Spec v1.1 §4: the invite and the tenant's activation set them. A lead
+    without a tenant can show neither — by PATCH or at creation."""
+    lead = _create(platform_admin_client, status='demo_booked')
+    url = f"{LEADS}/{lead['id']}"
+    for target in ('invited', 'pilot'):
+        res = platform_admin_client.patch(url, json={'status': target, 'notes': 'Should not stick'})
+        assert res.status_code == 422, f'{target}: {res.text}'
+        assert res.json()['detail']['code'] == 'lead.stage_set_by_system'
+        assert res.json()['detail']['params'] == {'status': target}
+
+        created = platform_admin_client.post(LEADS, json={**NEW_LEAD, 'status': target})
+        assert created.status_code == 422
+        assert created.json()['detail']['code'] == 'lead.stage_set_by_system'
+
+    after = platform_admin_client.get(url).json()
+    assert after['status'] == 'demo_booked' and after['notes'] is None  # the whole PATCH was refused
+    assert [e.type for e in _events(db_session, lead['id'])] == ['created']
 
 
 def test_same_status_writes_no_event(platform_admin_client, db_session):
@@ -188,10 +211,11 @@ def test_same_status_writes_no_event(platform_admin_client, db_session):
     assert [e.type for e in _events(db_session, lead['id'])] == ['created']
 
 
-def test_won_needs_a_live_tenant_and_is_terminal(platform_admin_client, db_session):
+def test_won_needs_the_pilot_stage_and_is_terminal(platform_admin_client, db_session):
     lead = _create(platform_admin_client)
-    # No tenant behind the lead: nothing to have won.
-    assert platform_admin_client.patch(f"{LEADS}/{lead['id']}", json={'status': 'won'}).status_code == 422
+    # Not in pilot (and no tenant behind the lead): nothing to have won.
+    refused = platform_admin_client.patch(f"{LEADS}/{lead['id']}", json={'status': 'won'})
+    assert refused.status_code == 409 and refused.json()['detail']['code'] == 'lead.win_needs_pilot'
 
     row = db_session.get(PlatformLead, lead['id'])
     row.status = LeadStatus.WON
@@ -304,7 +328,7 @@ def test_import_csv_reports_bad_rows_and_keeps_the_good_ones(platform_admin_clie
         'C001;Bonne Résidence;RPA (QC);QC;Prospect;Nouveau;7\n'
         'C002;;RPA (QC);QC;Prospect;Nouveau;5\n'
         'C003;Segment Inconnu;Aéroport;QC;Prospect;Nouveau;5\n'
-        'C004;Déjà Perdu;RPA (QC);QC;Prospect;Perdu;5\n'
+        'C004;Déjà Gagné;RPA (QC);QC;Prospect;Gagné;5\n'
         'C005;Sans Province;RPA (QC);;Prospect;Nouveau;5\n'
         'C006;Score Fou;RPA (QC);QC;Prospect;Nouveau;42\n'
     )
@@ -318,6 +342,52 @@ def test_import_csv_reports_bad_rows_and_keeps_the_good_ones(platform_admin_clie
     assert 'organisation' in body['skipped'][0]['reason']
     assert 'Aéroport' in body['skipped'][1]['reason']
     assert db_session.scalar(select(PlatformLead).where(PlatformLead.external_ref == 'C001')).score == 7
+
+
+def test_import_statuses_a_sheet_may_and_may_not_carry(platform_admin_client, db_session):
+    """Spec v1.1 §8: `invited`, `pilot` and `won` need a linked tenant, so
+    the row is skipped with its reason. `lost` comes in with its reason."""
+    csv_text = (
+        'ID;Organisation;Segment;Prov.;Statut;Raison de perte\n'
+        'S001;Contactée;RPA (QC);QC;Contacté;\n'
+        'S002;Démo;RPA (QC);QC;Démo bookée;ignorée ici\n'
+        'S003;Invitée;RPA (QC);QC;Invitation envoyée;\n'
+        'S004;En pilote;RPA (QC);QC;Pilote;\n'
+        'S005;Gagnée;RPA (QC);QC;Gagné;\n'
+        'S006;Perdue;RPA (QC);QC;Perdu;Signé avec une agence\n'
+        'S007;Perdue sans raison;RPA (QC);QC;Perdu;\n'
+    )
+    res = platform_admin_client.post(
+        f'{LEADS}/import', files={'file': ('leads.csv', csv_text.encode('utf-8-sig'), 'text/csv')},
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body['created'] == 3
+    assert [(s['row'], s['code'], s['params']) for s in body['skipped']] == [
+        (4, 'status_not_importable', {'value': 'Invitation envoyée'}),
+        (5, 'status_not_importable', {'value': 'Pilote'}),
+        (6, 'status_not_importable', {'value': 'Gagné'}),
+        (8, 'lost_needs_reason', {'value': 'Perdu'}),
+    ]
+
+    def lead(ref):
+        return db_session.scalar(select(PlatformLead).where(PlatformLead.external_ref == ref))
+
+    assert lead('S001').status == LeadStatus.CONTACTED
+    assert lead('S002').status == LeadStatus.DEMO_BOOKED and lead('S002').lost_reason is None
+    assert lead('S006').status == LeadStatus.LOST and lead('S006').lost_reason == 'Signé avec une agence'
+    assert all(lead(ref) is None for ref in ('S003', 'S004', 'S005', 'S007'))
+
+    # A re-import never moves a lead: the row now says « Perdu », the lead stays.
+    again = (
+        'ID;Organisation;Segment;Prov.;Statut;Raison de perte\n'
+        'S001;Contactée;RPA (QC);QC;Perdu;Plus de budget\n'
+    )
+    platform_admin_client.post(
+        f'{LEADS}/import', files={'file': ('leads.csv', again.encode('utf-8-sig'), 'text/csv')},
+    )
+    db_session.expire_all()
+    assert lead('S001').status == LeadStatus.CONTACTED and lead('S001').lost_reason is None
 
 
 def test_import_refuses_what_is_not_a_leads_sheet(platform_admin_client):
@@ -360,7 +430,7 @@ def test_stats_counts_overdue_open_actions_only(platform_admin_client):
     today = shift_today()
     yesterday, tomorrow = str(today - timedelta(days=1)), str(today + timedelta(days=1))
     _create(platform_admin_client, org_name='Late', next_action_at=yesterday)
-    _create(platform_admin_client, org_name='Late too', next_action_at=yesterday, status='pilot')
+    _create(platform_admin_client, org_name='Late too', next_action_at=yesterday, status='demo_booked')
     _create(platform_admin_client, org_name='Due today', next_action_at=str(today))
     _create(platform_admin_client, org_name='Later', next_action_at=tomorrow, status='demo_booked')
     _create(platform_admin_client, org_name='Late but lost', next_action_at=yesterday,
@@ -399,7 +469,7 @@ def test_invite_creates_the_tenant_and_links_the_lead(platform_admin_client, db_
     from app.models.tenant import Tenant
     from app.models.user import User
 
-    lead = _create(platform_admin_client, status='pilot', language='en', phone='(514) 555-0100')
+    lead = _create(platform_admin_client, status='demo_booked', language='en', phone='(514) 555-0100')
     res = _invite(platform_admin_client, lead['id'])
     assert res.status_code == 201, res.text
     body = res.json()
@@ -415,7 +485,7 @@ def test_invite_creates_the_tenant_and_links_the_lead(platform_admin_client, db_
     assert admin.preferred_language == 'en'  # falls back to the lead's language
 
     last = _events(db_session, lead['id'])[-1]
-    assert (last.type, last.from_status, last.to_status) == ('invited', LeadStatus.PILOT, LeadStatus.INVITED)
+    assert (last.type, last.from_status, last.to_status) == ('invited', LeadStatus.DEMO_BOOKED, LeadStatus.INVITED)
 
     detail = platform_admin_client.get(f"{LEADS}/{lead['id']}").json()
     assert detail['tenant'] == body['tenant']
@@ -435,7 +505,7 @@ def test_invite_creates_the_tenant_and_links_the_lead(platform_admin_client, db_
 def test_invite_is_all_or_nothing(platform_admin_client, db_session, seed):
     from app.models.tenant import Tenant
 
-    lead = _create(platform_admin_client, status='pilot')
+    lead = _create(platform_admin_client, status='demo_booked')
     events_before = len(_events(db_session, lead['id']))
 
     # The admin email already belongs to someone: refused after the slug
@@ -448,7 +518,7 @@ def test_invite_is_all_or_nothing(platform_admin_client, db_session, seed):
 
     row = db_session.get(PlatformLead, lead['id'])
     db_session.refresh(row)
-    assert row.status == LeadStatus.PILOT and row.tenant_id is None
+    assert row.status == LeadStatus.DEMO_BOOKED and row.tenant_id is None
     assert len(_events(db_session, lead['id'])) == events_before
     assert db_session.scalar(select(Tenant).where(Tenant.slug == 'residence-test')) is None
 
@@ -460,7 +530,7 @@ def test_invite_refuses_closed_and_unknown_leads(platform_admin_client, seed):
 
 
 def test_invite_is_owner_only(platform_admin_client, db_session, seed):
-    lead = _create(platform_admin_client, status='pilot')
+    lead = _create(platform_admin_client, status='demo_booked')
     operator, _user = _add_operator(db_session, PlatformOperatorRole.MARKETING, clerk_sub='int-op-mk-invite')
     operator.mfa_enabled = True
     db_session.flush()
@@ -511,9 +581,13 @@ def test_owner_wins_the_lead_once_the_client_commits(platform_admin_client, db_s
     url = f"{LEADS}/{lead['id']}"
     assert _invite(platform_admin_client, lead['id']).status_code == 201
 
-    # Invited but not set up yet: the tenant is not live.
-    early = platform_admin_client.patch(url, json={'status': 'won'})
-    assert early.status_code == 422 and early.json()['detail']['code'] == 'lead.win_needs_active_tenant'
+    # Invited but not set up yet: no pilot has run, so nothing is won —
+    # through the route or through a PATCH.
+    for early in (platform_admin_client.post(f'{url}/won'),
+                  platform_admin_client.patch(url, json={'status': 'won'})):
+        assert early.status_code == 409, early.text
+        assert early.json()['detail']['code'] == 'lead.win_needs_pilot'
+        assert early.json()['detail']['params'] == {'status': 'invited'}
 
     _activate_invited_tenant(db_session)
 
@@ -526,20 +600,86 @@ def test_owner_wins_the_lead_once_the_client_commits(platform_admin_client, db_s
     from app.tests.conftest import _make_test_client
     marketing = _make_test_client(db_session, 'int-op-mk-win', 'platform_admin')
     assert marketing.patch(url, json={'status': 'won'}).status_code == 403
+    assert marketing.post(f'{url}/won').status_code == 403
     assert marketing.patch(url, json={'next_action': 'Call back'}).status_code == 200
     row = db_session.get(PlatformLead, lead['id'])
     db_session.refresh(row)
     assert row.status == LeadStatus.PILOT
 
-    won = platform_admin_client.patch(url, json={'status': 'won'})
+    won = platform_admin_client.post(f'{url}/won')
     assert won.status_code == 200, won.text
     assert won.json()['status'] == 'won' and won.json()['converted_at'] is not None
     last = _events(db_session, lead['id'])[-1]
     assert (last.type, last.from_status, last.to_status) == ('status_changed', LeadStatus.PILOT, LeadStatus.WON)
     assert platform_admin_client.get(f'{LEADS}/stats').json()['by_status']['won'] == 1
 
-    # Terminal.
+    # Terminal: a second « won » is a 409, and no stage takes it back.
+    events = len(_events(db_session, lead['id']))
+    assert platform_admin_client.post(f'{url}/won').status_code == 409
     assert platform_admin_client.patch(url, json={'status': 'pilot'}).status_code == 422
+    assert len(_events(db_session, lead['id'])) == events
+
+
+def test_won_needs_the_pilot_whatever_the_tenant_state(platform_admin_client, db_session, seed):
+    """The v1.0 rule let any open stage be won once the tenant was active
+    (`pilot -> contacted -> won` answered 200). `pilot` is the only door."""
+    lead = _create(platform_admin_client, status='demo_booked')
+    url = f"{LEADS}/{lead['id']}"
+    assert _invite(platform_admin_client, lead['id']).status_code == 201
+    _activate_invited_tenant(db_session)
+
+    assert platform_admin_client.patch(url, json={'status': 'contacted'}).status_code == 200
+    for refused in (platform_admin_client.patch(url, json={'status': 'won'}),
+                    platform_admin_client.post(f'{url}/won')):
+        assert refused.status_code == 409
+        assert refused.json()['detail']['code'] == 'lead.win_needs_pilot'
+    row = db_session.get(PlatformLead, lead['id'])
+    db_session.refresh(row)
+    assert row.status == LeadStatus.CONTACTED and row.converted_at is None
+
+    # A lost lead is not won either, and an unknown one is a 404.
+    assert platform_admin_client.patch(url, json={'status': 'lost', 'lost_reason': 'Went silent'}).status_code == 200
+    assert platform_admin_client.post(f'{url}/won').status_code == 409
+    assert platform_admin_client.post(f'{LEADS}/00000000-0000-0000-0000-000000000000/won').status_code == 404
+
+
+def test_a_lead_returns_to_the_stage_its_tenant_is_at(platform_admin_client, db_session, seed):
+    """The one manual way into `invited` / `pilot`: a lead with a tenant,
+    put back where that tenant really is — a pilot closed as lost by mistake
+    would otherwise never be winnable again."""
+    lead = _create(platform_admin_client, status='demo_booked')
+    url = f"{LEADS}/{lead['id']}"
+    assert _invite(platform_admin_client, lead['id']).status_code == 201
+
+    # Tenant still pending: `invited` is its stage, `pilot` is not yet.
+    assert platform_admin_client.patch(url, json={'status': 'contacted'}).status_code == 200
+    early = platform_admin_client.patch(url, json={'status': 'pilot'})
+    assert early.status_code == 422 and early.json()['detail']['code'] == 'lead.stage_set_by_system'
+    assert platform_admin_client.patch(url, json={'status': 'invited'}).status_code == 200
+
+    _activate_invited_tenant(db_session)
+    assert platform_admin_client.patch(url, json={'status': 'lost', 'lost_reason': 'Misclick'}).status_code == 200
+    assert platform_admin_client.patch(url, json={'status': 'contacted'}).status_code == 200
+    # Tenant active: `pilot` is its stage, `invited` no longer.
+    stale = platform_admin_client.patch(url, json={'status': 'invited'})
+    assert stale.status_code == 422 and stale.json()['detail']['code'] == 'lead.stage_set_by_system'
+    back = platform_admin_client.patch(url, json={'status': 'pilot'})
+    assert back.status_code == 200 and back.json()['status'] == 'pilot'
+    assert platform_admin_client.post(f'{url}/won').status_code == 200
+
+    # A suspended workspace is neither stage.
+    other = _create(platform_admin_client, org_name='Autre Résidence', status='contacted')
+    other_url = f"{LEADS}/{other['id']}"
+    assert _invite(platform_admin_client, other['id'], slug='autre-residence',
+                   admin_email='admin@autre-residence.example').status_code == 201
+    from app.models.enums import TenantStatus
+    from app.models.tenant import Tenant
+    tenant = db_session.scalar(select(Tenant).where(Tenant.slug == 'autre-residence'))
+    tenant.status = TenantStatus.SUSPENDED
+    db_session.flush()
+    assert platform_admin_client.patch(other_url, json={'status': 'contacted'}).status_code == 200
+    for target in ('invited', 'pilot'):
+        assert platform_admin_client.patch(other_url, json={'status': target}).status_code == 422
 
 
 def test_a_failed_pilot_can_be_lost(platform_admin_client, db_session, seed):
@@ -576,7 +716,7 @@ def test_activation_without_a_lead_changes_nothing(apf_client, seed, db_session)
 # ── errors carry a code the bilingual screens translate ──────────────────────
 
 def test_refusals_carry_a_code_and_their_values(platform_admin_client, seed):
-    lead = _create(platform_admin_client, status='pilot', external_ref='L900')
+    lead = _create(platform_admin_client, status='demo_booked', external_ref='L900')
     url = f"{LEADS}/{lead['id']}"
 
     def detail(res):

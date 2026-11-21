@@ -326,3 +326,28 @@ Le pilote se déroule dans le vrai espace du prospect : il n'existe pas d'enviro
 - **Une fois par jour** : le jour d'envoi est écrit dans `platform_settings.lead_reminder_sent_on` (migration `0028`) *avant* l'envoi — un redéploiement ne renvoie pas le courriel. Contrepartie : un envoi échoué n'est pas retenté le jour même (il est journalisé). Une date saisie après l'envoi du jour attend le courriel du lendemain.
 - Le compteur « Actions en retard » de la liste ne change pas : il compte les dates strictement passées ; le courriel ajoute celles du jour.
 - Code : `services/platform_lead_reminder.py`, appelé par `scheduler.py`. Aucune route, aucun changement d'écran.
+
+### Alignement sur la v1.1 du spec (2026-11-21)
+
+La v1.1 du spec (2026-11-15) a été relue contre le code : six écarts relevés. Cette sous-section **remplace** les règles contraires écrites plus haut dans le §14 (« Machine à états », « Import », « Pilote et Gagné »). Elle est complétée PR par PR.
+
+**PR 1 — règles (fait)**
+
+- **`invited` et `pilot` sont posés par le système** : l'invitation depuis la fiche et la fin de l'assistant de configuration. À la main (PATCH, création) ils sont refusés : 422 `lead.stage_set_by_system`. Les trois premières étapes (`new`, `contacted`, `demo_booked`) se parcourent toujours dans les deux sens.
+- **Une seule voie de retour manuelle** : un lead qui a un tenant lié peut être remis sur l'étape où ce tenant se trouve réellement — `invited` si le tenant est `pending` ou `onboarding`, `pilot` s'il est `active`. Sans tenant, ou avec un tenant suspendu ou supprimé, c'est refusé. Raison : un pilote classé « perdu » par erreur ne se rouvre que vers `contacted` ; sans cette voie il ne pourrait plus jamais être gagné.
+- **`won` exige `status = pilot`** : `POST /api/v1/platform/leads/{id}/won` (owner), **409** `lead.win_needs_pilot` depuis tout autre statut, y compris un lead déjà gagné. Le PATCH `status = won` applique la même règle (même 409). Restent : 403 pour le marketing, 422 si le tenant lié n'est pas actif.
+- **Import** : `invited`, `pilot` et `won` sont refusés (ligne ignorée, `status_not_importable`). `lost` est accepté avec la colonne facultative « Raison de perte » ; sans raison la ligne est ignorée (`lost_needs_reason`). Ceci ne vaut qu'à la création : un ré-import ne touche toujours pas au statut d'un lead existant.
+- Écran : la barre de statut suit ces règles (`canMoveLead`), « Gagné » appelle la route `/won`.
+
+**À venir**
+
+- PR 2 — chronologie du pilote (`invited_at`, `pilot_started_at`, `pilot_ends_at`, `converted_at` renommée `won_at`), taux de conversion = gagnés ÷ pilotes atteints, pilotes échus, invitation de plus de 7 jours comptée en retard.
+- PR 3 — retirer un tenant lié à un lead `invited` ou `pilot` exige une raison et clôt le lead en `lost` (remplace « un tenant supprimé laisse le lead tel quel »).
+- PR 4 — écrans : encart Pilote, tuiles, badge Pilote sur les tenants.
+
+**Écarts conservés par rapport à la v1.1**
+
+- Accès : owner + marketing (la v1.1 ouvre le module à tout opérateur).
+- Un seul lien lead ↔ tenant : `platform_leads.tenant_id` (la v1.1 ajoute `tenants.lead_id`).
+- Segment, type, source et phase restent des chaînes validées, pas des enums Postgres.
+- Intake public : secret partagé entre serveurs, pas de CORS (le formulaire passe par la route serveur du site, pas par le navigateur) ; le pot de miel reste côté site.

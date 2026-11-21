@@ -8,12 +8,18 @@ State machine (§4, as settled with the product owner):
     new ─ contacted ─ demo_booked ─ invited ─ pilot ─► won
       └───────┴───────────┴───────────┴────────┴─────► lost ─► contacted
 
-- The five open stages move freely in both directions (skipping a stage or
-  stepping back to fix a misclick are both fine).
+- `new`, `contacted` and `demo_booked` move freely in both directions
+  (skipping a stage or stepping back to fix a misclick are both fine).
+- `invited` and `pilot` belong to the system (spec v1.1 §4): the invite and
+  the tenant's activation set them. By hand they are refused, with one way
+  back in — a lead that has a tenant may be put on the stage that tenant is
+  really at (a pilot closed as lost by mistake reopens to `contacted`, then
+  returns to `pilot`). A lead without a tenant can never show either.
 - `lost` needs a non-empty `lost_reason`; a lost lead reopens to `contacted`
   only, which clears the reason (the event keeps it).
-- `won` is the owner's call, made once the client commits: it needs a
-  linked tenant that is active, stamps `converted_at`, and is terminal.
+- `won` is the owner's call, made once the client commits: only from
+  `pilot` (409 otherwise), with the linked tenant active. It stamps
+  `converted_at` and is terminal.
 - Every transition writes a `status_changed` event with from/to.
 - Deleting a lead is the owner's alone and takes its feed with it; the
   platform audit trail keeps who removed which organization. A lead whose
@@ -49,6 +55,8 @@ OPEN_STATUSES = (
     LeadStatus.NEW, LeadStatus.CONTACTED, LeadStatus.DEMO_BOOKED, LeadStatus.PILOT, LeadStatus.INVITED,
 )
 CLOSED_STATUSES = (LeadStatus.WON, LeadStatus.LOST)
+# Set by the invite and by the tenant's activation, not by hand.
+SYSTEM_STATUSES = (LeadStatus.INVITED, LeadStatus.PILOT)
 EVENTS_ON_DETAIL = 50
 
 SORTS = ('next_action', 'score', 'updated')
@@ -158,13 +166,38 @@ class PlatformLeadService:
                 f'A lead with reference "{external_ref}" already exists.', ref=external_ref,
             )
 
+    def _check_system_stage(self, lead: PlatformLead, target: LeadStatus) -> None:
+        """`invited` / `pilot` by hand: only to put a lead back on the stage
+        its tenant is really at. No tenant, or a tenant in another state
+        (suspended, removed), leaves nothing to restore."""
+        tenant = self.db.get(Tenant, lead.tenant_id) if lead.tenant_id else None
+        if tenant is None:
+            expected = None
+        elif tenant.status == TenantStatus.ACTIVE:
+            expected = LeadStatus.PILOT
+        elif tenant.status in (TenantStatus.PENDING, TenantStatus.ONBOARDING):
+            expected = LeadStatus.INVITED
+        else:
+            expected = None
+        if target != expected:
+            raise _unprocessable(
+                'stage_set_by_system',
+                f'"{target.value}" is set by the invitation and the workspace, not by hand.',
+                status=target.value,
+            )
+
     def _check_win(self, lead: PlatformLead, scope: AccessScope) -> None:
-        """`won` = the client committed. Owner only, and only for a lead whose
-        tenant is live — otherwise there is nothing to have won."""
+        """`won` = the client committed. Owner only, from `pilot` only, and
+        only while the tenant is live — otherwise there is nothing to have won."""
         if not scope.is_platform_owner:
             raise coded(
                 status.HTTP_403_FORBIDDEN, 'lead.win_owner_only',
                 'Only a platform owner can mark a lead as won.',
+            )
+        if lead.status != LeadStatus.PILOT:
+            raise coded(
+                status.HTTP_409_CONFLICT, 'lead.win_needs_pilot',
+                'A lead can only be won from "pilot".', status=lead.status.value,
             )
         tenant = self.db.get(Tenant, lead.tenant_id) if lead.tenant_id else None
         if tenant is None or tenant.status != TenantStatus.ACTIVE:
@@ -292,6 +325,12 @@ class PlatformLeadService:
         target = LeadStatus(payload.status)
         if target == LeadStatus.WON:
             raise _unprocessable('new_cannot_be_won', 'A new lead cannot be won — it has no tenant yet.')
+        if target in SYSTEM_STATUSES:
+            raise _unprocessable(
+                'stage_set_by_system',
+                f'"{target.value}" is set by the invitation and the workspace, not by hand.',
+                status=target.value,
+            )
         if target == LeadStatus.LOST and not payload.lost_reason:
             raise _unprocessable('lost_needs_reason', 'A lost lead needs a reason (lost_reason).')
         self._ensure_ref_free(payload.external_ref)
@@ -319,9 +358,11 @@ class PlatformLeadService:
 
         current = lead.status
         target = LeadStatus(changes.pop('status')) if 'status' in changes else current
-        check_transition(current, target)
         if target == LeadStatus.WON and current != LeadStatus.WON:
             self._check_win(lead, scope)
+        check_transition(current, target)
+        if target in SYSTEM_STATUSES and target != current:
+            self._check_system_stage(lead, target)
 
         # Validate everything before touching the row — a refused PATCH must
         # leave the lead exactly as it was.
@@ -347,6 +388,21 @@ class PlatformLeadService:
         elif target != LeadStatus.LOST and 'lost_reason' in changes:
             lead.lost_reason = None  # a reason only means something on a lost lead
 
+        self.db.commit()
+        self.db.refresh(lead)
+        return lead
+
+    def win(self, lead_id: UUID, scope: AccessScope) -> PlatformLead:
+        """`POST /{id}/won` — the client committed. 409 unless the lead is in
+        `pilot` (a lead already won included)."""
+        lead = self._get_or_404(lead_id)
+        self._check_win(lead, scope)
+        lead.status = LeadStatus.WON
+        lead.converted_at = datetime.now(timezone.utc)
+        self._event(
+            lead, 'status_changed', scope.user.id,
+            from_status=LeadStatus.PILOT, to_status=LeadStatus.WON,
+        )
         self.db.commit()
         self.db.refresh(lead)
         return lead

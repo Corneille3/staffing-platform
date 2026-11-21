@@ -3,9 +3,7 @@
 Mounted at /api/v1/platform/leads. Tier-0 `owner` and `marketing` only:
 `operator`, `support` and every tenant-side identity get the same 403, with
 no hint whether a lead exists. Writes add the 2FA gate (when enforced).
-« Invite as a network » and deleting a lead are the owner's alone.
-
-Not in this module yet: the public intake.
+« Invite as a network », « Won » and deleting a lead are the owner's alone.
 """
 from datetime import date
 from typing import Literal
@@ -132,6 +130,17 @@ def add_lead_event(
     db: Session = Depends(get_db_session),
 ) -> LeadEventOut:
     return PlatformLeadService(db).add_event(lead_id, payload, scope)
+
+
+@router.post('/{lead_id}/won', response_model=LeadOut)
+def win_lead(
+    lead_id: UUID,
+    # The sale is the owner's to close (§14); marketing gets the 403.
+    scope: AccessScope = Depends(require_platform_owner),
+    db: Session = Depends(get_db_session),
+) -> LeadOut:
+    """The prospect committed: `pilot` -> `won`. 409 from any other status."""
+    return LeadOut.model_validate(PlatformLeadService(db).win(lead_id, scope))
 
 
 @router.post('/{lead_id}/invite', status_code=status.HTTP_201_CREATED, response_model=LeadInviteResult)

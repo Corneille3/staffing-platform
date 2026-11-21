@@ -1422,7 +1422,8 @@
         "secTracking": "Follow-up",
         "created": "Created {date}",
         "statusTitle": "Stage",
-        "wonHint": "Only an owner can mark a lead as won, once its workspace is active.",
+        "wonHint": "Only an owner can mark a lead as won, from the Pilot stage.",
+        "systemStageHint": "This stage is set by the invitation and by the prospect's workspace, not by hand.",
         "lostReasonLabel": "Why was this lead lost?",
         "lostReasonPlaceholder": "e.g. Signed with an agency for two years",
         "confirmLost": "Mark as lost",
@@ -1497,6 +1498,8 @@
         "ref_exists": "Another lead already has the reference “{ref}”.",
         "win_owner_only": "Only a platform owner can mark a lead as won.",
         "win_needs_active_tenant": "A lead can only be won once its invited workspace is active.",
+        "win_needs_pilot": "A lead can only be won from the Pilot stage.",
+        "stage_set_by_system": "This stage is set by the invitation and by the prospect's workspace, not by hand.",
         "new_cannot_be_won": "A new lead cannot be won — it has no workspace yet.",
         "lost_needs_reason": "A lost lead needs a reason.",
         "field_required": "“{field}” cannot be empty.",
@@ -1523,7 +1526,8 @@
           "unknown_type": "unknown type “{value}”",
           "bad_province": "missing or invalid province (2 letters)",
           "unknown_status": "unknown status “{value}”",
-          "status_not_importable": "the status “{value}” cannot be imported (won needs an active workspace, lost needs a reason)"
+          "status_not_importable": "the status “{value}” cannot be imported (it needs a workspace linked to the lead)",
+          "lost_needs_reason": "the status “{value}” needs a reason (column “Raison de perte”)"
         },
         "delete_has_live_tenant": "This lead is linked to the workspace “{name}”. Remove the workspace from Tenants before deleting the lead."
       },
