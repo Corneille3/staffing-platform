@@ -7,6 +7,7 @@ leaves only after the commit.
 Lives apart from platform_lead_service because it needs TenantService, which
 itself imports that module for the `won` hook.
 """
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -75,6 +76,7 @@ class LeadConversionService:
         previous = lead.status
         lead.tenant_id = tenant.id
         lead.status = LeadStatus.INVITED
+        lead.invited_at = datetime.now(timezone.utc)
         self.db.add(PlatformLeadEvent(
             lead_id=lead.id, type='invited', actor_id=scope.user.id,
             from_status=previous, to_status=LeadStatus.INVITED,

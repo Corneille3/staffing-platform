@@ -19,7 +19,12 @@ State machine (§4, as settled with the product owner):
   only, which clears the reason (the event keeps it).
 - `won` is the owner's call, made once the client commits: only from
   `pilot` (409 otherwise), with the linked tenant active. It stamps
-  `converted_at` and is terminal.
+  `won_at` and is terminal.
+- The pilot has dates: `invited_at` (invite), `pilot_started_at` (tenant
+  active — never reset by a second activation or a reopening),
+  `pilot_ends_at` (+30 days by default, edited by the operator while the
+  lead is in `pilot`). A pilot past its end and an invitation older than
+  7 days are what `/stats` flags.
 - Every transition writes a `status_changed` event with from/to.
 - Deleting a lead is the owner's alone and takes its feed with it; the
   platform audit trail keeps who removed which organization. A lead whose
@@ -30,16 +35,16 @@ State machine (§4, as settled with the product owner):
   system) — the trial runs in the prospect's real workspace, so an active
   tenant is a pilot, not a sale.
 """
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.auth.scope import AccessScope
 from app.core.errors import coded
-from app.core.timeutil import shift_today
+from app.core.timeutil import shift_local_date, shift_today
 from app.models.enums import LeadStatus
 from app.models.enums import TenantStatus
 from app.models.platform_lead import PlatformLead, PlatformLeadEvent
@@ -58,6 +63,10 @@ CLOSED_STATUSES = (LeadStatus.WON, LeadStatus.LOST)
 # Set by the invite and by the tenant's activation, not by hand.
 SYSTEM_STATUSES = (LeadStatus.INVITED, LeadStatus.PILOT)
 EVENTS_ON_DETAIL = 50
+# Planned length of a pilot, from the day the workspace goes active.
+PILOT_DAYS = 30
+# An invitation the admin has not acted on for this long needs a follow-up.
+STALE_INVITE_DAYS = 7
 
 SORTS = ('next_action', 'score', 'updated')
 
@@ -81,6 +90,15 @@ def check_transition(current: LeadStatus, target: LeadStatus) -> None:
         raise _unprocessable('lost_reopens_to_contacted', 'A lost lead can only be reopened to "contacted".')
 
 
+def start_pilot(lead: PlatformLead, started_at: datetime | None = None) -> None:
+    """Date the pilot. Only fills what is empty: finishing the wizard twice,
+    or putting a reopened lead back in `pilot`, never restarts the clock."""
+    if lead.pilot_started_at is None:
+        lead.pilot_started_at = started_at or datetime.now(timezone.utc)
+    if lead.pilot_ends_at is None:
+        lead.pilot_ends_at = shift_local_date(lead.pilot_started_at) + timedelta(days=PILOT_DAYS)
+
+
 def mark_lead_piloting(db: Session, tenant_id: UUID) -> PlatformLead | None:
     """The tenant just went active: its lead is now in pilot. No commit — the
     caller's transaction carries it, so tenant and lead move together. A lead
@@ -90,6 +108,7 @@ def mark_lead_piloting(db: Session, tenant_id: UUID) -> PlatformLead | None:
         return None
     previous = lead.status
     lead.status = LeadStatus.PILOT
+    start_pilot(lead)
     db.add(PlatformLeadEvent(
         lead_id=lead.id, type='tenant_activated', actor_id=None,
         from_status=previous, to_status=LeadStatus.PILOT,
@@ -166,7 +185,7 @@ class PlatformLeadService:
                 f'A lead with reference "{external_ref}" already exists.', ref=external_ref,
             )
 
-    def _check_system_stage(self, lead: PlatformLead, target: LeadStatus) -> None:
+    def _check_system_stage(self, lead: PlatformLead, target: LeadStatus) -> Tenant:
         """`invited` / `pilot` by hand: only to put a lead back on the stage
         its tenant is really at. No tenant, or a tenant in another state
         (suspended, removed), leaves nothing to restore."""
@@ -185,6 +204,18 @@ class PlatformLeadService:
                 f'"{target.value}" is set by the invitation and the workspace, not by hand.',
                 status=target.value,
             )
+        return tenant
+
+    @staticmethod
+    def _check_pilot_end(lead: PlatformLead, target: LeadStatus, value: date | None) -> None:
+        """The planned end of a pilot: a date, on a lead in `pilot`, not
+        before the pilot started."""
+        if target != LeadStatus.PILOT:
+            raise _unprocessable('pilot_end_needs_pilot', 'Only a lead in pilot has a pilot end date.')
+        if value is None:
+            raise _unprocessable('field_required', 'pilot_ends_at cannot be empty.', field='pilot_ends_at')
+        if lead.pilot_started_at is not None and value < shift_local_date(lead.pilot_started_at):
+            raise _unprocessable('pilot_end_before_start', 'A pilot cannot end before it started.')
 
     def _check_win(self, lead: PlatformLead, scope: AccessScope) -> None:
         """`won` = the client committed. Owner only, from `pilot` only, and
@@ -288,23 +319,38 @@ class PlatformLeadService:
             .order_by(PlatformLead.segment, PlatformLead.wave.asc().nulls_last())
         ).all()
 
-        overdue = self.db.scalar(
-            select(func.count()).select_from(PlatformLead).where(
-                PlatformLead.next_action_at < shift_today(),
-                PlatformLead.status.notin_(CLOSED_STATUSES),
-            )
-        ) or 0
+        today = shift_today()
+        # An invitation nobody acted on: the admin has not finished the setup
+        # wizard a week later, so the lead is still `invited` (v1.1 §4).
+        stale_invite = and_(
+            PlatformLead.status == LeadStatus.INVITED,
+            PlatformLead.invited_at < datetime.now(timezone.utc) - timedelta(days=STALE_INVITE_DAYS),
+        )
 
+        def how_many(*conditions) -> int:
+            return self.db.scalar(select(func.count()).select_from(PlatformLead).where(*conditions)) or 0
+
+        overdue = how_many(
+            PlatformLead.status.notin_(CLOSED_STATUSES),
+            or_(PlatformLead.next_action_at < today, stale_invite),
+        )
         # Demo requests from a marketing site nobody has picked up yet — the
         # list sorts them last (no next action, no score), so it flags them.
-        new_website = self.db.scalar(
-            select(func.count()).select_from(PlatformLead).where(
-                PlatformLead.status == LeadStatus.NEW,
-                PlatformLead.source == 'website_form',
-            )
-        ) or 0
+        new_website = how_many(PlatformLead.status == LeadStatus.NEW, PlatformLead.source == 'website_form')
+        pilots_overdue = how_many(PlatformLead.status == LeadStatus.PILOT, PlatformLead.pilot_ends_at < today)
 
-        past_new = total - by_status['new']
+        # Conversion is measured on the pilots, not on the contacts: a lead
+        # that never tried the product says nothing about closing.
+        reached_pilot = how_many(PlatformLead.pilot_started_at.is_not(None))
+        won_after_pilot = how_many(PlatformLead.status == LeadStatus.WON, PlatformLead.pilot_started_at.is_not(None))
+        avg_seconds = self.db.scalar(
+            select(func.avg(func.extract('epoch', PlatformLead.won_at - PlatformLead.pilot_started_at)))
+            .where(
+                PlatformLead.status == LeadStatus.WON,
+                PlatformLead.won_at.is_not(None), PlatformLead.pilot_started_at.is_not(None),
+            )
+        )
+
         return LeadStats(
             total=total,
             by_status=by_status,
@@ -316,7 +362,11 @@ class PlatformLeadService:
             overdue_actions=overdue,
             in_demo_or_pilot=by_status['demo_booked'] + by_status['pilot'],
             new_website_requests=new_website,
-            conversion_rate=round(by_status['won'] / past_new, 4) if past_new else None,
+            stale_invites=how_many(stale_invite),
+            pilots_active=by_status['pilot'],
+            pilots_overdue=pilots_overdue,
+            avg_pilot_days=round(float(avg_seconds) / 86400, 1) if avg_seconds is not None else None,
+            conversion_rate=round(won_after_pilot / reached_pilot, 4) if reached_pilot else None,
         )
 
     # ── writes ────────────────────────────────────────────────────────────────
@@ -361,8 +411,12 @@ class PlatformLeadService:
         if target == LeadStatus.WON and current != LeadStatus.WON:
             self._check_win(lead, scope)
         check_transition(current, target)
-        if target in SYSTEM_STATUSES and target != current:
+        stage_tenant = (
             self._check_system_stage(lead, target)
+            if target in SYSTEM_STATUSES and target != current else None
+        )
+        if 'pilot_ends_at' in changes:
+            self._check_pilot_end(lead, target, changes['pilot_ends_at'])
 
         # Validate everything before touching the row — a refused PATCH must
         # leave the lead exactly as it was.
@@ -378,7 +432,13 @@ class PlatformLeadService:
         if target != current:
             lead.status = target
             if target == LeadStatus.WON:
-                lead.converted_at = datetime.now(timezone.utc)
+                lead.won_at = datetime.now(timezone.utc)
+            # Back on the stage of its workspace: the dates follow the
+            # workspace's own history when the lead never carried them.
+            if target == LeadStatus.PILOT and stage_tenant is not None:
+                start_pilot(lead, stage_tenant.activated_at)
+            if target == LeadStatus.INVITED and stage_tenant is not None and lead.invited_at is None:
+                lead.invited_at = stage_tenant.created_at
             if current == LeadStatus.LOST:
                 lead.lost_reason = None  # reopened — the event below keeps the history
             self._event(
@@ -398,7 +458,7 @@ class PlatformLeadService:
         lead = self._get_or_404(lead_id)
         self._check_win(lead, scope)
         lead.status = LeadStatus.WON
-        lead.converted_at = datetime.now(timezone.utc)
+        lead.won_at = datetime.now(timezone.utc)
         self._event(
             lead, 'status_changed', scope.user.id,
             from_status=LeadStatus.PILOT, to_status=LeadStatus.WON,
