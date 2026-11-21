@@ -227,6 +227,12 @@ function TenantRow({
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 500, background: s.bg, color: s.c }}>
           <span style={{ width: 5, height: 5, borderRadius: 99, background: s.c }} />{tt.has(`status.${t.status}`) ? tt(`status.${t.status}`) : t.status}
         </span>
+        {/* The workspace is a prospect's trial, not a signed client yet. */}
+        {t.lead_status === "pilot" ? (
+          <span title={tt("pilotBadgeTitle")} style={{ display: "inline-flex", marginLeft: 6, padding: "3px 8px", borderRadius: 999, fontSize: 10.5, fontWeight: 500, background: "var(--terra-soft)", color: "var(--terra-ink)" }}>
+            {tt("pilotBadge")}
+          </span>
+        ) : null}
         <div style={{ fontSize: 10, color: "var(--ink-3)", marginTop: 4 }}>{fmtSince(t.since, locale)}</div>
       </div>
       <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>

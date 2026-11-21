@@ -15,6 +15,8 @@ import {
   LEAD_WAVES,
   WEBSITE_REQUESTS_FILTER,
   formatDay,
+  isPilotOverdue,
+  staleInviteDays,
   isLeadOverdue,
   isWebsiteRequestsFilter,
   leadsQuery,
@@ -182,7 +184,16 @@ export function PlatformLeadsView({
           sub={t("list.tileOverdueSub")}
           tone={stats.overdue_actions > 0 ? "terra" : undefined}
         />
-        <Tile label={t("list.tileDemo")} value={String(stats.in_demo_or_pilot)} sub={t("list.tileDemoSub")} />
+        <Tile
+          label={t("list.tilePilots")}
+          value={String(stats.pilots_active)}
+          sub={
+            stats.pilots_overdue > 0
+              ? t("list.tilePilotsOverdue", { count: stats.pilots_overdue })
+              : t("list.tilePilotsSub")
+          }
+          tone={stats.pilots_overdue > 0 ? "terra" : undefined}
+        />
         <Tile
           label={t("list.tileConversion")}
           value={conversion == null ? "—" : String(conversion)}
@@ -305,6 +316,9 @@ export function PlatformLeadsView({
 function LeadRow({ lead, last, todayKey, locale }: { lead: Lead; last: boolean; todayKey: string; locale: string }) {
   const t = useTranslations("platform.leads");
   const overdue = isLeadOverdue(lead, todayKey);
+  // What the « overdue actions » tile also counts, said on the row itself.
+  const pilotOverdue = isPilotOverdue(lead, todayKey);
+  const staleDays = staleInviteDays(lead, Date.now());
   return (
     <Link href={`${BASE_PATH}/${lead.id}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
       <div
@@ -343,7 +357,14 @@ function LeadRow({ lead, last, todayKey, locale }: { lead: Lead; last: boolean; 
         </div>
         <div style={{ fontFamily: "var(--mono)", color: scoreColor(lead.score) }}>{lead.score ?? "—"}</div>
         <div style={{ fontFamily: "var(--mono)", color: lead.wave ? "var(--ink)" : "var(--ink-4)" }}>{lead.wave ?? "—"}</div>
-        <div><LeadStatusChip status={lead.status} /></div>
+        <div>
+          <LeadStatusChip status={lead.status} />
+          {pilotOverdue || staleDays !== null ? (
+            <span style={{ display: "block", marginTop: 3, fontSize: 10, fontWeight: 600, color: "var(--terra-ink)" }}>
+              {pilotOverdue ? t("list.pilotOverdue") : t("list.staleInvite", { days: staleDays ?? 0 })}
+            </span>
+          ) : null}
+        </div>
         <div style={{ minWidth: 0, fontSize: 12, color: lead.next_action ? "var(--ink-2)" : "var(--ink-4)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {lead.next_action ?? "—"}
         </div>

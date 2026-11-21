@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowLeft, ArrowUpRight, Check, ExternalLink, Info, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Check, Clock, ExternalLink, Info, Send, Trash2 } from "lucide-react";
 import { Link, useRouter } from "../i18n/navigation";
 import { addLeadEvent, deleteLead, fetchLead, inviteLead, updateLead, winLead } from "../lib/browser-api";
 import {
@@ -19,7 +19,10 @@ import {
   daysBetween,
   formatDay,
   isLeadOverdue,
+  leadMilestones,
   leadTenantBanner,
+  pilotDaysLeft,
+  staleInviteDays,
   slugifyOrgName,
   splitContactName,
 } from "../lib/leads";
@@ -144,6 +147,10 @@ export function PlatformLeadDetail({
 
       {lead.tenant_id ? <TenantBanner lead={lead} tenant={tenant} isOwner={isOwner} /> : null}
 
+      {lead.status === "pilot" ? (
+        <PilotCard lead={lead} todayKey={todayKey} onSaveEnd={(v) => patch({ pilot_ends_at: v })} />
+      ) : null}
+
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.5fr) minmax(300px, 1fr)", gap: 18, alignItems: "start" }}>
         {/* Left — every field edits in place and saves on blur */}
         <div style={{ display: "grid", gap: 18, minWidth: 0 }}>
@@ -246,6 +253,9 @@ function TenantBanner({ lead, tenant, isOwner }: { lead: Lead; tenant: LeadTenan
           days: daysBetween(lead.created_at, lead.won_at),
         })
       : t({ won: "detail.pilotBody", removed: "detail.removedBody", lost_live: "detail.lostLiveBody", pilot: "detail.pilotBody", invited: "detail.invitedBody" }[kind], { name });
+  const milestones = leadMilestones(lead);
+  // Still `invited` a week later: the admin never finished the setup wizard.
+  const staleDays = kind === "invited" ? staleInviteDays(lead, Date.now()) : null;
   // The tenant's own state adds nothing once the title already says it.
   const showState = tenant && (kind === "invited" || kind === "pilot" || kind === "lost_live");
 
@@ -267,6 +277,22 @@ function TenantBanner({ lead, tenant, isOwner }: { lead: Lead; tenant: LeadTenan
           ) : null}
         </div>
         <div style={{ fontSize: 13, color: "var(--ink)", marginTop: 2 }}>{body}</div>
+        {staleDays !== null ? (
+          <div role="status" style={{ fontSize: 12.5, color: "var(--terra-ink)", fontWeight: 600, marginTop: 6 }}>
+            {t("detail.staleInvite", { days: staleDays })}
+          </div>
+        ) : null}
+        {milestones.length > 0 ? (
+          <div style={{ fontSize: 12, color: "var(--ink-2)", marginTop: 6 }}>
+            {milestones.map((step, i) => (
+              <span key={step.key}>
+                {i > 0 ? " · " : null}
+                {t(`detail.milestone.${step.key}`, { date: formatDay(shiftDateKey(step.at), locale) })}
+                {step.days !== null ? ` (${t("detail.milestone.after", { days: step.days })})` : null}
+              </span>
+            ))}
+          </div>
+        ) : null}
         {tenant ? (
           <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 3, fontFamily: "var(--mono)" }}>{tenant.slug}</div>
         ) : null}
@@ -278,6 +304,72 @@ function TenantBanner({ lead, tenant, isOwner }: { lead: Lead; tenant: LeadTenan
         </Link>
       ) : null}
     </div>
+  );
+}
+
+// ── Pilot ────────────────────────────────────────────────────────────────────
+
+/** The pilot's dates while the lead is in `pilot`: when it started, its
+ * planned end (the operator moves it) and how long is left — past the end,
+ * the card turns terra: it is time for the closing call. */
+function PilotCard({
+  lead,
+  todayKey,
+  onSaveEnd,
+}: {
+  lead: Lead;
+  todayKey: string;
+  onSaveEnd: (value: string | null) => Promise<void>;
+}) {
+  const t = useTranslations("platform.leads");
+  const locale = useLocale();
+  const left = pilotDaysLeft(lead, todayKey);
+  const overdue = left !== null && left < 0;
+  return (
+    <section
+      style={{
+        ...leadCard,
+        padding: "18px 20px",
+        marginBottom: 18,
+        borderColor: overdue ? "var(--terra)" : "var(--line)",
+        background: overdue ? "var(--terra-soft)" : "var(--card)",
+      }}
+    >
+      <div style={{ ...leadEyebrow, marginBottom: 14, display: "flex", alignItems: "center", gap: 8, color: overdue ? "var(--terra-ink)" : undefined }}>
+        <Clock size={13} /> {t("detail.pilot.title")}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14, alignItems: "start" }}>
+        <div>
+          <LeadFieldLabel>{t("detail.pilot.started")}</LeadFieldLabel>
+          <div style={{ fontSize: 14, padding: "8px 0" }}>
+            {lead.pilot_started_at ? formatDay(shiftDateKey(lead.pilot_started_at), locale) : "—"}
+          </div>
+        </div>
+        <Field
+          label={t("detail.pilot.ends")}
+          value={lead.pilot_ends_at}
+          type="date"
+          required
+          onSave={(v) => onSaveEnd(v as string | null)}
+        />
+        <div>
+          <LeadFieldLabel>{t("detail.pilot.remaining")}</LeadFieldLabel>
+          <div
+            role={overdue ? "status" : undefined}
+            style={{ fontSize: 14, padding: "8px 0", fontWeight: overdue ? 600 : 400, color: overdue ? "var(--terra-ink)" : "var(--ink)" }}
+          >
+            {left === null
+              ? "—"
+              : left < 0
+                ? t("detail.pilot.overdue", { days: -left })
+                : t("detail.pilot.left", { days: left })}
+          </div>
+        </div>
+      </div>
+      <p style={{ margin: "12px 0 0", fontSize: 12.5, color: overdue ? "var(--terra-ink)" : "var(--ink-3)", lineHeight: 1.5 }}>
+        {t(overdue ? "detail.pilot.overdueHint" : "detail.pilot.hint")}
+      </p>
+    </section>
   );
 }
 

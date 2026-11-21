@@ -122,6 +122,75 @@ export function isLeadOverdue(
   return lead.next_action_at < todayKey;
 }
 
+/** An invitation the admin has not acted on for this long needs a follow-up
+ * (mirrors the backend's STALE_INVITE_DAYS). */
+export const STALE_INVITE_DAYS = 7;
+
+/** Whole days between two YYYY-MM-DD keys (`to` − `from`), negative when
+ * `to` is earlier. Calendar days, so no time zone can shift it. */
+export function dayKeyDiff(fromKey: string, toKey: string): number {
+  const utc = (key: string) => {
+    const [y, m, d] = key.slice(0, 10).split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((utc(toKey) - utc(fromKey)) / 86_400_000);
+}
+
+/** Days left before the pilot's planned end: 0 on the day itself, negative
+ * once it is past. Null when the lead is not in pilot or has no end date. */
+export function pilotDaysLeft(
+  lead: Pick<Lead, "status" | "pilot_ends_at">,
+  todayKey: string,
+): number | null {
+  if (lead.status !== "pilot" || !lead.pilot_ends_at) return null;
+  return dayKeyDiff(todayKey, lead.pilot_ends_at);
+}
+
+/** The pilot's planned end is behind us: time for the closing call. */
+export function isPilotOverdue(lead: Pick<Lead, "status" | "pilot_ends_at">, todayKey: string): boolean {
+  const left = pilotDaysLeft(lead, todayKey);
+  return left !== null && left < 0;
+}
+
+/** Whole days since the invitation, when the lead is still `invited` more
+ * than a week later (the admin has not finished the setup wizard). Null
+ * otherwise — same 7 × 24 h rule as the « overdue actions » counter. */
+export function staleInviteDays(
+  lead: Pick<Lead, "status" | "invited_at">,
+  nowMs: number,
+): number | null {
+  if (lead.status !== "invited" || !lead.invited_at) return null;
+  const elapsed = nowMs - new Date(lead.invited_at).getTime();
+  if (elapsed <= STALE_INVITE_DAYS * 86_400_000) return null;
+  return Math.floor(elapsed / 86_400_000);
+}
+
+export type LeadMilestone = {
+  key: "invited" | "pilot" | "won";
+  at: string;
+  /** Whole days since the previous milestone; null for the first one. */
+  days: number | null;
+};
+
+/** The dated steps a lead went through once it had a workspace, in order,
+ * each with the delay since the one before. */
+export function leadMilestones(
+  lead: Pick<Lead, "invited_at" | "pilot_started_at" | "won_at">,
+): LeadMilestone[] {
+  const steps: [LeadMilestone["key"], string | null][] = [
+    ["invited", lead.invited_at],
+    ["pilot", lead.pilot_started_at],
+    ["won", lead.won_at],
+  ];
+  const out: LeadMilestone[] = [];
+  for (const [key, at] of steps) {
+    if (!at) continue;
+    const previous = out[out.length - 1];
+    out.push({ key, at, days: previous ? daysBetween(previous.at, at) : null });
+  }
+  return out;
+}
+
 /** Whole days from one ISO instant to another (creation → conversion). */
 export function daysBetween(fromIso: string, toIso: string): number {
   const ms = new Date(toIso).getTime() - new Date(fromIso).getTime();
