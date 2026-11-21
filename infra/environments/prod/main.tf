@@ -106,6 +106,10 @@ module "secrets" {
   vapid_private_key = var.vapid_private_key
   vapid_subject     = var.vapid_subject
 
+  # Grafana Cloud + Sentry credentials: the secret is created empty here and
+  # filled by hand (SPEC_OBSERVABILITY PR2A) — Terraform never holds its value.
+  create_observability_secret = true
+
   tags = local.tags
 }
 
@@ -118,9 +122,14 @@ module "app_runtime" {
   app_port              = var.app_port
   app_image             = var.app_image
   app_env_secret_name   = module.secrets.app_env_secret_name
-  secret_arns           = [module.secrets.app_env_secret_arn]
-  aws_region            = var.aws_region
-  tags                  = local.tags
+  # The instance role may read both. Nothing reads the observability secret
+  # until PR2B adds the agent to user_data.
+  secret_arns = [
+    module.secrets.app_env_secret_arn,
+    module.secrets.observability_secret_arn,
+  ]
+  aws_region = var.aws_region
+  tags       = local.tags
 }
 
 module "ses" {

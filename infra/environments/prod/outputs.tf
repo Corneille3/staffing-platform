@@ -38,3 +38,8 @@ output "ses_dkim_cname_records" {
 output "ses_domain" {
   value = module.ses.domain
 }
+
+output "observability_secret_name" {
+  description = "Secret to fill by hand with the Grafana Cloud + Sentry credentials (SPEC_OBSERVABILITY, between PR2A and PR2B)."
+  value       = module.secrets.observability_secret_name
+}
