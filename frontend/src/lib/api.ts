@@ -24,6 +24,7 @@ import {
   LeadStats,
   PlatformOperatorsResponse,
   PlatformSettings,
+  PlatformOverview,
   PlatformTenantsResponse,
   ReplacementFeed,
   RequestResponse,
@@ -255,6 +256,10 @@ export async function getAssignments(): Promise<Assignment[]> {
 
 export async function getNetworkOverview(): Promise<NetworkOverview> {
   return fetchJson<NetworkOverview>("/api/v1/reports/network-overview");
+}
+
+export async function getPlatformOverview(): Promise<PlatformOverview> {
+  return fetchJson<PlatformOverview>("/api/v1/platform/overview");
 }
 
 export async function getPlatformTenants(): Promise<PlatformTenantsResponse> {

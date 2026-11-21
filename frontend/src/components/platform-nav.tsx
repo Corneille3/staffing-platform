@@ -11,7 +11,7 @@ import type { PlatformOperatorRole } from "../lib/types";
 // without an href are not built yet and render disabled. Labels come from
 // `platform.nav.<key>`.
 const NAV: { key: string; href?: string; icon: React.ReactNode }[] = [
-  { key: "overview", icon: <Activity size={16} /> },
+  { key: "overview", href: "/platform/overview", icon: <Activity size={16} /> },
   { key: "tenants", href: "/platform/tenants", icon: <Briefcase size={16} /> },
   { key: "leads", href: "/platform/leads", icon: <Target size={16} /> },
   { key: "billing", icon: <Sparkles size={16} /> },
