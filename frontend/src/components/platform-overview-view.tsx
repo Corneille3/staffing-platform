@@ -31,9 +31,11 @@ function localeTag(locale: string): string {
 
 function fmtToday(value: string, locale: string): string {
   try {
-    return new Date(value).toLocaleDateString(localeTag(locale), {
+    const day = new Date(value).toLocaleDateString(localeTag(locale), {
       weekday: "long", day: "numeric", month: "long", timeZone: SHIFT_TZ,
     });
+    // First letter only: CSS `capitalize` would also write « Novembre ».
+    return day.charAt(0).toUpperCase() + day.slice(1);
   } catch {
     return "";
   }
@@ -65,7 +67,7 @@ export function PlatformOverviewView({ data }: { data: PlatformOverview }) {
         <h1 style={{ fontFamily: "var(--serif)", fontSize: "clamp(2rem, 4vw, 2.75rem)", lineHeight: 1.02, margin: "6px 0 0", letterSpacing: "-0.02em", fontWeight: 400 }}>
           {t.rich("headline", { em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em> })}
         </h1>
-        <p style={{ margin: "8px 0 0", color: "var(--ink-3)", fontSize: 13, textTransform: "capitalize" }}>
+        <p style={{ margin: "8px 0 0", color: "var(--ink-3)", fontSize: 13 }}>
           {fmtToday(data.generated_at, locale)}
         </p>
       </div>
@@ -237,7 +239,7 @@ function Stat({ label, value, tone, last }: { label: string; value: string; tone
 
 function SectionTitle({ children, link }: { children: React.ReactNode; link?: { href: string; label: string } }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10, minHeight: 20 }}>
       <h2 className="stf-h-eyebrow" style={{ ...eyebrow, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>{children}</h2>
       {link ? (
         <Link href={link.href} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--ink-2)", textDecoration: "none" }}>
