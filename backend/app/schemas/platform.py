@@ -208,3 +208,56 @@ class PlatformAuditRow(BaseModel):
 class PlatformAuditResponse(BaseModel):
     rows: list[PlatformAuditRow]
     total: int
+
+
+class OverviewAttentionItem(BaseModel):
+    """One line of « to watch » on the overview. `kind` picks the wording and
+    the link on the screen:
+
+    - `new_website_requests`, `overdue_followups` — a count (owner only);
+    - `pilot_overdue` — one lead past its pilot end (owner only);
+    - `invite_stale`, `onboarding_stuck` — a tenant still pending / in the
+      setup wizard a week after its invitation;
+    - `tenant_suspended`;
+    - `access_request_pending` — waiting on the tenant's admin (`info_only`).
+    """
+    kind: str
+    count: int = 1
+    name: str | None = None
+    days: int | None = None
+    tenant_id: UUID | None = None
+    lead_id: UUID | None = None
+    info_only: bool = False
+
+
+class OverviewTenantCounts(BaseModel):
+    pending: int
+    onboarding: int
+    active: int
+    suspended: int
+
+
+class OverviewActivity(BaseModel):
+    """Requests published in the last `days` days, all live tenants together."""
+    days: int
+    published: int
+    filled: int
+    expired: int
+    fill_rate: int | None = None  # 0-100; None when nothing was published
+
+
+class OverviewLeads(BaseModel):
+    total: int
+    open_pipeline: int
+    by_status: dict[str, int]
+
+
+class PlatformOverview(BaseModel):
+    """`GET /platform/overview`. `leads` and `audit` are null for anyone but
+    an owner — the API withholds them, the screen has nothing to hide."""
+    generated_at: datetime
+    attention: list[OverviewAttentionItem]
+    tenants: OverviewTenantCounts
+    activity: OverviewActivity
+    leads: OverviewLeads | None = None
+    audit: list[PlatformAuditRow] | None = None

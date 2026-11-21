@@ -29,6 +29,7 @@ from app.schemas.platform import (
     PlatformOperatorRead,
     PlatformOperatorRoleUpdate,
     PlatformOperatorsResponse,
+    PlatformOverview,
     PlatformSettingsRead,
     PlatformSettingsUpdate,
     PlatformTenantCreate,
@@ -42,6 +43,7 @@ from app.schemas.tenant import TenantNetworkCreate, TenantRemoval
 from app.services.housekeeping_service import HousekeepingService
 from app.services.platform_audit_service import AUDIT_CATEGORIES, PlatformAuditService
 from app.services.platform_operator_service import PlatformOperatorService
+from app.services.platform_overview_service import PlatformOverviewService
 from app.services.platform_service import PlatformService
 from app.services.platform_settings_service import PlatformSettingsService
 from app.services.tenant_access_service import TenantAccessService
@@ -134,6 +136,17 @@ def update_settings(
 ) -> PlatformSettingsRead:
     updated = PlatformSettingsService(db).update(payload.model_dump(exclude_unset=True), scope)
     return PlatformSettingsRead.model_validate(updated)
+
+
+@router.get('/overview', response_model=PlatformOverview)
+def platform_overview(
+    scope: AccessScope = Depends(require_platform_admin),
+    db: Session = Depends(get_db_session),
+) -> PlatformOverview:
+    """What needs the operator's attention today, then the counts — one read
+    for the whole screen. Every tier-0 role but marketing; the pipeline and
+    the audit trail come back for an owner only (null otherwise)."""
+    return PlatformOverview(**PlatformOverviewService(db).build(scope))
 
 
 @router.get('/tenants', response_model=PlatformTenantsResponse)
