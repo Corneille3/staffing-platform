@@ -72,15 +72,37 @@ export function isClosedLeadStatus(status: LeadStatus): boolean {
   return CLOSED.includes(status);
 }
 
+/** What the status bar needs to know beyond the lead's own status. */
+export type LeadMoveContext = {
+  /** The viewer is a platform owner — only an owner closes a sale. */
+  isOwner?: boolean;
+  /** Status of the linked workspace, null when the lead has none. */
+  tenantStatus?: string | null;
+};
+
+/** The stage a linked workspace puts its lead at: `invited` until the admin
+ * finishes the setup wizard, `pilot` once it is active. Null without a
+ * workspace, or with one that is suspended or removed. */
+export function leadStageOfTenant(tenantStatus: string | null | undefined): LeadStatus | null {
+  if (tenantStatus === "active") return "pilot";
+  if (tenantStatus === "pending" || tenantStatus === "onboarding") return "invited";
+  return null;
+}
+
 /** Mirrors the backend state machine: which stage can be clicked from here.
- * A won lead is closed; a lost lead reopens to `contacted` only; the five
- * open stages move freely both ways. `won` is offered only when `canWin`
- * (the viewer is an owner and the lead's tenant is active). */
-export function canMoveLead(current: LeadStatus, target: LeadStatus, canWin = false): boolean {
+ * A won lead is closed; a lost lead reopens to `contacted` only; `new`,
+ * `contacted` and `demo_booked` move freely both ways. `invited` and `pilot`
+ * are set by the invitation and by the workspace, never by hand — except to
+ * put a lead back on the stage its workspace is really at. `won` is offered
+ * to an owner, from `pilot` only, while the workspace is active. */
+export function canMoveLead(current: LeadStatus, target: LeadStatus, context: LeadMoveContext = {}): boolean {
   if (target === current) return false;
   if (current === "won") return false;
-  if (target === "won") return canWin && current !== "lost";
+  if (target === "won") {
+    return current === "pilot" && !!context.isOwner && context.tenantStatus === "active";
+  }
   if (current === "lost") return target === "contacted";
+  if (target === "invited" || target === "pilot") return leadStageOfTenant(context.tenantStatus) === target;
   return true;
 }
 

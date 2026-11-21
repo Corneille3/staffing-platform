@@ -827,6 +827,11 @@ export async function updateLead(id: string, patch: LeadPatch): Promise<Lead> {
   return patchJson<Lead>(`/api/v1/platform/leads/${id}`, patch);
 }
 
+/** « Won » — owner only, from `pilot` only (409 otherwise). */
+export async function winLead(id: string): Promise<Lead> {
+  return postJson<Lead>(`/api/v1/platform/leads/${id}/won`, {});
+}
+
 export async function fetchLead(id: string): Promise<LeadDetail> {
   return getJson<LeadDetail>(`/api/v1/platform/leads/${id}`);
 }

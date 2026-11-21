@@ -7,6 +7,7 @@ import {
   isWebsiteRequestsFilter,
   WEBSITE_REQUESTS_FILTER,
   isLeadOverdue,
+  leadStageOfTenant,
   leadTenantBanner,
   leadsQuery,
   leadsToCsv,
@@ -17,34 +18,73 @@ import {
 import type { Lead } from "./types";
 
 describe("canMoveLead", () => {
-  it("lets the open stages move both ways and skip", () => {
+  const owner = { isOwner: true, tenantStatus: "active" };
+
+  it("lets the first three stages move both ways and skip", () => {
     expect(canMoveLead("new", "demo_booked")).toBe(true);
-    expect(canMoveLead("pilot", "contacted")).toBe(true);
-    expect(canMoveLead("invited", "new")).toBe(true);
+    expect(canMoveLead("demo_booked", "new")).toBe(true);
+    expect(canMoveLead("pilot", "contacted", owner)).toBe(true);
+    expect(canMoveLead("invited", "new", { tenantStatus: "pending" })).toBe(true);
+  });
+
+  it("never offers invited or pilot by hand to a lead without a workspace", () => {
+    for (const from of ["new", "contacted", "demo_booked"] as const) {
+      expect(canMoveLead(from, "invited")).toBe(false);
+      expect(canMoveLead(from, "pilot")).toBe(false);
+      expect(canMoveLead(from, "pilot", { isOwner: true, tenantStatus: null })).toBe(false);
+    }
+  });
+
+  it("puts a lead back on the stage its workspace is at, and no other", () => {
+    expect(canMoveLead("contacted", "pilot", { tenantStatus: "active" })).toBe(true);
+    expect(canMoveLead("contacted", "invited", { tenantStatus: "active" })).toBe(false);
+    expect(canMoveLead("contacted", "invited", { tenantStatus: "pending" })).toBe(true);
+    expect(canMoveLead("contacted", "invited", { tenantStatus: "onboarding" })).toBe(true);
+    expect(canMoveLead("contacted", "pilot", { tenantStatus: "onboarding" })).toBe(false);
+    for (const tenantStatus of ["suspended", "removed"]) {
+      expect(canMoveLead("contacted", "invited", { tenantStatus })).toBe(false);
+      expect(canMoveLead("contacted", "pilot", { tenantStatus })).toBe(false);
+    }
   });
 
   it("never offers the current stage", () => {
-    expect(canMoveLead("pilot", "pilot")).toBe(false);
+    expect(canMoveLead("pilot", "pilot", owner)).toBe(false);
   });
 
-  it("offers won only to an owner with a live tenant, and closes a won lead", () => {
-    expect(canMoveLead("invited", "won")).toBe(false);
-    expect(canMoveLead("pilot", "won", true)).toBe(true);
-    expect(canMoveLead("lost", "won", true)).toBe(false);
-    expect(canMoveLead("won", "pilot", true)).toBe(false);
+  it("offers won from pilot only, to an owner with a live workspace, and closes a won lead", () => {
+    expect(canMoveLead("pilot", "won", owner)).toBe(true);
+    expect(canMoveLead("pilot", "won", { isOwner: false, tenantStatus: "active" })).toBe(false);
+    expect(canMoveLead("pilot", "won", { isOwner: true, tenantStatus: "suspended" })).toBe(false);
+    expect(canMoveLead("pilot", "won")).toBe(false);
+    for (const from of ["new", "contacted", "demo_booked", "invited", "lost"] as const) {
+      expect(canMoveLead(from, "won", owner)).toBe(false);
+    }
+    expect(canMoveLead("won", "pilot", owner)).toBe(false);
     expect(canMoveLead("won", "contacted")).toBe(false);
     expect(canMoveLead("won", "lost")).toBe(false);
   });
 
   it("reopens a lost lead to contacted only", () => {
     expect(canMoveLead("lost", "contacted")).toBe(true);
-    expect(canMoveLead("lost", "pilot")).toBe(false);
+    expect(canMoveLead("lost", "pilot", owner)).toBe(false);
     expect(canMoveLead("lost", "new")).toBe(false);
   });
 
   it("lets any open stage be lost", () => {
     expect(canMoveLead("new", "lost")).toBe(true);
     expect(canMoveLead("invited", "lost")).toBe(true);
+    expect(canMoveLead("pilot", "lost", owner)).toBe(true);
+  });
+});
+
+describe("leadStageOfTenant", () => {
+  it("maps a workspace to the stage of its lead", () => {
+    expect(leadStageOfTenant("pending")).toBe("invited");
+    expect(leadStageOfTenant("onboarding")).toBe("invited");
+    expect(leadStageOfTenant("active")).toBe("pilot");
+    expect(leadStageOfTenant("suspended")).toBeNull();
+    expect(leadStageOfTenant("removed")).toBeNull();
+    expect(leadStageOfTenant(null)).toBeNull();
   });
 });
 

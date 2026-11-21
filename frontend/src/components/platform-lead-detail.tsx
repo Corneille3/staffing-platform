@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { ArrowLeft, ArrowUpRight, Check, ExternalLink, Info, Send, Trash2 } from "lucide-react";
 import { Link, useRouter } from "../i18n/navigation";
-import { addLeadEvent, deleteLead, fetchLead, inviteLead, updateLead } from "../lib/browser-api";
+import { addLeadEvent, deleteLead, fetchLead, inviteLead, updateLead, winLead } from "../lib/browser-api";
 import {
   LEAD_BAN_PHASES,
   LEAD_EVENT_TYPES,
@@ -84,7 +84,8 @@ export function PlatformLeadDetail({
   /** One PATCH; the row state follows the server's answer. Throws on refusal
    * so the calling field can show the message and roll its draft back. */
   async function patch(change: LeadPatch): Promise<void> {
-    const updated = await updateLead(lead.id, change);
+    // « Won » has its own route: the server only accepts it from `pilot`.
+    const updated = change.status === "won" ? await winLead(lead.id) : await updateLead(lead.id, change);
     setLead(updated);
     // A transition wrote an event — pull the feed rather than guess it.
     if (change.status) await reloadFeed();
@@ -139,7 +140,7 @@ export function PlatformLeadDetail({
       {inviting ? <InviteModal lead={lead} onClose={() => setInviting(false)} onInvited={onInvited} /> : null}
       {deleting ? <DeleteModal lead={lead} onClose={() => setDeleting(false)} /> : null}
 
-      <StatusBar lead={lead} canWin={isOwner && tenant?.status === "active"} onMove={(status, reason) => patch(reason ? { status, lost_reason: reason } : { status })} />
+      <StatusBar lead={lead} isOwner={isOwner} tenantStatus={tenant?.status ?? null} onMove={(status, reason) => patch(reason ? { status, lost_reason: reason } : { status })} />
 
       {lead.tenant_id ? <TenantBanner lead={lead} tenant={tenant} isOwner={isOwner} /> : null}
 
@@ -284,12 +285,15 @@ function TenantBanner({ lead, tenant, isOwner }: { lead: Lead; tenant: LeadTenan
 
 function StatusBar({
   lead,
-  canWin,
+  isOwner,
+  tenantStatus,
   onMove,
 }: {
   lead: Lead;
-  // Owner + active tenant: the only case where « Won » can be clicked.
-  canWin: boolean;
+  // « Won » is the owner's, from `pilot`; `invited` / `pilot` follow the
+  // linked workspace (see canMoveLead).
+  isOwner: boolean;
+  tenantStatus: string | null;
   onMove: (status: LeadStatus, lostReason?: string) => Promise<void>;
 }) {
   const leadError = useLeadError();
@@ -321,7 +325,8 @@ function StatusBar({
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {LEAD_STATUSES.map((status) => {
           const current = lead.status === status;
-          const allowed = canMoveLead(lead.status, status, canWin);
+          const allowed = canMoveLead(lead.status, status, { isOwner, tenantStatus });
+          const systemStage = status === "invited" || status === "pilot";
           const tone = LEAD_STATUS_TONE[status];
           return (
             <button
@@ -329,7 +334,15 @@ function StatusBar({
               type="button"
               disabled={!allowed || busy !== null}
               aria-pressed={current}
-              title={status === "won" && !current && !allowed ? t("detail.wonHint") : undefined}
+              title={
+                current || allowed
+                  ? undefined
+                  : status === "won"
+                    ? t("detail.wonHint")
+                    : systemStage
+                      ? t("detail.systemStageHint")
+                      : undefined
+              }
               onClick={() => {
                 setLosing(status === "lost");
                 setWinning(status === "won");
