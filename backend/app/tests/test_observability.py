@@ -252,3 +252,6 @@ def test_sentry_stays_off_without_a_dsn(monkeypatch):
     assert calls[0]['release'] == 'abc1234' and calls[0]['traces_sample_rate'] == 0
     assert calls[0]['environment'] == settings.app_env
     assert 'release=abc1234' in said[-1]
+    # Spec §1d: `send_default_pii` stays at its default (off) — Sentry must not
+    # receive IP addresses, cookies or request bodies of care workers.
+    assert not calls[0].get('send_default_pii', False)

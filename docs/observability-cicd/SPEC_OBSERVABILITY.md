@@ -1,14 +1,41 @@
 # SPEC — Observability for Staffig (Track A)
 
-Status: ready to implement AFTER SPEC_STEP0_ELASTIC_IP is merged, applied,
-and verified (EIP live, Cloudflare updated, deploy script resolves by tag).
-Branch: `feature/observability`
-Structure: 4 sequential PRs. Do not combine them. Each PR has its own
-acceptance criteria; stop after each and hand back to the human.
+Status: READY. The prerequisite is done: the Elastic IP has been live since
+2026-10-25 (PR #115), so the prod instance is replaceable.
+Branch: `feature/observability`, recreated from `main` (see "Before starting").
+Structure: 4 sequential PRs, with PR2 split into PR2A and PR2B. Do not
+combine them. Each PR has its own acceptance criteria; stop after each and
+hand back to the human.
+
+## Revision log
+
+- 2026-11-21 — Step 0 marked done. Stale summer worktree/branch to be
+  discarded. PR1 also fixes `docs/observability-cicd/README.md`. PR2 split
+  into PR2A (secret + IAM, no instance change) and PR2B (alloy agent in
+  `user_data`, replaces the instance), so the secret is filled BEFORE the new
+  instance boots. PR2B gets a mandatory pre-apply checklist, after the
+  2026-11-15 outage where an instance replacement picked an unusable AMI.
+- 2026-11-21 (b) — PR4 now lists the credentials it needs (Grafana
+  annotation and read tokens, Sentry auth token), which the first version
+  had left implicit. Sentry is kept.
 
 Reference plan (context, decisions, rationale): the project doc
 `claude/observability-plan.md` in the user's Claude project. This spec is
 self-contained — implement from THIS file.
+
+## Before starting (human)
+
+The worktree `~/STAFFIG-observability` and the local branch
+`feature/observability` hold the old Elastic IP commit, already shipped
+another way (PR #115). They contain nothing `main` lacks. Discard them and
+start clean:
+
+```
+git worktree remove ~/STAFFIG-observability
+git branch -D feature/observability
+git switch main && git pull
+git switch -c feature/observability
+```
 
 ## Decisions already made (do not reopen)
 
@@ -37,14 +64,18 @@ self-contained — implement from THIS file.
   replace the prod instance. Plans and PRs only; apply/deploy is human.
 - Do NOT modify `scripts/deploy-backend.sh` before PR4.
 
-## Human prerequisites (before PR2 can be tested)
+## Human prerequisites (before PR2B is applied)
 
-The human provides, as a new Secrets Manager secret (see PR2):
 - Grafana Cloud: Prometheus remote_write URL + username (instance id),
-  Loki push URL + username, one API token with metrics:write + logs:write.
+  Loki push URL + username, one access-policy token with `metrics:write`
+  and `logs:write`.
 - Sentry: project DSN.
-Until these exist, PR1 and PR2 can still be built and reviewed; end-to-end
-verification waits for the secret.
+
+PR4 needs more credentials, created later (see PR4).
+
+PR1 needs none of these: it is built and verified entirely on the local
+stack. PR2A creates the empty secret; the human fills it (see "Between
+PR2A and PR2B"); only then is PR2B applied.
 
 ---
 
@@ -93,6 +124,7 @@ sweep `(0.1, 0.5, 1, 5, 15, 60)`.
 - `sentry_sdk.init(dsn=settings.sentry_dsn, environment=settings.app_env,
   release=settings.git_sha, traces_sample_rate=0)` in `app/main.py`,
   guarded: skipped entirely when `SENTRY_DSN` is empty (local/dev/test).
+  Keep `send_default_pii` at its default (off).
 - New settings: `sentry_dsn: str = ""`, `git_sha: str = "unknown"`.
 - `backend/Dockerfile`: add `ARG GIT_SHA=unknown` + `ENV GIT_SHA=$GIT_SHA`
   (the deploy script passes it in PR4; harmless until then).
@@ -109,19 +141,55 @@ sweep `(0.1, 0.5, 1, 5, 15, 60)`.
    exception inside a metrics helper does not fail the request.
 5. With `SENTRY_DSN` unset, startup logs show Sentry skipped and nothing
    is sent anywhere.
+6. `docs/observability-cicd/README.md` is up to date (see 1e).
+
+### 1e. Docs
+
+Update `docs/observability-cicd/README.md`: step 1 (Elastic IP) = done
+2026-10-25 (PR #115); step 2 (observability) = in progress. Remove the
+hardcoded instance id: the instance is identified by its tag
+`Name=apf-staffing-platform-prod-app`, since it is now replaceable.
 
 ---
 
-## PR2 — Infra: secret + alloy agent (Terraform only)
+## PR2A — Secret + IAM only (Terraform, NO instance change)
 
 ### 2a. New secret
 
 In the `secrets-manager` module pattern: a secret named
-`<name_prefix>-observability` holding JSON keys `GRAFANA_PROM_URL`,
-`GRAFANA_PROM_USER`, `GRAFANA_LOKI_URL`, `GRAFANA_LOKI_USER`,
-`GRAFANA_TOKEN`, `SENTRY_DSN` (values placeholder; human fills in console).
-Add its ARN to `module.app_runtime.secret_arns` in
-`infra/environments/prod/main.tf`.
+`<name_prefix>-observability`, created WITHOUT a Terraform-managed value
+(no `aws_secretsmanager_secret_version`, or one with
+`lifecycle { ignore_changes = [secret_string] }`), so Terraform never
+overwrites what the human puts in it. Expected JSON keys, documented in the
+PR description: `GRAFANA_PROM_URL`, `GRAFANA_PROM_USER`, `GRAFANA_LOKI_URL`,
+`GRAFANA_LOKI_USER`, `GRAFANA_TOKEN`, `SENTRY_DSN`. Add its ARN to
+`module.app_runtime.secret_arns` in `infra/environments/prod/main.tf`.
+
+Do NOT touch `user_data.sh.tftpl` in this PR.
+
+### PR2A acceptance criteria
+
+1. `terraform plan` shows the secret ADDED and the instance role's secrets
+   policy UPDATED in place, and **no change to `aws_instance`**. Any
+   instance replacement in this plan = stop and report.
+2. `terraform fmt -check -recursive infra/` passes.
+
+### Between PR2A and PR2B (human)
+
+After applying PR2A, fill the secret with the real values (one JSON object
+with the six keys), from the console or with:
+
+```
+aws secretsmanager put-secret-value --region ca-central-1 \
+  --secret-id <name_prefix>-observability \
+  --secret-string file://observability.json
+```
+
+Then delete `observability.json` from disk.
+
+---
+
+## PR2B — Alloy agent in user_data (REPLACES the instance)
 
 ### 2b. `user_data.sh.tftpl` additions
 
@@ -145,18 +213,53 @@ Add its ARN to `module.app_runtime.secret_arns` in
   component (disk, mem, cpu); (3) `loki.source.docker` targeting the
   `apf-app` container → `loki.write` to Grafana Cloud.
 
-### PR2 acceptance criteria
+### PR2B acceptance criteria
 
 1. `terraform -chdir=infra/environments/prod plan` succeeds. Expected:
-   the new secret + policy attachment ADDED, and `aws_instance` REPLACED
-   (this is the intended, Step-0-enabled replacement — flag it clearly in
-   the PR description so the human schedules the apply).
+   `aws_instance.this` REPLACED and `aws_eip_association.app` updated as a
+   consequence — nothing else. Flag the replacement clearly in the PR
+   description so the human schedules the apply.
 2. `terraform fmt -check -recursive infra/` passes.
 3. The rendered user_data (`terraform plan` output or `templatefile`
    unit-render) contains both systemd units and no plaintext token.
-4. (Human, post-apply) Grafana Cloud explorer shows `staffig_*` and
+4. The PR description quotes the AMI id the plan will use (see checklist).
+5. (Human, post-apply) `/health/ready` returns 200 through
+   `api.kouamvision.com`; Grafana Cloud explorer shows `staffig_*` and
    `up{job=...} == 1`; Loki shows apf-app log lines; reboot rehearsal:
    both units come back without manual action.
+
+### PR2B pre-apply checklist (human, mandatory)
+
+The 2026-11-15 outage came from an instance replacement: the AMI filter
+resolved to an image that could not boot on this instance. The filter is
+now restricted to `al2023-ami-2023.*-x86_64`, but `most_recent = true`
+still means the AMI changes whenever Amazon publishes a new release, and
+`ignore_changes = [ami]` does NOT apply to a replacement. So, before
+`terraform apply`:
+
+1. **RDS is running.** `aws rds describe-db-instances --region ca-central-1
+   --query 'DBInstances[].DBInstanceStatus'` = `available`. Migrations run
+   when the new instance boots; with RDS stopped, `/health/ready` stays 503
+   (the 2026-06-03 failure).
+2. **The secret is filled.** `aws secretsmanager get-secret-value` on
+   `<name_prefix>-observability` returns the six keys with real values.
+3. **The plan's scope.** Only `aws_instance.this` replaced and the EIP
+   association updated. Anything else = stop.
+4. **The AMI.** Take the `ami` value of the new instance from the plan,
+   then run `aws ec2 describe-images --region ca-central-1 --image-ids <ami>
+   --query 'Images[0].[Name,BlockDeviceMappings[0].Ebs.VolumeSize]'`. The
+   name must be a standard `al2023-ami-2023.…-x86_64` image (no `minimal`,
+   `ecs` or `neuron`) and the snapshot size must be at most 20 GB.
+5. **The window.** Apply at a quiet hour. The API is unavailable during the
+   replacement (boot, image pull, migrations), typically a few minutes.
+   Warn pilot organizations if any are active.
+6. **The way back.** Rollback = revert the PR2B commit and apply again (a
+   second replacement). The Elastic IP keeps the address, so Cloudflare
+   needs no change.
+
+Recommendation, decision left to the human: pin the exact AMI id in a
+variable instead of `most_recent`, so that a replacement only changes the
+AMI when someone decides it.
 
 ---
 
@@ -200,15 +303,27 @@ Add its ARN to `module.app_runtime.secret_arns` in
 
 ## PR4 — Close the loop: annotate, bake, auto-rollback (deploy script)
 
-Modify `scripts/deploy-backend.sh` only. Keep every existing phase; append:
+Modify `scripts/deploy-backend.sh` only. Keep every existing phase; append
+the steps below.
+
+Credentials (human, before PR4): the instance token from PR2A only WRITES
+metrics and logs. The deploy script, which runs on the human's machine,
+needs two more, stored in a separate secret `<name_prefix>-deploy-observability`
+and read with `aws secretsmanager get-secret-value` — never hardcoded:
+`GRAFANA_URL` + `GRAFANA_SA_TOKEN` (a Grafana service-account token
+allowed to write annotations) and `GRAFANA_PROM_QUERY_URL` +
+`GRAFANA_READ_TOKEN` (an access-policy token with `metrics:read`, for the
+bake queries), and `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + `SENTRY_PROJECT`
+(a Sentry auth token allowed to create releases; the DSN cannot do this).
+
+Steps:
 
 1. Build with `--build-arg GIT_SHA=${COMMIT}`.
 2. Before rolling: record the previous live SHA tag (from ECR, the image
    currently tagged `:latest`) into a variable for rollback.
 3. After the existing `/health/ready` gate passes: POST a Grafana
-   annotation (`deploy sha-${COMMIT}`) and create a Sentry release via
-   their APIs (tokens read from the observability secret via
-   `aws secretsmanager get-secret-value` — never hardcoded).
+   annotation (`deploy sha-${COMMIT}`) through the Grafana HTTP API, and
+   create a Sentry release for `${COMMIT}` through the Sentry API.
 4. Bake: for 5 minutes, every 30s query Grafana Cloud's Prometheus API
    for 5xx rate and p95; compare against fixed thresholds (5xx >1%,
    p95 >1.5s sustained over 3 consecutive samples).
@@ -236,4 +351,5 @@ Modify `scripts/deploy-backend.sh` only. Keep every existing phase; append:
 > Stop after the PR1 acceptance criteria pass locally and show me the
 > results.
 
-(then PR2, PR3, PR4 — sequentially, after each human verification.)
+(then PR2A, PR2B, PR3, PR4 — sequentially, after each human verification;
+PR2B only after its pre-apply checklist is complete.)
