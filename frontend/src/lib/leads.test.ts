@@ -8,7 +8,12 @@ import {
   WEBSITE_REQUESTS_FILTER,
   isLeadOverdue,
   leadStageOfTenant,
+  leadMilestones,
   leadTenantBanner,
+  pilotDaysLeft,
+  isPilotOverdue,
+  staleInviteDays,
+  dayKeyDiff,
   tenantRemovalNeedsReason,
   leadsQuery,
   leadsToCsv,
@@ -96,6 +101,71 @@ describe("tenantRemovalNeedsReason", () => {
     for (const status of ["new", "contacted", "demo_booked", "won", "lost", null, undefined]) {
       expect(tenantRemovalNeedsReason(status)).toBe(false);
     }
+  });
+});
+
+describe("pilot dates", () => {
+  const today = "2026-11-21";
+
+  it("counts calendar days between two keys", () => {
+    expect(dayKeyDiff("2026-11-21", "2026-12-21")).toBe(30);
+    expect(dayKeyDiff("2026-11-21", "2026-11-21")).toBe(0);
+    expect(dayKeyDiff("2026-11-21", "2026-11-11")).toBe(-10);
+    expect(dayKeyDiff("2026-10-31", "2026-11-02")).toBe(2); // across the DST change
+  });
+
+  it("tells how long a pilot has left, and when it is past its end", () => {
+    expect(pilotDaysLeft({ status: "pilot", pilot_ends_at: "2026-12-01" }, today)).toBe(10);
+    expect(pilotDaysLeft({ status: "pilot", pilot_ends_at: today }, today)).toBe(0);
+    expect(pilotDaysLeft({ status: "pilot", pilot_ends_at: "2026-11-18" }, today)).toBe(-3);
+    expect(isPilotOverdue({ status: "pilot", pilot_ends_at: today }, today)).toBe(false);
+    expect(isPilotOverdue({ status: "pilot", pilot_ends_at: "2026-11-20" }, today)).toBe(true);
+  });
+
+  it("has nothing to say outside the pilot", () => {
+    expect(pilotDaysLeft({ status: "pilot", pilot_ends_at: null }, today)).toBeNull();
+    expect(pilotDaysLeft({ status: "won", pilot_ends_at: "2026-11-01" }, today)).toBeNull();
+    expect(isPilotOverdue({ status: "lost", pilot_ends_at: "2026-11-01" }, today)).toBe(false);
+  });
+});
+
+describe("staleInviteDays", () => {
+  const now = new Date("2026-11-21T15:00:00Z").getTime();
+
+  it("flags an invitation left for more than a week", () => {
+    expect(staleInviteDays({ status: "invited", invited_at: "2026-11-12T15:00:00Z" }, now)).toBe(9);
+    expect(staleInviteDays({ status: "invited", invited_at: "2026-11-14T14:59:00Z" }, now)).toBe(7);
+  });
+
+  it("leaves a recent invitation, and any other stage, alone", () => {
+    expect(staleInviteDays({ status: "invited", invited_at: "2026-11-14T15:00:00Z" }, now)).toBeNull();
+    expect(staleInviteDays({ status: "invited", invited_at: "2026-11-20T15:00:00Z" }, now)).toBeNull();
+    expect(staleInviteDays({ status: "invited", invited_at: null }, now)).toBeNull();
+    expect(staleInviteDays({ status: "pilot", invited_at: "2026-10-01T15:00:00Z" }, now)).toBeNull();
+    expect(staleInviteDays({ status: "lost", invited_at: "2026-10-01T15:00:00Z" }, now)).toBeNull();
+  });
+});
+
+describe("leadMilestones", () => {
+  it("lists the dated steps with the delay since the one before", () => {
+    expect(
+      leadMilestones({
+        invited_at: "2026-11-01T10:00:00Z",
+        pilot_started_at: "2026-11-04T10:00:00Z",
+        won_at: "2026-12-02T10:00:00Z",
+      }),
+    ).toEqual([
+      { key: "invited", at: "2026-11-01T10:00:00Z", days: null },
+      { key: "pilot", at: "2026-11-04T10:00:00Z", days: 3 },
+      { key: "won", at: "2026-12-02T10:00:00Z", days: 28 },
+    ]);
+  });
+
+  it("skips what has not happened", () => {
+    expect(leadMilestones({ invited_at: "2026-11-01T10:00:00Z", pilot_started_at: null, won_at: null })).toEqual([
+      { key: "invited", at: "2026-11-01T10:00:00Z", days: null },
+    ]);
+    expect(leadMilestones({ invited_at: null, pilot_started_at: null, won_at: null })).toEqual([]);
   });
 });
 

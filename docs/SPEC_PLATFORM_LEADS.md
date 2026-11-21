@@ -359,9 +359,14 @@ Remplace la règle « un tenant supprimé laisse le lead tel quel » de la sous-
 - Un lead qui ne dépend plus du tenant (rouvert à une étape antérieure, déjà perdu, gagné) ne demande aucune raison et n'est pas modifié.
 - `GET /platform/tenants` : chaque ligne porte `lead_status`. Écran : la modale de suppression affiche un encart et un champ « Raison » quand le lead est `invited` ou `pilot` ; « Révoquer » ouvre alors la même modale au lieu d'agir tout de suite.
 
-**À venir**
+**PR 4 — écrans (fait, frontend seulement)**
 
-- PR 4 — écrans : encart Pilote, tuiles, badge Pilote sur les tenants.
+- **Fiche, encart « Pilote »** (lead en `pilot`) : début, fin prévue modifiable sur place, échéance (« Il reste N jours », « Se termine aujourd'hui », « Échu depuis N jours »). Passé la date de fin, l'encart passe en terra et rappelle l'appel de clôture.
+- **Fiche, bandeau du tenant** : les étapes datées (« Invité le … · Pilote démarré le … (N jours après) · Gagné le … ») et, pour un lead `invited` depuis plus de 7 jours, la ligne « Invitation sans suite depuis N jours ».
+- **Liste** : la tuile « Démo / pilote » devient **« Pilotes »** (en cours, et « dont N échus » en terra) ; une ligne dont le pilote est échu ou l'invitation sans suite le dit sous son statut.
+- **Tenants** : badge « Pilote » sur le tenant dont le lead est en `pilot`.
+- La barre de statut (étapes système grisées, « Gagné » depuis `pilot` seulement) est livrée depuis la PR 1.
+- Non repris de la v1.1 : le lien « Open workspace » dans l'encart — entrer dans un tenant passe toujours par la demande d'accès consentie.
 
 **Écarts conservés par rapport à la v1.1**
 
