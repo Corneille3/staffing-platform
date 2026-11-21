@@ -38,6 +38,8 @@ services:
         condition: service_healthy
     ports:
       - "8000:8000"
+      # Prometheus metrics — host-local only, as on the prod instance.
+      - "127.0.0.1:9091:9091"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./backend:/app

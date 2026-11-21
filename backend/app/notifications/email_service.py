@@ -7,6 +7,7 @@ from email.mime.text import MIMEText
 from email.utils import formataddr, formatdate, make_msgid, parseaddr
 
 from app.core.config import settings
+from app.core.metrics import record_notification
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,7 @@ class EmailNotificationService:
     def send(self, message: EmailMessage) -> dict[str, str]:
         if not settings.smtp_host:
             logger.info('SMTP not configured — skipping email to %s: %s', message.to_email, message.subject)
+            record_notification('email', 'skipped')
             return {'channel': 'email', 'delivery_status': 'skipped', 'recipient': message.to_email}
 
         from_header, envelope_from = _from_parts()
@@ -64,10 +66,12 @@ class EmailNotificationService:
                     self._auth_and_send(conn, mime, envelope_from, message.to_email)
 
             logger.info('Email sent to %s: %s', message.to_email, message.subject)
+            record_notification('email', 'sent')
             return {'channel': 'email', 'delivery_status': 'sent', 'recipient': message.to_email}
 
         except Exception:
             logger.exception('Failed to send email to %s: %s', message.to_email, message.subject)
+            record_notification('email', 'failed')
             return {'channel': 'email', 'delivery_status': 'failed', 'recipient': message.to_email}
 
     @staticmethod

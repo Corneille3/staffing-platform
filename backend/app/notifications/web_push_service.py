@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.metrics import record_notification
 from app.models.push_subscription import PushSubscription
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ class WebPushService:
         push service reports gone (404/410) are pruned. Never raises."""
         if not self.enabled:
             logger.info('Web Push not configured — skipping for user %s', user_id)
+            record_notification('push', 'skipped')
             return {'sent': 0, 'pruned': 0, 'failed': 0}
 
         subscriptions = db.scalars(
@@ -74,4 +76,9 @@ class WebPushService:
                 logger.exception('Web Push failed for subscription %s', subscription.id)
         if pruned:
             db.flush()
+        # Per device. A pruned endpoint (the browser unsubscribed) was not a
+        # delivery failure of ours: counted as skipped.
+        record_notification('push', 'sent', sent)
+        record_notification('push', 'failed', failed)
+        record_notification('push', 'skipped', pruned)
         return {'sent': sent, 'pruned': pruned, 'failed': failed}

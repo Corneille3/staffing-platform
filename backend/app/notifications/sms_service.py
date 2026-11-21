@@ -4,6 +4,7 @@ from base64 import b64encode
 import httpx
 
 from app.core.config import settings
+from app.core.metrics import record_notification
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,7 @@ class SmsNotificationService:
     def send(self, phone_number: str, body: str) -> dict[str, str]:
         if not settings.twilio_account_sid:
             logger.info('SMS not configured — skipping to %s', phone_number)
+            record_notification('sms', 'skipped')
             return {'channel': 'sms', 'delivery_status': 'skipped', 'phone_number': phone_number}
 
         url = _TWILIO_API.format(sid=settings.twilio_account_sid)
@@ -35,7 +37,9 @@ class SmsNotificationService:
             resp.raise_for_status()
             sid = resp.json().get('sid', '')
             logger.info('SMS sent to %s sid=%s', phone_number, sid)
+            record_notification('sms', 'sent')
             return {'channel': 'sms', 'delivery_status': 'sent', 'phone_number': phone_number, 'sid': sid}
         except Exception:
             logger.exception('Failed to send SMS to %s', phone_number)
+            record_notification('sms', 'failed')
             return {'channel': 'sms', 'delivery_status': 'failed', 'phone_number': phone_number}

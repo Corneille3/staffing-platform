@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.metrics import record_clock_event, record_time_to_fill
 from app.core.config import settings
 from app.core.geo import site_distance_m
 from app.core.timeutil import shift_end_utc
@@ -118,6 +119,7 @@ class AssignmentService:
             payload={'staffing_request_id': str(payload.staffing_request_id), 'worker_user_id': str(payload.worker_user_id)},
         )
         self.db.commit()
+        record_time_to_fill(staffing_request.created_at)
         worker = self.worker_repository.get(payload.worker_user_id)
         if worker:
             self.dispatcher.notify_assignment_confirmed(staffing_request, worker)
@@ -185,6 +187,7 @@ class AssignmentService:
         )
         self.db.commit()
         self.db.refresh(assignment)
+        record_clock_event('in', geo.get('geo_ok'))
         return assignment
 
     def check_out(
@@ -257,6 +260,7 @@ class AssignmentService:
         )
         self.db.commit()
         self.db.refresh(assignment)
+        record_clock_event('out', geo.get('geo_ok'))
         return assignment
 
     def correct_times(

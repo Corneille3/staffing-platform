@@ -16,6 +16,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select, update, or_
 from sqlalchemy.orm import Session
 
+from app.core.metrics import record_time_to_fill
 from app.auth.scope import AccessScope
 from app.core.timeutil import shift_end_utc, shift_start_utc
 from app.models.assignment import Assignment
@@ -525,6 +526,7 @@ class ReplacementService:
         # notify_request_filled for why this isn't an SMS.
         claimed_request = self.db.get(StaffingRequest, request_id)
         if claimed_request is not None:
+            record_time_to_fill(claimed_request.created_at, now)
             self.dispatcher.notify_request_filled(claimed_request, claimer_user_id)
 
         return assignment

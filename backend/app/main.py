@@ -1,3 +1,4 @@
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -7,6 +8,7 @@ from alembic.script import ScriptDirectory
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy import text
 
 from app.api.v1.router import api_router
@@ -15,10 +17,33 @@ from app.api.v1.webhooks import router as webhooks_router
 from app.auth.permissions import require_authenticated
 from app.core.config import settings
 from app.core.logging import configure_logging
+from app.core.metrics import start_metrics_server
+from app.core.request_id import RequestIdMiddleware
 from app.db.session import engine
 from app.scheduler import scheduler
 
 configure_logging()
+logger = logging.getLogger(__name__)
+
+
+def _init_sentry() -> None:
+    """Error tracking — only when a DSN is configured (prod). Local, dev and
+    test runs send nothing anywhere. Errors only: no performance tracing."""
+    if not settings.sentry_dsn:
+        logger.info('Sentry disabled (no SENTRY_DSN)')
+        return
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.app_env,
+        release=settings.git_sha,
+        traces_sample_rate=0,
+    )
+    logger.info('Sentry enabled (environment=%s, release=%s)', settings.app_env, settings.git_sha)
+
+
+_init_sentry()
 
 # main.py lives at <backend>/app/main.py → the alembic.ini is one dir up.
 _ALEMBIC_INI = os.path.join(os.path.dirname(os.path.dirname(__file__)), "alembic.ini")
@@ -41,6 +66,10 @@ async def lifespan(_: FastAPI):
     Tests construct TestClient without entering it as a context manager, so
     lifespan never runs there; the flag gate is belt-and-suspenders (conftest
     also sets scheduler_enabled=False)."""
+    if settings.app_env != 'test':
+        # Private port, own HTTP server: /metrics is never a route of this
+        # app, whose port is public through Cloudflare.
+        start_metrics_server(settings.metrics_port)
     if settings.scheduler_enabled and settings.app_env != 'test':
         scheduler.start()
     yield
@@ -56,6 +85,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Outermost: every log line of a request, CORS preflights included, carries
+# its id, and the response returns it.
+app.add_middleware(RequestIdMiddleware)
+
+# HTTP metrics (latency, status codes per route) into the default registry.
+# `.instrument()` only — never `.expose()`: see start_metrics_server.
+Instrumentator().instrument(app)
 
 app.include_router(
     api_router,
