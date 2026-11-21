@@ -310,6 +310,20 @@ describe("leadTenantBanner", () => {
     expect(leadTenantBanner({ status: "pilot", won_at: null }, "active")).toBe("pilot");
   });
 
+  it("says when the lead was moved back behind its workspace", () => {
+    // The banner used to read « Pilot under way » on a lead set back to Contacted.
+    expect(leadTenantBanner({ status: "contacted", won_at: null }, "active")).toBe("behind_pilot");
+    expect(leadTenantBanner({ status: "new", won_at: null }, "active")).toBe("behind_pilot");
+    expect(leadTenantBanner({ status: "demo_booked", won_at: null }, "pending")).toBe("behind_invited");
+    expect(leadTenantBanner({ status: "contacted", won_at: null }, "onboarding")).toBe("behind_invited");
+  });
+
+  it("says when the workspace is suspended", () => {
+    expect(leadTenantBanner({ status: "pilot", won_at: null }, "suspended")).toBe("suspended");
+    expect(leadTenantBanner({ status: "contacted", won_at: null }, "suspended")).toBe("suspended");
+    expect(leadTenantBanner({ status: "lost", won_at: null }, "suspended")).toBe("lost_live");
+  });
+
   it("says so when the tenant is gone", () => {
     expect(leadTenantBanner(open, "removed")).toBe("removed");
     expect(leadTenantBanner({ status: "lost", won_at: null }, "removed")).toBe("removed");

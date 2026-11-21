@@ -237,12 +237,17 @@ function TenantBanner({ lead, tenant, isOwner }: { lead: Lead; tenant: LeadTenan
   const t = useTranslations("platform.leads");
   const locale = useLocale();
   const kind = leadTenantBanner(lead, tenant?.status ?? null);
-  const tone = BANNER_TONE[kind === "removed" ? "muted" : kind === "lost_live" ? "sand" : "moss"];
+  // Moss only when lead and workspace agree; sand when something needs a look.
+  const attention = kind === "lost_live" || kind === "suspended" || kind === "behind_pilot" || kind === "behind_invited";
+  const tone = BANNER_TONE[kind === "removed" ? "muted" : attention ? "sand" : "moss"];
   const name = tenant?.name ?? lead.org_name;
   const title = {
     won: "detail.convertedTitle",
     removed: "detail.removedTitle",
     lost_live: "detail.lostLiveTitle",
+    suspended: "detail.suspendedTitle",
+    behind_pilot: "detail.behindTitle",
+    behind_invited: "detail.behindTitle",
     pilot: "detail.pilotTitle",
     invited: "detail.invitedTitle",
   }[kind];
@@ -252,12 +257,21 @@ function TenantBanner({ lead, tenant, isOwner }: { lead: Lead; tenant: LeadTenan
           date: formatDay(shiftDateKey(lead.won_at), locale),
           days: daysBetween(lead.created_at, lead.won_at),
         })
-      : t({ won: "detail.pilotBody", removed: "detail.removedBody", lost_live: "detail.lostLiveBody", pilot: "detail.pilotBody", invited: "detail.invitedBody" }[kind], { name });
+      : t({
+          won: "detail.pilotBody",
+          removed: "detail.removedBody",
+          lost_live: "detail.lostLiveBody",
+          suspended: "detail.suspendedBody",
+          behind_pilot: "detail.behindPilotBody",
+          behind_invited: "detail.behindInvitedBody",
+          pilot: "detail.pilotBody",
+          invited: "detail.invitedBody",
+        }[kind], { name });
   const milestones = leadMilestones(lead);
   // Still `invited` a week later: the admin never finished the setup wizard.
   const staleDays = kind === "invited" ? staleInviteDays(lead, Date.now()) : null;
   // The tenant's own state adds nothing once the title already says it.
-  const showState = tenant && (kind === "invited" || kind === "pilot" || kind === "lost_live");
+  const showState = tenant && kind !== "won" && kind !== "removed" && kind !== "suspended";
 
   return (
     <div style={{ ...leadCard, padding: "16px 20px", marginBottom: 18, background: tone.bg, borderColor: "transparent", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
