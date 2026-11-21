@@ -8,7 +8,7 @@ they land scoped to their own tenant.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
@@ -18,6 +18,7 @@ from app.schemas.tenant import (
     TenantAdminRead,
     TenantNetworkCreate,
     TenantNetworkRead,
+    TenantRemoval,
 )
 from app.services.tenant_service import TenantService
 
@@ -75,9 +76,12 @@ def remove_network(
     # Clerk deletion) — gate it like suspend/revoke: owner/operator with 2FA,
     # never `support`. Was the least-guarded route before this.
     scope: AccessScope = Depends(require_platform_operator_mfa),
+    # Only needed (422 without it) when the tenant's sales lead is still
+    # invited or in pilot — that lead is then closed as lost.
+    payload: TenantRemoval | None = Body(default=None),
     db: Session = Depends(get_db_session),
 ) -> TenantNetworkRead:
-    tenant = TenantService(db).remove_tenant(tenant_id, scope)
+    tenant = TenantService(db).remove_tenant(tenant_id, scope, payload.reason if payload else None)
     return TenantNetworkRead(
         id=tenant.id,
         name=tenant.name,

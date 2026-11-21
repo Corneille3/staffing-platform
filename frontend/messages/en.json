@@ -1628,7 +1628,18 @@
         "note": "Audit history is preserved. This cannot be undone from the console.",
         "failed": "Removal failed",
         "removing": "Removing…",
-        "confirm": "Remove network"
+        "confirm": "Remove network",
+        "leadPilot": "This network is the pilot of a lead in the pipeline. Removing it ends the pilot: the lead will be marked Lost, with the reason below.",
+        "leadInvited": "This network comes from an invitation sent to a lead in the pipeline. The lead will be marked Lost, with the reason below.",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "e.g. The client chose an agency",
+        "needReason": "Give the reason: it is recorded on the lead."
+      },
+      "revokeModal": {
+        "title": "Revoke the invitation of <em>{name}</em>?",
+        "body": "The invitation is cancelled and the network <b>removed from the console</b>. The invited admin can no longer create their account with that link.",
+        "removing": "Revoking…",
+        "confirm": "Revoke the invitation"
       },
       "accessModal": {
         "needReason": "Give the tenant admin a real reason (min 5 characters).",

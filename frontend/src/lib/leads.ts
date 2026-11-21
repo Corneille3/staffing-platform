@@ -89,6 +89,12 @@ export function leadStageOfTenant(tenantStatus: string | null | undefined): Lead
   return null;
 }
 
+/** A workspace whose lead is still invited or in pilot: removing it (or
+ * revoking its invite) ends that lead, so the API wants a reason. */
+export function tenantRemovalNeedsReason(leadStatus: string | null | undefined): boolean {
+  return leadStatus === "invited" || leadStatus === "pilot";
+}
+
 /** Mirrors the backend state machine: which stage can be clicked from here.
  * A won lead is closed; a lost lead reopens to `contacted` only; `new`,
  * `contacted` and `demo_booked` move freely both ways. `invited` and `pilot`

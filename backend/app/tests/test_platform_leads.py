@@ -851,6 +851,108 @@ def test_an_invitation_left_for_a_week_counts_as_late(platform_admin_client, db_
     assert (stats['stale_invites'], stats['overdue_actions']) == (0, 0)
 
 
+# ── removing the workspace of a lead (spec v1.1 §4) ──────────────────────────
+
+def _tenant_of(db_session, lead_id):
+    from app.models.tenant import Tenant
+    row = db_session.get(PlatformLead, lead_id)
+    db_session.refresh(row)
+    return row, db_session.get(Tenant, row.tenant_id)
+
+
+def test_removing_the_workspace_of_a_pilot_needs_a_reason_and_loses_the_lead(platform_admin_client, db_session, seed):
+    from app.models.enums import TenantStatus
+    from app.models.platform_audit_log import PlatformAuditLog
+
+    url, row = _pilot_lead(platform_admin_client, db_session)
+    row, tenant = _tenant_of(db_session, row.id)
+    events = len(_events(db_session, row.id))
+
+    # No reason, or a blank one: refused before anything is touched.
+    for body in (None, {}, {'reason': '   '}):
+        res = platform_admin_client.request('DELETE', f'/api/v1/networks/{tenant.id}', json=body)
+        assert res.status_code == 422, res.text
+        detail = res.json()['detail']
+        assert detail['code'] == 'tenant.removal_needs_reason'
+        assert detail['params'] == {'lead': 'Résidence Test', 'lead_status': 'pilot'}
+    db_session.refresh(tenant)
+    db_session.refresh(row)
+    assert tenant.status == TenantStatus.ACTIVE and row.status == LeadStatus.PILOT
+    assert len(_events(db_session, row.id)) == events
+
+    done = platform_admin_client.request(
+        'DELETE', f'/api/v1/networks/{tenant.id}', json={'reason': '  Pilote abandonné  '},
+    )
+    assert done.status_code == 200, done.text
+    db_session.refresh(tenant)
+    db_session.refresh(row)
+    assert tenant.status == TenantStatus.REMOVED
+    assert row.status == LeadStatus.LOST and row.lost_reason == 'Pilote abandonné'
+    assert row.pilot_started_at is not None and row.won_at is None  # the history stays
+    last = _events(db_session, row.id)[-1]
+    assert (last.type, last.from_status, last.to_status, last.body, last.actor_id) == (
+        'status_changed', LeadStatus.PILOT, LeadStatus.LOST, 'Pilote abandonné', seed.apf.id,
+    )
+    trail = db_session.scalar(select(PlatformAuditLog).where(
+        PlatformAuditLog.action == 'tenant.removed', PlatformAuditLog.target_id == str(tenant.id),
+    ))
+    assert trail.payload['reason'] == 'Pilote abandonné' and trail.payload['lead_status_before'] == 'pilot'
+
+    # The lead is lost and its workspace gone: nothing to put it back on.
+    assert platform_admin_client.patch(url, json={'status': 'contacted'}).status_code == 200
+    assert platform_admin_client.patch(url, json={'status': 'pilot'}).status_code == 422
+
+
+def test_revoking_the_invite_of_a_lead_needs_a_reason_too(platform_admin_client, db_session, seed):
+    from app.models.enums import TenantStatus
+
+    lead = _create(platform_admin_client, status='demo_booked')
+    assert _invite(platform_admin_client, lead['id']).status_code == 201
+    row, tenant = _tenant_of(db_session, lead['id'])
+
+    refused = platform_admin_client.post(f'/api/v1/platform/tenants/{tenant.id}/revoke')
+    assert refused.status_code == 422
+    assert refused.json()['detail']['code'] == 'tenant.removal_needs_reason'
+    assert refused.json()['detail']['params']['lead_status'] == 'invited'
+
+    done = platform_admin_client.post(
+        f'/api/v1/platform/tenants/{tenant.id}/revoke', json={'reason': 'Mauvais courriel'},
+    )
+    assert done.status_code == 200, done.text
+    db_session.refresh(tenant)
+    db_session.refresh(row)
+    assert tenant.status == TenantStatus.REMOVED
+    assert row.status == LeadStatus.LOST and row.lost_reason == 'Mauvais courriel'
+
+
+def test_suspending_a_workspace_leaves_its_lead_alone(platform_admin_client, db_session, seed):
+    _url, row = _pilot_lead(platform_admin_client, db_session)
+    row, tenant = _tenant_of(db_session, row.id)
+    assert platform_admin_client.post(f'/api/v1/platform/tenants/{tenant.id}/suspend').status_code == 200
+    db_session.refresh(row)
+    assert row.status == LeadStatus.PILOT and row.lost_reason is None
+
+
+def test_removal_asks_nothing_when_the_lead_no_longer_rides_on_the_workspace(platform_admin_client, db_session, seed):
+    """A lead already closed (or won) keeps its own outcome: no reason is
+    required and the removal does not rewrite it."""
+    url, row = _pilot_lead(platform_admin_client, db_session)
+    row, tenant = _tenant_of(db_session, row.id)
+    assert platform_admin_client.patch(url, json={'status': 'lost', 'lost_reason': 'Pilot dropped'}).status_code == 200
+
+    assert platform_admin_client.delete(f'/api/v1/networks/{tenant.id}').status_code == 200
+    db_session.refresh(row)
+    assert row.status == LeadStatus.LOST and row.lost_reason == 'Pilot dropped'
+
+    # The tenants table carries each lead's stage (the screen needs it to ask for the reason).
+    other = _create(platform_admin_client, org_name='Autre Résidence', status='demo_booked')
+    assert _invite(platform_admin_client, other['id'], slug='autre-residence',
+                   admin_email='admin@autre-residence.example').status_code == 201
+    rows = platform_admin_client.get('/api/v1/platform/tenants').json()['tenants']
+    assert next(r for r in rows if r['slug'] == 'autre-residence')['lead_status'] == 'invited'
+    assert next(r for r in rows if r['slug'] == seed.tenant.slug)['lead_status'] is None
+
+
 # ── errors carry a code the bilingual screens translate ──────────────────────
 
 def test_refusals_carry_a_code_and_their_values(platform_admin_client, seed):

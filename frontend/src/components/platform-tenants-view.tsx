@@ -12,6 +12,7 @@ import {
   removeNetwork,
   requestTenantAccess,
 } from "../lib/browser-api";
+import { tenantRemovalNeedsReason } from "../lib/leads";
 import type { PlatformTenantRow, PlatformTenantsResponse, TenantProfile } from "../lib/types";
 
 // Colours only — the chip's wording comes from `platform.tenants.status`.
@@ -176,6 +177,7 @@ function TenantRow({
   const [accessOpen, setAccessOpen] = useState(false);
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
+  const [revokeOpen, setRevokeOpen] = useState(false);
   const s = STATUS_META[t.status] ?? STATUS_META.active;
   // Own workspace (not a §2.2 visit) can never be removed — backend refuses too.
   const canRemove = !readOnlyOperator && !(workspace && !workspace.via_grant);
@@ -235,7 +237,16 @@ function TenantRow({
         {t.status === "pending" && !readOnlyOperator && (
           <>
             <button type="button" disabled={busy} onClick={() => run("resend")} style={rowBtn}>{tt("resend")}</button>
-            <button type="button" disabled={busy} onClick={() => run("revoke")} style={rowBtn}>{tt("revoke")}</button>
+            <button
+              type="button"
+              disabled={busy}
+              // An invite that came from a sales lead closes that lead: the
+              // modal asks for the reason first.
+              onClick={() => (tenantRemovalNeedsReason(t.lead_status) ? setRevokeOpen(true) : run("revoke"))}
+              style={rowBtn}
+            >
+              {tt("revoke")}
+            </button>
           </>
         )}
         {t.status === "active" && (
@@ -339,6 +350,17 @@ function TenantRow({
           }}
         />
       )}
+      {revokeOpen && (
+        <RemoveTenantModal
+          tenant={t}
+          revoke
+          onClose={() => setRevokeOpen(false)}
+          onDone={() => {
+            setRevokeOpen(false);
+            onAction();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -391,10 +413,14 @@ function SuspendTenantModal({
 
 function RemoveTenantModal({
   tenant,
+  revoke = false,
   onClose,
   onDone,
 }: {
   tenant: PlatformTenantRow;
+  // Revoking a pending invite instead of removing a live network — same
+  // modal, shown only when the invite came from a sales lead.
+  revoke?: boolean;
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -402,12 +428,23 @@ function RemoveTenantModal({
   const tc = useTranslations("common");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  // The lead behind this workspace is still invited or in pilot: it will be
+  // closed as lost, with the reason typed here.
+  const needsReason = tenantRemovalNeedsReason(tenant.lead_status);
+  const copy = revoke ? "revokeModal" : "removeModal";
 
   async function confirm() {
+    const why = reason.trim();
+    if (needsReason && !why) {
+      setError(tt("removeModal.needReason"));
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      await removeNetwork(tenant.id);
+      if (revoke) await platformTenantAction(tenant.id, "revoke", why || undefined);
+      else await removeNetwork(tenant.id, why || undefined);
       onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : tt("removeModal.failed"));
@@ -422,7 +459,7 @@ function RemoveTenantModal({
           <div>
             <div className="stf-h-eyebrow" style={{ ...eyebrow, color: "var(--rose)" }}>{tt("removeModal.eyebrow")}</div>
             <h2 style={{ fontFamily: "var(--serif)", fontSize: 26, lineHeight: 1.05, margin: "4px 0 0" }}>
-              {tt.rich("removeModal.title", { name: tenant.name, em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em> })}
+              {tt.rich(`${copy}.title`, { name: tenant.name, em: (chunks) => <em style={{ fontStyle: "italic" }}>{chunks}</em> })}
             </h2>
           </div>
           <button type="button" onClick={onClose} style={{ ...rowBtn, width: 32, height: 32, borderRadius: 99, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
@@ -430,11 +467,31 @@ function RemoveTenantModal({
           </button>
         </div>
         <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
-          {tt.rich("removeModal.body", { b: (chunks) => <strong>{chunks}</strong> })}
+          {tt.rich(`${copy}.body`, { b: (chunks) => <strong>{chunks}</strong> })}
         </p>
         <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
           {tt("removeModal.note")}
         </p>
+        {needsReason ? (
+          <div style={{ margin: "0 0 18px", padding: "12px 14px", borderRadius: 10, background: "var(--sand-soft)", border: "0.5px solid var(--line)" }}>
+            <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.5 }}>
+              {tt(tenant.lead_status === "pilot" ? "removeModal.leadPilot" : "removeModal.leadInvited")}
+            </p>
+            <label style={{ display: "block", fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--ink-3)", fontWeight: 500, marginBottom: 6 }} htmlFor="tenant-removal-reason">
+              {tt("removeModal.reasonLabel")}
+            </label>
+            <textarea
+              id="tenant-removal-reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              maxLength={1000}
+              rows={2}
+              placeholder={tt("removeModal.reasonPlaceholder")}
+              disabled={busy}
+              style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: 8, border: "0.5px solid var(--line)", fontFamily: "var(--ui)", fontSize: 13, resize: "vertical", background: "#fff" }}
+            />
+          </div>
+        ) : null}
         {error ? <p style={{ margin: "0 0 12px", color: "var(--rose)", fontSize: 12 }}>{error}</p> : null}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button type="button" onClick={onClose} disabled={busy} style={rowBtn}>{tc("cancel")}</button>
@@ -444,7 +501,7 @@ function RemoveTenantModal({
             disabled={busy}
             style={{ ...primaryBtn, background: "var(--rose)", opacity: busy ? 0.6 : 1 }}
           >
-            <Trash2 size={14} /> {busy ? tt("removeModal.removing") : tt("removeModal.confirm")}
+            <Trash2 size={14} /> {busy ? tt(`${copy}.removing`) : tt(`${copy}.confirm`)}
           </button>
         </div>
       </div>

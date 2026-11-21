@@ -296,7 +296,7 @@ Relecture du spec d'origine contre le code livré ; quatre écarts, dont trois f
 - `POST /api/v1/platform/leads/{id}/invite` — **owner seulement**. Le corps apporte ce que le lead n'a pas : `slug`, prénom, nom et courriel de l'admin ; `name`, `admin_phone` et la langue retombent sur les valeurs du lead. Retourne `{lead, tenant}`.
 - Tout ou rien : tenant, premier admin, `platform_leads.tenant_id`, statut `invited` et événement `invited` sont une seule transaction (`TenantService.stage_network`, sans commit ni courriel) ; le courriel d'invitation part après le commit.
 - 409 si le lead est déjà lié à un tenant ou s'il est `won` / `lost` ; les conflits de slug ou de courriel sont ceux de l'invitation classique.
-- **Aucun retour arrière automatique** : une invitation révoquée ou un tenant supprimé laisse le lead tel quel.
+- ~~**Aucun retour arrière automatique** : une invitation révoquée ou un tenant supprimé laisse le lead tel quel.~~ Remplacé le 2026-11-21 : voir « Alignement sur la v1.1 », PR 3.
 
 ### Pilote et « Gagné » (2026-11-15, remplace la règle « won automatique »)
 
@@ -348,9 +348,19 @@ La v1.1 du spec (2026-11-15) a été relue contre le code : six écarts relevés
 - `/stats` : **taux de conversion = gagnés ÷ leads ayant atteint le pilote** (`null` tant qu'aucun pilote n'a démarré) ; `pilots_active`, `pilots_overdue` (`pilot_ends_at < aujourd'hui` et statut `pilot`), `avg_pilot_days` (moyenne de `won_at − pilot_started_at`), `stale_invites` (lead `invited` depuis plus de **7 jours**, assistant non terminé). `overdue_actions` compte aussi ces invitations sans suite, sans compter deux fois un lead en retard sur les deux plans.
 - Non fait : le courriel quotidien des suivis ne liste pas encore les invitations sans suite ni les pilotes échus.
 
+**PR 3 — retirer un tenant clôt son lead (fait)**
+
+Remplace la règle « un tenant supprimé laisse le lead tel quel » de la sous-section « Conversion ».
+
+- **Supprimer** un tenant (`DELETE /api/v1/networks/{id}`) ou **révoquer** son invitation (`POST /api/v1/platform/tenants/{id}/revoke`) dont le lead est encore `invited` ou `pilot` exige une raison dans le corps (`{"reason": "…"}`) : sans elle, 422 `tenant.removal_needs_reason`, vérifié avant toute écriture.
+- Avec la raison, dans la même transaction : le lead passe à `lost`, la raison est recopiée dans `lost_reason` et dans l'événement `status_changed` du fil ; la ligne `tenant.removed` du journal d'audit garde la raison et le statut du lead avant.
+- Les dates du pilote restent sur le lead.
+- **Suspendre** ne touche pas au lead.
+- Un lead qui ne dépend plus du tenant (rouvert à une étape antérieure, déjà perdu, gagné) ne demande aucune raison et n'est pas modifié.
+- `GET /platform/tenants` : chaque ligne porte `lead_status`. Écran : la modale de suppression affiche un encart et un champ « Raison » quand le lead est `invited` ou `pilot` ; « Révoquer » ouvre alors la même modale au lieu d'agir tout de suite.
+
 **À venir**
 
-- PR 3 — retirer un tenant lié à un lead `invited` ou `pilot` exige une raison et clôt le lead en `lost` (remplace « un tenant supprimé laisse le lead tel quel »).
 - PR 4 — écrans : encart Pilote, tuiles, badge Pilote sur les tenants.
 
 **Écarts conservés par rapport à la v1.1**

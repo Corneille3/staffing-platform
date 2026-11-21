@@ -9,6 +9,7 @@ import {
   isLeadOverdue,
   leadStageOfTenant,
   leadTenantBanner,
+  tenantRemovalNeedsReason,
   leadsQuery,
   leadsToCsv,
   parseLeadFilters,
@@ -85,6 +86,16 @@ describe("leadStageOfTenant", () => {
     expect(leadStageOfTenant("suspended")).toBeNull();
     expect(leadStageOfTenant("removed")).toBeNull();
     expect(leadStageOfTenant(null)).toBeNull();
+  });
+});
+
+describe("tenantRemovalNeedsReason", () => {
+  it("asks for a reason while the lead rides on the workspace", () => {
+    expect(tenantRemovalNeedsReason("invited")).toBe(true);
+    expect(tenantRemovalNeedsReason("pilot")).toBe(true);
+    for (const status of ["new", "contacted", "demo_booked", "won", "lost", null, undefined]) {
+      expect(tenantRemovalNeedsReason(status)).toBe(false);
+    }
   });
 });
 
